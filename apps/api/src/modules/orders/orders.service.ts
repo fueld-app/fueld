@@ -48,6 +48,7 @@ interface ListOrdersQuery {
   vesselId?: string;       // filter by vessel
   placeId?: string;        // filter by port/place
   invoicingCompanyId?: string; // filter by invoicing company
+  productType?: string;      // filter by product type (matches order_items.product_type)
   dateFrom?: string;       // filter ETA >= date (ISO string)
   dateTo?: string;         // filter ETA <= date (ISO string)
   createdFrom?: string;    // filter createdAt >= date
@@ -876,6 +877,12 @@ export async function listOrders(query?: ListOrdersQuery) {
 
   if (query?.invoicingCompanyId) {
     conditions.push(eq(orders.invoicingCompanyId, query.invoicingCompanyId));
+  }
+
+  if (query?.productType) {
+    conditions.push(
+      sql`EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.product_type = ${query.productType})`,
+    );
   }
 
   if (query?.dateFrom) {

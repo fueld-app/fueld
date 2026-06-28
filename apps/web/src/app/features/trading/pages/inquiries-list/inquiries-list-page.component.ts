@@ -63,6 +63,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
           [filters]="filterState()"
           [fields]="filterFields()"
           [countFn]="filterCountFn"
+          [applying]="applyingFilters()"
           (filtersChange)="onFiltersChange($event)"
         />
         <div class="ml-auto">
@@ -494,10 +495,14 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   // ─── Filter configuration (config-driven) ──────────────────────────
 
   readonly filterState = signal<FilterState>({ ...EMPTY_FILTERS });
+  readonly applyingFilters = signal(false);
   readonly teamUsers = signal<TeamUserOption[]>([]);
   readonly responsibleFilterOptions = computed<DropdownOption[]>(() =>
     this.teamUsers().map((user) => ({ value: user.id, label: user.name })),
   );
+
+  /** Product type options loaded from tenant settings. */
+  readonly productOptions = signal<DropdownOption[]>([]);
 
   /** Filter field definitions — passed to the overlay component. */
   readonly filterFields = computed<FilterFieldDef[]>(() => [
@@ -507,6 +512,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     { key: 'salesRepId', label: 'Responsible', type: 'dropdown', options: this.responsibleFilterOptions() },
     { key: 'brokerId', label: 'Broker', type: 'dropdown', searchFn: (term) => this.searchCompanies('BROKER', term) },
     { key: 'invoicingCompanyId', label: 'Invoicing Company', type: 'dropdown', searchFn: (term) => this.searchInvoicingCompanies(term) },
+    { key: 'productType', label: 'Product', type: 'dropdown', options: this.productOptions() },
     { key: 'eta', label: 'ETA', type: 'date-range' },
     { key: 'created', label: 'Created', type: 'date-range' },
   ]);
@@ -520,6 +526,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     if (f['salesRepId']) params.set('salesRepId', f['salesRepId']);
     if (f['brokerId']) params.set('brokerId', f['brokerId']);
     if (f['invoicingCompanyId']) params.set('invoicingCompanyId', f['invoicingCompanyId']);
+    if (f['productType']) params.set('productType', f['productType']);
     if (f['etaFrom']) params.set('dateFrom', f['etaFrom']);
     if (f['etaTo']) params.set('dateTo', f['etaTo']);
     if (f['createdFrom']) params.set('createdFrom', f['createdFrom']);
@@ -547,6 +554,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     if (f['salesRepId']) pills.push({ key: 'salesRepId', label: 'Responsible', value: f.labels['salesRepId'] ?? f['salesRepId'].slice(0, 8) });
     if (f['brokerId']) pills.push({ key: 'brokerId', label: 'Broker', value: f.labels['brokerId'] ?? f['brokerId'].slice(0, 8) });
     if (f['invoicingCompanyId']) pills.push({ key: 'invoicingCompanyId', label: 'Invoicing', value: f.labels['invoicingCompanyId'] ?? f['invoicingCompanyId'].slice(0, 8) });
+    if (f['productType']) pills.push({ key: 'productType', label: 'Product', value: f.labels['productType'] ?? f['productType'] });
     if (f['etaFrom']) pills.push({ key: 'etaFrom', label: 'ETA from', value: f['etaFrom'] });
     if (f['etaTo']) pills.push({ key: 'etaTo', label: 'ETA to', value: f['etaTo'] });
     if (f['createdFrom']) pills.push({ key: 'createdFrom', label: 'Created from', value: f['createdFrom'] });
@@ -591,6 +599,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     this.loadSavedFilters();
     this.loadInquiries();
     void this.loadResponsibleUsers();
+    void this.loadProducts();
     void this.userPrefs.load();
     void this.dateFormatSvc.load();
     if (!this.isOrders()) {
@@ -631,6 +640,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   async loadInquiries(): Promise<void> {
     this.loading.set(true);
+    this.applyingFilters.set(true);
     try {
       const params = new URLSearchParams();
       this.applyStatusFilter(params);
@@ -654,6 +664,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       this.showToast('error', 'Failed to load inquiries.');
     } finally {
       this.loading.set(false);
+      this.applyingFilters.set(false);
     }
   }
 
@@ -667,6 +678,19 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       }
     } catch {
       this.teamUsers.set([]);
+    }
+  }
+
+  private async loadProducts(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ products: string[] }>>(`${API}/admin/settings/my-products`),
+      );
+      if (res.success && res.data?.products) {
+        this.productOptions.set(res.data.products.map((p) => ({ value: p, label: p })));
+      }
+    } catch {
+      // ignore — product filter just won't have options
     }
   }
 
@@ -705,20 +729,26 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     } catch { return []; }
   }
 
+  private ownCompaniesCache: DropdownOption[] | null = null;
+
   private async searchInvoicingCompanies(term: string): Promise<DropdownOption[]> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<Array<{ id: string; name: string }>>>(
-          `${API}/admin/settings/own-companies`,
-        ),
-      );
-      if (res.success && Array.isArray(res.data)) {
-        return res.data
-          .filter((c) => !term || c.name.toLowerCase().includes(term.toLowerCase()))
-          .map((c) => ({ value: c.id, label: c.name }));
-      }
-      return [];
-    } catch { return []; }
+    if (!this.ownCompaniesCache) {
+      try {
+        const res = await firstValueFrom(
+          this.http.get<ApiResponse<Array<{ id: string; name: string }>>>(
+            `${API}/admin/settings/own-companies`,
+          ),
+        );
+        if (res.success && Array.isArray(res.data)) {
+          this.ownCompaniesCache = res.data.map((c) => ({ value: c.id, label: c.name }));
+        } else {
+          this.ownCompaniesCache = [];
+        }
+      } catch { this.ownCompaniesCache = []; }
+    }
+    const cache = this.ownCompaniesCache ?? [];
+    if (!term) return cache;
+    return cache.filter((c) => c.label.toLowerCase().includes(term.toLowerCase()));
   }
 
   // ─── Actions ──────────────────────────────────────────────────────

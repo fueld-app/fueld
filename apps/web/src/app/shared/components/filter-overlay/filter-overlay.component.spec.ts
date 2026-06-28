@@ -116,4 +116,20 @@ describe('FilterOverlayComponent', () => {
 
     expect(mockCountFn).toHaveBeenCalled();
   });
+
+  it('should reset async search state and count on close', () => {
+    const { component } = setup();
+    component.toggle();
+    // Simulate some async state
+    component.asyncOptions.set({ clientId: [{ value: '1', label: 'A' }] });
+    component.asyncLoading.set({ clientId: true });
+    component.resultCount.set(42);
+
+    component.close();
+
+    expect(component.isOpen()).toBe(false);
+    expect(component.asyncOptions()).toEqual({});
+    expect(component.asyncLoading()).toEqual({});
+    expect(component.resultCount()).toBeNull();
+  });
 });

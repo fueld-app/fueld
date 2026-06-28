@@ -101,18 +101,44 @@ export interface FilterFieldDef {
               <div>
                 <div class="mb-1 text-xs font-medium text-gray-500 dark:text-muted">{{ field.label }} range</div>
                 <div class="grid grid-cols-2 gap-3">
-                  <input
-                    type="date"
-                    [ngModel]="draft()[field.key + 'From'] || ''"
-                    (ngModelChange)="onFieldChange(field.key + 'From', $event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
-                  />
-                  <input
-                    type="date"
-                    [ngModel]="draft()[field.key + 'To'] || ''"
-                    (ngModelChange)="onFieldChange(field.key + 'To', $event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
-                  />
+                  <div class="relative">
+                    <input
+                      type="date"
+                      [ngModel]="draft()[field.key + 'From'] || ''"
+                      (ngModelChange)="onFieldChange(field.key + 'From', $event)"
+                      class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
+                    />
+                    @if (draft()[field.key + 'From']) {
+                      <button
+                        type="button"
+                        (click)="onFieldChange(field.key + 'From', '')"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-ink-dim"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                        </svg>
+                      </button>
+                    }
+                  </div>
+                  <div class="relative">
+                    <input
+                      type="date"
+                      [ngModel]="draft()[field.key + 'To'] || ''"
+                      (ngModelChange)="onFieldChange(field.key + 'To', $event)"
+                      class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
+                    />
+                    @if (draft()[field.key + 'To']) {
+                      <button
+                        type="button"
+                        (click)="onFieldChange(field.key + 'To', '')"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-ink-dim"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                        </svg>
+                      </button>
+                    }
+                  </div>
                 </div>
               </div>
             }
@@ -145,9 +171,18 @@ export interface FilterFieldDef {
               <button
                 type="button"
                 (click)="apply()"
-                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+                [disabled]="applying()"
+                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
               >
-                Apply
+                @if (applying()) {
+                  <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                  Applying…
+                } @else {
+                  Apply
+                }
               </button>
             </div>
           </div>
@@ -163,6 +198,8 @@ export class FilterOverlayComponent {
   readonly fields = input<FilterFieldDef[]>([]);
   /** Optional count function — parent provides. Returns total matching results. */
   readonly countFn = input<((filters: FilterState) => Promise<number>) | null>(null);
+  /** Loading state from parent — disables Apply button while fetching results. */
+  readonly applying = input(false);
   /** Emitted when user clicks Apply */
   readonly filtersChange = output<FilterState>();
 
@@ -235,6 +272,19 @@ export class FilterOverlayComponent {
 
   close(): void {
     this.isOpen.set(false);
+    // Reset async search state
+    this.asyncOptions.set({});
+    this.asyncLoading.set({});
+    // Cancel any pending count request
+    if (this.countAbort) {
+      this.countAbort.abort();
+      this.countAbort = null;
+    }
+    if (this.countTimeout) {
+      clearTimeout(this.countTimeout);
+      this.countTimeout = null;
+    }
+    this.resultCount.set(null);
   }
 
   apply(): void {
