@@ -499,28 +499,24 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly responsibleFilterOptions = computed<DropdownOption[]>(() =>
     this.teamUsers().map((user) => ({ value: user.id, label: user.name })),
   );
+  readonly applyingFilters = signal(false);
 
-  // Filter pills
+  // Filter pills — uses labels from FilterState (persisted to localStorage)
   readonly activeFilterPills = computed(() => {
     const f = this.filterState();
     const pills: Array<{ key: keyof FilterState; label: string; value: string }> = [];
-    if (f.clientId) { const opt = this.clientFilterLabel(); pills.push({ key: 'clientId', label: 'Client', value: opt || f.clientId.slice(0, 8) }); }
-    if (f.vesselId) pills.push({ key: 'vesselId', label: 'Vessel', value: this.vesselFilterLabel() || f.vesselId.slice(0, 8) });
-    if (f.placeId) pills.push({ key: 'placeId', label: 'Port', value: this.placeFilterLabel() || f.placeId.slice(0, 8) });
-    if (f.salesRepId) { const u = this.teamUsers().find(u => u.id === f.salesRepId); pills.push({ key: 'salesRepId', label: 'Responsible', value: u?.name ?? f.salesRepId.slice(0, 8) }); }
-    if (f.brokerId) pills.push({ key: 'brokerId', label: 'Broker', value: this.brokerFilterLabel() || f.brokerId.slice(0, 8) });
-    if (f.invoicingCompanyId) pills.push({ key: 'invoicingCompanyId', label: 'Invoicing', value: this.invoicingFilterLabel() || f.invoicingCompanyId.slice(0, 8) });
+    if (f.clientId) pills.push({ key: 'clientId', label: 'Client', value: f.labels['clientId'] ?? f.clientId.slice(0, 8) });
+    if (f.vesselId) pills.push({ key: 'vesselId', label: 'Vessel', value: f.labels['vesselId'] ?? f.vesselId.slice(0, 8) });
+    if (f.placeId) pills.push({ key: 'placeId', label: 'Port', value: f.labels['placeId'] ?? f.placeId.slice(0, 8) });
+    if (f.salesRepId) pills.push({ key: 'salesRepId', label: 'Responsible', value: f.labels['salesRepId'] ?? f.salesRepId.slice(0, 8) });
+    if (f.brokerId) pills.push({ key: 'brokerId', label: 'Broker', value: f.labels['brokerId'] ?? f.brokerId.slice(0, 8) });
+    if (f.invoicingCompanyId) pills.push({ key: 'invoicingCompanyId', label: 'Invoicing', value: f.labels['invoicingCompanyId'] ?? f.invoicingCompanyId.slice(0, 8) });
     if (f.dateFrom) pills.push({ key: 'dateFrom', label: 'ETA from', value: f.dateFrom });
     if (f.dateTo) pills.push({ key: 'dateTo', label: 'ETA to', value: f.dateTo });
+    if (f.createdFrom) pills.push({ key: 'createdFrom', label: 'Created from', value: f.createdFrom });
+    if (f.createdTo) pills.push({ key: 'createdTo', label: 'Created to', value: f.createdTo });
     return pills;
   });
-
-  // Labels for filter pills (resolved from option lists)
-  readonly clientFilterLabel = signal('');
-  readonly vesselFilterLabel = signal('');
-  readonly placeFilterLabel = signal('');
-  readonly brokerFilterLabel = signal('');
-  readonly invoicingFilterLabel = signal('');
 
   private readonly filterStorageKey = computed(() => `filter_${this.resolvedMode()}`);
 
@@ -613,6 +609,8 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       if (f.invoicingCompanyId) params.set('invoicingCompanyId', f.invoicingCompanyId);
       if (f.dateFrom) params.set('dateFrom', f.dateFrom);
       if (f.dateTo) params.set('dateTo', f.dateTo);
+      if (f.createdFrom) params.set('createdFrom', f.createdFrom);
+      if (f.createdTo) params.set('createdTo', f.createdTo);
       if (this.activeSortBy()) params.set('sortBy', this.activeSortBy());
       if (this.activeSortBy()) params.set('sortDir', this.activeSortDir());
 

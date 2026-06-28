@@ -50,6 +50,8 @@ interface ListOrdersQuery {
   invoicingCompanyId?: string; // filter by invoicing company
   dateFrom?: string;       // filter ETA >= date (ISO string)
   dateTo?: string;         // filter ETA <= date (ISO string)
+  createdFrom?: string;    // filter createdAt >= date
+  createdTo?: string;      // filter createdAt <= date
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   page?: number;
@@ -882,6 +884,14 @@ export async function listOrders(query?: ListOrdersQuery) {
 
   if (query?.dateTo) {
     conditions.push(lte(orders.eta, new Date(query.dateTo)));
+  }
+
+  if (query?.createdFrom) {
+    conditions.push(gte(orders.createdAt, new Date(query.createdFrom)));
+  }
+
+  if (query?.createdTo) {
+    conditions.push(lte(orders.createdAt, new Date(query.createdTo + 'T23:59:59')));
   }
 
   if (query?.search) {

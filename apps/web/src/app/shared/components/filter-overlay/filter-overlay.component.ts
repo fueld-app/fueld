@@ -6,6 +6,7 @@ import {
   output,
   inject,
   computed,
+  HostListener,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -27,6 +28,10 @@ export interface FilterState {
   invoicingCompanyId: string;
   dateFrom: string;
   dateTo: string;
+  createdFrom: string;
+  createdTo: string;
+  /** Human-readable labels for pill display (persisted to localStorage) */
+  labels: Record<string, string>;
 }
 
 export const EMPTY_FILTERS: FilterState = {
@@ -38,6 +43,9 @@ export const EMPTY_FILTERS: FilterState = {
   invoicingCompanyId: '',
   dateFrom: '',
   dateTo: '',
+  createdFrom: '',
+  createdTo: '',
+  labels: {},
 };
 
 export interface FilterFieldConfig {
@@ -80,7 +88,10 @@ const FIELD_CONFIGS: FilterFieldConfig[] = [
       <!-- Overlay panel -->
       @if (isOpen()) {
         <div class="fixed inset-0 z-40" (click)="close()"></div>
-        <div class="absolute right-0 z-50 mt-2 w-[480px] rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-xl overflow-hidden">
+        <div
+          class="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-[480px] rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-xl overflow-hidden"
+          (keydown.escape)="close()"
+        >
           <!-- Header -->
           <div class="flex items-center justify-between border-b border-gray-200 dark:border-line px-4 py-3">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Filters</h3>
@@ -104,6 +115,7 @@ const FIELD_CONFIGS: FilterFieldConfig[] = [
                     [loading]="getLoading(field.key)()"
                     [asyncSearch]="field.options !== 'static-responsible'"
                     [clearable]="true"
+                    [minSearchLength]="1"
                     (searchChange)="onAsyncSearch(field.key, $event)"
                     (selectionChange)="onFieldChange(field.key, $event)"
                   />
@@ -111,23 +123,39 @@ const FIELD_CONFIGS: FilterFieldConfig[] = [
               }
             </div>
 
-            <!-- Date range -->
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">ETA from</label>
+            <!-- ETA date range -->
+            <div>
+              <div class="mb-1 text-xs font-medium text-gray-500 dark:text-muted">ETA range</div>
+              <div class="grid grid-cols-2 gap-3">
                 <input
                   type="date"
                   [ngModel]="draft().dateFrom || ''"
                   (ngModelChange)="onFieldChange('dateFrom', $event)"
                   class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
                 />
-              </div>
-              <div>
-                <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">ETA to</label>
                 <input
                   type="date"
                   [ngModel]="draft().dateTo || ''"
                   (ngModelChange)="onFieldChange('dateTo', $event)"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
+                />
+              </div>
+            </div>
+
+            <!-- Created date range -->
+            <div>
+              <div class="mb-1 text-xs font-medium text-gray-500 dark:text-muted">Created date range</div>
+              <div class="grid grid-cols-2 gap-3">
+                <input
+                  type="date"
+                  [ngModel]="draft().createdFrom || ''"
+                  (ngModelChange)="onFieldChange('createdFrom', $event)"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
+                />
+                <input
+                  type="date"
+                  [ngModel]="draft().createdTo || ''"
+                  (ngModelChange)="onFieldChange('createdTo', $event)"
                   class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
                 />
               </div>
@@ -194,8 +222,21 @@ export class FilterOverlayComponent {
 
   readonly activeCount = computed(() => {
     const f = this.filters();
-    return Object.values(f).filter((v) => v && v.trim()).length;
+    let count = 0;
+    for (const field of FIELD_CONFIGS) {
+      if ((f[field.key] as string)?.trim()) count++;
+    }
+    if (f.dateFrom?.trim()) count++;
+    if (f.dateTo?.trim()) count++;
+    if (f.createdFrom?.trim()) count++;
+    if (f.createdTo?.trim()) count++;
+    return count;
   });
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.isOpen()) this.close();
+  }
 
   toggle(): void {
     if (this.isOpen()) {
@@ -220,7 +261,26 @@ export class FilterOverlayComponent {
   }
 
   onFieldChange(key: keyof FilterState, value: string): void {
-    this.draft.update((d) => ({ ...d, [key]: value ?? '' }));
+    this.draft.update((d) => {
+      const next = { ...d, [key]: value ?? '' } as FilterState;
+      // Resolve label for dropdown selections
+      if (value && key !== 'dateFrom' && key !== 'dateTo' && key !== 'createdFrom' && key !== 'createdTo') {
+        const opts = this.getOptions(key)();
+        const match = opts.find((o) => o.value === value);
+        if (match) {
+          next.labels = { ...d.labels, [key]: match.label };
+        } else if (key === 'salesRepId') {
+          // Responsible options are provided by parent — already in opts
+          const r = opts.find((o) => o.value === value);
+          if (r) next.labels = { ...d.labels, [key]: r.label };
+        }
+      } else if (!value) {
+        // Clear label when value is cleared
+        const { [key]: _removed, ...restLabels } = d.labels;
+        next.labels = restLabels;
+      }
+      return next;
+    });
   }
 
   getOptions(key: keyof FilterState): ReturnType<typeof signal<DropdownOption[]>> {
