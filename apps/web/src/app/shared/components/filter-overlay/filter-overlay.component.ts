@@ -332,6 +332,9 @@ export class FilterOverlayComponent {
   async onAsyncSearch(field: FilterFieldDef, term: string): Promise<void> {
     const key = field.key;
     if (this.searchTimeouts[key]) clearTimeout(this.searchTimeouts[key]!);
+    // Set loading immediately so the dropdown shows a spinner instead of "No results"
+    // during the debounce window before doSearch fires.
+    this.asyncLoading.update((s) => ({ ...s, [key]: true }));
     this.searchTimeouts[key] = setTimeout(() => this.doSearch(field, term), 300);
   }
 
