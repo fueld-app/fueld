@@ -538,6 +538,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     const params = new URLSearchParams();
     this.applyStatusFilter(params);
     this.buildFilterParams(params, filters);
+    if (this.searchTerm()) params.set('search', this.searchTerm());
     params.set('limit', '1');
     return firstValueFrom(this.http.get<ApiResponse<{ items: unknown[]; total: number }>>(`${API}/orders?${params}`))
       .then(res => res.success ? res.data.total : 0)

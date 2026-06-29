@@ -3,7 +3,8 @@ import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { vi } from 'vitest';
 
-import { FilterOverlayComponent, EMPTY_FILTERS, type FilterState } from './filter-overlay.component';
+import { FilterOverlayComponent, EMPTY_FILTERS, type FilterState, type FilterFieldDef } from './filter-overlay.component';
+import type { DropdownOption } from '../searchable-dropdown/searchable-dropdown.component';
 
 try {
   TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -131,5 +132,86 @@ describe('FilterOverlayComponent', () => {
     expect(component.asyncOptions()).toEqual({});
     expect(component.asyncLoading()).toEqual({});
     expect(component.resultCount()).toBeNull();
+  });
+
+  // ── Gap 4: Date clear button ─────────────────────────────────────
+
+  it('should clear date field via clear button (onFieldChange with empty string)', () => {
+    const filters: FilterState = { etaFrom: '2024-01-01', labels: {} };
+    const { component } = setup(filters);
+    component.toggle();
+    expect(component.draft()['etaFrom']).toBe('2024-01-01');
+
+    // Simulate clear button click
+    component.onFieldChange('etaFrom', '');
+
+    expect(component.draft()['etaFrom']).toBe('');
+  });
+
+  // ── Gap 6: Product filter field ──────────────────────────────────
+
+  it('should show product filter field in dropdown fields', () => {
+    const productField: FilterFieldDef = {
+      key: 'productType',
+      label: 'Product',
+      type: 'dropdown',
+      options: [{ value: 'ULSD', label: 'ULSD' }, { value: 'VLSFO', label: 'VLSFO' }],
+    };
+    const { fixture, component } = setup(EMPTY_FILTERS, null);
+    fixture.componentRef.setInput('fields', [productField]);
+    fixture.detectChanges();
+
+    const dropdowns = component.dropdownFields();
+    expect(dropdowns.length).toBe(1);
+    expect(dropdowns[0].key).toBe('productType');
+    expect(dropdowns[0].label).toBe('Product');
+    expect(dropdowns[0].options?.length).toBe(2);
+  });
+
+  // ── Gap 8: Apply loading state ───────────────────────────────────
+
+  it('should reflect applying input state', () => {
+    const { fixture, component } = setup();
+    expect(component.applying()).toBe(false);
+
+    fixture.componentRef.setInput('applying', true);
+    fixture.detectChanges();
+
+    expect(component.applying()).toBe(true);
+  });
+
+  // ── Gap 2: Async search staleness guard ────────────────────────────
+
+  it('should ignore stale async search responses', async () => {
+    let resolveA: (opts: DropdownOption[]) => void = () => {};
+    let resolveB: (opts: DropdownOption[]) => void = () => {};
+    const promiseA = new Promise<DropdownOption[]>((r) => { resolveA = r; });
+    const promiseB = new Promise<DropdownOption[]>((r) => { resolveB = r; });
+
+    const searchFn = (term: string) => term === 'aaa' ? promiseA : promiseB;
+    const field: FilterFieldDef = { key: 'raceKey', label: 'Race', type: 'dropdown', searchFn };
+
+    const { fixture, component } = setup(EMPTY_FILTERS, null);
+    fixture.componentRef.setInput('fields', [field]);
+    fixture.detectChanges();
+
+    // Fire both searches without awaiting
+    const p1 = (component as any).doSearch(field, 'aaa');
+    const p2 = (component as any).doSearch(field, 'bbb');
+
+    // Resolve second first (out of order)
+    resolveB([{ value: 'b-val', label: 'B' }]);
+    await p2;
+
+    // Now resolve first (stale — should be ignored)
+    resolveA([{ value: 'a-val', label: 'A' }]);
+    await p1;
+
+    fixture.detectChanges();
+
+    // asyncOptions should have 'bbb' results, not 'aaa'
+    const opts = component.asyncOptions()['raceKey'] ?? [];
+    expect(opts.length).toBe(1);
+    expect(opts[0].value).toBe('b-val');
   });
 });

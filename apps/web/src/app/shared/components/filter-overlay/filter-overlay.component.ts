@@ -275,6 +275,7 @@ export class FilterOverlayComponent {
     // Reset async search state
     this.asyncOptions.set({});
     this.asyncLoading.set({});
+    this.latestSearchTerms = {};
     // Cancel any pending count request
     if (this.countAbort) {
       this.countAbort.abort();
@@ -325,6 +326,7 @@ export class FilterOverlayComponent {
   }
 
   private searchTimeouts: Record<string, ReturnType<typeof setTimeout> | null> = {};
+  private latestSearchTerms: Record<string, string> = {};
 
   async onAsyncSearch(field: FilterFieldDef, term: string): Promise<void> {
     const key = field.key;
@@ -335,12 +337,17 @@ export class FilterOverlayComponent {
   private async doSearch(field: FilterFieldDef, term: string): Promise<void> {
     if (!field.searchFn) return;
     const key = field.key;
+    this.latestSearchTerms[key] = term;
     this.asyncLoading.update((s) => ({ ...s, [key]: true }));
     try {
       const opts = await field.searchFn(term);
+      // Only apply results if this is still the latest search for this field
+      if (this.latestSearchTerms[key] !== term) return;
       this.asyncOptions.update((s) => ({ ...s, [key]: opts }));
     } catch { /* ignore */ } finally {
-      this.asyncLoading.update((s) => ({ ...s, [key]: false }));
+      if (this.latestSearchTerms[key] === term) {
+        this.asyncLoading.update((s) => ({ ...s, [key]: false }));
+      }
     }
   }
 
