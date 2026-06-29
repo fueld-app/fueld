@@ -508,7 +508,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly filterFields = computed<FilterFieldDef[]>(() => [
     { key: 'clientId', label: 'Client', type: 'dropdown', searchFn: (term) => this.searchCompanies('CLIENT', term) },
     { key: 'vesselId', label: 'Vessel', type: 'dropdown', searchFn: (term) => this.searchVessels(term) },
-    { key: 'placeId', label: 'Port', type: 'dropdown', searchFn: (term) => this.searchPlaces(term) },
+    { key: 'placeId', label: 'Place', type: 'dropdown', searchFn: (term) => this.searchPlaces(term) },
     { key: 'salesRepId', label: 'Responsible', type: 'dropdown', options: this.responsibleFilterOptions() },
     { key: 'brokerId', label: 'Broker', type: 'dropdown', searchFn: (term) => this.searchCompanies('BROKER', term) },
     { key: 'invoicingCompanyId', label: 'Invoicing Company', type: 'dropdown', searchFn: (term) => this.searchInvoicingCompanies(term) },
@@ -551,7 +551,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     const pills: Array<{ key: string; label: string; value: string }> = [];
     if (f['clientId']) pills.push({ key: 'clientId', label: 'Client', value: f.labels['clientId'] ?? f['clientId'].slice(0, 8) });
     if (f['vesselId']) pills.push({ key: 'vesselId', label: 'Vessel', value: f.labels['vesselId'] ?? f['vesselId'].slice(0, 8) });
-    if (f['placeId']) pills.push({ key: 'placeId', label: 'Port', value: f.labels['placeId'] ?? f['placeId'].slice(0, 8) });
+    if (f['placeId']) pills.push({ key: 'placeId', label: 'Place', value: f.labels['placeId'] ?? f['placeId'].slice(0, 8) });
     if (f['salesRepId']) pills.push({ key: 'salesRepId', label: 'Responsible', value: f.labels['salesRepId'] ?? f['salesRepId'].slice(0, 8) });
     if (f['brokerId']) pills.push({ key: 'brokerId', label: 'Broker', value: f.labels['brokerId'] ?? f['brokerId'].slice(0, 8) });
     if (f['invoicingCompanyId']) pills.push({ key: 'invoicingCompanyId', label: 'Invoicing', value: f.labels['invoicingCompanyId'] ?? f['invoicingCompanyId'].slice(0, 8) });
@@ -711,22 +711,22 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private async searchVessels(term: string): Promise<DropdownOption[]> {
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ items: Array<{ id: string; name: string }> }>>(
-          `${API}/vessels?search=${encodeURIComponent(term)}&limit=20`,
+        this.http.get<ApiResponse<{ vessels: Array<{ id: string; name: string }>; total: number }>>(
+          `${API}/vessels/local?search=${encodeURIComponent(term)}&limit=20`,
         ),
       );
-      return res.success && res.data?.items ? res.data.items.map((v) => ({ value: v.id, label: v.name })) : [];
+      return res.success && res.data?.vessels ? res.data.vessels.map((v) => ({ value: v.id, label: v.name })) : [];
     } catch { return []; }
   }
 
   private async searchPlaces(term: string): Promise<DropdownOption[]> {
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ items: Array<{ id: string; name: string }> }>>(
-          `${API}/places?search=${encodeURIComponent(term)}&limit=20`,
+        this.http.get<ApiResponse<{ places: Array<{ id: string; name: string }>; total: number }>>(
+          `${API}/lloyds/places/local?search=${encodeURIComponent(term)}&limit=20`,
         ),
       );
-      return res.success && res.data?.items ? res.data.items.map((p) => ({ value: p.id, label: p.name })) : [];
+      return res.success && res.data?.places ? res.data.places.map((p) => ({ value: p.id, label: p.name })) : [];
     } catch { return []; }
   }
 
