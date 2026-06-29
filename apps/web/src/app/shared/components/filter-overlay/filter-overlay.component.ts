@@ -108,6 +108,8 @@ export interface FilterFieldDef {
                       [ngModel]="draft()[field.key + 'From'] || ''"
                       (ngModelChange)="onFieldChange(field.key + 'From', $event)"
                       class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
+                      [class.text-gray-400]="!draft()[field.key + 'From']"
+                      [class.dark:text-muted]="!draft()[field.key + 'From']"
                     />
                     @if (draft()[field.key + 'From']) {
                       <button
@@ -127,6 +129,8 @@ export interface FilterFieldDef {
                       [ngModel]="draft()[field.key + 'To'] || ''"
                       (ngModelChange)="onFieldChange(field.key + 'To', $event)"
                       class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
+                      [class.text-gray-400]="!draft()[field.key + 'To']"
+                      [class.dark:text-muted]="!draft()[field.key + 'To']"
                     />
                     @if (draft()[field.key + 'To']) {
                       <button
