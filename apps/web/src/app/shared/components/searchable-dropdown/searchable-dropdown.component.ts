@@ -129,6 +129,8 @@ export interface DropdownOption {
 export class SearchableDropdownComponent implements OnInit, OnDestroy {
   readonly options = input.required<DropdownOption[]>();
   readonly selected = input<string>('');
+  /** Label for the currently-selected value, used as fallback when the option isn't in the options list (e.g. async search after refresh). */
+  readonly selectedLabel = input<string>('');
   readonly placeholder = input<string>('Select...');
   readonly clearable = input(false);
   /** Minimum characters before emitting searchChange (default 2) */
@@ -172,7 +174,7 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
       if (this.isOpen()) return;
       const sel = this.selected();
       const match = this.options().find((o) => o.value === sel);
-      this.searchText.set(match?.label ?? '');
+      this.searchText.set(match?.label ?? this.selectedLabel() ?? '');
     });
   }
 
@@ -190,6 +192,10 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     this.isOpen.set(true);
     this.searchText.set('');
     this.highlightIndex.set(0);
+    // For async search, trigger an initial search so first matches show without typing
+    if (this.asyncSearch()) {
+      this.searchChange.emit('');
+    }
   }
 
   private updateDropdownPosition(): void {
@@ -201,10 +207,10 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
 
   close(): void {
     this.isOpen.set(false);
-    // Restore display text
+    // Restore display text — fall back to selectedLabel for async fields where options may be empty
     const sel = this.selected();
     const match = this.options().find((o) => o.value === sel);
-    this.searchText.set(match?.label ?? '');
+    this.searchText.set(match?.label ?? this.selectedLabel() ?? '');
   }
 
   onSearch(event: Event): void {

@@ -84,6 +84,7 @@ export interface FilterFieldDef {
                       [placeholder]="'Filter by ' + field.label + '…'"
                       [options]="getOptions(field)()"
                       [selected]="draft()[field.key] ?? ''"
+                      [selectedLabel]="draft().labels[field.key] || ''"
                       [loading]="getLoading(field.key)()"
                       [asyncSearch]="!!field.searchFn"
                       [clearable]="true"
