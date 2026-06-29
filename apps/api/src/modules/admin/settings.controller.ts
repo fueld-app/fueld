@@ -1880,7 +1880,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .get('/whatsapp', async ({ auth }) => {
     try {
       requireAdmin(auth);
-      const data = await getWhatsAppSettings();
+      const data = await getWhatsAppSettings(auth.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';

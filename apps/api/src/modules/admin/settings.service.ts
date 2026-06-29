@@ -1616,8 +1616,10 @@ export async function updateInquirySettings(data: {
 //  WHATSAPP SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function getWhatsAppSettings(): Promise<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }> {
-  const tenant = await db.query.tenants.findFirst();
+export async function getWhatsAppSettings(tenantId?: string): Promise<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }> {
+  const tenant = tenantId
+    ? await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) })
+    : await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
 
   const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;

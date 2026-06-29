@@ -20,7 +20,7 @@ export const whatsappController = new Elysia({ prefix: '/whatsapp' })
   .get(
     '/status',
     async ({ auth }) => {
-      const status = await getWhatsAppStatus(auth.userId);
+      const status = await getWhatsAppStatus(auth.userId, auth.tenantId);
       return { success: true, data: status } satisfies ApiResponse<typeof status>;
     },
     {
@@ -36,7 +36,7 @@ export const whatsappController = new Elysia({ prefix: '/whatsapp' })
   .post(
     '/link',
     async ({ auth }) => {
-      const result = await startWhatsAppSession(auth.userId);
+      const result = await startWhatsAppSession(auth.userId, auth.tenantId);
       return { success: true, data: result } satisfies ApiResponse<typeof result>;
     },
     {

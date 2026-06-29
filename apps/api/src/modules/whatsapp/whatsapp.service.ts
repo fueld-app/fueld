@@ -173,8 +173,8 @@ async function useDbAuthState(userId: string) {
 
 // ─── Connection Management ───────────────────────────────────────────
 
-export async function startWhatsAppSession(userId: string): Promise<{ qr?: string; status: string }> {
-  const waSettings = await getWhatsAppSettings();
+export async function startWhatsAppSession(userId: string, tenantId?: string): Promise<{ qr?: string; status: string }> {
+  const waSettings = await getWhatsAppSettings(tenantId);
   if (!waSettings.enabled) {
     return { status: 'disabled' };
   }
@@ -297,7 +297,7 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return; // Ignore history sync etc.
 
-    const waSettings = await getWhatsAppSettings();
+    const waSettings = await getWhatsAppSettings(tenantId);
     if (!waSettings.enabled || !waSettings.incomingRfqEnabled) return;
 
     for (const msg of messages) {
@@ -346,14 +346,14 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
   };
 }
 
-export async function getWhatsAppStatus(userId: string): Promise<{
+export async function getWhatsAppStatus(userId: string, tenantId?: string): Promise<{
   linked: boolean;
   status: string;
   phoneNumber?: string | null;
   qr?: string;
   whatsappEnabled: boolean;
 }> {
-  const waSettings = await getWhatsAppSettings();
+  const waSettings = await getWhatsAppSettings(tenantId);
   const enabled = waSettings.enabled;
 
   // Check in-memory connection first
