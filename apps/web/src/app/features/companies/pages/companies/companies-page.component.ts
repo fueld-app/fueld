@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   signal,
+  computed,
   inject,
   OnInit,
   OnDestroy,
@@ -15,6 +16,8 @@ import type { CounterpartyDto, ApiResponse } from '@fueld/types';
 import { COUNTRIES, SELECTABLE_COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue, findCountry } from '../../../../shared/data/countries';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
+import { FilterOverlayComponent, type FilterState, EMPTY_FILTERS, type FilterFieldDef } from '../../../../shared/components/filter-overlay/filter-overlay.component';
+import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 import { AuthService } from '@app/core/auth/auth.service';
 import { CompaniesCreateModalComponent } from './companies-create-modal.component';
@@ -42,7 +45,7 @@ interface CompanySearchResult {
 @Component({
   selector: 'app-companies-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent, SortHeaderComponent, CompaniesCreateModalComponent, CompaniesDeleteModalComponent],
+  imports: [FormsModule, PaginationComponent, SortHeaderComponent, FilterOverlayComponent, CompaniesCreateModalComponent, CompaniesDeleteModalComponent],
   template: `
     <div>
       <!-- Header -->
@@ -147,58 +150,29 @@ interface CompanySearchResult {
 
         </div>
 
-        <!-- Filter by type -->
-        <select
-          [ngModel]="filterType()"
-          (ngModelChange)="filterType.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-          class="h-10 rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
-        >
-          <option value="">All Types</option>
-          @for (type of availableTypes(); track type) {
-            <option [value]="type">{{ typeLabel(type) }}</option>
-          }
-        </select>
-
-        <!-- Filter by responsible -->
-        <select
-          [ngModel]="filterResponsible()"
-          (ngModelChange)="filterResponsible.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-          class="h-10 rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
-        >
-          <option value="">All Responsible</option>
-          @for (u of users(); track u.id) {
-            <option [value]="u.id">{{ u.name }}</option>
-          }
-        </select>
-
-        <!-- Filter by country -->
-        <select
-          [ngModel]="filterCountry()"
-          (ngModelChange)="filterCountry.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-          class="h-10 rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
-        >
-          <option value="">All Countries</option>
-          @for (c of countries; track c.code) {
-            <option [value]="c.code">{{ flagEmoji(c.code) }} {{ c.name }}</option>
-          }
-        </select>
-
-        <!-- Filter by segment -->
-        @if (segmentCategories().length > 0) {
-          <select
-            [ngModel]="filterSegment()"
-            (ngModelChange)="filterSegment.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-            class="h-10 rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
-          >
-            <option value="">All Segments</option>
-            @for (cat of segmentCategories(); track cat.key) {
-              @for (opt of cat.options; track opt.key) {
-                <option [value]="cat.key + ':' + opt.key">{{ cat.label }}: {{ opt.label }}</option>
-              }
-            }
-          </select>
-        }
+        <!-- Filter overlay -->
+        <app-filter-overlay
+          [filters]="filterState()"
+          [fields]="filterFields()"
+          (filtersChange)="onFiltersChange($event)"
+        />
       </div>
+
+      <!-- Active filter pills -->
+      @if (activeFilterPills().length > 0) {
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          @for (pill of activeFilterPills(); track pill.key) {
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-surface-3 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-ink-dim">
+              {{ pill.label }}: {{ pill.value }}
+              <button type="button" (click)="removeFilter(pill.key)" class="text-gray-400 hover:text-gray-600 dark:hover:text-ink">
+                <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                </svg>
+              </button>
+            </span>
+          }
+        </div>
+      }
 
       <!-- Click-away backdrop for dropdown -->
       @if (dropdownOpen()) {
@@ -391,6 +365,36 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   readonly segmentCategories = signal<{ key: string; label: string; mode: 'multi' | 'single'; options: { key: string; label: string }[] }[]>([]);
   readonly frozenCompanyIds = signal<Set<string>>(new Set());
 
+  // ─── Filter overlay state ───────────────────────────────────────────
+  readonly filterState = signal<FilterState>({ ...EMPTY_FILTERS });
+  private readonly filterStorageKey = 'filter_companies';
+  readonly filterFields = computed<FilterFieldDef[]>(() => {
+    const fields: FilterFieldDef[] = [
+      { key: 'type', label: 'Type', type: 'dropdown', options: this.availableTypes().map((t) => ({ value: t, label: this.typeLabel(t) })) },
+      { key: 'responsibleUserId', label: 'Responsible', type: 'dropdown', options: this.users().map((u) => ({ value: u.id, label: u.name })) },
+      { key: 'countryIso', label: 'Country', type: 'dropdown', options: this.countries.map((c) => ({ value: c.code, label: c.name })) },
+    ];
+    if (this.segmentCategories().length > 0) {
+      const segmentOpts: DropdownOption[] = [];
+      for (const cat of this.segmentCategories()) {
+        for (const opt of cat.options) {
+          segmentOpts.push({ value: cat.key + ':' + opt.key, label: cat.label + ': ' + opt.label });
+        }
+      }
+      fields.push({ key: 'segment', label: 'Segment', type: 'dropdown', options: segmentOpts });
+    }
+    return fields;
+  });
+  readonly activeFilterPills = computed(() => {
+    const f = this.filterState();
+    const pills: Array<{ key: string; label: string; value: string }> = [];
+    if (f['type']) pills.push({ key: 'type', label: 'Type', value: f.labels['type'] ?? f['type'] });
+    if (f['responsibleUserId']) pills.push({ key: 'responsibleUserId', label: 'Responsible', value: f.labels['responsibleUserId'] ?? f['responsibleUserId'] });
+    if (f['countryIso']) pills.push({ key: 'countryIso', label: 'Country', value: f.labels['countryIso'] ?? f['countryIso'] });
+    if (f['segment']) pills.push({ key: 'segment', label: 'Segment', value: f.labels['segment'] ?? f['segment'] });
+    return pills;
+  });
+
   // Search / typeahead
   readonly searchTerm = signal('');
   readonly searchResults = signal<CompanySearchResult[]>([]);
@@ -419,6 +423,8 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   readonly typeOptions = () => this.availableTypes().map((type) => ({ value: type, label: this.typeLabel(type) }));
 
   ngOnInit(): void {
+    this.loadSavedFilters();
+
     // Restore page & filter from URL query params
     const params = this.route.snapshot.queryParamMap;
     const page = Number(params.get('page'));
@@ -438,6 +444,16 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     if (sortDir) this.sortDir.set(sortDir);
     const segment = params.get('segment');
     if (segment) this.filterSegment.set(segment);
+    // Sync filterState from individual signals (URL params take precedence)
+    if (this.filterType() || this.filterResponsible() || this.filterCountry() || this.filterSegment()) {
+      this.filterState.set({
+        labels: {},
+        ...(this.filterType() ? { type: this.filterType() } : {}),
+        ...(this.filterResponsible() ? { responsibleUserId: this.filterResponsible() } : {}),
+        ...(this.filterCountry() ? { countryIso: this.filterCountry() } : {}),
+        ...(this.filterSegment() ? { segment: this.filterSegment() } : {}),
+      });
+    }
 
     this.loadCompanies();
     this.loadCompanyTypes();
@@ -594,6 +610,54 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
       sortDir: this.sortBy() ? this.sortDir() : null,
     };
     this.router.navigate([], { queryParams, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  // ─── Filter overlay handlers ─────────────────────────────────────
+  onFiltersChange(state: FilterState): void {
+    this.filterState.set(state);
+    this.filterType.set(state['type'] ?? '');
+    this.filterResponsible.set(state['responsibleUserId'] ?? '');
+    this.filterCountry.set(state['countryIso'] ?? '');
+    this.filterSegment.set(state['segment'] ?? '');
+    this.currentPage.set(1);
+    this.saveFilters();
+    this.loadCompanies();
+    this.updateUrlParams();
+  }
+
+  removeFilter(key: string): void {
+    this.filterState.update((f) => {
+      const next = { ...f, [key]: '' };
+      const { [key]: _removed, ...restLabels } = f.labels;
+      next.labels = restLabels;
+      return next;
+    });
+    if (key === 'type') this.filterType.set('');
+    if (key === 'responsibleUserId') this.filterResponsible.set('');
+    if (key === 'countryIso') this.filterCountry.set('');
+    if (key === 'segment') this.filterSegment.set('');
+    this.currentPage.set(1);
+    this.saveFilters();
+    this.loadCompanies();
+    this.updateUrlParams();
+  }
+
+  private loadSavedFilters(): void {
+    try {
+      const raw = localStorage.getItem(this.filterStorageKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<FilterState>;
+        this.filterState.set({ labels: {}, ...saved });
+        this.filterType.set(saved['type'] ?? '');
+        this.filterResponsible.set(saved['responsibleUserId'] ?? '');
+        this.filterCountry.set(saved['countryIso'] ?? '');
+        this.filterSegment.set(saved['segment'] ?? '');
+      }
+    } catch { /* ignore */ }
+  }
+
+  private saveFilters(): void {
+    try { localStorage.setItem(this.filterStorageKey, JSON.stringify(this.filterState())); } catch { /* ignore */ }
   }
 
   // ─── Sorting ────────────────────────────────────────────────────

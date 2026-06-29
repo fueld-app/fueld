@@ -60,6 +60,8 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
     async ({ query }) => {
       const results = await listVessels({
         search: query.search,
+        flag: query.flag,
+        type: query.type,
         sortBy: query.sortBy,
         sortDir: query.sortDir as 'asc' | 'desc' | undefined,
         page: query.page && Number.isFinite(Number(query.page)) ? Number(query.page) : undefined,
@@ -70,6 +72,8 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
     {
       query: t.Object({
         search: t.Optional(t.String()),
+        flag: t.Optional(t.String()),
+        type: t.Optional(t.String()),
         sortBy: t.Optional(t.String()),
         sortDir: t.Optional(t.String()),
         page: t.Optional(t.String()),

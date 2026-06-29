@@ -72,6 +72,8 @@ export interface SeasearcherVesselDetailResponse {
 
 export async function listVessels(query?: {
   search?: string;
+  flag?: string;
+  type?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   limit?: number;
@@ -86,6 +88,17 @@ export async function listVessels(query?: {
         ilike(vessels.mmsi, `%${escapeLikePattern(query.search)}%`),
       ),
     );
+  }
+  if (query?.flag) {
+    conditions.push(
+      or(
+        ilike(vessels.flag, `%${escapeLikePattern(query.flag)}%`),
+        ilike(vessels.flagCode, `%${escapeLikePattern(query.flag)}%`),
+      )!,
+    );
+  }
+  if (query?.type) {
+    conditions.push(ilike(vessels.type, `%${escapeLikePattern(query.type)}%`));
   }
 
   const where = conditions.length

@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   signal,
+  computed,
   inject,
   OnInit,
   OnDestroy,
@@ -16,6 +17,8 @@ import { COUNTRIES, SELECTABLE_COUNTRIES, countryLabel as resolveCountryLabel, c
 import { AREAS } from '../../../../shared/data/areas';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
+import { FilterOverlayComponent, type FilterState, EMPTY_FILTERS, type FilterFieldDef } from '../../../../shared/components/filter-overlay/filter-overlay.component';
+import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { flagFromUnlocode } from '../../../../shared/utils/flags';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -48,10 +51,18 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
   FIL: 'Hydrocarbon Field',
 };
 
+const PLACE_TYPE_OPTIONS: DropdownOption[] = [
+  { value: 'POR', label: 'Port' },
+  { value: 'PSP', label: 'Sub Port' },
+  { value: 'ANC', label: 'Anchorage' },
+  { value: 'TER', label: 'Terminal' },
+  { value: 'FIL', label: 'Hydrocarbon Field' },
+];
+
 @Component({
   selector: 'app-places-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent, SortHeaderComponent],
+  imports: [FormsModule, PaginationComponent, SortHeaderComponent, FilterOverlayComponent],
   template: `
     <div>
       <!-- Header -->
@@ -144,28 +155,11 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
             </div>
           }
         </div>
-        <select
-          [(ngModel)]="localTypeFilter"
-          (ngModelChange)="currentPage.set(1); loadPlaces(); updateUrlParams()"
-          class="app-input w-full bg-white dark:bg-surface sm:w-40"
-        >
-          <option value="">All types</option>
-          <option value="POR">Port</option>
-          <option value="PSP">Sub Port</option>
-          <option value="ANC">Anchorage</option>
-          <option value="TER">Terminal</option>
-          <option value="FIL">Hydrocarbon Field</option>
-        </select>
-        <select
-          [ngModel]="filterResponsible()"
-          (ngModelChange)="filterResponsible.set($event); currentPage.set(1); loadPlaces(); updateUrlParams()"
-          class="app-input w-full bg-white dark:bg-surface sm:w-48"
-        >
-          <option value="">All Responsible</option>
-          @for (u of users(); track u.id) {
-            <option [value]="u.id">{{ u.name }}</option>
-          }
-        </select>
+        <app-filter-overlay
+          [filters]="filterState()"
+          [fields]="filterFields()"
+          (filtersChange)="onFiltersChange($event)"
+        />
         <button
           (click)="loadPlaces()"
           class="rounded-lg bg-gray-100 dark:bg-surface-3 px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-200 transition-colors"
@@ -177,6 +171,23 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
       <!-- Click-away backdrop for dropdown -->
       @if (lliDropdownOpen()) {
         <div class="fixed inset-0 z-10" (click)="lliDropdownOpen.set(false)"></div>
+      }
+
+      <!-- Active filter pills -->
+      @if (activeFilterPills().length > 0) {
+        <div class="mb-4 flex flex-wrap gap-2">
+          @for (pill of activeFilterPills(); track pill.key) {
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 dark:bg-brand-700/15 px-3 py-1 text-xs font-medium text-brand-700 dark:text-brand-400">
+              {{ pill.label }}: {{ pill.value }}
+              <button type="button" (click)="removeFilter(pill.key)" class="inline-flex items-center justify-center rounded-full hover:bg-brand-100 dark:hover:bg-brand-700/25 w-4 h-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                </svg>
+              </button>
+            </span>
+          }
+          <button type="button" (click)="clearAllFilters()" class="text-xs text-gray-500 dark:text-muted hover:text-gray-700 dark:hover:text-ink-dim underline">Clear all</button>
+        </div>
       }
 
       <!-- Desktop table -->
@@ -448,11 +459,24 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   readonly totalCount = signal(0);
   readonly currentPage = signal(1);
   readonly pageSize = 25;
-  localTypeFilter = '';
-  readonly filterResponsible = signal('');
   readonly sortBy = signal('');
   readonly sortDir = signal<'asc' | 'desc'>('asc');
   readonly users = signal<{ id: string; name: string; email: string }[]>([]);
+
+  // ─── Filter overlay state ────────────────────────────────────────
+  readonly filterState = signal<FilterState>({ ...EMPTY_FILTERS });
+  private readonly filterStorageKey = 'filter_places';
+  readonly filterFields = computed<FilterFieldDef[]>(() => [
+    { key: 'placeType', label: 'Type', type: 'dropdown', options: PLACE_TYPE_OPTIONS },
+    { key: 'responsibleUserId', label: 'Responsible', type: 'dropdown', options: this.users().map((u) => ({ value: u.id, label: u.name })) },
+  ]);
+  readonly activeFilterPills = computed(() => {
+    const f = this.filterState();
+    const pills: Array<{ key: string; label: string; value: string }> = [];
+    if (f['placeType']) pills.push({ key: 'placeType', label: 'Type', value: f.labels['placeType'] ?? f['placeType'] });
+    if (f['responsibleUserId']) pills.push({ key: 'responsibleUserId', label: 'Responsible', value: f.labels['responsibleUserId'] ?? f['responsibleUserId'].slice(0, 8) });
+    return pills;
+  });
 
   // ─── LLI typeahead state ─────────────────────────────────────────
   readonly lliSearchTerm = signal('');
@@ -479,14 +503,17 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   readonly deleteError = signal<string | null>(null);
 
   ngOnInit(): void {
+    // Restore saved filters from localStorage
+    this.loadSavedFilters();
+
     // Restore page & filter from URL query params
     const params = this.route.snapshot.queryParamMap;
     const page = Number(params.get('page'));
     if (page > 0) this.currentPage.set(page);
     const type = params.get('type');
-    if (type) this.localTypeFilter = type;
+    if (type) this.filterState.update((f) => ({ ...f, placeType: type }));
     const responsible = params.get('responsible');
-    if (responsible) this.filterResponsible.set(responsible);
+    if (responsible) this.filterState.update((f) => ({ ...f, responsibleUserId: responsible }));
     const sortBy = params.get('sortBy');
     if (sortBy) this.sortBy.set(sortBy);
     const sortDir = params.get('sortDir') as 'asc' | 'desc';
@@ -559,8 +586,8 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     try {
       const params = new URLSearchParams();
-      if (this.localTypeFilter) params.set('placeType', this.localTypeFilter);
-      if (this.filterResponsible()) params.set('responsibleUserId', this.filterResponsible());
+      if (this.filterState()['placeType']) params.set('placeType', this.filterState()['placeType']);
+      if (this.filterState()['responsibleUserId']) params.set('responsibleUserId', this.filterState()['responsibleUserId']);
       if (this.sortBy()) params.set('sortBy', this.sortBy());
       if (this.sortBy()) params.set('sortDir', this.sortDir());
       params.set('page', String(this.currentPage()));
@@ -582,6 +609,48 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   }
 
   // ─── Typeahead click ──────────────────────────────────────────
+
+  onFiltersChange(state: FilterState): void {
+    this.filterState.set(state);
+    this.saveFilters();
+    this.currentPage.set(1);
+    this.loadPlaces();
+  }
+
+  removeFilter(key: string): void {
+    this.filterState.update((f) => {
+      const next = { ...f, [key]: '' };
+      const { [key]: _removed, ...restLabels } = f.labels;
+      next.labels = restLabels;
+      return next;
+    });
+    this.saveFilters();
+    this.currentPage.set(1);
+    this.loadPlaces();
+  }
+
+  clearAllFilters(): void {
+    this.filterState.set({ labels: {} });
+    this.saveFilters();
+    this.currentPage.set(1);
+    this.loadPlaces();
+  }
+
+  private loadSavedFilters(): void {
+    try {
+      const raw = localStorage.getItem(this.filterStorageKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<FilterState>;
+        this.filterState.set({ labels: {}, ...saved });
+      }
+    } catch { /* ignore */ }
+  }
+
+  private saveFilters(): void {
+    try {
+      localStorage.setItem(this.filterStorageKey, JSON.stringify(this.filterState()));
+    } catch { /* ignore */ }
+  }
 
   onTypeaheadClick(r: LliSearchResult): void {
     if (r.source === 'local' && r.localId) {
@@ -626,8 +695,8 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   updateUrlParams(): void {
     const queryParams: Record<string, string | null> = {
       page: this.currentPage() > 1 ? String(this.currentPage()) : null,
-      type: this.localTypeFilter || null,
-      responsible: this.filterResponsible() || null,
+      type: this.filterState()['placeType'] || null,
+      responsible: this.filterState()['responsibleUserId'] || null,
       sortBy: this.sortBy() || null,
       sortDir: this.sortBy() ? this.sortDir() : null,
     };

@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   signal,
+  computed,
   inject,
   OnInit,
   OnDestroy,
@@ -12,9 +13,11 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { VesselDto, ApiResponse } from '@fueld/types';
-import { countryLabel as resolveCountryLabel, countryFlagFromValue } from '../../../../shared/data/countries';
+import { countryLabel as resolveCountryLabel, countryFlagFromValue, SELECTABLE_COUNTRIES } from '../../../../shared/data/countries';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
+import { FilterOverlayComponent, type FilterState, EMPTY_FILTERS, type FilterFieldDef } from '../../../../shared/components/filter-overlay/filter-overlay.component';
+import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Vessels Page — Browse, search, import from Seasearcher, create
@@ -42,7 +45,7 @@ interface VesselSearchResult {
 @Component({
   selector: 'app-vessels-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent, SortHeaderComponent],
+  imports: [FormsModule, PaginationComponent, SortHeaderComponent, FilterOverlayComponent],
   template: `
     <div>
       <!-- Header -->
@@ -148,6 +151,30 @@ interface VesselSearchResult {
           }
         </div>
       </div>
+
+      <!-- Filter overlay -->
+      <app-filter-overlay
+        [filters]="filterState()"
+        [fields]="filterFields()"
+        (filtersChange)="onFiltersChange($event)"
+      />
+
+      <!-- Active filter pills -->
+      @if (activeFilterPills().length > 0) {
+        <div class="mb-4 flex flex-wrap gap-2">
+          @for (pill of activeFilterPills(); track pill.key) {
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 dark:bg-brand-700/15 px-3 py-1 text-xs font-medium text-brand-700 dark:text-brand-400">
+              {{ pill.label }}: {{ pill.value }}
+              <button type="button" (click)="removeFilter(pill.key)" class="inline-flex items-center justify-center rounded-full hover:bg-brand-100 dark:hover:bg-brand-700/25 w-4 h-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                </svg>
+              </button>
+            </span>
+          }
+          <button type="button" (click)="clearAllFilters()" class="text-xs text-gray-500 dark:text-muted hover:text-gray-700 dark:hover:text-ink-dim underline">Clear all</button>
+        </div>
+      }
 
       <!-- Click-away backdrop for dropdown -->
       @if (dropdownOpen()) {
@@ -386,6 +413,21 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
   readonly sortBy = signal('');
   readonly sortDir = signal<'asc' | 'desc'>('asc');
 
+  // ─── Filter overlay state ────────────────────────────────────────
+  readonly filterState = signal<FilterState>({ ...EMPTY_FILTERS });
+  private readonly filterStorageKey = 'filter_vessels';
+  readonly filterFields = computed<FilterFieldDef[]>(() => [
+    { key: 'type', label: 'Type', type: 'dropdown', options: this.vesselTypes().map((t) => ({ value: t, label: t })) },
+    { key: 'flag', label: 'Flag', type: 'dropdown', options: SELECTABLE_COUNTRIES.map((c) => ({ value: c.code, label: c.name })) },
+  ]);
+  readonly activeFilterPills = computed(() => {
+    const f = this.filterState();
+    const pills: Array<{ key: string; label: string; value: string }> = [];
+    if (f['type']) pills.push({ key: 'type', label: 'Type', value: f.labels['type'] ?? f['type'] });
+    if (f['flag']) pills.push({ key: 'flag', label: 'Flag', value: f.labels['flag'] ?? f['flag'] });
+    return pills;
+  });
+
   // Search
   readonly searchTerm = signal('');
   readonly searchResults = signal<VesselSearchResult[]>([]);
@@ -414,6 +456,9 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
   readonly vesselTypes = signal<string[]>([]);
 
   ngOnInit(): void {
+    // Restore saved filters from localStorage
+    this.loadSavedFilters();
+
     // Restore page from URL query params
     const params = this.route.snapshot.queryParamMap;
     const page = Number(params.get('page'));
@@ -455,6 +500,8 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
     const params = new URLSearchParams();
     params.set('page', String(this.currentPage()));
     params.set('limit', String(this.pageSize));
+    if (this.filterState()['flag']) params.set('flag', this.filterState()['flag']);
+    if (this.filterState()['type']) params.set('type', this.filterState()['type']);
     if (this.sortBy()) params.set('sortBy', this.sortBy());
     if (this.sortBy()) params.set('sortDir', this.sortDir());
 
@@ -474,7 +521,50 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ─── Search ────────────────────────────────────────────────────────
+
+  // ─── Filter overlay handlers ───────────────────────────────────
+  onFiltersChange(state: FilterState): void {
+    this.filterState.set(state);
+    this.saveFilters();
+    this.currentPage.set(1);
+    this.loadVessels();
+  }
+
+  removeFilter(key: string): void {
+    this.filterState.update((f) => {
+      const next = { ...f, [key]: '' };
+      const { [key]: _removed, ...restLabels } = f.labels;
+      next.labels = restLabels;
+      return next;
+    });
+    this.saveFilters();
+    this.currentPage.set(1);
+    this.loadVessels();
+  }
+
+  clearAllFilters(): void {
+    this.filterState.set({ labels: {} });
+    this.saveFilters();
+    this.currentPage.set(1);
+    this.loadVessels();
+  }
+
+  private loadSavedFilters(): void {
+    try {
+      const raw = localStorage.getItem(this.filterStorageKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<FilterState>;
+        this.filterState.set({ labels: {}, ...saved });
+      }
+    } catch { /* ignore */ }
+  }
+
+  private saveFilters(): void {
+    try {
+      localStorage.setItem(this.filterStorageKey, JSON.stringify(this.filterState()));
+    } catch { /* ignore */ }
+  }
+
   onSearchInput(term: string): void {
     this.searchTerm.set(term);
     this.searchDone.set(false);
