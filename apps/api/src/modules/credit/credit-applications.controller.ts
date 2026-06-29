@@ -41,6 +41,7 @@ interface CreditApplicationsControllerDeps {
     tenantId: string,
     eventType: 'credit_application_submitted' | 'credit_application_processed',
     context: Record<string, string | number | undefined>,
+    userId?: string,
   ) => Promise<void>;
 }
 
@@ -217,7 +218,7 @@ export function createCreditApplicationsController(deps: CreditApplicationsContr
               companyName: app.counterpartyName,
               currency: app.requestedCurrency,
               amount: Number(app.requestedAmount).toLocaleString(),
-            });
+            }, auth.sub);
           }
         } catch (e) {
           console.error('[CreditApplications] Notification failed:', e);
@@ -305,7 +306,7 @@ export function createCreditApplicationsController(deps: CreditApplicationsContr
                 currency: app.requestedCurrency,
                 amount: Number(app.requestedAmount).toLocaleString(),
                 status: statusLabel,
-              });
+              }, auth.sub);
             }
           } catch (e) {
             console.error('[CreditApplications] Trader notification failed:', e);

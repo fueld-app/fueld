@@ -576,6 +576,7 @@ export async function sendTemplatedGroupMessage(
   tenantId: string,
   eventType: string,
   context: TemplateContext,
+  userId?: string,
 ): Promise<{ success: boolean; message: string }> {
   // 1. Find the rule
   const [rule] = await db
@@ -614,7 +615,18 @@ export async function sendTemplatedGroupMessage(
   }
 
   // 3. Interpolate template
-  const text = interpolateTemplate(rule.messageTemplate, context);
+  //    Look up the triggering user's phone so {{phone}}/{{Phone}} is available
+  let phone = (context['phone'] as string) || (context['Phone'] as string) || '';
+  if (!phone && userId) {
+    const [user] = await db
+      .select({ phone: users.phone })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    phone = user?.phone ?? '';
+  }
+  const ctx = { ...context, phone, Phone: phone };
+  const text = interpolateTemplate(rule.messageTemplate, ctx);
 
   // 4. Send
   return sendWhatsAppGroupMessage(null, groupJid, text);

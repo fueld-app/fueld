@@ -12,8 +12,9 @@ export async function notifyCreditApplicationWhatsApp(
   tenantId: string,
   eventType: 'credit_application_submitted' | 'credit_application_processed',
   context: Record<string, string | number | undefined | Array<Record<string, string | number | undefined>>>,
+  userId?: string,
 ): Promise<void> {
-  const result = await sendTemplatedGroupMessage(tenantId, eventType, context);
+  const result = await sendTemplatedGroupMessage(tenantId, eventType, context, userId);
   if (!result.success) {
     console.warn('[CreditNotifications] WhatsApp group message failed:', result.message);
   }

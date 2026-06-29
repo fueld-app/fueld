@@ -1978,7 +1978,7 @@ export async function updateOrderStatus(
           etd: etdLabel ?? '',
           deliveryWindow,
           dates: datesLabel,
-        }).catch((err) => {
+        }, userId).catch((err) => {
           console.error(`[orders] WhatsApp ${eventType} notification failed:`, err);
         });
       }

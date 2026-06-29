@@ -2044,6 +2044,8 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
         etd: '2026-06-14',
         poNumber: 'PO-12345',
         notes: 'Urgent delivery required',
+        phone: '+1234567890',
+        Phone: '+1234567890',
       };
 
       const result = await sendTemplatedGroupMessage(tenant.id, rule.eventType, testContext);
