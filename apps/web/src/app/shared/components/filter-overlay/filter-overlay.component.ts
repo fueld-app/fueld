@@ -59,11 +59,11 @@ export interface FilterFieldDef {
       @if (isOpen()) {
         <div class="fixed inset-0 z-40" (click)="close()"></div>
         <div
-          class="fixed left-1/2 top-[8vh] z-50 -translate-x-1/2 w-[calc(100vw-1rem)] max-w-[480px] rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-xl overflow-hidden sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:translate-x-0 sm:mt-2"
+          class="fixed inset-x-0 top-[8vh] z-50 mx-auto w-[calc(100vw-1rem)] max-w-[480px] rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2"
           (keydown.escape)="close()"
         >
           <!-- Header -->
-          <div class="flex items-center justify-between border-b border-gray-200 dark:border-line px-4 py-3">
+          <div class="flex items-center justify-between rounded-t-xl border-b border-gray-200 dark:border-line px-4 py-3">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Filters</h3>
             <button type="button" (click)="close()" class="text-gray-400 hover:text-gray-600 dark:hover:text-ink-dim">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -150,7 +150,7 @@ export interface FilterFieldDef {
           </div>
 
           <!-- Footer -->
-          <div class="flex items-center justify-between border-t border-gray-200 dark:border-line px-4 py-3">
+          <div class="flex items-center justify-between rounded-b-xl border-t border-gray-200 dark:border-line px-4 py-3">
             <div class="flex items-center gap-3">
               <button
                 type="button"

@@ -11,6 +11,7 @@ import {
   OnInit,
   OnDestroy,
   effect,
+  HostListener,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -155,7 +156,8 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
   readonly dropdownTop = signal(0);
   readonly dropdownLeft = signal(0);
   readonly dropdownWidth = signal(0);
-  private readonly minDropdownWidth = 320;
+  private readonly minDropdownWidth = 200;
+  private readonly dropdownMaxHeight = 192; // max-h-48 = 12rem = 192px
 
   readonly filteredOptions = computed(() => {
     const term = this.searchText().toLowerCase();
@@ -165,8 +167,18 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     return this.options().filter((o) => o.label.toLowerCase().includes(term));
   });
 
+  @HostListener('window:resize')
+  onResize(): void {
+    if (this.isOpen()) this.close();
+  }
+
   private clickOutside = (e: MouseEvent) => {
     if (!this.elRef.nativeElement.contains(e.target)) this.close();
+  };
+
+  // Capture-mode scroll listener catches scroll on ANY element (e.g. overflow-y-auto containers)
+  private captureScroll = () => {
+    if (this.isOpen()) this.close();
   };
 
   constructor() {
@@ -180,10 +192,12 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     document.addEventListener('click', this.clickOutside);
+    document.addEventListener('scroll', this.captureScroll, true); // capture = catch all scrollable ancestors
   }
 
   ngOnDestroy(): void {
     document.removeEventListener('click', this.clickOutside);
+    document.removeEventListener('scroll', this.captureScroll, true);
     if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
   }
 
@@ -200,9 +214,25 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
 
   private updateDropdownPosition(): void {
     const rect = this.triggerRef.nativeElement.getBoundingClientRect();
-    this.dropdownTop.set(rect.bottom + 4); // 4px gap
-    this.dropdownLeft.set(rect.left);
-    this.dropdownWidth.set(Math.max(rect.width, this.minDropdownWidth));
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const width = Math.max(rect.width, this.minDropdownWidth);
+
+    // Default: position below the input. Flip above if not enough space below.
+    let top = rect.bottom + 4; // 4px gap
+    if (top + this.dropdownMaxHeight > viewportHeight && rect.top - 4 - this.dropdownMaxHeight > 0) {
+      top = rect.top - 4 - this.dropdownMaxHeight;
+    }
+
+    // Clamp left so the dropdown doesn't overflow the right edge of the viewport
+    let left = rect.left;
+    if (left + width > viewportWidth) {
+      left = Math.max(0, viewportWidth - width - 8);
+    }
+
+    this.dropdownTop.set(top);
+    this.dropdownLeft.set(left);
+    this.dropdownWidth.set(width);
   }
 
   close(): void {
