@@ -48,3 +48,4 @@ google-cloud-sdk/
 google-cloud-cli-*.tar.gz
 # Pi agent temp scripts
 tmp/
+build-info.json

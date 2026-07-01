@@ -59,7 +59,7 @@ export interface FilterFieldDef {
       @if (isOpen()) {
         <div class="fixed inset-0 z-40" (click)="close()"></div>
         <div
-          class="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-[480px] rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-xl overflow-hidden"
+          class="fixed left-1/2 top-[8vh] z-50 -translate-x-1/2 w-[calc(100vw-1rem)] max-w-[480px] rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-xl overflow-hidden sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:translate-x-0 sm:mt-2"
           (keydown.escape)="close()"
         >
           <!-- Header -->

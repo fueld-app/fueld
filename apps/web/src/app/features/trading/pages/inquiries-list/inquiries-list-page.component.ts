@@ -52,20 +52,22 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
 
       <!-- Search bar + Filter button -->
       <div class="mb-4 flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          [ngModel]="searchTerm()"
-          (ngModelChange)="onSearch($event)"
-          [placeholder]="searchPlaceholder()"
-          class="w-full max-w-md rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
-        />
-        <app-filter-overlay
-          [filters]="filterState()"
-          [fields]="filterFields()"
-          [countFn]="filterCountFn"
-          [applying]="applyingFilters()"
-          (filtersChange)="onFiltersChange($event)"
-        />
+        <div class="flex flex-1 items-center gap-3">
+          <input
+            type="text"
+            [ngModel]="searchTerm()"
+            (ngModelChange)="onSearch($event)"
+            [placeholder]="searchPlaceholder()"
+            class="min-w-0 flex-1 max-w-md rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+          />
+          <app-filter-overlay
+            [filters]="filterState()"
+            [fields]="filterFields()"
+            [countFn]="filterCountFn"
+            [applying]="applyingFilters()"
+            (filtersChange)="onFiltersChange($event)"
+          />
+        </div>
         <div class="ml-auto">
           <app-column-picker
             [columns]="allColumnOptions()"
