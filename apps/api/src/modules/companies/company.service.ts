@@ -450,19 +450,44 @@ export async function listCompanies(query?: {
 }) {
   const conditions = [];
   if (query?.search) conditions.push(ilike(counterparties.name, `%${escapeLikePattern(query.search)}%`));
-  if (query?.type) conditions.push(sql`${counterparties.types} @> ${JSON.stringify([query.type])}::jsonb`);
+  if (query?.type) {
+    const types = query.type.split(',').filter(Boolean);
+    if (types.length === 1) {
+      conditions.push(sql`${counterparties.types} @> ${JSON.stringify([types[0]])}::jsonb`);
+    } else {
+      // OR: match companies that have ANY of the selected types
+      conditions.push(sql`(${types.map(t => `${counterparties.types} @> ${JSON.stringify([t])}::jsonb`).join(' OR ')})`);
+    }
+  }
   if (query?.country) conditions.push(ilike(counterparties.country, `%${escapeLikePattern(query.country)}%`));
-  if (query?.countryIso) conditions.push(eq(counterparties.countryIso, query.countryIso.toUpperCase()));
-  if (query?.responsibleUserId) conditions.push(eq(counterparties.responsibleUserId, query.responsibleUserId));
+  if (query?.countryIso) {
+    const isos = query.countryIso.split(',').filter(Boolean);
+    if (isos.length === 1) {
+      conditions.push(eq(counterparties.countryIso, isos[0].toUpperCase()));
+    } else {
+      conditions.push(inArray(counterparties.countryIso, isos.map(s => s.toUpperCase())));
+    }
+  }
+  if (query?.responsibleUserId) {
+    const ids = query.responsibleUserId.split(',').filter(Boolean);
+    if (ids.length === 1) {
+      conditions.push(eq(counterparties.responsibleUserId, ids[0]));
+    } else {
+      conditions.push(inArray(counterparties.responsibleUserId, ids));
+    }
+  }
   if (query?.segment) {
-    const [catKey, optKey] = query.segment.split(':');
-    if (catKey && optKey) {
-      // Match both single-select (string) and multi-select (array contains).
-      // catKey/optKey are bound as parameters (not sql.raw) to avoid SQL injection.
-      conditions.push(sql`(
-        ${counterparties.segments}->>${catKey} = ${optKey}
-        OR ${counterparties.segments}->${catKey} @> ${JSON.stringify([optKey])}::jsonb
-      )`);
+    const segments = query.segment.split(',').filter(Boolean);
+    for (const seg of segments) {
+      const [catKey, optKey] = seg.split(':');
+      if (catKey && optKey) {
+        // Match both single-select (string) and multi-select (array contains).
+        // catKey/optKey are bound as parameters (not sql.raw) to avoid SQL injection.
+        conditions.push(sql`(
+          ${counterparties.segments}->>${catKey} = ${optKey}
+          OR ${counterparties.segments}->${catKey} @> ${JSON.stringify([optKey])}::jsonb
+        )`);
+      }
     }
   }
 

@@ -15,9 +15,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-// ═══════════════════════════════════════════════════════════════════════
-//  Searchable Dropdown — Filterable select with keyboard nav
-// ═══════════════════════════════════════════════════════════════════════
+//  Searchable Dropdown — Filterable select with keyboard nav + optional multi-select
 
 export interface DropdownOption {
   value: string;
@@ -32,26 +30,69 @@ export interface DropdownOption {
   host: { class: 'relative block' },
   template: `
     <div class="relative" #trigger>
-      <input
-        type="text"
-        [value]="searchText()"
-        (input)="onSearch($event)"
-        (focus)="open()"
-        (keydown.arrowDown)="onArrowDown($event)"
-        (keydown.arrowUp)="onArrowUp($event)"
-        (keydown.enter)="onEnter($event)"
-        (keydown.escape)="close()"
-        [placeholder]="placeholder()"
-        [attr.aria-expanded]="isOpen()"
-        aria-haspopup="listbox"
-        role="combobox"
-        autocomplete="off"
-        class="w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
-        [class.pr-16]="clearable() && selected()"
-        [class.pr-8]="!clearable() || !selected()"
-      />
-      <!-- Clear button -->
-      @if (clearable() && selected()) {
+      @if (multiSelect() && selectedValues().length > 0) {
+        <!-- Multi-select: chips + inline input -->
+        <div
+          class="flex min-h-[38px] flex-wrap items-center gap-1 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-2 py-1.5 text-sm shadow-sm focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600/20"
+          (click)="onInputClick()"
+        >
+          @for (chip of selectedChips(); track chip.value) {
+            <span class="inline-flex items-center gap-1 rounded-full bg-brand-50 dark:bg-brand-500/15 px-2 py-0.5 text-xs font-medium text-brand-700 dark:text-brand-400">
+              {{ chip.label }}
+              <button
+                type="button"
+                (click)="removeValue($event, chip.value)"
+                class="text-brand-600 hover:text-brand-800 dark:text-brand-400 dark:hover:text-brand-300"
+                aria-label="Remove {{ chip.label }}"
+              >
+                <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                </svg>
+              </button>
+            </span>
+          }
+          <input
+            type="text"
+            [value]="searchText()"
+            (input)="onSearch($event)"
+            (focus)="open()"
+            (click)="onInputClick()"
+            (keydown.arrowDown)="onArrowDown($event)"
+            (keydown.arrowUp)="onArrowUp($event)"
+            (keydown.enter)="onEnter($event)"
+            (keydown.escape)="close()"
+            [placeholder]="selectedValues().length ? '' : placeholder()"
+            [attr.aria-expanded]="isOpen()"
+            aria-haspopup="listbox"
+            role="combobox"
+            autocomplete="off"
+            class="min-w-[60px] flex-1 border-0 bg-transparent p-0 text-sm outline-none ring-0 placeholder:text-gray-400 dark:placeholder:text-muted"
+          />
+        </div>
+      } @else {
+        <!-- Single-select: plain input -->
+        <input
+          type="text"
+          [value]="searchText()"
+          (input)="onSearch($event)"
+          (focus)="open()"
+          (click)="onInputClick()"
+          (keydown.arrowDown)="onArrowDown($event)"
+          (keydown.arrowUp)="onArrowUp($event)"
+          (keydown.enter)="onEnter($event)"
+          (keydown.escape)="close()"
+          [placeholder]="placeholder()"
+          [attr.aria-expanded]="isOpen()"
+          aria-haspopup="listbox"
+          role="combobox"
+          autocomplete="off"
+          class="w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+          [class.pr-16]="clearable() && selected()"
+          [class.pr-8]="!clearable() || !selected()"
+        />
+      }
+      <!-- Clear button (single-select only) -->
+      @if (clearable() && selected() && !multiSelect()) {
         <button
           type="button"
           (click)="clear($event)"
@@ -63,13 +104,15 @@ export interface DropdownOption {
           </svg>
         </button>
       }
-      <!-- Chevron -->
-      <svg
-        class="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-muted"
-        xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-      >
-        <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-      </svg>
+      <!-- Chevron (single-select only, to avoid overlap with chips) -->
+      @if (!multiSelect() || selectedValues().length === 0) {
+        <svg
+          class="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-muted"
+          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+        >
+          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+        </svg>
+      }
     </div>
 
     <!-- Dropdown panel (fixed positioning to escape overflow containers) -->
@@ -84,10 +127,10 @@ export interface DropdownOption {
         @for (opt of filteredOptions(); track opt.value; let i = $index) {
           <li
             role="option"
-            [attr.aria-selected]="opt.value === selected()"
+            [attr.aria-selected]="isOptionSelected(opt)"
             [class.bg-brand-50]="i === highlightIndex()"
             [class.text-brand-700]="i === highlightIndex()"
-            [class.font-semibold]="opt.value === selected()"
+            [class.font-semibold]="isOptionSelected(opt)"
             class="cursor-pointer px-3 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-surface-tint"
             (mousedown)="onOptionPointerDown($event, opt)"
             (mouseenter)="highlightIndex.set(i)"
@@ -100,7 +143,7 @@ export interface DropdownOption {
                     {{ opt.actionLabel }}
                   </span>
                 }
-                @if (opt.value === selected()) {
+                @if (isOptionSelected(opt)) {
                   <svg class="h-4 w-4 text-brand-600 dark:text-brand-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
                   </svg>
@@ -140,7 +183,13 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
   readonly loading = input(false);
   /** Enable async/typeahead mode — disables local filtering, parent controls options */
   readonly asyncSearch = input(false);
+  /** Enable multi-select mode — user can select multiple values shown as chips */
+  readonly multiSelect = input(false);
+  /** Selected values for multi-select mode */
+  readonly selectedValues = input<string[]>([]);
   readonly selectionChange = output<string>();
+  /** Emits selected values array in multi-select mode */
+  readonly multiSelectionChange = output<string[]>();
   /** Emits search term when user types >= minSearchLength chars. Use for async/typeahead search. */
   readonly searchChange = output<string>();
 
@@ -158,6 +207,15 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
   readonly dropdownWidth = signal(0);
   private readonly minDropdownWidth = 200;
   private readonly dropdownMaxHeight = 192; // max-h-48 = 12rem = 192px
+
+  /** Chips to display for selected values in multi-select mode */
+  readonly selectedChips = computed(() => {
+    if (!this.multiSelect()) return [];
+    const selected = this.selectedValues();
+    return this.options()
+      .filter((o) => selected.includes(o.value))
+      .map((o) => ({ value: o.value, label: o.label }));
+  });
 
   readonly filteredOptions = computed(() => {
     const term = this.searchText().toLowerCase();
@@ -184,6 +242,7 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
   constructor() {
     effect(() => {
       if (this.isOpen()) return;
+      if (this.multiSelect()) return; // In multi-select, search text is managed differently
       const sel = this.selected();
       const match = this.options().find((o) => o.value === sel);
       this.searchText.set(match?.label ?? this.selectedLabel() ?? '');
@@ -201,6 +260,11 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
   }
 
+  /** Click on input — reopen dropdown if closed (fixes click-to-reopen when already focused) */
+  onInputClick(): void {
+    if (!this.isOpen()) this.open();
+  }
+
   open(): void {
     this.updateDropdownPosition();
     this.isOpen.set(true);
@@ -210,6 +274,11 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     if (this.asyncSearch()) {
       this.searchChange.emit('');
     }
+  }
+
+  isOptionSelected(opt: DropdownOption): boolean {
+    if (this.multiSelect()) return this.selectedValues().includes(opt.value);
+    return opt.value === this.selected();
   }
 
   private updateDropdownPosition(): void {
@@ -237,10 +306,14 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
 
   close(): void {
     this.isOpen.set(false);
-    // Restore display text — fall back to selectedLabel for async fields where options may be empty
-    const sel = this.selected();
-    const match = this.options().find((o) => o.value === sel);
-    this.searchText.set(match?.label ?? this.selectedLabel() ?? '');
+    if (!this.multiSelect()) {
+      // Restore display text — fall back to selectedLabel for async fields where options may be empty
+      const sel = this.selected();
+      const match = this.options().find((o) => o.value === sel);
+      this.searchText.set(match?.label ?? this.selectedLabel() ?? '');
+    } else {
+      this.searchText.set('');
+    }
   }
 
   onSearch(event: Event): void {
@@ -259,9 +332,31 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
   }
 
   selectOption(opt: DropdownOption): void {
-    this.searchText.set(opt.label);
-    this.selectionChange.emit(opt.value);
-    this.isOpen.set(false);
+    if (this.multiSelect()) {
+      const current = this.selectedValues();
+      const isSelected = current.includes(opt.value);
+      const next = isSelected
+        ? current.filter((v) => v !== opt.value)
+        : [...current, opt.value];
+      this.multiSelectionChange.emit(next);
+      // Keep dropdown open, clear search for next selection
+      this.searchText.set('');
+      this.highlightIndex.set(0);
+      // Re-calculate position since chips may have changed the input height
+      this.updateDropdownPosition();
+    } else {
+      this.searchText.set(opt.label);
+      this.selectionChange.emit(opt.value);
+      this.isOpen.set(false);
+    }
+  }
+
+  /** Remove a selected value in multi-select mode (chip X button) */
+  removeValue(event: Event, value: string): void {
+    event.stopPropagation();
+    event.preventDefault();
+    const next = this.selectedValues().filter((v) => v !== value);
+    this.multiSelectionChange.emit(next);
   }
 
   onOptionPointerDown(event: MouseEvent, opt: DropdownOption): void {

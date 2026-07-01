@@ -467,8 +467,8 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   readonly filterState = signal<FilterState>({ ...EMPTY_FILTERS });
   private readonly filterStorageKey = 'filter_places';
   readonly filterFields = computed<FilterFieldDef[]>(() => [
-    { key: 'placeType', label: 'Type', type: 'dropdown', options: PLACE_TYPE_OPTIONS },
-    { key: 'responsibleUserId', label: 'Responsible', type: 'dropdown', options: this.users().map((u) => ({ value: u.id, label: u.name })) },
+    { key: 'placeType', label: 'Type', type: 'dropdown', multiSelect: true, options: PLACE_TYPE_OPTIONS },
+    { key: 'responsibleUserId', label: 'Responsible', type: 'dropdown', multiSelect: true, options: this.users().map((u) => ({ value: u.id, label: u.name })) },
   ]);
   readonly activeFilterPills = computed(() => {
     const f = this.filterState();

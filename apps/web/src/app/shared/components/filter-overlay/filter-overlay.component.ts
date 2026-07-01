@@ -32,6 +32,8 @@ export interface FilterFieldDef {
   options?: DropdownOption[];
   /** Async search function for type='dropdown' — parent provides. */
   searchFn?: (term: string) => Promise<DropdownOption[]>;
+  /** Enable multi-select mode — user can select multiple values as chips. */
+  multiSelect?: boolean;
 }
 
 @Component({
@@ -85,12 +87,15 @@ export interface FilterFieldDef {
                       [options]="getOptions(field)()"
                       [selected]="draft()[field.key] ?? ''"
                       [selectedLabel]="draft().labels[field.key] || ''"
+                      [selectedValues]="getSelectedValues(field.key)"
                       [loading]="getLoading(field.key)()"
                       [asyncSearch]="!!field.searchFn"
+                      [multiSelect]="!!field.multiSelect"
                       [clearable]="true"
                       [minSearchLength]="1"
                       (searchChange)="onAsyncSearch(field, $event)"
                       (selectionChange)="onFieldChange(field.key, $event)"
+                      (multiSelectionChange)="onMultiFieldChange(field, $event)"
                     />
                   </div>
                 }
@@ -228,7 +233,8 @@ export class FilterOverlayComponent {
     let count = 0;
     for (const [key, val] of Object.entries(f)) {
       if (key === 'labels') continue;
-      if (typeof val === 'string' && val?.trim()) count++;
+      if (Array.isArray(val) && val.length > 0) count++;
+      else if (typeof val === 'string' && val?.trim()) count++;
     }
     return count;
   });
@@ -252,13 +258,42 @@ export class FilterOverlayComponent {
     });
   }
 
-  /** Checks if any non-labels values in the state are non-empty strings. */
+  /** Checks if any non-labels values in the state are non-empty. */
   private hasActiveFilters(state: FilterState): boolean {
     for (const [key, val] of Object.entries(state)) {
       if (key === 'labels') continue;
+      if (Array.isArray(val) && val.length > 0) return true;
       if (typeof val === 'string' && val.trim()) return true;
     }
     return false;
+  }
+
+  /** Get selected values array for multi-select fields */
+  getSelectedValues(key: string): string[] {
+    const val = this.draft()[key];
+    return Array.isArray(val) ? val : [];
+  }
+
+  /** Handle multi-select field changes */
+  onMultiFieldChange(field: FilterFieldDef, values: string[]): void {
+    const key = field.key;
+    this.draft.update((d) => {
+      const next = { ...d, [key]: values } as FilterState;
+      // Build labels for all selected values
+      const opts = field.options ?? this.asyncOptions()[key] ?? [];
+      const labels: Record<string, string> = {};
+      for (const v of values) {
+        const match = opts.find((o) => o.value === v);
+        if (match) labels[v] = match.label;
+      }
+      const { [key]: _removed, ...restLabels } = d.labels;
+      next.labels = { ...restLabels };
+      // Store labels as comma-separated for display in pills
+      if (values.length > 0) {
+        next.labels[key] = values.map((v) => labels[v] ?? v).join(', ');
+      }
+      return next;
+    });
   }
 
   @HostListener('document:keydown.escape')

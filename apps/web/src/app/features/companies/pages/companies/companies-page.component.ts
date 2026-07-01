@@ -150,12 +150,46 @@ interface CompanySearchResult {
 
         </div>
 
-        <!-- Filter overlay -->
-        <app-filter-overlay
-          [filters]="filterState()"
-          [fields]="filterFields()"
-          (filtersChange)="onFiltersChange($event)"
-        />
+        <!-- Filter overlay + Column config -->
+        <div class="flex items-center gap-2">
+          <app-filter-overlay
+            [filters]="filterState()"
+            [fields]="filterFields()"
+            (filtersChange)="onFiltersChange($event)"
+          />
+
+          <!-- Column config -->
+          <div class="relative" #colConfigContainer>
+            <button
+              type="button"
+              (click)="showColumnConfig.set(!showColumnConfig())"
+              class="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h9.5A2.25 2.25 0 0117 4.25v2.5A2.25 2.25 0 0114.75 9h-9.5A2.25 2.25 0 013 6.75v-2.5zM4.5 4.25a.75.75 0 01.75-.75h9.5a.75.75 0 01.75.75v2.5a.75.75 0 01-.75.75h-9.5a.75.75 0 01-.75-.75v-2.5zM3 13.25A2.25 2.25 0 015.25 11h9.5A2.25 2.25 0 0117 13.25v2.5A2.25 2.25 0 0114.75 18h-9.5A2.25 2.25 0 013 15.75v-2.5zM4.5 13.25a.75.75 0 01.75-.75h9.5a.75.75 0 01.75.75v2.5a.75.75 0 01-.75.75h-9.5a.75.75 0 01-.75-.75v-2.5z" clip-rule="evenodd" />
+              </svg>
+              Columns
+            </button>
+            @if (showColumnConfig()) {
+              <div class="fixed inset-0 z-40" (click)="showColumnConfig.set(false)"></div>
+              <div class="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg py-1">
+                @for (col of columns; track col.key) {
+                  @if (col.key !== 'creditLimit' || auth.canSeePrices()) {
+                    <label class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint cursor-pointer">
+                      <input
+                        type="checkbox"
+                        [checked]="columnConfig()[col.key] !== false"
+                        (change)="toggleColumn(col.key)"
+                        class="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      {{ col.label }}
+                    </label>
+                  }
+                }
+              </div>
+            }
+          </div>
+        </div>
       </div>
 
       <!-- Active filter pills -->
@@ -192,22 +226,39 @@ interface CompanySearchResult {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
+                @if (isColVisible('name')) {
                 <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
+                }
+                @if (isColVisible('type')) {
                 <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Type</th>
+                }
+                @if (isColVisible('country')) {
                 <th app-sort-header field="country" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Country</th>
+                }
+                @if (isColVisible('sanctioned')) {
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Sanctioned</th>
-                @if (auth.canSeePrices()) {
+                }
+                @if (auth.canSeePrices() && isColVisible('creditLimit')) {
                 <th app-sort-header field="creditLimit" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Credit Limit</th>
                 }
+                @if (isColVisible('contacts')) {
                 <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Contacts</th>
+                }
+                @if (isColVisible('responsible')) {
                 <th app-sort-header field="responsible" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Responsible</th>
+                }
+                @if (isColVisible('source')) {
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Source</th>
+                }
+                @if (isColVisible('actions')) {
                 <th class="px-4 py-3 w-10"></th>
+                }
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (company of companies(); track company.id) {
                 <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="goToCompany(company.id)">
+                  @if (isColVisible('name')) {
                   <td class="px-4 py-3">
                     <span class="font-medium text-gray-900 dark:text-ink">{{ company.name }}</span>
                     @if (company.parentName) {
@@ -231,6 +282,8 @@ interface CompanySearchResult {
                       </div>
                     }
                   </td>
+                  }
+                  @if (isColVisible('type')) {
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">
                       @for (t of (company.types.length ? company.types : [company.type]); track t) {
@@ -241,12 +294,16 @@ interface CompanySearchResult {
                       }
                     </div>
                   </td>
+                  }
+                  @if (isColVisible('country')) {
                   <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                     {{ flagEmoji(company.countryIso) }} {{ countryLabel(company.countryIso || company.country) || '—' }}
                     @if (company.countryIso && company.countryIso !== company.country) {
                       <span class="text-gray-400 dark:text-muted text-xs ml-1">({{ company.countryIso }})</span>
                     }
                   </td>
+                  }
+                  @if (isColVisible('sanctioned')) {
                   <td class="px-4 py-3">
                     @if (company.isSanctioned) {
                       <span class="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
@@ -259,7 +316,8 @@ interface CompanySearchResult {
                       <span class="text-xs text-gray-400 dark:text-muted">No</span>
                     }
                   </td>
-                  @if (auth.canSeePrices()) {
+                  }
+                  @if (auth.canSeePrices() && isColVisible('creditLimit')) {
                   <td class="px-4 py-3 text-right text-gray-700 dark:text-ink-dim font-medium tabular-nums">
                     @if (company.creditLimit && +company.creditLimit > 0) {
                       {{ formatCreditLimit(+company.creditLimit) }}
@@ -268,12 +326,17 @@ interface CompanySearchResult {
                     }
                   </td>
                   }
+                  @if (isColVisible('contacts')) {
                   <td class="px-4 py-3 text-center text-gray-600 dark:text-ink-dim">
                     {{ company.contactsCount ?? 0 }}
                   </td>
+                  }
+                  @if (isColVisible('responsible')) {
                   <td class="px-4 py-3 text-sm text-gray-600 dark:text-ink-dim">
                     {{ company.responsibleUserName ?? '—' }}
                   </td>
+                  }
+                  @if (isColVisible('source')) {
                   <td class="px-4 py-3">
                     @if (company.seasearcherId) {
                       <span class="inline-flex rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400">Imported</span>
@@ -281,6 +344,8 @@ interface CompanySearchResult {
                       <span class="inline-flex rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-ink-dim">Manual</span>
                     }
                   </td>
+                  }
+                  @if (isColVisible('actions')) {
                   <td class="px-4 py-3">
                     <button
                       (click)="confirmDelete(company, $event)"
@@ -292,10 +357,11 @@ interface CompanySearchResult {
                       </svg>
                     </button>
                   </td>
+                  }
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="9" class="px-4 py-8 text-center text-gray-400 dark:text-muted">No companies found</td>
+                  <td [attr.colspan]="columnCount()" class="px-4 py-8 text-center text-gray-400 dark:text-muted">No companies found</td>
                 </tr>
               }
             </tbody>
@@ -355,10 +421,10 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   readonly total = signal(0);
   readonly currentPage = signal(1);
   readonly loading = signal(true);
-  readonly filterType = signal('');
-  readonly filterResponsible = signal('');
-  readonly filterCountry = signal('');
-  readonly filterSegment = signal(''); // format: "categoryKey:optionKey"
+  readonly filterType = signal<string | string[]>([]);
+  readonly filterResponsible = signal<string | string[]>([]);
+  readonly filterCountry = signal<string | string[]>([]);
+  readonly filterSegment = signal<string | string[]>([]); // format: "categoryKey:optionKey"
   readonly sortBy = signal('');
   readonly sortDir = signal<'asc' | 'desc'>('asc');
   readonly users = signal<{ id: string; name: string; email: string }[]>([]);
@@ -370,9 +436,9 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   private readonly filterStorageKey = 'filter_companies';
   readonly filterFields = computed<FilterFieldDef[]>(() => {
     const fields: FilterFieldDef[] = [
-      { key: 'type', label: 'Type', type: 'dropdown', options: this.availableTypes().map((t) => ({ value: t, label: this.typeLabel(t) })) },
-      { key: 'responsibleUserId', label: 'Responsible', type: 'dropdown', options: this.users().map((u) => ({ value: u.id, label: u.name })) },
-      { key: 'countryIso', label: 'Country', type: 'dropdown', options: this.countries.map((c) => ({ value: c.code, label: c.name })) },
+      { key: 'type', label: 'Type', type: 'dropdown', multiSelect: true, options: this.availableTypes().map((t) => ({ value: t, label: this.typeLabel(t) })) },
+      { key: 'responsibleUserId', label: 'Responsible', type: 'dropdown', multiSelect: true, options: this.users().map((u) => ({ value: u.id, label: u.name })) },
+      { key: 'countryIso', label: 'Country', type: 'dropdown', multiSelect: true, options: this.countries.map((c) => ({ value: c.code, label: c.name })) },
     ];
     if (this.segmentCategories().length > 0) {
       const segmentOpts: DropdownOption[] = [];
@@ -381,19 +447,67 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
           segmentOpts.push({ value: cat.key + ':' + opt.key, label: cat.label + ': ' + opt.label });
         }
       }
-      fields.push({ key: 'segment', label: 'Segment', type: 'dropdown', options: segmentOpts });
+      fields.push({ key: 'segment', label: 'Segment', type: 'dropdown', multiSelect: true, options: segmentOpts });
     }
     return fields;
   });
   readonly activeFilterPills = computed(() => {
     const f = this.filterState();
     const pills: Array<{ key: string; label: string; value: string }> = [];
-    if (f['type']) pills.push({ key: 'type', label: 'Type', value: f.labels['type'] ?? f['type'] });
-    if (f['responsibleUserId']) pills.push({ key: 'responsibleUserId', label: 'Responsible', value: f.labels['responsibleUserId'] ?? f['responsibleUserId'] });
-    if (f['countryIso']) pills.push({ key: 'countryIso', label: 'Country', value: f.labels['countryIso'] ?? f['countryIso'] });
-    if (f['segment']) pills.push({ key: 'segment', label: 'Segment', value: f.labels['segment'] ?? f['segment'] });
+    const addPill = (key: string, label: string, val: unknown) => {
+      if (!val) return;
+      if (Array.isArray(val)) { if (val.length) pills.push({ key, label, value: f.labels[key] ?? val.join(', ') }); }
+      else if (typeof val === 'string' && val) pills.push({ key, label, value: f.labels[key] ?? val });
+    };
+    addPill('type', 'Type', f['type']);
+    addPill('responsibleUserId', 'Responsible', f['responsibleUserId']);
+    addPill('countryIso', 'Country', f['countryIso']);
+    addPill('segment', 'Segment', f['segment']);
     return pills;
   });
+
+  // Column config
+  private readonly colConfigKey = 'companies_columns';
+  readonly columnConfig = signal<Record<string, boolean>>({
+    name: true, type: true, country: true, sanctioned: true,
+    creditLimit: true, contacts: true, responsible: true, source: true, actions: true,
+  });
+  readonly showColumnConfig = signal(false);
+  readonly columns = [
+    { key: 'name', label: 'Name' },
+    { key: 'type', label: 'Type' },
+    { key: 'country', label: 'Country' },
+    { key: 'sanctioned', label: 'Sanctioned' },
+    { key: 'creditLimit', label: 'Credit Limit' },
+    { key: 'contacts', label: 'Contacts' },
+    { key: 'responsible', label: 'Responsible' },
+    { key: 'source', label: 'Source' },
+    { key: 'actions', label: 'Actions' },
+  ];
+  readonly visibleColumns = computed(() => this.columns.filter((c) => this.columnConfig()[c.key] !== false));
+  isColVisible(key: string): boolean { return this.columnConfig()[key] !== false; }
+  readonly columnCount = computed(() => {
+    const cfg = this.columnConfig();
+    let count = Object.values(cfg).filter(Boolean).length;
+    if (!this.auth.canSeePrices() && cfg['creditLimit']) count--; // credit limit hidden for light users
+    return count;
+  });
+
+  toggleColumn(key: string): void {
+    this.columnConfig.update((c) => ({ ...c, [key]: c[key] === false }));
+    this.saveColumnConfig();
+  }
+
+  private loadColumnConfig(): void {
+    try {
+      const raw = localStorage.getItem(this.colConfigKey);
+      if (raw) this.columnConfig.set({ ...this.columnConfig(), ...JSON.parse(raw) });
+    } catch { /* ignore */ }
+  }
+
+  private saveColumnConfig(): void {
+    try { localStorage.setItem(this.colConfigKey, JSON.stringify(this.columnConfig())); } catch { /* ignore */ }
+  }
 
   // Search / typeahead
   readonly searchTerm = signal('');
@@ -424,6 +538,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadSavedFilters();
+    this.loadColumnConfig();
 
     // Restore page & filter from URL query params
     const params = this.route.snapshot.queryParamMap;
@@ -494,10 +609,14 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     const params = new URLSearchParams();
     params.set('page', String(this.currentPage()));
     params.set('limit', String(this.pageSize));
-    if (this.filterType()) params.set('type', this.filterType());
-    if (this.filterResponsible()) params.set('responsibleUserId', this.filterResponsible());
-    if (this.filterCountry()) params.set('countryIso', this.filterCountry());
-    if (this.filterSegment()) params.set('segment', this.filterSegment());
+    const typeVal = this.filterType();
+    if (typeVal) { const s = Array.isArray(typeVal) ? typeVal.join(',') : typeVal; if (s) params.set('type', s); }
+    const respVal = this.filterResponsible();
+    if (respVal) { const s = Array.isArray(respVal) ? respVal.join(',') : respVal; if (s) params.set('responsibleUserId', s); }
+    const countryVal = this.filterCountry();
+    if (countryVal) { const s = Array.isArray(countryVal) ? countryVal.join(',') : countryVal; if (s) params.set('countryIso', s); }
+    const segVal = this.filterSegment();
+    if (segVal) { const s = Array.isArray(segVal) ? segVal.join(',') : segVal; if (s) params.set('segment', s); }
     if (this.sortBy()) params.set('sortBy', this.sortBy());
     if (this.sortBy()) params.set('sortDir', this.sortDir());
 
@@ -600,12 +719,13 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   }
 
   updateUrlParams(): void {
+    const toStr = (v: string | string[]) => Array.isArray(v) ? v.join(',') : v;
     const queryParams: Record<string, string | null> = {
       page: this.currentPage() > 1 ? String(this.currentPage()) : null,
-      type: this.filterType() || null,
-      responsible: this.filterResponsible() || null,
-      countryIso: this.filterCountry() || null,
-      segment: this.filterSegment() || null,
+      type: toStr(this.filterType()) || null,
+      responsible: toStr(this.filterResponsible()) || null,
+      countryIso: toStr(this.filterCountry()) || null,
+      segment: toStr(this.filterSegment()) || null,
       sortBy: this.sortBy() || null,
       sortDir: this.sortBy() ? this.sortDir() : null,
     };
@@ -627,15 +747,15 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
 
   removeFilter(key: string): void {
     this.filterState.update((f) => {
-      const next = { ...f, [key]: '' };
+      const next = { ...f, [key]: Array.isArray(f[key]) ? [] : '' };
       const { [key]: _removed, ...restLabels } = f.labels;
       next.labels = restLabels;
       return next;
     });
-    if (key === 'type') this.filterType.set('');
-    if (key === 'responsibleUserId') this.filterResponsible.set('');
-    if (key === 'countryIso') this.filterCountry.set('');
-    if (key === 'segment') this.filterSegment.set('');
+    if (key === 'type') this.filterType.set([]);
+    if (key === 'responsibleUserId') this.filterResponsible.set([]);
+    if (key === 'countryIso') this.filterCountry.set([]);
+    if (key === 'segment') this.filterSegment.set([]);
     this.currentPage.set(1);
     this.saveFilters();
     this.loadCompanies();

@@ -417,8 +417,8 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
   readonly filterState = signal<FilterState>({ ...EMPTY_FILTERS });
   private readonly filterStorageKey = 'filter_vessels';
   readonly filterFields = computed<FilterFieldDef[]>(() => [
-    { key: 'type', label: 'Type', type: 'dropdown', options: this.vesselTypes().map((t) => ({ value: t, label: t })) },
-    { key: 'flag', label: 'Flag', type: 'dropdown', options: SELECTABLE_COUNTRIES.map((c) => ({ value: c.code, label: c.name })) },
+    { key: 'type', label: 'Type', type: 'dropdown', multiSelect: true, options: this.vesselTypes().map((t) => ({ value: t, label: t })) },
+    { key: 'flag', label: 'Flag', type: 'dropdown', multiSelect: true, options: SELECTABLE_COUNTRIES.map((c) => ({ value: c.code, label: c.name })) },
   ]);
   readonly activeFilterPills = computed(() => {
     const f = this.filterState();

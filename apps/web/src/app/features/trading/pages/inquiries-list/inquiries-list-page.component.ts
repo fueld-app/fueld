@@ -518,10 +518,10 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     { key: 'clientId', label: 'Client', type: 'dropdown', searchFn: (term) => this.searchCompanies('CLIENT', term) },
     { key: 'vesselId', label: 'Vessel', type: 'dropdown', searchFn: (term) => this.searchVessels(term) },
     { key: 'placeId', label: 'Place', type: 'dropdown', searchFn: (term) => this.searchPlaces(term) },
-    { key: 'salesRepId', label: 'Responsible', type: 'dropdown', options: this.responsibleFilterOptions() },
+    { key: 'salesRepId', label: 'Responsible', type: 'dropdown', multiSelect: true, options: this.responsibleFilterOptions() },
     { key: 'brokerId', label: 'Broker', type: 'dropdown', searchFn: (term) => this.searchCompanies('BROKER', term) },
     { key: 'invoicingCompanyId', label: 'Invoicing Company', type: 'dropdown', searchFn: (term) => this.searchInvoicingCompanies(term) },
-    { key: 'productType', label: 'Product', type: 'dropdown', options: this.productOptions() },
+    { key: 'productType', label: 'Product', type: 'dropdown', multiSelect: true, options: this.productOptions() },
     { key: 'eta', label: 'ETA', type: 'date-range' },
     { key: 'created', label: 'Created', type: 'date-range' },
   ]);
