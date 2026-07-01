@@ -225,6 +225,11 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     return this.options().filter((o) => o.label.toLowerCase().includes(term));
   });
 
+  @HostListener('window:scroll')
+  onScroll(): void {
+    if (this.isOpen()) this.close();
+  }
+
   @HostListener('window:resize')
   onResize(): void {
     if (this.isOpen()) this.close();
@@ -232,14 +237,6 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
 
   private clickOutside = (e: MouseEvent) => {
     if (!this.elRef.nativeElement.contains(e.target)) this.close();
-  };
-
-  // Capture-mode scroll listener catches scroll on ANY element (e.g. overflow-y-auto containers).
-  // But ignore scroll events that originate from within the component (e.g. scrolling the dropdown list itself).
-  private captureScroll = (e: Event) => {
-    if (!this.isOpen()) return;
-    if (this.elRef.nativeElement.contains(e.target)) return; // scrolling inside our own dropdown — keep open
-    this.close();
   };
 
   constructor() {
@@ -254,12 +251,10 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     document.addEventListener('click', this.clickOutside);
-    document.addEventListener('scroll', this.captureScroll, true); // capture = catch all scrollable ancestors
   }
 
   ngOnDestroy(): void {
     document.removeEventListener('click', this.clickOutside);
-    document.removeEventListener('scroll', this.captureScroll, true);
     if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
   }
 
