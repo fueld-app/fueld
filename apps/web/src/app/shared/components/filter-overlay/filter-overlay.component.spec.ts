@@ -182,6 +182,22 @@ describe('FilterOverlayComponent', () => {
 
   // ── Gap 2: Async search staleness guard ────────────────────────────
 
+  it('should not set loading state for static-option fields (no searchFn)', async () => {
+    const field: FilterFieldDef = {
+      key: 'type',
+      label: 'Type',
+      type: 'dropdown',
+      options: [{ value: 'CLIENT', label: 'Client' }, { value: 'SUPPLIER', label: 'Supplier' }],
+    };
+    const { component } = setup(EMPTY_FILTERS, null);
+
+    // Simulate user typing in a static-option field
+    await component.onAsyncSearch(field, 'cli');
+
+    // Loading state should NOT be set for fields without searchFn
+    expect(component.asyncLoading()['type']).toBeFalsy();
+  });
+
   it('should ignore stale async search responses', async () => {
     let resolveA: (opts: DropdownOption[]) => void = () => {};
     let resolveB: (opts: DropdownOption[]) => void = () => {};

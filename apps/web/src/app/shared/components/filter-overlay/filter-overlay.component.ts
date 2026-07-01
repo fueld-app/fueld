@@ -334,6 +334,9 @@ export class FilterOverlayComponent {
   private latestSearchTerms: Record<string, string> = {};
 
   async onAsyncSearch(field: FilterFieldDef, term: string): Promise<void> {
+    // Static-option fields use local filtering in SearchableDropdownComponent —
+    // skip async search entirely so loading state isn't stuck on.
+    if (!field.searchFn) return;
     const key = field.key;
     if (this.searchTimeouts[key]) clearTimeout(this.searchTimeouts[key]!);
     // Set loading immediately so the dropdown shows a spinner instead of "No results"
