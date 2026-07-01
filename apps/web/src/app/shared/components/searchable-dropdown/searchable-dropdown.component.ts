@@ -234,9 +234,12 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     if (!this.elRef.nativeElement.contains(e.target)) this.close();
   };
 
-  // Capture-mode scroll listener catches scroll on ANY element (e.g. overflow-y-auto containers)
-  private captureScroll = () => {
-    if (this.isOpen()) this.close();
+  // Capture-mode scroll listener catches scroll on ANY element (e.g. overflow-y-auto containers).
+  // But ignore scroll events that originate from within the component (e.g. scrolling the dropdown list itself).
+  private captureScroll = (e: Event) => {
+    if (!this.isOpen()) return;
+    if (this.elRef.nativeElement.contains(e.target)) return; // scrolling inside our own dropdown — keep open
+    this.close();
   };
 
   constructor() {
