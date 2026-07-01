@@ -87,7 +87,7 @@ interface CompanySearchResult {
 
           <!-- Typeahead dropdown -->
           @if (dropdownOpen() && searchDone()) {
-            <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-80 overflow-y-auto">
+            <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-80 overflow-y-auto overscroll-contain">
               @for (r of searchResults(); track r.seasearcherId ?? r.localId) {
                 <div (click)="onTypeaheadClick(r)" class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors border-b border-gray-50 last:border-0 cursor-pointer">
                   <div class="min-w-0 flex-1">

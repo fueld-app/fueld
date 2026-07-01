@@ -84,7 +84,7 @@ interface ContactSuggestion {
     <!-- Dropdown suggestions -->
     @if (showDropdown() && suggestions().length > 0) {
       <div class="relative">
-        <div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg">
+        <div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg">
           @for (s of suggestions(); track s.email) {
             <button
               type="button"

@@ -75,7 +75,7 @@ export interface FilterFieldDef {
           </div>
 
           <!-- Filter fields -->
-          <div class="max-h-[60vh] overflow-y-auto px-4 py-4 space-y-4">
+          <div class="max-h-[60vh] overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
             <!-- Dropdown fields -->
             @if (dropdownFields().length > 0) {
               <div class="grid grid-cols-2 gap-3">

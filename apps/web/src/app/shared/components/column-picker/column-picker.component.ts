@@ -42,7 +42,7 @@ export interface ColumnOption {
           (click)="$event.stopPropagation()"
         >
           <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Visible columns</p>
-          <div class="max-h-72 space-y-1 overflow-y-auto">
+          <div class="max-h-72 space-y-1 overflow-y-auto overscroll-contain">
             @for (col of orderedColumns(); track col.field) {
               <div class="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-gray-50 dark:hover:bg-surface-tint">
                 <input
