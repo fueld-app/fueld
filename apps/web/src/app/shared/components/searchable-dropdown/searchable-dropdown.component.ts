@@ -122,7 +122,7 @@ export interface DropdownOption {
         [style.top.px]="dropdownTop()"
         [style.left.px]="dropdownLeft()"
         [style.width.px]="dropdownWidth()"
-        class="fixed z-[9999] max-h-48 overflow-auto rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none"
+        class="fixed z-[9999] max-h-48 overflow-auto overscroll-contain rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none"
       >
         @for (opt of filteredOptions(); track opt.value; let i = $index) {
           <li
