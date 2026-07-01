@@ -712,6 +712,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       INVOICED: 'bg-amber-500',
       PAID: 'bg-green-600',
       CANCELLED: 'bg-red-400',
+      LOST: 'bg-red-400',
     };
     return colors[status] ?? 'bg-gray-400';
   }

@@ -219,6 +219,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Invoiced Orders', route: '/trading/invoiced-orders' },
       { label: 'Completed Orders', route: '/trading/completed-orders', hiddenForRoles: ['LIGHT'] },
       { label: 'Cancelled Orders', route: '/trading/cancelled-orders' },
+      { label: 'Lost Inquiries', route: '/trading/lost-inquiries' },
       { label: 'Inquiries', route: '/trading/inquiries' },
     ],
   },

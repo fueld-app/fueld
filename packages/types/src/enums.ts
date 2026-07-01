@@ -9,6 +9,7 @@ export enum OrderStatus {
   Invoiced = 'INVOICED',
   Paid = 'PAID',
   Cancelled = 'CANCELLED',
+  Lost = 'LOST',
 }
 
 /** Product types available for order items. */

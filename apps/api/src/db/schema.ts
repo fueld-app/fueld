@@ -49,6 +49,7 @@ export const orderStatusEnum = pgEnum('order_status', [
   'INVOICED',
   'PAID',
   'CANCELLED',
+  'LOST',
 ]);
 
 export const productTypeEnum = pgEnum('product_type', [

@@ -128,7 +128,7 @@ export async function getTeamStats(
   // 2. Aggregate order items grouped by sales rep
   const fromDate = from ? new Date(`${from}T00:00:00`) : null;
   const toDate = to ? new Date(`${to}T23:59:59`) : null;
-  const revenueExcludedStatuses: (typeof orders.status.enumValues)[number][] = ['INQUIRY', 'CANCELLED'];
+  const revenueExcludedStatuses: (typeof orders.status.enumValues)[number][] = ['INQUIRY', 'CANCELLED', 'LOST'];
   const baseConditions = [
     eq(orders.tenantId, tenantId),
     isNotNull(orders.salesRepId),
@@ -334,7 +334,7 @@ export async function getLossAnalysis(
 ): Promise<{ reasons: LossReason[]; totalCancelled: number }> {
   const conditions = [
     eq(orders.tenantId, tenantId),
-    eq(orders.status, 'CANCELLED'),
+    inArray(orders.status, ['CANCELLED', 'LOST']),
     isNotNull(orders.lossReason),
   ];
   if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
@@ -415,7 +415,7 @@ export async function getConversionMetrics(
         closeDaysSum += days;
         closeDaysCount++;
       }
-    } else if (row.status === 'CANCELLED') {
+    } else if (row.status === 'CANCELLED' || row.status === 'LOST') {
       totalLost++;
     }
   }

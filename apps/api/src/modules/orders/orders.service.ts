@@ -1475,8 +1475,8 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
   if (input.deliveryMethod !== undefined) setData.deliveryMethod = input.deliveryMethod ?? null;
   if (input.responseDeadlineAt !== undefined) setData.responseDeadlineAt = input.responseDeadlineAt ? new Date(input.responseDeadlineAt) : null;
 
-  // Auto-set closedAt when status moves to CANCELLED or PAID
-  if (input.status === 'CANCELLED' || input.status === 'PAID') {
+  // Auto-set closedAt when status moves to CANCELLED, LOST, or PAID
+  if (input.status === 'CANCELLED' || input.status === 'LOST' || input.status === 'PAID') {
     setData.closedAt = new Date();
   }
 
@@ -1845,7 +1845,7 @@ export async function updateOrderStatus(
 
   if (lossReason !== undefined) setData.lossReason = lossReason;
 
-  if (newStatus === 'CANCELLED' || newStatus === 'PAID') {
+  if (newStatus === 'CANCELLED' || newStatus === 'LOST' || newStatus === 'PAID') {
     setData.closedAt = new Date();
   }
 
@@ -2148,7 +2148,7 @@ async function applyInventoryEffectsForStatusChange(args: {
     }
   }
 
-  if (toStatus === 'CANCELLED') {
+  if (toStatus === 'CANCELLED' || toStatus === 'LOST') {
     await inv.releaseReservationsByOrder(orderId);
     // Cancel any LINKED replenishment plans we created for this order.
     const { inventoryReplenishmentPlans: plans } = await import('../../db/schema');

@@ -175,6 +175,22 @@ export const routes: Routes = [
             title: 'Trading > Cancelled Orders',
           },
           {
+            path: 'lost-inquiries',
+            loadComponent: () =>
+              import('./features/trading/pages/lost-inquiries-list/lost-inquiries-list-page.component').then(
+                (m) => m.LostInquiriesListPageComponent,
+              ),
+            title: 'Trading > Lost Inquiries',
+          },
+          {
+            path: 'lost-inquiries/:id',
+            loadComponent: () =>
+              import('./features/trading/pages/order-detail/order-detail-page.component').then(
+                (m) => m.OrderDetailPageComponent,
+              ),
+            title: 'Trading > Lost Inquiries',
+          },
+          {
             path: 'completed-orders/:id',
             canActivate: [lightGuard],
             loadComponent: () =>

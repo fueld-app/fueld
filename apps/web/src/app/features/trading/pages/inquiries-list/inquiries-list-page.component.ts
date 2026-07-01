@@ -334,15 +334,16 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly newInquiryModal = inject(NewInquiryModalService);
   private queryParamSub?: Subscription;
 
-  readonly mode = input<'inquiries' | 'active-orders' | 'delivered-orders' | 'invoiced-orders' | 'completed-orders' | 'cancelled-orders' | undefined>('inquiries');
+  readonly mode = input<'inquiries' | 'active-orders' | 'delivered-orders' | 'invoiced-orders' | 'completed-orders' | 'cancelled-orders' | 'lost-inquiries' | undefined>('inquiries');
   readonly resolvedMode = computed(() => this.mode() ?? 'inquiries');
 
-  readonly isOrders = computed(() => this.resolvedMode() !== 'inquiries');
+  readonly isOrders = computed(() => this.resolvedMode() !== 'inquiries' && this.resolvedMode() !== 'lost-inquiries');
   readonly isActiveOrders = computed(() => this.resolvedMode() === 'active-orders');
   readonly isDeliveredOrders = computed(() => this.resolvedMode() === 'delivered-orders');
   readonly isInvoicedOrders = computed(() => this.resolvedMode() === 'invoiced-orders');
   readonly isCompletedOrders = computed(() => this.resolvedMode() === 'completed-orders');
   readonly isCancelledOrders = computed(() => this.resolvedMode() === 'cancelled-orders');
+  readonly isLostInquiries = computed(() => this.resolvedMode() === 'lost-inquiries');
   readonly baseRoute = computed(() => (
     this.isActiveOrders()
       ? '/trading/orders'
@@ -354,7 +355,9 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
             ? '/trading/completed-orders'
             : this.isCancelledOrders()
               ? '/trading/cancelled-orders'
-              : '/trading/inquiries'
+              : this.isLostInquiries()
+                ? '/trading/lost-inquiries'
+                : '/trading/inquiries'
   ));
   readonly titleText = computed(() => (
     this.isActiveOrders()
@@ -367,7 +370,9 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
             ? 'Completed Orders'
             : this.isCancelledOrders()
               ? 'Cancelled Orders'
-          : 'Inquiries'
+              : this.isLostInquiries()
+                ? 'Lost Inquiries'
+                : 'Inquiries'
   ));
   readonly subtitleText = computed(() =>
     this.isActiveOrders()
@@ -380,7 +385,9 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
             ? 'Orders that are paid and delivered.'
             : this.isCancelledOrders()
               ? 'Orders that have been cancelled.'
-          : 'Manage bunker inquiries and offers before confirmation.',
+              : this.isLostInquiries()
+                ? 'Inquiries that were lost or cancelled before confirmation.'
+                : 'Manage bunker inquiries and offers before confirmation.',
   );
   readonly searchPlaceholder = computed(() =>
     this.isOrders()
@@ -636,6 +643,8 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       params.set('statuses', 'PAID');
     } else if (this.isCancelledOrders()) {
       params.set('statuses', 'CANCELLED');
+    } else if (this.isLostInquiries()) {
+      params.set('statuses', 'LOST');
     } else {
       params.set('statuses', 'INQUIRY,OFFER');
     }

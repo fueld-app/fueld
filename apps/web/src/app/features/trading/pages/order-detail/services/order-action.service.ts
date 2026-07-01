@@ -212,13 +212,15 @@ export class OrderActionService {
     try {
       const res = await firstValueFrom(this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, { status: 'CANCELLED', lossReason }));
       if (res.success) {
-        ctx.updateOrder((o) => ({ ...o, status: 'CANCELLED' as OrderStatus, lossReason }));
+        // API decides actual status: LOST for inquiries, CANCELLED for orders
+        const newStatus = isInquiry ? ('LOST' as OrderStatus) : ('CANCELLED' as OrderStatus);
+        ctx.updateOrder((o) => ({ ...o, status: newStatus, lossReason }));
         const updatedOrder = ctx.order();
         if (updatedOrder?.clientId) await this.financialSvc.loadCustomerCreditLines(updatedOrder.clientId);
         await this.financialSvc.loadSupplierCreditLines(ctx.activeOrderSupplier()?.companyId ?? updatedOrder?.supplierId);
         ctx.cancelModalRef()?.close();
         ctx.showToast('success', `${isInquiry ? 'Inquiry' : 'Order'} cancelled.`);
-        await ctx.normalizeDetailRoute('CANCELLED' as OrderStatus, id);
+        await ctx.normalizeDetailRoute(newStatus, id);
       } else {
         ctx.showToast('error', res.message ?? `Failed to cancel ${isInquiry ? 'inquiry' : 'order'}.`);
       }

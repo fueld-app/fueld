@@ -468,7 +468,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return status === OrderStatus.Delivered
       || status === OrderStatus.Invoiced
       || status === OrderStatus.Paid
-      || status === OrderStatus.Cancelled;
+      || status === OrderStatus.Cancelled
+      || status === OrderStatus.Lost;
   });
 
   readonly allowDeliveredEdit = computed(() => {
@@ -536,11 +537,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly isPaidOrCancelled = computed(() => {
     const status = this.order()?.status;
-    return status === OrderStatus.Paid || status === OrderStatus.Cancelled;
+    return status === OrderStatus.Paid || status === OrderStatus.Cancelled || status === OrderStatus.Lost;
   });
 
 
-  readonly canRecordPayment = computed(() => this.order()?.status !== OrderStatus.Cancelled);
+  readonly canRecordPayment = computed(() => this.order()?.status !== OrderStatus.Cancelled && this.order()?.status !== OrderStatus.Lost);
 
   readonly canEditClient = computed(() => !this.isPaidOrCancelled());
   readonly hasInvoicingCompany = computed(() => !!this.order()?.invoicingCompanyId);
@@ -921,7 +922,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     | '/trading/inquiries'
     | '/trading/delivered-orders'
     | '/trading/completed-orders'
-    | '/trading/cancelled-orders' {
+    | '/trading/cancelled-orders'
+    | '/trading/lost-inquiries' {
     if (status === OrderStatus.Inquiry || status === OrderStatus.Offer) {
       return '/trading/inquiries';
     }
@@ -934,6 +936,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     if (status === OrderStatus.Cancelled) {
       return '/trading/cancelled-orders';
     }
+    if (status === OrderStatus.Lost) {
+      return '/trading/lost-inquiries';
+    }
     return '/trading/orders';
   }
 
@@ -945,13 +950,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const isOnDeliveredPath = currentPath.startsWith('/trading/delivered-orders/');
     const isOnCompletedPath = currentPath.startsWith('/trading/completed-orders/');
     const isOnCancelledPath = currentPath.startsWith('/trading/cancelled-orders/');
+    const isOnLostPath = currentPath.startsWith('/trading/lost-inquiries/');
 
     const isAlreadyOnExpectedPath =
       (expectedBase === '/trading/orders' && isOnOrdersPath)
       || (expectedBase === '/trading/inquiries' && isOnInquiriesPath)
       || (expectedBase === '/trading/delivered-orders' && isOnDeliveredPath)
       || (expectedBase === '/trading/completed-orders' && isOnCompletedPath)
-      || (expectedBase === '/trading/cancelled-orders' && isOnCancelledPath);
+      || (expectedBase === '/trading/cancelled-orders' && isOnCancelledPath)
+      || (expectedBase === '/trading/lost-inquiries' && isOnLostPath);
 
     if (!isAlreadyOnExpectedPath) {
       await this.router.navigate([expectedBase, routeId], {

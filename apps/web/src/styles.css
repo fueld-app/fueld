@@ -567,6 +567,7 @@ body {
   .status-pill[data-status="invoiced"]  { background: var(--st-invoiced-bg);  color: var(--st-invoiced-fg);  border-color: var(--st-invoiced-line); }
   .status-pill[data-status="paid"]      { background: var(--st-paid-bg);      color: var(--st-paid-fg);      border-color: var(--st-paid-line); }
   .status-pill[data-status="cancelled"] { background: var(--st-cancelled-bg); color: var(--st-cancelled-fg); border-color: var(--st-cancelled-line); }
+  .status-pill[data-status="lost"]      { background: var(--st-cancelled-bg); color: var(--st-cancelled-fg); border-color: var(--st-cancelled-line); }
   .status-pill[data-status="overdue"]   { background: var(--st-overdue-bg);   color: var(--st-overdue-fg);   border-color: var(--st-overdue-line); }
   .status-pill[data-status="draft"]           { background: var(--st-draft-bg);           color: var(--st-draft-fg);           border-color: var(--st-draft-line); }
   .status-pill[data-status="void"]            { background: var(--st-void-bg);            color: var(--st-void-fg);            border-color: var(--st-void-line); }

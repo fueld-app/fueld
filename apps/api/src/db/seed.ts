@@ -252,14 +252,14 @@ async function seed() {
       eta: daysAgo(30),
       closedAt: daysAgo(5),
     },
-    // Cancelled / lost
+    // Lost inquiry
     {
       tenantId: tenant.id,
       clientId: clients[2].id,
       vesselId: vessels[0].id,
       placeId: places[0].id,
       salesRepId: trader1.id,
-      status: 'CANCELLED' as const,
+      status: 'LOST' as const,
       lossReason: 'Price too high — client went with competitor',
       closedAt: daysAgo(15),
       supplierId: suppliers[0].id,

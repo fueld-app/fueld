@@ -36,6 +36,7 @@ describe('enums', () => {
       Invoiced: 'INVOICED',
       Paid: 'PAID',
       Cancelled: 'CANCELLED',
+      Lost: 'LOST',
     });
   });
 

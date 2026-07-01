@@ -722,7 +722,7 @@ function buildTraderPerformanceReport(dataset: ScopedDataset): TraderPerformance
       totalNetProfitValue: 0,
     };
 
-    if (order.status === 'CANCELLED') {
+    if (order.status === 'CANCELLED' || order.status === 'LOST') {
       current.row.lostCount += 1;
       current.row.winRate = formatPercentValue(current.row.wonCount, current.row.wonCount + current.row.lostCount);
       stats.set(order.traderId, current);
@@ -893,7 +893,7 @@ function buildPipelineSummary(dataset: ScopedDataset): PipelineStageDto[] {
 
 async function buildLossAnalysisFromDb(tenantId: string, context: ReportAccessContext, filters: ReportFiltersDto): Promise<LossAnalysisResponseDto> {
   const normalized = normalizeReportFilters(filters, context);
-  const conditions = [eq(orders.tenantId, tenantId), eq(orders.status, 'CANCELLED'), isNotNull(orders.lossReason)];
+  const conditions = [eq(orders.tenantId, tenantId), inArray(orders.status, ['CANCELLED', 'LOST']), isNotNull(orders.lossReason)];
   if (normalized.from) conditions.push(gte(orders.createdAt, new Date(`${normalized.from}T00:00:00`)));
   if (normalized.to) conditions.push(lte(orders.createdAt, new Date(`${normalized.to}T23:59:59`)));
   if (context.userIds) conditions.push(inArray(orders.salesRepId, context.userIds));
@@ -932,7 +932,7 @@ function buildConversionMetrics(dataset: ScopedDataset): ConversionMetricsDto {
         closeDaysSum += (new Date(order.closedAt).getTime() - new Date(order.createdAt).getTime()) / 86_400_000;
         closeDaysCount += 1;
       }
-    } else if (order.status === 'CANCELLED') {
+    } else if (order.status === 'CANCELLED' || order.status === 'LOST') {
       totalLost += 1;
     }
   }

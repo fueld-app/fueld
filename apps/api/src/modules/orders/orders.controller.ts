@@ -486,9 +486,17 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           }
         }
 
+        // Determine actual status: cancelling an inquiry → LOST, cancelling an order → CANCELLED
+        let actualStatus = body.status;
+        if (body.status === 'CANCELLED' && order) {
+          if (order.status === 'INQUIRY' || order.status === 'OFFER') {
+            actualStatus = 'LOST';
+          }
+        }
+
         const updated = await updateOrderStatus(
           orderId,
-          body.status,
+          actualStatus,
           auth.sub,
           body.lossReason?.trim(),
         );
