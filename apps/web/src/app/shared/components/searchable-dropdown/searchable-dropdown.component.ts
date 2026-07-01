@@ -122,6 +122,7 @@ export interface DropdownOption {
         [style.top.px]="dropdownTop()"
         [style.left.px]="dropdownLeft()"
         [style.width.px]="dropdownWidth()"
+        (wheel)="onWheel($event)"
         class="fixed z-[9999] max-h-48 overflow-auto overscroll-contain rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none"
       >
         @for (opt of filteredOptions(); track opt.value; let i = $index) {
@@ -225,6 +226,11 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     return this.options().filter((o) => o.label.toLowerCase().includes(term));
   });
 
+  @HostListener('window:scroll')
+  onScroll(): void {
+    if (this.isOpen()) this.close();
+  }
+
   @HostListener('window:resize')
   onResize(): void {
     if (this.isOpen()) this.close();
@@ -234,27 +240,23 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     if (!this.elRef.nativeElement.contains(e.target)) this.close();
   };
 
-  // Capture-mode scroll listener: reposition the dropdown to follow the input when
-  // any ancestor scrolls. Close only when the input scrolls completely out of view.
-  // overscroll-contain on the dropdown prevents this from firing for scroll inside
-  // scrollable dropdown lists.
-  private scrollRafId: number | null = null;
-  private captureScroll = () => {
+  /** Prevent scroll chaining from the dropdown to parent containers.
+   *  Works for both scrollable and non-scrollable dropdowns (unlike overscroll-contain). */
+  onWheel(event: WheelEvent): void {
     if (!this.isOpen()) return;
-    if (this.scrollRafId !== null) return; // Already scheduled — throttle via rAF
-    this.scrollRafId = requestAnimationFrame(() => {
-      this.scrollRafId = null;
-      if (!this.isOpen()) return;
-      const rect = this.triggerRef.nativeElement.getBoundingClientRect();
-      // If the input has scrolled out of the viewport, close the dropdown
-      if (rect.bottom < 0 || rect.top > window.innerHeight) {
-        this.close();
-        return;
-      }
-      // Otherwise reposition the dropdown to follow the input
-      this.updateDropdownPosition();
-    });
-  };
+    const el = event.currentTarget as HTMLElement;
+    const isScrollable = el.scrollHeight > el.clientHeight;
+    if (!isScrollable) {
+      event.preventDefault(); // Non-scrollable — don't chain to parent
+      return;
+    }
+    // Scrollable — prevent chaining only at scroll boundaries
+    const atTop = el.scrollTop === 0 && event.deltaY < 0;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight && event.deltaY > 0;
+    if (atTop || atBottom) {
+      event.preventDefault();
+    }
+  }
 
   constructor() {
     effect(() => {
@@ -268,13 +270,10 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     document.addEventListener('click', this.clickOutside);
-    document.addEventListener('scroll', this.captureScroll, true); // capture = catch all scrollable ancestors
   }
 
   ngOnDestroy(): void {
     document.removeEventListener('click', this.clickOutside);
-    document.removeEventListener('scroll', this.captureScroll, true);
-    if (this.scrollRafId !== null) cancelAnimationFrame(this.scrollRafId);
     if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
   }
 
@@ -324,10 +323,6 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
 
   close(): void {
     this.isOpen.set(false);
-    if (this.scrollRafId !== null) {
-      cancelAnimationFrame(this.scrollRafId);
-      this.scrollRafId = null;
-    }
     if (!this.multiSelect()) {
       // Restore display text — fall back to selectedLabel for async fields where options may be empty
       const sel = this.selected();
