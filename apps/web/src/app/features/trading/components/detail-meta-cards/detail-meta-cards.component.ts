@@ -111,21 +111,21 @@ import {
                   </select>
                 }
               </div>
-              <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
-                <label class="text-xs font-medium text-gray-400 dark:text-muted">PO Number</label>
-                @if (isReadonly()) {
-                  <p class="mt-1 text-sm text-gray-900 dark:text-ink">{{ purchaseOrderNumber() || '—' }}</p>
-                } @else {
-                  <input
-                    type="text"
-                    [ngModel]="purchaseOrderNumber()"
-                    (ngModelChange)="purchaseOrderNumberChange.emit($event)"
-                    placeholder="e.g. PO-2026-001"
-                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
-                  />
-                }
-              </div>
             }
+            <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+              <label class="text-xs font-medium text-gray-400 dark:text-muted">PO Number</label>
+              @if (isReadonly()) {
+                <p class="mt-1 text-sm text-gray-900 dark:text-ink">{{ purchaseOrderNumber() || '—' }}</p>
+              } @else {
+                <input
+                  type="text"
+                  [ngModel]="purchaseOrderNumber()"
+                  (ngModelChange)="purchaseOrderNumberChange.emit($event)"
+                  placeholder="e.g. PO-2026-001"
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                />
+              }
+            </div>
           }
           @if (activeClientPartyTab() === 'broker' && showBrokerTab()) {
             <button
