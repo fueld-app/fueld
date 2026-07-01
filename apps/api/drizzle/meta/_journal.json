@@ -673,6 +673,13 @@
       "when": 1782465600000,
       "tag": "0095_order_response_deadline_at",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1782552000000,
+      "tag": "0096_add_lost_order_status",
+      "breakpoints": true
     }
   ]
 }
