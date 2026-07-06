@@ -257,9 +257,9 @@ interface CompanySearchResult {
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (company of companies(); track company.id) {
-                <tr class="relative transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, company.id)" (auxclick)="onRowAuxClick($event, company.id)">
+                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, company.id)" (auxclick)="onRowAuxClick($event, company.id)">
                   @if (isColVisible('name')) {
-                  <td class="px-4 py-3">
+                  <td class="relative px-4 py-3">
                     <a [routerLink]="['/companies', company.id]" class="absolute inset-0 z-0" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
                     <a [routerLink]="['/companies', company.id]" (click)="$event.stopPropagation()" class="relative z-10 font-medium text-gray-900 dark:text-ink hover:underline">{{ company.name }}</a>
                     @if (company.parentName) {

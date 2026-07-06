@@ -207,8 +207,8 @@ interface VesselSearchResult {
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (v of vessels(); track v.id) {
-                <tr class="relative hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, v.id)" (auxclick)="onRowAuxClick($event, v.id)">
-                  <td class="px-5 py-3">
+                <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, v.id)" (auxclick)="onRowAuxClick($event, v.id)">
+                  <td class="relative px-5 py-3">
                     <a [routerLink]="['/vessels', v.id]" class="absolute inset-0 z-0" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
                     <a [routerLink]="['/vessels', v.id]" (click)="$event.stopPropagation()" class="relative z-10 font-medium text-gray-900 dark:text-ink hover:underline">{{ v.name }}</a>
                     <div class="text-xs text-gray-400 dark:text-muted">

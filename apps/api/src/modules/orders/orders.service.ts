@@ -43,13 +43,13 @@ import { formatStoredDateOnlyLabel } from '../documents/inquiry.utils';
 interface ListOrdersQuery {
   search?: string;
   statuses?: string[];     // filter by status(es), e.g. ['INQUIRY','OFFER'] for inquiries
-  salesRepId?: string;
+  salesRepIds?: string[];  // filter by sales rep(s) — multi-select
   brokerId?: string;       // filter by broker company
   clientId?: string;        // filter by client company
   vesselId?: string;       // filter by vessel
   placeId?: string;        // filter by port/place
   invoicingCompanyId?: string; // filter by invoicing company
-  productType?: string;      // filter by product type (matches order_items.product_type)
+  productTypes?: string[];   // filter by product type(s) — multi-select (matches order_items.product_type)
   dateFrom?: string;       // filter ETA >= date (ISO string)
   dateTo?: string;         // filter ETA <= date (ISO string)
   createdFrom?: string;    // filter createdAt >= date
@@ -858,8 +858,8 @@ export async function listOrders(query?: ListOrdersQuery) {
     conditions.push(inArray(orders.status, query.statuses as any));
   }
 
-  if (query?.salesRepId) {
-    conditions.push(eq(orders.salesRepId, query.salesRepId));
+  if (query?.salesRepIds?.length) {
+    conditions.push(inArray(orders.salesRepId, query.salesRepIds));
   }
 
   if (query?.brokerId) {
@@ -882,9 +882,9 @@ export async function listOrders(query?: ListOrdersQuery) {
     conditions.push(eq(orders.invoicingCompanyId, query.invoicingCompanyId));
   }
 
-  if (query?.productType) {
+  if (query?.productTypes?.length) {
     conditions.push(
-      sql`EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.product_type = ${query.productType})`,
+      sql`EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.product_type IN (${sql.join(query.productTypes.map((p) => sql`${p}`))}))`,
     );
   }
 

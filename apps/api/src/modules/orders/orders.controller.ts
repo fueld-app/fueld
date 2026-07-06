@@ -63,18 +63,24 @@ export const ordersController = new Elysia({ prefix: '/orders' })
     async ({ query }) => {
       try {
         const statuses = query.statuses
-          ? query.statuses.split(',').map((s) => s.trim())
+          ? query.statuses.split(',').map((s) => s.trim()).filter(Boolean)
+          : undefined;
+        const salesRepIds = query.salesRepId
+          ? query.salesRepId.split(',').map((s) => s.trim()).filter(Boolean)
+          : undefined;
+        const productTypes = query.productType
+          ? query.productType.split(',').map((s) => s.trim()).filter(Boolean)
           : undefined;
         const results = await listOrders({
           search: query.search,
           statuses,
-          salesRepId: query.salesRepId,
+          salesRepIds,
           brokerId: query.brokerId,
           clientId: query.clientId,
           vesselId: query.vesselId,
           placeId: query.placeId,
           invoicingCompanyId: query.invoicingCompanyId,
-          productType: query.productType,
+          productTypes,
           dateFrom: query.dateFrom,
           dateTo: query.dateTo,
           createdFrom: query.createdFrom,

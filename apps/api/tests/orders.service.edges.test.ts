@@ -37,7 +37,7 @@ describe('orders.service edge branches', () => {
     expect(search.items[0]?.id).toBeDefined();
     expect(search.items[0]!.id).toBe(second.id);
 
-    const filteredByRep = await listOrders({ salesRepId: user.id, statuses: ['INQUIRY', 'CONFIRMED'] });
+    const filteredByRep = await listOrders({ salesRepIds: [user.id], statuses: ['INQUIRY', 'CONFIRMED'] });
     expect(filteredByRep.total).toBe(2);
 
     const paged = await listOrders({
