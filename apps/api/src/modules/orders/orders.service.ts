@@ -884,7 +884,7 @@ export async function listOrders(query?: ListOrdersQuery) {
 
   if (query?.productTypes?.length) {
     conditions.push(
-      sql`EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.product_type IN (${sql.join(query.productTypes.map((p) => sql`${p}`))}))`,
+      sql`EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.product_type IN (${sql.join(query.productTypes.map((p) => sql`${p}`), sql`, `)}))`,
     );
   }
 

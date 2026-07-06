@@ -544,10 +544,16 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     if (f['clientId']) params.set('clientId', f['clientId']);
     if (f['vesselId']) params.set('vesselId', f['vesselId']);
     if (f['placeId']) params.set('placeId', f['placeId']);
-    if (f['salesRepId']) params.set('salesRepId', f['salesRepId']);
+    if (f['salesRepId']) {
+      const v = f['salesRepId'];
+      params.set('salesRepId', Array.isArray(v) ? v.join(',') : v);
+    }
     if (f['brokerId']) params.set('brokerId', f['brokerId']);
     if (f['invoicingCompanyId']) params.set('invoicingCompanyId', f['invoicingCompanyId']);
-    if (f['productType']) params.set('productType', f['productType']);
+    if (f['productType']) {
+      const v = f['productType'];
+      params.set('productType', Array.isArray(v) ? v.join(',') : v);
+    }
     if (f['etaFrom']) params.set('dateFrom', f['etaFrom']);
     if (f['etaTo']) params.set('dateTo', f['etaTo']);
     if (f['createdFrom']) params.set('createdFrom', f['createdFrom']);

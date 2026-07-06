@@ -501,8 +501,10 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
     const params = new URLSearchParams();
     params.set('page', String(this.currentPage()));
     params.set('limit', String(this.pageSize));
-    if (this.filterState()['flag']) params.set('flag', this.filterState()['flag']);
-    if (this.filterState()['type']) params.set('type', this.filterState()['type']);
+    const flagVal = this.filterState()['flag'];
+    if (flagVal) params.set('flag', Array.isArray(flagVal) ? flagVal.join(',') : flagVal);
+    const typeVal = this.filterState()['type'];
+    if (typeVal) params.set('type', Array.isArray(typeVal) ? typeVal.join(',') : typeVal);
     if (this.sortBy()) params.set('sortBy', this.sortBy());
     if (this.sortBy()) params.set('sortDir', this.sortDir());
 

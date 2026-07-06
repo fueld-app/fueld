@@ -3,7 +3,7 @@
 //  Search local DB first; fall back to LLI API if not found.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, ilike, or, and, sql, asc, desc } from 'drizzle-orm';
+import { eq, ilike, or, and, sql, asc, desc, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { escapeLikePattern } from '../../utils/like';
 import { vessels, places, counterparties, orders, portSuppliers, users, companyContacts } from '../../db/schema';
@@ -507,8 +507,22 @@ export async function listPlaces(query?: {
     );
   }
   if (query?.country) conditions.push(ilike(places.country, `%${escapeLikePattern(query.country)}%`));
-  if (query?.placeType) conditions.push(eq(places.placeType, query.placeType as any));
-  if (query?.responsibleUserId) conditions.push(eq(places.responsibleUserId, query.responsibleUserId));
+  if (query?.placeType) {
+    const types = query.placeType.split(',').map((s) => s.trim()).filter(Boolean);
+    if (types.length === 1) {
+      conditions.push(eq(places.placeType, types[0] as any));
+    } else if (types.length > 1) {
+      conditions.push(inArray(places.placeType, types as any));
+    }
+  }
+  if (query?.responsibleUserId) {
+    const ids = query.responsibleUserId.split(',').map((s) => s.trim()).filter(Boolean);
+    if (ids.length === 1) {
+      conditions.push(eq(places.responsibleUserId, ids[0]));
+    } else if (ids.length > 1) {
+      conditions.push(inArray(places.responsibleUserId, ids));
+    }
+  }
 
   const where = conditions.length
     ? conditions.length === 1

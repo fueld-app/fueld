@@ -51,6 +51,87 @@ describe('orders.service edge branches', () => {
     expect(paged.total).toBe(2);
   });
 
+  it('multi-select salesRepId filter returns orders from all selected reps (OR logic)', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, listOrders } = await loadOrdersService();
+    const { users } = await import('../src/db/schema');
+
+    const [rep2] = await db
+      .insert(users)
+      .values({ tenantId: tenant.id, email: 'rep2@test.local', name: 'Rep Two', role: 'TRADER' })
+      .returning();
+
+    // Order 1 — owned by the seeded user
+    await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    // Order 2 — owned by rep2
+    await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: rep2!.id,
+    });
+
+    // Single rep → 1 order
+    const singleRep1 = await listOrders({ salesRepIds: [user.id] });
+    expect(singleRep1.total).toBe(1);
+
+    const singleRep2 = await listOrders({ salesRepIds: [rep2!.id] });
+    expect(singleRep2.total).toBe(1);
+
+    // Both reps selected → 2 orders (OR logic, not AND)
+    const bothReps = await listOrders({ salesRepIds: [user.id, rep2!.id] });
+    expect(bothReps.total).toBe(2);
+
+    // A non-existent rep alongside a real one → still returns the real rep's orders
+    const realAndGhost = await listOrders({ salesRepIds: [user.id, '00000000-0000-0000-0000-000000000000'] });
+    expect(realAndGhost.total).toBe(1);
+  });
+
+  it('multi-select productType filter returns orders matching any selected product', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const { createOrder, updateOrderStatus, saveOrderItems, listOrders } = await loadOrdersService();
+
+    const order1 = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await updateOrderStatus(order1.id, 'CONFIRMED', user.id);
+    await saveOrderItems(order1.id, [
+      { productType: 'VLSFO', quantity: '10', costPrice: '100', costCurrency: 'USD', salesPrice: '150', salesCurrency: 'USD' },
+    ]);
+
+    const order2 = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await updateOrderStatus(order2.id, 'CONFIRMED', user.id);
+    await saveOrderItems(order2.id, [
+      { productType: 'MGO', quantity: '5', costPrice: '200', costCurrency: 'USD', salesPrice: '300', salesCurrency: 'USD' },
+    ]);
+
+    // Single product → 1 order each
+    expect((await listOrders({ productTypes: ['VLSFO'] })).total).toBe(1);
+    expect((await listOrders({ productTypes: ['MGO'] })).total).toBe(1);
+
+    // Both products → 2 orders (OR logic)
+    expect((await listOrders({ productTypes: ['VLSFO', 'MGO'] })).total).toBe(2);
+  });
+
   it('covers no-invoice payment path and payments ordering', async () => {
     const { tenant, client, vessel, place, user } = await seedBasics();
     const { createOrder, createOrderPayment, listOrderPayments } = await loadOrdersService();

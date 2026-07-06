@@ -90,15 +90,30 @@ export async function listVessels(query?: {
     );
   }
   if (query?.flag) {
-    conditions.push(
-      or(
-        ilike(vessels.flag, `%${escapeLikePattern(query.flag)}%`),
-        ilike(vessels.flagCode, `%${escapeLikePattern(query.flag)}%`),
-      )!,
-    );
+    const flags = query.flag.split(',').map((s) => s.trim()).filter(Boolean);
+    if (flags.length === 1) {
+      conditions.push(
+        or(
+          ilike(vessels.flag, `%${escapeLikePattern(flags[0]!)}%`),
+          ilike(vessels.flagCode, `%${escapeLikePattern(flags[0]!)}%`),
+        )!,
+      );
+    } else if (flags.length > 1) {
+      // Multi-select: match any of the selected flags (OR across each flag value)
+      const flagConditions = flags.flatMap((f) => [
+        ilike(vessels.flag, `%${escapeLikePattern(f)}%`),
+        ilike(vessels.flagCode, `%${escapeLikePattern(f)}%`),
+      ]);
+      conditions.push(or(...flagConditions)!);
+    }
   }
   if (query?.type) {
-    conditions.push(ilike(vessels.type, `%${escapeLikePattern(query.type)}%`));
+    const types = query.type.split(',').map((s) => s.trim()).filter(Boolean);
+    if (types.length === 1) {
+      conditions.push(ilike(vessels.type, `%${escapeLikePattern(types[0]!)}%`));
+    } else if (types.length > 1) {
+      conditions.push(or(...types.map((t) => ilike(vessels.type, `%${escapeLikePattern(t)}%`)))!);
+    }
   }
 
   const where = conditions.length

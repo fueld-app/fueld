@@ -589,8 +589,10 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     try {
       const params = new URLSearchParams();
-      if (this.filterState()['placeType']) params.set('placeType', this.filterState()['placeType']);
-      if (this.filterState()['responsibleUserId']) params.set('responsibleUserId', this.filterState()['responsibleUserId']);
+      const placeTypeVal = this.filterState()['placeType'];
+      if (placeTypeVal) params.set('placeType', Array.isArray(placeTypeVal) ? placeTypeVal.join(',') : placeTypeVal);
+      const respVal = this.filterState()['responsibleUserId'];
+      if (respVal) params.set('responsibleUserId', Array.isArray(respVal) ? respVal.join(',') : respVal);
       if (this.sortBy()) params.set('sortBy', this.sortBy());
       if (this.sortBy()) params.set('sortDir', this.sortDir());
       params.set('page', String(this.currentPage()));
