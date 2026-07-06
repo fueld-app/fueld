@@ -258,12 +258,10 @@ interface CompanySearchResult {
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (company of companies(); track company.id) {
                 <tr class="relative transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, company.id)" (auxclick)="onRowAuxClick($event, company.id)">
-                  <td [attr.colspan]="100" class="absolute inset-0 p-0 border-0 z-0">
-                    <a [routerLink]="['/companies', company.id]" class="block w-full h-full" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
-                  </td>
                   @if (isColVisible('name')) {
                   <td class="px-4 py-3">
-                    <a [routerLink]="['/companies', company.id]" (click)="$event.stopPropagation()" class="font-medium text-gray-900 dark:text-ink hover:underline">{{ company.name }}</a>
+                    <a [routerLink]="['/companies', company.id]" class="absolute inset-0 z-0" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
+                    <a [routerLink]="['/companies', company.id]" (click)="$event.stopPropagation()" class="relative z-10 font-medium text-gray-900 dark:text-ink hover:underline">{{ company.name }}</a>
                     @if (company.parentName) {
                       <span class="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-500/15 px-2 py-0.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-400">
                         Child of {{ company.parentName }}

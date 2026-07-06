@@ -125,16 +125,17 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                 <tr class="relative transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint"
                   (click)="onRowClick($event, inq.orderNumber || inq.id)"
                   (auxclick)="onRowAuxClick($event, inq.orderNumber || inq.id)">
-                  <td [attr.colspan]="100" class="absolute inset-0 p-0 border-0 z-0">
-                    <a [routerLink]="[baseRoute(), inq.orderNumber || inq.id]" class="block w-full h-full" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
-                  </td>
                   @for (col of visibleColumns(); track col.field) {
                     @switch (col.field) {
                       @case ('orderNumber') {
                         <td class="px-4 py-3 font-mono text-xs text-gray-500 dark:text-muted">
                           <a [routerLink]="[baseRoute(), inq.orderNumber || inq.id]"
+                            class="absolute inset-0 z-0"
+                            tabindex="-1" aria-hidden="true"
+                            (click)="$event.stopPropagation()"></a>
+                          <a [routerLink]="[baseRoute(), inq.orderNumber || inq.id]"
                             (click)="$event.stopPropagation()"
-                            class="hover:text-brand-700 dark:hover:text-brand-400 hover:underline">
+                            class="relative z-10 hover:text-brand-700 dark:hover:text-brand-400 hover:underline">
                             {{ inq.orderNumber ?? '—' }}
                           </a>
                         </td>
@@ -710,7 +711,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
         this.http.get<ApiResponse<{ products: string[] }>>(`${API}/admin/settings/my-products`),
       );
       if (res.success && res.data?.products) {
-        this.productOptions.set(res.data.products.map((p) => ({ value: p, label: p })));
+        this.productOptions.set(res.data.products.map((p) => ({ value: p, label: p.replace(/_/g, ' ') })));
       }
     } catch {
       // ignore — product filter just won't have options

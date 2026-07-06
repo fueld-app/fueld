@@ -220,10 +220,10 @@ const PLACE_TYPE_OPTIONS: DropdownOption[] = [
           <tbody class="divide-y divide-gray-100 dark:divide-line">
             @for (place of places(); track place.id) {
               <tr class="relative cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint" (click)="onRowClick($event, place.id)" (auxclick)="onRowAuxClick($event, place.id)">
-                <td [attr.colspan]="100" class="absolute inset-0 p-0 border-0 z-0">
-                  <a [routerLink]="['/places', place.id]" class="block w-full h-full" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
+                <td class="px-4 py-3">
+                  <a [routerLink]="['/places', place.id]" class="absolute inset-0 z-0" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
+                  <a [routerLink]="['/places', place.id]" (click)="$event.stopPropagation()" class="relative z-10 font-medium text-brand-700 dark:text-brand-400 hover:underline">{{ place.name }}</a>
                 </td>
-                <td class="px-4 py-3"><a [routerLink]="['/places', place.id]" (click)="$event.stopPropagation()" class="font-medium text-brand-700 dark:text-brand-400 hover:underline">{{ place.name }}</a></td>
                 <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                   <span class="mr-1.5">{{ countryFlag(place) }}</span>{{ countryLabel(place.countryIso || place.country) }}
                   @if (place.countryIso && place.countryIso !== place.country) {

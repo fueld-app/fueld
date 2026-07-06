@@ -96,7 +96,7 @@ import type {
               <!-- Product -->
               <td class="px-4 py-2">
                 @if (readonly()) {
-                  <span>{{ row.productType }}</span>
+                  <span>{{ formatProductTypeLabel(row.productType) }}</span>
                 } @else {
                   <app-searchable-dropdown
                     [options]="productOptions()"
@@ -434,7 +434,7 @@ import type {
           <!-- Card header -->
           <div class="flex items-center justify-between mb-3">
             <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-700/15 px-2 py-0.5 text-xs font-semibold text-brand-700 dark:text-brand-400">
-              {{ row.productType || 'New Item' }}
+              {{ formatProductTypeLabel(row.productType) || 'New Item' }}
             </span>
             @if (!readonly()) {
               <div class="flex items-center gap-1">
@@ -481,7 +481,7 @@ import type {
             <div class="col-span-2">
               <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Product</label>
               @if (readonly()) {
-                <span class="text-sm">{{ row.productType }}</span>
+                <span class="text-sm">{{ formatProductTypeLabel(row.productType) }}</span>
               } @else {
                 <app-searchable-dropdown
                   [options]="productOptions()"
@@ -961,7 +961,10 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   readonly productOptions = computed(() => {
     const fromInput = this.productOptionsInput();
-    return fromInput.length > 0 ? fromInput : OrderItemsComponent.DEFAULT_PRODUCTS;
+    const raw = fromInput.length > 0 ? fromInput : OrderItemsComponent.DEFAULT_PRODUCTS;
+    // Format labels for display (e.g. BARGING_FEE → "BARGING FEE");
+    // the raw value is preserved for the data model.
+    return raw.map((o) => ({ value: o.value, label: o.label.replace(/_/g, ' ') }));
   });
 
   readonly unitOptions = computed(() => {
@@ -1204,6 +1207,11 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   supplierLabel(orderSupplierId: string | null | undefined): string {
     if (!orderSupplierId) return 'Unassigned';
     return this.supplierOptions().find((supplier) => supplier.value === orderSupplierId)?.label ?? 'Unknown supplier';
+  }
+
+  /** Format a product type for display: replaces underscores with spaces (BARGING_FEE → "BARGING FEE"). */
+  formatProductTypeLabel(productType: string | null | undefined): string {
+    return (productType ?? '').replace(/_/g, ' ');
   }
 
   /** Update the main quantity (used for calculations/invoicing) */
