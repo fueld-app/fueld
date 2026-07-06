@@ -504,9 +504,10 @@ const NAVIGATION: NavItem[] = [
             <div class="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden dark:border-line dark:bg-surface">
               @if (searchResults().length) {
                 @for (result of searchResults(); track result.id + result.kind) {
-                  <button
+                  <a
+                    [routerLink]="resultRouterLink(result)"
+                    (click)="closeSearchPanel()"
                     class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-surface-tint"
-                    (click)="goToResult(result)"
                   >
                     @if (result.kind === 'order') {
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-amber-500 dark:text-amber-300" viewBox="0 0 20 20" fill="currentColor">
@@ -533,7 +534,7 @@ const NAVIGATION: NavItem[] = [
                       [class]="result.kind === 'order' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400' : result.kind === 'company' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400' : result.kind === 'vessel' ? 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400' : 'bg-gray-100 text-gray-500 dark:bg-surface-3 dark:text-muted'">
                       {{ result.kind === 'order' ? 'Order' : result.kind === 'company' ? 'Company' : result.kind === 'vessel' ? 'Vessel' : 'Place' }}
                     </span>
-                  </button>
+                  </a>
                 }
               } @else {
                 <div class="px-4 py-3 text-sm text-gray-500 dark:text-muted">No results found</div>
@@ -1285,6 +1286,22 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     } else {
       this.goToPlace(result.id);
     }
+  }
+
+  /** Returns the routerLink array for a search result, or null for unknown types. */
+  resultRouterLink(result: SearchResult): string[] | null {
+    if (result.kind === 'place') return ['/places', result.id];
+    if (result.kind === 'company') return ['/companies', result.id];
+    if (result.kind === 'vessel') return ['/vessels', result.id];
+    if (result.kind === 'order') return [this.orderDetailRoute(result.orderStatus), result.id];
+    return null;
+  }
+
+  /** Closes the search panel (used by routerLink search result clicks). */
+  closeSearchPanel(): void {
+    this.searchOpen.set(false);
+    this.searchTerm.set('');
+    this.searchResults.set([]);
   }
 
   navigateFirstResult(): void {

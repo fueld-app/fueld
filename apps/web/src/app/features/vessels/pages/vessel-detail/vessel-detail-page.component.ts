@@ -641,12 +641,19 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     </thead>
                     <tbody class="divide-y divide-gray-50">
                       @for (o of vesselOrders(); track o.id) {
-                        <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="goToOrder(o.id, o.status)">
+                        <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint"
+                          (click)="onOrderRowClick($event, o.id, o.status)"
+                          (auxclick)="$event.button === 1 && openOrderInNewTab(o.id, o.status)"
+                        >
                           <td class="px-5 py-2.5">
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                              [class]="statusBadgeClass(o.status)">
+                            <a
+                              [routerLink]="orderRoute(o.id, o.status)"
+                              (click)="$event.stopPropagation()"
+                              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                              [class]="statusBadgeClass(o.status)"
+                            >
                               {{ o.status }}
-                            </span>
+                            </a>
                           </td>
                           <td class="px-5 py-2.5 text-gray-900 dark:text-ink font-medium">{{ o.clientName }}</td>
                           <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.placeName }}</td>
@@ -1958,6 +1965,19 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   }
 
   goToOrder(orderId: string, status?: string): void {
+    this.router.navigate(this.orderRoute(orderId, status));
+  }
+
+  onOrderRowClick(event: MouseEvent, orderId: string, status?: string): void {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      this.openOrderInNewTab(orderId, status);
+    } else {
+      this.goToOrder(orderId, status);
+    }
+  }
+
+  orderRoute(orderId: string, status?: string): string[] {
     const baseRoute = status === 'INQUIRY' || status === 'OFFER'
       ? '/trading/inquiries'
       : status === 'PAID'
@@ -1965,7 +1985,13 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
         : status === 'CANCELLED'
           ? '/trading/cancelled-orders'
           : '/trading/orders';
-    this.router.navigate([baseRoute, orderId]);
+    return [baseRoute, orderId];
+  }
+
+  openOrderInNewTab(orderId: string, status?: string): void {
+    const route = this.orderRoute(orderId, status);
+    const url = this.router.serializeUrl(this.router.createUrlTree(route));
+    window.open(url, '_blank');
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────

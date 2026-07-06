@@ -1,7 +1,7 @@
 import { Service, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, CreditLineDto, BankAccountDto, OwnCompanyDto } from '@fueld/types';
+import type { ApiResponse, CreditLineDto, BankAccountDto, OwnCompanyDto, SupplierPaymentDto, CreateSupplierPaymentDto } from '@fueld/types';
 import { PaymentTermType } from '@fueld/types';
 import { API_URL } from '@app/core/config/api';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
@@ -23,6 +23,8 @@ export class OrderFinancialService {
   readonly customerCreditFrozen = signal(false);
   readonly supplierCreditLines = signal<CreditLineDto[]>([]);
   readonly supplierCreditLoading = signal(false);
+  readonly supplierPayments = signal<SupplierPaymentDto[]>([]);
+  readonly supplierPaymentsLoading = signal(false);
 
   async loadCustomerCreditLines(counterpartyId: string | null | undefined): Promise<void> {
     if (!counterpartyId) return;
@@ -71,6 +73,57 @@ export class OrderFinancialService {
       this.supplierCreditLines.set([]);
     } finally {
       this.supplierCreditLoading.set(false);
+    }
+  }
+
+  // ─── Supplier Payments (per-leg settlement) ────────────────────────
+  async loadSupplierPayments(orderId: string, orderSupplierId: string): Promise<void> {
+    if (!orderSupplierId) { this.supplierPayments.set([]); return; }
+    this.supplierPaymentsLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<SupplierPaymentDto[]>>(
+          `${API_URL}/orders/${orderId}/suppliers/${orderSupplierId}/payments`,
+        ),
+      );
+      if (res.success) this.supplierPayments.set(res.data ?? []);
+    } catch {
+      this.supplierPayments.set([]);
+    } finally {
+      this.supplierPaymentsLoading.set(false);
+    }
+  }
+
+  async createSupplierPayment(orderId: string, orderSupplierId: string, input: CreateSupplierPaymentDto): Promise<SupplierPaymentDto | null> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<SupplierPaymentDto>>(
+          `${API_URL}/orders/${orderId}/suppliers/${orderSupplierId}/payments`,
+          input,
+        ),
+      );
+      if (res.success && res.data) {
+        await this.loadSupplierPayments(orderId, orderSupplierId);
+        return res.data;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async deleteSupplierPayment(orderId: string, orderSupplierId: string, paymentId: string): Promise<boolean> {
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<boolean>>(`${API_URL}/orders/supplier-payments/${paymentId}`),
+      );
+      if (res.success) {
+        await this.loadSupplierPayments(orderId, orderSupplierId);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
   }
 

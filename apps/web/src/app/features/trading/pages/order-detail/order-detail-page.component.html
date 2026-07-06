@@ -335,6 +335,22 @@
     }
 } @placeholder { <div></div> }
 @defer (on idle) {
+    @if (activeSupplierLegId()) {
+      <app-supplier-payments-card
+        [payments]="supplierPayments()"
+        [paymentsTotal]="supplierPaymentsTotal()"
+        [legCost]="supplierLegCost()"
+        [currency]="order()?.currency ?? 'USD'"
+        [loading]="supplierPaymentsLoading()"
+        [canSeePrices]="auth.canSeePrices()"
+        [canRecordPayment]="canRecordPayment() && auth.canSeePrices()"
+        [paidAt]="supplierPaidAt()"
+        (addPayment)="openSupplierPaymentModal()"
+        (deletePayment)="onSupplierPaymentDeleted($event)"
+      />
+    }
+} @placeholder { <div></div> }
+@defer (on idle) {
     <app-order-attachments-card
       [attachments]="attachments()"
       [attachmentTypes]="refData.configuredAttachmentTypes()"
@@ -459,6 +475,18 @@
   [defaultCurrency]="order()?.currency ?? 'USD'"
   [todayLocal]="todayLocalDateString()"
   (saved)="loadPayments()"
+/>
+} @placeholder { <div></div> }
+
+@defer (on idle) {
+<app-supplier-payment-modal
+  #supplierPaymentModal
+  [orderId]="orderId()"
+  [orderSupplierId]="activeSupplierLegId() ?? ''"
+  [currencyOptions]="refData.configuredCurrencies()"
+  [defaultCurrency]="order()?.currency ?? 'USD'"
+  [todayLocal]="todayLocalDateString()"
+  (saved)="onSupplierPaymentSaved()"
 />
 } @placeholder { <div></div> }
 

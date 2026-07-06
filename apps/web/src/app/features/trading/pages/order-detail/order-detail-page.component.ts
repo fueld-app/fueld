@@ -31,6 +31,7 @@ import {
   type CompanyContactDto,
   type BankAccountDto,
   type OrderSupplierDto,
+  type SupplierPaymentDto,
   type SupplierNominationSummaryDto,
   type WarehouseDto,
   type InventorySkuDto,
@@ -70,6 +71,8 @@ import { OrderPlaceRemarkPromptComponent } from './components/order-place-remark
 import { OrderSuppliersTabComponent } from './components/order-suppliers-tab/order-suppliers-tab.component';
 import { OrderCaptureTabComponent } from './components/order-capture-tab/order-capture-tab.component';
 import { OrderPaymentsCardComponent } from './components/order-payments-card/order-payments-card.component';
+import { SupplierPaymentsCardComponent } from './components/supplier-payments-card/supplier-payments-card.component';
+import { SupplierPaymentModalComponent } from './components/supplier-payment-modal/supplier-payment-modal.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
@@ -148,6 +151,8 @@ import type {
     OrderPlaceRemarkPromptComponent,
     OrderSuppliersTabComponent,
     OrderCaptureTabComponent,
+    SupplierPaymentsCardComponent,
+    SupplierPaymentModalComponent,
   ],
   templateUrl: 'order-detail-page.component.html',
   styles: [
@@ -313,6 +318,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   selectedAttachment: File | null = null;
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
+  readonly supplierPayments = computed(() => this.financialSvc.supplierPayments());
+  readonly supplierPaymentsLoading = computed(() => this.financialSvc.supplierPaymentsLoading());
   readonly portDocumentationContext = computed(() => this.portDocSvc.portDocumentationContext());
   readonly portDocumentationLoading = computed(() => this.portDocSvc.portDocumentationLoading());
   readonly portDocumentationError = computed(() => this.portDocSvc.portDocumentationError());
@@ -331,6 +338,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly showCustomerPaymentNote = signal(false);
   readonly showSupplierPaymentNote = signal(false);
   readonly paymentModalRef = viewChild(OrderPaymentModalComponent);
+  readonly supplierPaymentModalRef = viewChild(SupplierPaymentModalComponent);
   readonly todayLocalDateString = () => this.formatDateForInput(new Date(), this.placeTimezone());
   readonly convertModalRef = viewChild(OrderConvertModalComponent);
   readonly cancelModalRef = viewChild(OrderCancelModalComponent);
@@ -699,6 +707,38 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return this.paymentsTotal() >= due;
   });
 
+  // ─── Supplier-side settlement (two-sided order settlement) ──────────
+  readonly activeSupplierLegId = computed(() => {
+    const leg = this.activeOrderSupplier();
+    const id = leg?.id ?? null;
+    // Exclude temporary (unsaved) legs.
+    return id && !this.supplierSvc.isTemporaryOrderSupplierId(id) ? id : null;
+  });
+
+  readonly supplierLegCost = computed(() => {
+    const legId = this.activeSupplierLegId();
+    if (!legId) return 0;
+    return this.itemRows()
+      .filter((item) => item.orderSupplierId === legId)
+      .reduce((sum, item) => {
+        const qty = Number(item.deliveredQuantity ?? item.quantity ?? 0);
+        const cost = Number(item.costPrice ?? 0);
+        return sum + qty * cost;
+      }, 0);
+  });
+
+  readonly supplierPaymentsTotal = computed(() =>
+    this.supplierPayments().reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
+  );
+
+  readonly supplierPaidAt = computed(() => this.activeOrderSupplier()?.paidAt ?? null);
+
+  readonly hasEnoughSupplierPaymentsForMarkPaid = computed(() => {
+    const cost = this.supplierLegCost();
+    if (cost <= 0) return false;
+    return this.supplierPaymentsTotal() >= cost - 0.005;
+  });
+
   readonly customerCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
     const lines = this.customerCreditLines().filter((line) => line.currency === currency);
@@ -1030,6 +1070,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.inquirySvc.loadReplies(this.orderId()),
         this.loadAttachments(),
         this.loadPayments(),
+        this.loadSupplierPayments(),
         this.portDocSvc.load(this.orderId()),
         this.loadSupplierNominationSummary(),
       ]);
@@ -1199,6 +1240,55 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const modal = this.paymentModalRef();
     if (modal) { modal.openModal(); return; }
     setTimeout(() => this.paymentModalRef()?.openModal(), 200);
+  }
+
+  // ─── Supplier-side payment modal (two-sided settlement) ───────────
+  openSupplierPaymentModal(): void {
+    if (!this.activeSupplierLegId()) {
+      this.showToast('error', 'Save the supplier leg before recording payments.');
+      return;
+    }
+    const modal = this.supplierPaymentModalRef();
+    if (modal) { modal.openModal(); return; }
+    setTimeout(() => this.supplierPaymentModalRef()?.openModal(), 200);
+  }
+
+  async loadSupplierPayments(): Promise<void> {
+    const orderId = this.orderId();
+    const legId = this.activeSupplierLegId();
+    if (!orderId || !legId) {
+      this.financialSvc.supplierPayments.set([]);
+      return;
+    }
+    await this.financialSvc.loadSupplierPayments(orderId, legId);
+  }
+
+  async onSupplierPaymentSaved(): Promise<void> {
+    await this.loadSupplierPayments();
+    // Reload the order detail so the leg's paidAt/amountPaid update, and
+    // refresh supplier credit lines so availability reflects the settlement.
+    const companyId = this.activeSupplierCompanyId();
+    await this.financialSvc.loadSupplierCreditLines(companyId);
+    // Best-effort: refresh order to pick up leg paidAt from the server.
+    this.refreshOrderSilently();
+  }
+
+  async onSupplierPaymentDeleted(paymentId: string): Promise<void> {
+    const orderId = this.orderId();
+    const legId = this.activeSupplierLegId();
+    if (!orderId || !legId) return;
+    const ok = await this.financialSvc.deleteSupplierPayment(orderId, legId, paymentId);
+    if (!ok) {
+      this.showToast('error', 'Failed to delete supplier payment.');
+      return;
+    }
+    await this.financialSvc.loadSupplierCreditLines(this.activeSupplierCompanyId());
+    this.refreshOrderSilently();
+  }
+
+  private refreshOrderSilently(): void {
+    // Reload order detail so leg settlement fields (paidAt/amountPaid) update.
+    this.loadOrder().catch(() => {});
   }
 
 
@@ -2106,6 +2196,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       sortOrder: nextSortOrder,
       isPrimary: false,
       deliveredAt: null,
+      amountPaid: '0',
+      paidAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       company: null,

@@ -4,6 +4,7 @@ import {
   input,
   output,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import type { PlattsSuggestionsResponseDto } from '@fueld/types';
 
 export interface PlattsSuggestionViewModel {
@@ -16,6 +17,7 @@ export interface PlattsSuggestionViewModel {
 @Component({
   selector: 'app-order-platts-signals',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterLink],
   template: `
     <div
       class="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm"
@@ -37,13 +39,12 @@ export interface PlattsSuggestionViewModel {
         </div>
         <div class="flex items-center gap-2">
           @if (meta()?.reportTitle && meta()?.reportId) {
-            <button
-              type="button"
-              (click)="openReport.emit(meta()!.reportId!)"
+            <a
+              [routerLink]="['/resources/platts', meta()!.reportId!]"
               class="inline-flex items-center rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-ink-dim transition-colors hover:border-brand-300 hover:text-brand-700"
             >
               Open source report
-            </button>
+            </a>
           }
           <button
             type="button"
@@ -83,9 +84,8 @@ export interface PlattsSuggestionViewModel {
               } @else {
                 <div class="mt-3 space-y-2">
                   @for (match of item.matches; track match.entryId) {
-                    <button
-                      type="button"
-                      (click)="openReport.emit(match.reportId)"
+                    <a
+                      [routerLink]="['/resources/platts', match.reportId]"
                       class="block w-full rounded-lg border border-gray-200 dark:border-line px-3 py-3 text-left transition-colors hover:border-brand-300 hover:bg-brand-50/40"
                     >
                       <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-muted">
@@ -116,7 +116,7 @@ export interface PlattsSuggestionViewModel {
                         }
                         <span>score {{ match.score }}</span>
                       </div>
-                    </button>
+                    </a>
                   }
                 </div>
               }

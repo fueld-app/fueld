@@ -66,6 +66,8 @@ export class OrderSupplierService {
       sortOrder: nextSortOrder,
       isPrimary: false,
       deliveredAt: null,
+      amountPaid: '0',
+      paidAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       company: null,

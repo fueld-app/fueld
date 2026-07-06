@@ -643,6 +643,10 @@ export interface OrderSupplierDto {
   sortOrder: number;
   isPrimary: boolean;
   deliveredAt: string | null;
+  /** Total amount paid to the supplier for this leg (two-sided settlement). */
+  amountPaid: string;
+  /** Set when supplier payments cover the leg cost; null while unpaid. */
+  paidAt: string | null;
   createdAt: string;
   updatedAt: string;
   company: CounterpartyDto | null;
@@ -1379,6 +1383,35 @@ export interface CreateCustomerPaymentDto {
   amount: string;
   currency: string;
   receivedAt?: string;
+  method?: string | null;
+  note?: string | null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SUPPLIER PAYMENTS (per-leg supplier settlement — two-sided order settlement)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface SupplierPaymentDto {
+  id: string;
+  tenantId: string;
+  orderSupplierId: string;
+  orderId: string;
+  supplierId: string;
+  invoiceId: string | null;
+  amount: string;
+  currency: string;
+  paidAt: string;
+  method: string | null;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSupplierPaymentDto {
+  amount: string;
+  currency: string;
+  paidAt?: string;
   method?: string | null;
   note?: string | null;
 }

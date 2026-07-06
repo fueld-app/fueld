@@ -21,6 +21,7 @@ import {
   tenants,
   customerPayments,
   invoices,
+  supplierPayments,
   companyContacts,
   priceReferences,
   creditLines,
@@ -531,6 +532,8 @@ async function listOrderSuppliers(orderId: string) {
     sortOrder: row.sortOrder,
     isPrimary: row.isPrimary,
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
+    amountPaid: row.amountPaid ?? '0',
+    paidAt: row.paidAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     company: await getCounterpartyById(row.companyId),
@@ -1841,6 +1844,162 @@ export async function createOrderPayment(orderId: string, input: {
   }
 
   return created ? mapPaymentRow(created) : null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SUPPLIER PAYMENTS — per-leg supplier settlement (two-sided order settlement)
+//  Mirrors the customer-side payment functions above. One row = one payment
+//  made to a supplier against a specific order_supplier leg. Aggregated into
+//  order_suppliers.amount_paid / paid_at by updateOrderSupplierAmountPaid.
+// ═══════════════════════════════════════════════════════════════════════
+
+export function mapSupplierPaymentRow(row: typeof supplierPayments.$inferSelect) {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    orderSupplierId: row.orderSupplierId,
+    orderId: row.orderId,
+    supplierId: row.supplierId,
+    invoiceId: row.invoiceId,
+    amount: String(row.amount),
+    currency: row.currency,
+    paidAt: row.paidAt.toISOString(),
+    method: row.method ?? null,
+    note: row.note ?? null,
+    createdBy: row.createdBy ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export async function listSupplierPayments(orderSupplierId: string) {
+  const rows = await db
+    .select()
+    .from(supplierPayments)
+    .where(eq(supplierPayments.orderSupplierId, orderSupplierId))
+    .orderBy(desc(supplierPayments.paidAt));
+  return rows.map(mapSupplierPaymentRow);
+}
+
+/**
+ * Recompute order_suppliers.amount_paid and paid_at for a leg.
+ * amount_paid = SUM(supplier_payments.amount) for the leg.
+ * paid_at is set when amount_paid >= leg cost (costPrice × qty across items),
+ * and cleared when it drops below. Returns the updated leg row or null.
+ */
+export async function updateOrderSupplierAmountPaid(orderSupplierId: string): Promise<void> {
+  const [{ paidTotal }] = await db
+    .select({ paidTotal: sql<number>`COALESCE(SUM(${supplierPayments.amount}), 0)::float` })
+    .from(supplierPayments)
+    .where(eq(supplierPayments.orderSupplierId, orderSupplierId));
+
+  const [{ costTotal }] = await db
+    .select({ costTotal: sql<number>`COALESCE(SUM(${orderItems.costPrice}::numeric * ${orderItems.quantity}::numeric), 0)::float` })
+    .from(orderItems)
+    .where(eq(orderItems.orderSupplierId, orderSupplierId));
+
+  const fullyPaid = paidTotal > 0 && paidTotal >= costTotal - 0.005; // tolerance for float rounding
+  const [leg] = await db
+    .select({ paidAt: orderSuppliers.paidAt })
+    .from(orderSuppliers)
+    .where(eq(orderSuppliers.id, orderSupplierId))
+    .limit(1);
+
+  await db
+    .update(orderSuppliers)
+    .set({
+      amountPaid: paidTotal.toFixed(2),
+      paidAt: fullyPaid ? (leg?.paidAt ?? new Date()) : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(orderSuppliers.id, orderSupplierId));
+}
+
+export async function createSupplierPayment(orderSupplierId: string, input: {
+  amount: string;
+  currency: string;
+  paidAt?: string | null;
+  method?: string | null;
+  note?: string | null;
+  createdBy?: string | null;
+}) {
+  const [leg] = await db
+    .select({
+      id: orderSuppliers.id,
+      orderId: orderSuppliers.orderId,
+      companyId: orderSuppliers.companyId,
+      tenantId: orders.tenantId,
+    })
+    .from(orderSuppliers)
+    .innerJoin(orders, eq(orderSuppliers.orderId, orders.id))
+    .where(eq(orderSuppliers.id, orderSupplierId))
+    .limit(1);
+
+  if (!leg) return null;
+
+  const [created] = await db
+    .insert(supplierPayments)
+    .values({
+      tenantId: leg.tenantId,
+      orderSupplierId: leg.id,
+      orderId: leg.orderId,
+      supplierId: leg.companyId,
+      amount: input.amount,
+      currency: input.currency,
+      paidAt: input.paidAt ? new Date(input.paidAt) : new Date(),
+      method: input.method ?? null,
+      note: input.note ?? null,
+      createdBy: input.createdBy ?? null,
+    })
+    .returning();
+
+  if (created) {
+    await updateOrderSupplierAmountPaid(orderSupplierId);
+  }
+  return created ? mapSupplierPaymentRow(created) : null;
+}
+
+export async function updateSupplierPayment(
+  paymentId: string,
+  input: { amount?: string; currency?: string; paidAt?: string | null; method?: string | null; note?: string | null },
+) {
+  const [existing] = await db
+    .select({ orderSupplierId: supplierPayments.orderSupplierId })
+    .from(supplierPayments)
+    .where(eq(supplierPayments.id, paymentId))
+    .limit(1);
+  if (!existing) return null;
+
+  const setData: Record<string, unknown> = { updatedAt: new Date() };
+  if (input.amount !== undefined) setData.amount = input.amount;
+  if (input.currency !== undefined) setData.currency = input.currency;
+  if (input.paidAt !== undefined) setData.paidAt = input.paidAt ? new Date(input.paidAt) : new Date();
+  if (input.method !== undefined) setData.method = input.method ?? null;
+  if (input.note !== undefined) setData.note = input.note ?? null;
+
+  const [updated] = await db
+    .update(supplierPayments)
+    .set(setData)
+    .where(eq(supplierPayments.id, paymentId))
+    .returning();
+
+  if (updated) {
+    await updateOrderSupplierAmountPaid(existing.orderSupplierId);
+  }
+  return updated ? mapSupplierPaymentRow(updated) : null;
+}
+
+export async function deleteSupplierPayment(paymentId: string): Promise<boolean> {
+  const [existing] = await db
+    .select({ orderSupplierId: supplierPayments.orderSupplierId })
+    .from(supplierPayments)
+    .where(eq(supplierPayments.id, paymentId))
+    .limit(1);
+  if (!existing) return false;
+
+  await db.delete(supplierPayments).where(eq(supplierPayments.id, paymentId));
+  await updateOrderSupplierAmountPaid(existing.orderSupplierId);
+  return true;
 }
 
 // ─── Update Order Status ────────────────────────────────────────────

@@ -8,7 +8,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
@@ -62,7 +62,7 @@ const PLACE_TYPE_OPTIONS: DropdownOption[] = [
 @Component({
   selector: 'app-places-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent, SortHeaderComponent, FilterOverlayComponent],
+  imports: [FormsModule, RouterLink, PaginationComponent, SortHeaderComponent, FilterOverlayComponent],
   template: `
     <div>
       <!-- Header -->
@@ -219,8 +219,8 @@ const PLACE_TYPE_OPTIONS: DropdownOption[] = [
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-line">
             @for (place of places(); track place.id) {
-              <tr (click)="openPlace(place.id)" class="cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint">
-                <td class="px-4 py-3 font-medium text-brand-700 dark:text-brand-400 hover:underline">{{ place.name }}</td>
+              <tr (click)="onRowClick($event, place.id)" (auxclick)="onRowAuxClick($event, place.id)" class="cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint">
+                <td class="px-4 py-3"><a [routerLink]="['/places', place.id]" (click)="$event.stopPropagation()" class="font-medium text-brand-700 dark:text-brand-400 hover:underline">{{ place.name }}</a></td>
                 <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                   <span class="mr-1.5">{{ countryFlag(place) }}</span>{{ countryLabel(place.countryIso || place.country) }}
                   @if (place.countryIso && place.countryIso !== place.country) {
@@ -287,7 +287,7 @@ const PLACE_TYPE_OPTIONS: DropdownOption[] = [
       <!-- Mobile cards -->
       <div class="space-y-3 md:hidden">
         @for (place of places(); track place.id) {
-          <div (click)="openPlace(place.id)" class="cursor-pointer rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-4 shadow-sm hover:border-brand-300 transition-colors">
+          <a [routerLink]="['/places', place.id]" class="block cursor-pointer rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-4 shadow-sm hover:border-brand-300 transition-colors">
             <div class="flex items-center justify-between mb-2">
               <span class="font-semibold text-gray-900 dark:text-ink">{{ place.name }}</span>
               @if (place.placeType) {
@@ -303,7 +303,7 @@ const PLACE_TYPE_OPTIONS: DropdownOption[] = [
               <span>🌍 {{ place.area ?? '—' }}</span>
               <span>� {{ place.orderCount ?? 0 }} orders @if (place.activeOrderCount) { ({{ place.activeOrderCount }} active) }</span>
             </div>
-          </div>
+          </a>
         } @empty {
           @if (!loading()) {
             <div class="text-center py-8 text-sm text-gray-400 dark:text-muted italic">
@@ -832,5 +832,20 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
 
   openPlace(id: string): void {
     this.router.navigate(['/places', id]);
+  }
+
+  onRowClick(event: MouseEvent, id: string): void {
+    if (event.ctrlKey || event.metaKey) {
+      window.open(`/places/${id}`, '_blank');
+      return;
+    }
+    this.openPlace(id);
+  }
+
+  onRowAuxClick(event: MouseEvent, id: string): void {
+    if (event.button === 1) {
+      event.preventDefault();
+      window.open(`/places/${id}`, '_blank');
+    }
   }
 }

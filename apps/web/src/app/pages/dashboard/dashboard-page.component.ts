@@ -22,7 +22,7 @@ import type {
   CounterpartyDto,
 } from '@fueld/types';
 import { firstValueFrom } from 'rxjs';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Role } from '@fueld/types';
 
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
@@ -50,7 +50,7 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
 @Component({
   selector: 'app-dashboard-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, CollectionsWidgetComponent, DashboardFollowUpsWidgetComponent],
+  imports: [FormsModule, CollectionsWidgetComponent, DashboardFollowUpsWidgetComponent, RouterLink],
   template: `
     <div>
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -190,9 +190,8 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
           </div>
             <div class="divide-y divide-red-50 dark:divide-red-500/20">
               @for (company of frozenCompanies(); track company.id) {
-                <button
-                  type="button"
-                  (click)="goToCompany(company.id)"
+                <a
+                  [routerLink]="['/companies', company.id]"
                   class="flex w-full items-center justify-between gap-4 px-5 py-3 text-left transition-colors hover:bg-red-50/60 dark:hover:bg-red-500/10"
                 >
                   <div class="min-w-0 flex-1">
@@ -215,7 +214,7 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                   </svg>
-                </button>
+                </a>
               }
             </div>
         </div>
@@ -238,9 +237,9 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-line">
                 @for (g of topCreditGroups(); track g.id) {
-                  <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors dark:hover:bg-surface-tint" (click)="goToCompanyGroup(g.id)">
+                  <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors dark:hover:bg-surface-tint" (click)="onGroupRowClick($event, g.id)" (auxclick)="onAuxClick($event, '/companies/' + g.id)">
                     <td class="px-4 py-2.5">
-                      <span class="font-medium text-gray-900 dark:text-ink">{{ g.name }}</span>
+                      <a [routerLink]="['/companies', g.id]" class="font-medium text-gray-900 dark:text-ink hover:underline" (click)="$event.stopPropagation()">{{ g.name }}</a>
                       @if (g.country) {
                         <span class="ml-1 text-xs text-gray-400 dark:text-muted">{{ g.country }}</span>
                       }
@@ -732,6 +731,25 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   goToCompanyGroup(id: string): void {
     void this.router.navigate(['/companies', id]);
+  }
+
+  openInNewTab(path: string): void {
+    window.open(path, '_blank');
+  }
+
+  onGroupRowClick(event: MouseEvent, id: string): void {
+    if (event.ctrlKey || event.metaKey) {
+      window.open('/companies/' + id, '_blank');
+      return;
+    }
+    this.goToCompanyGroup(id);
+  }
+
+  onAuxClick(event: MouseEvent, url: string): void {
+    if (event.button === 1) {
+      event.preventDefault();
+      window.open(url, '_blank');
+    }
   }
 
   goToCompany(id: string): void {

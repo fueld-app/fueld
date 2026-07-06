@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CompanyOrder {
@@ -19,7 +20,7 @@ interface CompanyOrder {
 @Component({
   selector: 'app-orders-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe],
+  imports: [DateLabelPipe, RouterLink],
   template: `
     <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-[13]">
       <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
@@ -64,12 +65,12 @@ interface CompanyOrder {
             </thead>
             <tbody class="divide-y divide-gray-50">
               @for (order of activeOrders(); track order.id) {
-                <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors dark:hover:bg-surface-tint" (click)="orderClick.emit({ id: order.id, status: order.status })">
+                <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors dark:hover:bg-surface-tint" (click)="onRowClick($event, order)" (auxclick)="onAuxClick($event, '/trading/orders/' + order.id)">
                   @if (mode() === 'group') {
                     <td class="px-5 py-2.5 text-gray-700 dark:text-ink-dim">{{ order.clientName || '—' }}</td>
                   }
                   <td class="px-5 py-2.5">
-                    <span class="font-medium text-gray-900 dark:text-ink">{{ order.vesselName }}</span>
+                    <a [routerLink]="['/orders', order.id]" class="font-medium text-gray-900 dark:text-ink hover:underline" (click)="$event.stopPropagation()">{{ order.vesselName }}</a>
                     @if (order.vesselImo) { <span class="ml-1 text-xs text-gray-400 dark:text-muted">{{ order.vesselImo }}</span> }
                   </td>
                   <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">
@@ -104,6 +105,21 @@ export class OrdersCardComponent {
 
   readonly modeToggle = output<void>();
   readonly orderClick = output<{ id: string; status: string }>();
+
+  onRowClick(event: MouseEvent, order: CompanyOrder): void {
+    if (event.ctrlKey || event.metaKey) {
+      window.open('/trading/orders/' + order.id, '_blank');
+      return;
+    }
+    this.orderClick.emit({ id: order.id, status: order.status });
+  }
+
+  onAuxClick(event: MouseEvent, url: string): void {
+    if (event.button === 1) {
+      event.preventDefault();
+      window.open(url, '_blank');
+    }
+  }
 
   get activeOrders(): () => CompanyOrder[] {
     return () => this.mode() === 'group' ? this.groupOrders() : this.ownOrders();

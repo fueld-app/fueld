@@ -8,7 +8,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
@@ -45,7 +45,7 @@ interface VesselSearchResult {
 @Component({
   selector: 'app-vessels-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent, SortHeaderComponent, FilterOverlayComponent],
+  imports: [FormsModule, RouterLink, PaginationComponent, SortHeaderComponent, FilterOverlayComponent],
   template: `
     <div>
       <!-- Header -->
@@ -207,9 +207,9 @@ interface VesselSearchResult {
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (v of vessels(); track v.id) {
-                <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="goToVessel(v.id)">
+                <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, v.id)" (auxclick)="onRowAuxClick($event, v.id)">
                   <td class="px-5 py-3">
-                    <div class="font-medium text-gray-900 dark:text-ink">{{ v.name }}</div>
+                    <a [routerLink]="['/vessels', v.id]" (click)="$event.stopPropagation()" class="font-medium text-gray-900 dark:text-ink hover:underline">{{ v.name }}</a>
                     <div class="text-xs text-gray-400 dark:text-muted">
                       @if (v.imo) { IMO {{ v.imo }} }
                       @if (v.mmsi) { · MMSI {{ v.mmsi }} }
@@ -617,6 +617,21 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
   // ─── Navigation ────────────────────────────────────────────────────
   goToVessel(id: string): void {
     this.router.navigate(['/vessels', id]);
+  }
+
+  onRowClick(event: MouseEvent, id: string): void {
+    if (event.ctrlKey || event.metaKey) {
+      window.open(`/vessels/${id}`, '_blank');
+      return;
+    }
+    this.goToVessel(id);
+  }
+
+  onRowAuxClick(event: MouseEvent, id: string): void {
+    if (event.button === 1) {
+      event.preventDefault();
+      window.open(`/vessels/${id}`, '_blank');
+    }
   }
 
   changePage(page: number): void {

@@ -4,7 +4,7 @@
 //  Used amount is calculated from open orders automatically.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, sql, inArray, asc, desc } from 'drizzle-orm';
+import { eq, and, sql, inArray, asc, desc, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   creditLines,
@@ -17,8 +17,11 @@ import {
 } from '../../db/schema';
 import type { CreditLineDto, CreditLineType } from '@fueld/types';
 
-// Active statuses that count towards "used" credit
-const SUPPLIER_ACTIVE_STATUSES = ['CONFIRMED', 'DELIVERED', 'INVOICED'] as const;
+// Active statuses that count towards "used" credit.
+// Supplier side includes PAID: a PAID order (customer paid) does NOT auto-free
+// supplier credit — supplier credit is only released when the leg is settled
+// (order_suppliers.paid_at IS NOT NULL), filtered in calcUsedAmountForSupplier.
+const SUPPLIER_ACTIVE_STATUSES = ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'] as const;
 const CUSTOMER_ACTIVE_STATUSES = ['INQUIRY', 'OFFER', 'CONFIRMED', 'DELIVERED', 'INVOICED'] as const;
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -44,6 +47,9 @@ async function calcUsedAmountForSupplier(counterpartyIds: string[]): Promise<str
         inArray(orderSuppliers.companyId, counterpartyIds),
         eq(orderSuppliers.paymentTermType, 'CREDIT'),
         inArray(orders.status, [...SUPPLIER_ACTIVE_STATUSES]),
+        // Exclude settled legs (two-sided settlement): supplier credit is
+        // released per-leg when paid_at is set, independent of order.status.
+        isNull(orderSuppliers.paidAt),
       ),
     );
   return row?.total ?? '0';

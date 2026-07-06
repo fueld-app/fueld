@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, output, signal } from '@angular/core';
+
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface HierarchyNode {

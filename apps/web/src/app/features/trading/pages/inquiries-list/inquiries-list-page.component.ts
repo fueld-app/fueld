@@ -122,11 +122,19 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (inq of inquiries(); track inq.id) {
-                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="goToDetail(inq.orderNumber || inq.id)">
+                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint"
+                  (click)="onRowClick($event, inq.orderNumber || inq.id)"
+                  (auxclick)="onRowAuxClick($event, inq.orderNumber || inq.id)">
                   @for (col of visibleColumns(); track col.field) {
                     @switch (col.field) {
                       @case ('orderNumber') {
-                        <td class="px-4 py-3 font-mono text-xs text-gray-500 dark:text-muted">{{ inq.orderNumber ?? '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-500 dark:text-muted">
+                          <a [routerLink]="[baseRoute(), inq.orderNumber || inq.id]"
+                            (click)="$event.stopPropagation()"
+                            class="hover:text-brand-700 dark:hover:text-brand-400 hover:underline">
+                            {{ inq.orderNumber ?? '—' }}
+                          </a>
+                        </td>
                       }
                       @case ('client') {
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-ink">{{ inq.clientName }}</td>
@@ -832,6 +840,29 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   goToDetail(id: string): void {
     this.router.navigate([this.baseRoute(), id]);
+  }
+
+  private buildDetailUrl(id: string): string {
+    return `/${this.baseRoute()}/${id}`;
+  }
+
+  private openInNewTab(url: string): void {
+    window.open(url, '_blank');
+  }
+
+  onRowClick(event: MouseEvent, id: string): void {
+    if (event.ctrlKey || event.metaKey) {
+      this.openInNewTab(this.buildDetailUrl(id));
+      return;
+    }
+    this.goToDetail(id);
+  }
+
+  onRowAuxClick(event: MouseEvent, id: string): void {
+    if (event.button === 1) {
+      event.preventDefault();
+      this.openInNewTab(this.buildDetailUrl(id));
+    }
   }
 
   // ─── Toast ─────────────────────────────────────────────────────────

@@ -33,6 +33,10 @@ import {
   deleteOrderAttachment,
   listOrderPayments,
   createOrderPayment,
+  listSupplierPayments,
+  createSupplierPayment,
+  updateSupplierPayment,
+  deleteSupplierPayment,
   finalizeItemPrice,
 } from './orders.service';
 import { logActivity } from '../activity/activity.service';
@@ -266,6 +270,125 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         tags: ['Orders'],
         summary: 'Remove a supplier leg from an order',
       },
+    },
+  )
+
+  // ─── Supplier Payments (per-leg settlement) ───────────────────────
+  .get(
+    '/:id/suppliers/:supplierRecordId/payments',
+    async ({ params }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: [], message: 'Order not found' };
+        const payments = await listSupplierPayments(params.supplierRecordId);
+        return { success: true, data: payments } satisfies ApiResponse<typeof payments>;
+      } catch (err) {
+        console.error('[Orders] List supplier payments failed:', err);
+        return { success: false, data: [], message: 'Failed to load supplier payments' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), supplierRecordId: t.String() }),
+      detail: { tags: ['Orders'], summary: 'List supplier payments for a leg' },
+    },
+  )
+  .post(
+    '/:id/suppliers/:supplierRecordId/payments',
+    async ({ params, body, auth, set }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const amount = Number(body.amount);
+        if (!Number.isFinite(amount) || amount < 0) {
+          set.status = 400;
+          return { success: false, data: null, message: 'Invalid payment amount' };
+        }
+        const created = await createSupplierPayment(params.supplierRecordId, {
+          amount: body.amount,
+          currency: body.currency,
+          paidAt: body.paidAt ?? null,
+          method: body.method ?? null,
+          note: body.note ?? null,
+          createdBy: auth.sub,
+        });
+        if (!created) return { success: false, data: null, message: 'Order supplier leg not found' };
+        await logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: { action: 'add_supplier_payment', supplierRecordId: params.supplierRecordId, amount: body.amount },
+        });
+        return { success: true, data: created } satisfies ApiResponse<typeof created>;
+      } catch (err) {
+        console.error('[Orders] Create supplier payment failed:', err);
+        return { success: false, data: null, message: 'Failed to add supplier payment' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), supplierRecordId: t.String() }),
+      body: t.Object({
+        amount: t.String(),
+        currency: t.String(),
+        paidAt: t.Optional(t.String()),
+        method: t.Optional(t.Nullable(t.String())),
+        note: t.Optional(t.Nullable(t.String())),
+      }),
+      detail: { tags: ['Orders'], summary: 'Create a supplier payment for a leg' },
+    },
+  )
+  .patch(
+    '/supplier-payments/:paymentId',
+    async ({ params, body }) => {
+      try {
+        const updated = await updateSupplierPayment(params.paymentId, {
+          amount: body.amount,
+          currency: body.currency,
+          paidAt: body.paidAt ?? null,
+          method: body.method ?? null,
+          note: body.note ?? null,
+        });
+        if (!updated) return { success: false, data: null, message: 'Supplier payment not found' };
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err) {
+        console.error('[Orders] Update supplier payment failed:', err);
+        return { success: false, data: null, message: 'Failed to update supplier payment' };
+      }
+    },
+    {
+      params: t.Object({ paymentId: t.String() }),
+      body: t.Object({
+        amount: t.Optional(t.String()),
+        currency: t.Optional(t.String()),
+        paidAt: t.Optional(t.Nullable(t.String())),
+        method: t.Optional(t.Nullable(t.String())),
+        note: t.Optional(t.Nullable(t.String())),
+      }),
+      detail: { tags: ['Orders'], summary: 'Update a supplier payment' },
+    },
+  )
+  .delete(
+    '/supplier-payments/:paymentId',
+    async ({ params, auth }) => {
+      try {
+        const deleted = await deleteSupplierPayment(params.paymentId);
+        if (!deleted) return { success: false, data: null, message: 'Supplier payment not found' };
+        await logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: 'supplier-payment',
+          metadata: { action: 'delete_supplier_payment', paymentId: params.paymentId },
+        });
+        return { success: true, data: deleted } satisfies ApiResponse<typeof deleted>;
+      } catch (err) {
+        console.error('[Orders] Delete supplier payment failed:', err);
+        return { success: false, data: null, message: 'Failed to delete supplier payment' };
+      }
+    },
+    {
+      params: t.Object({ paymentId: t.String() }),
+      detail: { tags: ['Orders'], summary: 'Delete a supplier payment' },
     },
   )
 

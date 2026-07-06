@@ -8,7 +8,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
@@ -45,7 +45,7 @@ interface CompanySearchResult {
 @Component({
   selector: 'app-companies-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent, SortHeaderComponent, FilterOverlayComponent, CompaniesCreateModalComponent, CompaniesDeleteModalComponent],
+  imports: [FormsModule, RouterLink, PaginationComponent, SortHeaderComponent, FilterOverlayComponent, CompaniesCreateModalComponent, CompaniesDeleteModalComponent],
   template: `
     <div>
       <!-- Header -->
@@ -257,10 +257,10 @@ interface CompanySearchResult {
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (company of companies(); track company.id) {
-                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="goToCompany(company.id)">
+                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, company.id)" (auxclick)="onRowAuxClick($event, company.id)">
                   @if (isColVisible('name')) {
                   <td class="px-4 py-3">
-                    <span class="font-medium text-gray-900 dark:text-ink">{{ company.name }}</span>
+                    <a [routerLink]="['/companies', company.id]" (click)="$event.stopPropagation()" class="font-medium text-gray-900 dark:text-ink hover:underline">{{ company.name }}</a>
                     @if (company.parentName) {
                       <span class="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-500/15 px-2 py-0.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-400">
                         Child of {{ company.parentName }}
@@ -710,6 +710,21 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   // ─── Navigation ────────────────────────────────────────────────────
   goToCompany(id: string): void {
     this.router.navigate(['/companies', id]);
+  }
+
+  onRowClick(event: MouseEvent, id: string): void {
+    if (event.ctrlKey || event.metaKey) {
+      window.open(`/companies/${id}`, '_blank');
+      return;
+    }
+    this.goToCompany(id);
+  }
+
+  onRowAuxClick(event: MouseEvent, id: string): void {
+    if (event.button === 1) {
+      event.preventDefault();
+      window.open(`/companies/${id}`, '_blank');
+    }
   }
 
   changePage(page: number): void {

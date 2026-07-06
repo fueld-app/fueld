@@ -680,6 +680,13 @@
       "when": 1782552000000,
       "tag": "0096_add_lost_order_status",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1782638400000,
+      "tag": "0097_supplier_payments",
+      "breakpoints": true
     }
   ]
 }

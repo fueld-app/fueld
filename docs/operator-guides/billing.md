@@ -117,6 +117,40 @@ Inquiry → Confirmed → Delivered → Invoiced → Paid
                             Mark Paid
 ```
 
+> **Two-sided settlement:** Marking an order **Paid** settles the *customer* side
+> and frees the customer's credit line. The *supplier* side is settled
+> independently — see [§7. Supplier Settlement](#7-supplier-settlement).
+
+---
+
+## 7. Supplier Settlement
+
+Customer and supplier credit are released **independently**. Marking an order Paid
+frees the customer's credit line, but does **not** free the supplier credit line —
+that only happens when you settle with the supplier for that leg.
+
+### Add a supplier payment
+1. Select the supplier leg (use the supplier switcher if the order has multiple suppliers).
+2. Scroll to the **Supplier Payments** card (right column, under the customer Payments card).
+3. Click **Add payment**.
+4. Fill in:
+   - **Amount** — the amount you paid the supplier (required)
+   - **Currency** — defaults to the order's currency
+   - **Paid at** — date you paid
+   - **Method** — e.g. "Wire", "ACH" (optional)
+   - **Note** — reference or memo (optional)
+5. Click **Record payment**.
+
+### Settling a leg
+- The card shows **Paid: X / Y {currency}** — the running total vs the leg's cost.
+- While unpaid, an **Outstanding** badge shows the remaining balance.
+- Once payments cover the leg cost, the leg is **Settled** (badge turns green with the paid date) and the supplier's credit line availability goes back up.
+- If you remove a payment that drops the total below cost, the leg becomes outstanding again and supplier credit is re-consumed.
+
+### Independence from the customer side
+- You can mark an order **Paid** (customer side) while supplier legs remain unsettled — supplier credit stays consumed until each leg is settled.
+- Settling a supplier leg does **not** change the order status; it only releases that leg's supplier credit.
+
 ---
 
 ## Quick Reference
@@ -126,7 +160,9 @@ Inquiry → Confirmed → Delivered → Invoiced → Paid
 | Set payment terms | Client/Supplier cards > Payment section |
 | Generate invoice | Header ⋯ menu > View Invoice |
 | Send invoice | Header ⋯ menu > Send Invoice |
-| Record payment | Payments card > Add payment |
-| Mark as paid | Header ⋯ menu > Mark Paid |
+| Record customer payment | Payments card > Add payment |
+| Mark order as paid (customer) | Header ⋯ menu > Mark Paid |
+| Record supplier payment | Supplier Payments card > Add payment |
+| Settle a supplier leg | Supplier Payments card (paid ≥ cost → Settled) |
 | View credit line | Client card > Payment section |
 | Request credit increase | Client card > Payment > Request Increase |

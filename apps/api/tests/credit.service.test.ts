@@ -382,4 +382,158 @@ describe('credit.service', () => {
     expect(cancelledCustomerCredit?.availableAmount).toBe('1000.00');
     expect(cancelledSupplierCredit?.availableAmount).toBe('1000.00');
   });
+
+  // ─── Two-sided settlement: supplier credit released per-leg ──────────
+  it('releases supplier credit when a leg is settled, while the order is still INVOICED', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, getCreditLineById } = await loadCreditService();
+    const { createOrder, updateOrder, saveOrderItems, updateOrderStatus, createSupplierPayment, getOrderById } = await loadOrdersService();
+
+    const [supplier] = await db
+      .insert(counterparties)
+      .values({ tenantId: tenant.id, name: 'Supplier Settled', type: 'SUPPLIER', types: ['SUPPLIER'] })
+      .returning();
+
+    const credit = await createCreditLine({
+      type: 'SUPPLIER',
+      counterpartyIds: [supplier!.id],
+      creditAmount: '1000.00',
+      currency: 'USD',
+      periodDays: 30,
+    });
+
+    const order = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+      supplierId: supplier!.id,
+      supplierPaymentTermType: 'CREDIT',
+    });
+    await updateOrder(order.id, { supplierId: supplier!.id, supplierPaymentTermType: 'CREDIT' });
+    await updateOrderStatus(order.id, 'INVOICED', user.id);
+
+    const detail = await getOrderById(order.id);
+    const leg = detail?.orderSuppliers?.find((s) => s.companyId === supplier!.id)!;
+    await saveOrderItems(order.id, [
+      { productType: 'VLSFO', quantity: '4', orderSupplierId: leg.id, costPrice: '100', costCurrency: 'USD', salesPrice: '150', salesCurrency: 'USD' },
+    ]);
+    // leg cost = 400
+
+    // Before settling, supplier credit is used
+    const usedBefore = await getCreditLineById(credit!.id);
+    expect(usedBefore?.usedAmount).toBe('400.00');
+
+    // Settle the leg fully
+    await createSupplierPayment(leg.id, { amount: '400', currency: 'USD' });
+
+    // After settling, supplier credit is released — even though order is still INVOICED
+    const usedAfter = await getCreditLineById(credit!.id);
+    expect(usedAfter?.usedAmount).toBe('0.00');
+    expect(usedAfter?.availableAmount).toBe('1000.00');
+  });
+
+  it('keeps supplier credit used when an order is PAID but the supplier leg is unpaid', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, getCreditLineById } = await loadCreditService();
+    const { createOrder, updateOrder, saveOrderItems, updateOrderStatus, getOrderById } = await loadOrdersService();
+
+    const [supplier] = await db
+      .insert(counterparties)
+      .values({ tenantId: tenant.id, name: 'Supplier Unpaid', type: 'SUPPLIER', types: ['SUPPLIER'] })
+      .returning();
+
+    const credit = await createCreditLine({
+      type: 'SUPPLIER',
+      counterpartyIds: [supplier!.id],
+      creditAmount: '1000.00',
+      currency: 'USD',
+      periodDays: 30,
+    });
+
+    const order = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+      supplierId: supplier!.id,
+      customerPaymentTermType: 'CREDIT',
+      supplierPaymentTermType: 'CREDIT',
+    });
+    await updateOrder(order.id, {
+      customerPaymentTermType: 'CREDIT',
+      supplierId: supplier!.id,
+      supplierPaymentTermType: 'CREDIT',
+    });
+    await updateOrderStatus(order.id, 'CONFIRMED', user.id);
+
+    const detail = await getOrderById(order.id);
+    const leg = detail?.orderSuppliers?.find((s) => s.companyId === supplier!.id)!;
+    await saveOrderItems(order.id, [
+      { productType: 'VLSFO', quantity: '3', orderSupplierId: leg.id, costPrice: '100', costCurrency: 'USD', salesPrice: '150', salesCurrency: 'USD' },
+    ]);
+    // leg cost = 300
+
+    // Mark order PAID on the customer side (no supplier payment recorded)
+    await updateOrderStatus(order.id, 'PAID', user.id);
+
+    // Supplier credit should REMAIN used — PAID no longer auto-frees it
+    const supplierCredit = await getCreditLineById(credit!.id);
+    expect(supplierCredit?.usedAmount).toBe('300.00');
+    expect(supplierCredit?.availableAmount).toBe('700.00');
+  });
+
+  it('keeps supplier credit used on partial supplier payment until fully paid', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, getCreditLineById } = await loadCreditService();
+    const { createOrder, updateOrder, saveOrderItems, updateOrderStatus, createSupplierPayment, getOrderById } = await loadOrdersService();
+
+    const [supplier] = await db
+      .insert(counterparties)
+      .values({ tenantId: tenant.id, name: 'Supplier Partial', type: 'SUPPLIER', types: ['SUPPLIER'] })
+      .returning();
+
+    const credit = await createCreditLine({
+      type: 'SUPPLIER',
+      counterpartyIds: [supplier!.id],
+      creditAmount: '1000.00',
+      currency: 'USD',
+      periodDays: 30,
+    });
+
+    const order = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+      supplierId: supplier!.id,
+      supplierPaymentTermType: 'CREDIT',
+    });
+    await updateOrder(order.id, { supplierId: supplier!.id, supplierPaymentTermType: 'CREDIT' });
+    await updateOrderStatus(order.id, 'CONFIRMED', user.id);
+
+    const detail = await getOrderById(order.id);
+    const leg = detail?.orderSuppliers?.find((s) => s.companyId === supplier!.id)!;
+    await saveOrderItems(order.id, [
+      { productType: 'VLSFO', quantity: '5', orderSupplierId: leg.id, costPrice: '100', costCurrency: 'USD', salesPrice: '140', salesCurrency: 'USD' },
+    ]);
+    // leg cost = 500
+
+    // Partial payment (200 of 500) — not settled, credit still used
+    await createSupplierPayment(leg.id, { amount: '200', currency: 'USD' });
+    const partial = await getCreditLineById(credit!.id);
+    expect(partial?.usedAmount).toBe('500.00');
+
+    // Pay the remainder — settled, credit released
+    await createSupplierPayment(leg.id, { amount: '300', currency: 'USD' });
+    const full = await getCreditLineById(credit!.id);
+    expect(full?.usedAmount).toBe('0.00');
+    expect(full?.availableAmount).toBe('1000.00');
+  });
 });

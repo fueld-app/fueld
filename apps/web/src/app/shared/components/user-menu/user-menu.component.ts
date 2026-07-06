@@ -10,7 +10,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -25,6 +25,7 @@ import { API } from '@app/core/config/api';
 @Component({
   selector: 'app-user-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterLink],
   host: { class: 'relative inline-block' },
   template: `
     <!-- Hidden file input for avatar upload -->
@@ -154,8 +155,8 @@ import { API } from '@app/core/config/api';
               </button>
             }
           }
-          <button
-            (click)="goToSecurity()"
+          <a
+            routerLink="/account/settings"
             class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors dark:text-ink-dim dark:hover:bg-surface-tint"
             role="menuitem"
           >
@@ -163,7 +164,7 @@ import { API } from '@app/core/config/api';
               <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
             </svg>
             Settings
-          </button>
+          </a>
           <button
             (click)="handleLogout()"
             class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors dark:text-red-400 dark:hover:bg-red-500/10"

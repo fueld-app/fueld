@@ -998,6 +998,10 @@ export const orderSuppliers = pgTable('order_suppliers', {
   sortOrder: integer('sort_order').notNull().default(0),
   isPrimary: boolean('is_primary').notNull().default(false),
   deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  // Supplier-side settlement (two-sided order settlement).
+  // amountPaid mirrors invoices.amountPaid; paidAt set when supplier payments cover leg cost.
+  amountPaid: numeric('amount_paid', { precision: 14, scale: 2 }).default('0'),
+  paidAt: timestamp('paid_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -1299,6 +1303,30 @@ export const customerPayments = pgTable('customer_payments', {
   note: text('note'),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  12c. SUPPLIER PAYMENTS (per-leg supplier settlement ledger entries)
+//  Mirrors customer_payments. One row = one payment you made to a supplier
+//  against a specific order_supplier leg. Aggregated into
+//  order_suppliers.amount_paid / paid_at by updateOrderSupplierAmountPaid.
+// ═══════════════════════════════════════════════════════════════════════
+
+export const supplierPayments = pgTable('supplier_payments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  orderSupplierId: uuid('order_supplier_id').notNull().references(() => orderSuppliers.id, { onDelete: 'cascade' }),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  supplierId: uuid('supplier_id').notNull().references(() => counterparties.id),
+  invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'set null' }),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  currency: text('currency').notNull().default('USD'),
+  paidAt: timestamp('paid_at', { withTimezone: true }).notNull().defaultNow(),
+  method: text('method'),
+  note: text('note'),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1799,6 +1827,16 @@ export const orderSuppliersRelations = relations(orderSuppliers, ({ one, many })
   contact: one(companyContacts, { fields: [orderSuppliers.contactId], references: [companyContacts.id] }),
   items: many(orderItems),
   supplierNominations: many(supplierNominations),
+  supplierPayments: many(supplierPayments),
+}));
+
+export const supplierPaymentsRelations = relations(supplierPayments, ({ one }) => ({
+  tenant: one(tenants, { fields: [supplierPayments.tenantId], references: [tenants.id] }),
+  orderSupplier: one(orderSuppliers, { fields: [supplierPayments.orderSupplierId], references: [orderSuppliers.id] }),
+  order: one(orders, { fields: [supplierPayments.orderId], references: [orders.id] }),
+  supplier: one(counterparties, { fields: [supplierPayments.supplierId], references: [counterparties.id] }),
+  invoice: one(invoices, { fields: [supplierPayments.invoiceId], references: [invoices.id] }),
+  createdByUser: one(users, { fields: [supplierPayments.createdBy], references: [users.id] }),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({

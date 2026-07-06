@@ -123,6 +123,7 @@ function getTruncateTables() {
     'order_port_documents',
     'order_attachments',
     'order_items',
+    'supplier_payments',
     'order_suppliers',
     'orders',
     'port_document_assets',
@@ -298,6 +299,37 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_order_suppliers_primary_per_order
       ON order_suppliers(order_id)
       WHERE is_primary = true
+  `;
+
+  // Two-sided order settlement: order_suppliers settlement columns + supplier_payments
+  await sql`
+    ALTER TABLE order_suppliers
+      ADD COLUMN IF NOT EXISTS amount_paid numeric(14,2) DEFAULT '0',
+      ADD COLUMN IF NOT EXISTS paid_at timestamptz
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS supplier_payments (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      order_supplier_id uuid NOT NULL REFERENCES order_suppliers(id) ON DELETE CASCADE,
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      supplier_id uuid NOT NULL REFERENCES counterparties(id),
+      invoice_id uuid REFERENCES invoices(id) ON DELETE SET NULL,
+      amount numeric(14,2) NOT NULL,
+      currency text NOT NULL DEFAULT 'USD',
+      paid_at timestamptz NOT NULL DEFAULT now(),
+      method text,
+      note text,
+      created_by uuid REFERENCES users(id),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_supplier_payments_order_supplier_id
+      ON supplier_payments(order_supplier_id)
   `;
 
   await sql`

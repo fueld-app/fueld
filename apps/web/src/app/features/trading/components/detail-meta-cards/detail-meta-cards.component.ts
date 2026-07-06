@@ -8,7 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { DateFormatService } from '@app/core/services/date-format.service';
 import type { OwnCompanyDto, BankAccountDto } from '@fueld/types';
 import {
@@ -19,7 +19,7 @@ import {
 @Component({
   selector: 'app-trading-detail-meta-cards',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SearchableDropdownComponent, FormsModule],
+  imports: [SearchableDropdownComponent, FormsModule, RouterLink],
   template: `
     <div class="mb-4 grid gap-4 grid-cols-1 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
       <!-- Client + Customer Contact + Broker + Agent + Customer Payment -->
@@ -128,10 +128,8 @@ import {
             </div>
           }
           @if (activeClientPartyTab() === 'broker' && showBrokerTab()) {
-            <button
-              type="button"
-              (click)="navigateToBroker()"
-              [disabled]="!brokerId()"
+            <a
+              [routerLink]="brokerId() ? ['/companies', brokerId()] : null"
               class="text-xs font-medium uppercase tracking-wider mb-1.5"
               [class.text-gray-500]="!brokerId()"
               [class.text-brand-600]="!!brokerId()"
@@ -139,9 +137,10 @@ import {
               [class.cursor-pointer]="!!brokerId()"
               [class.cursor-not-allowed]="!brokerId()"
               [class.opacity-50]="!brokerId()"
+              [class.pointer-events-none]="!brokerId()"
             >
               Broker
-            </button>
+            </a>
             @if (isReadonly()) {
               <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ brokerName() }}</p>
             } @else {
@@ -195,10 +194,8 @@ import {
             }
           }
           @if (activeClientPartyTab() === 'agent' && showAgentTab()) {
-            <button
-              type="button"
-              (click)="navigateToAgent()"
-              [disabled]="!agentId()"
+            <a
+              [routerLink]="agentId() ? ['/companies', agentId()] : null"
               class="text-xs font-medium uppercase tracking-wider mb-1.5"
               [class.text-gray-500]="!agentId()"
               [class.text-brand-600]="!!agentId()"
@@ -206,9 +203,10 @@ import {
               [class.cursor-pointer]="!!agentId()"
               [class.cursor-not-allowed]="!agentId()"
               [class.opacity-50]="!agentId()"
+              [class.pointer-events-none]="!agentId()"
             >
               Agent
-            </button>
+            </a>
             @if (isReadonly()) {
               <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ agentName() }}</p>
             } @else {
@@ -252,10 +250,8 @@ import {
       <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden">
         <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between gap-3">
           @if (!supplierId()) {
-            <button
-              type="button"
-              (click)="navigateToSupplier()"
-              [disabled]="!supplierId()"
+            <a
+              [routerLink]="supplierId() ? ['/companies', supplierId()] : null"
               class="text-xs font-medium uppercase tracking-wider shrink-0"
               [class.text-gray-500]="!supplierId()"
               [class.text-brand-600]="!!supplierId()"
@@ -263,9 +259,10 @@ import {
               [class.cursor-pointer]="!!supplierId()"
               [class.cursor-not-allowed]="!supplierId()"
               [class.opacity-50]="!supplierId()"
+              [class.pointer-events-none]="!supplierId()"
             >
               Supplier
-            </button>
+            </a>
           }
           <div class="min-w-0 flex-1">
             <ng-content select="[supplierHeaderTabs]"></ng-content>
@@ -312,10 +309,8 @@ import {
 
       <!-- Voyage: Vessel + Place + ETA/ETD -->
       <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
-        <button
-          type="button"
-          (click)="navigateToVessel()"
-          [disabled]="!vesselId()"
+        <a
+          [routerLink]="vesselId() ? ['/vessels', vesselId()] : null"
           class="text-xs font-medium uppercase tracking-wider mb-1.5"
           [class.text-gray-500]="!vesselId()"
           [class.text-brand-600]="!!vesselId()"
@@ -323,9 +318,10 @@ import {
           [class.cursor-pointer]="!!vesselId()"
           [class.cursor-not-allowed]="!vesselId()"
           [class.opacity-50]="!vesselId()"
+          [class.pointer-events-none]="!vesselId()"
         >
           Vessel
-        </button>
+        </a>
         @if (isReadonly()) {
           <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ vesselName() }}</p>
         } @else {
@@ -340,10 +336,8 @@ import {
           />
         }
         <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
-          <button
-            type="button"
-            (click)="navigateToPlace()"
-            [disabled]="!placeId()"
+          <a
+            [routerLink]="placeId() ? ['/places', placeId()] : null"
             class="text-xs font-medium uppercase tracking-wider mb-1.5"
             [class.text-gray-500]="!placeId()"
             [class.text-brand-600]="!!placeId()"
@@ -351,9 +345,10 @@ import {
             [class.cursor-pointer]="!!placeId()"
             [class.cursor-not-allowed]="!placeId()"
             [class.opacity-50]="!placeId()"
+            [class.pointer-events-none]="!placeId()"
           >
             Place
-          </button>
+          </a>
           @if (isReadonly()) {
             <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ placeName() }}</p>
           } @else {
