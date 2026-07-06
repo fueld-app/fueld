@@ -104,4 +104,53 @@ describe('orders.service edge branches', () => {
     const activity = await getOrderActivity(missing);
     expect(activity).toEqual([]);
   });
+
+  it('updates an order attachment type and returns null for missing attachment', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const {
+      createOrder,
+      createOrderAttachment,
+      updateOrderAttachmentType,
+      listOrderAttachments,
+    } = await loadOrdersService();
+
+    const order = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    // Upload an attachment as OTHER (simulating the user's mistake)
+    const att = await createOrderAttachment({
+      orderId: order.id,
+      type: 'OTHER',
+      fileName: 'bdr.pdf',
+      filePath: '/uploads/attachments/test.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 1024,
+      uploadedBy: user.id,
+    });
+    expect(att).not.toBeNull();
+    expect(att!.type).toBe('OTHER');
+
+    // Fix the type to BDR (lowercase to verify uppercasing)
+    const updated = await updateOrderAttachmentType(att!.id, order.id, 'bdr');
+    expect(updated).not.toBeNull();
+    expect(updated!.type).toBe('BDR');
+
+    // Verify the change persisted
+    const listed = await listOrderAttachments(order.id);
+    expect(listed.length).toBe(1);
+    expect(listed[0]!.type).toBe('BDR');
+
+    // Non-existent attachment returns null
+    const missing = await updateOrderAttachmentType(
+      '123e4567-e89b-12d3-a456-426614174000',
+      order.id,
+      'BDR',
+    );
+    expect(missing).toBeNull();
+  });
 });

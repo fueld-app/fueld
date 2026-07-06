@@ -1733,6 +1733,19 @@ export async function createOrderAttachment(input: {
   return created ?? null;
 }
 
+export async function updateOrderAttachmentType(
+  attachmentId: string,
+  orderId: string,
+  type: string,
+): Promise<typeof orderAttachments.$inferSelect | null> {
+  const [updated] = await db
+    .update(orderAttachments)
+    .set({ type: type.toUpperCase() })
+    .where(and(eq(orderAttachments.id, attachmentId), eq(orderAttachments.orderId, orderId)))
+    .returning();
+  return updated ?? null;
+}
+
 export async function deleteOrderAttachment(attachmentId: string, orderId: string): Promise<void> {
   const result = await db
     .update(orderAttachments)

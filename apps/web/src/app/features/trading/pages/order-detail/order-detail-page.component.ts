@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   signal,
   computed,
+  linkedSignal,
   inject,
   viewChild,
   OnInit,
@@ -302,7 +303,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly orderSuppliers = signal<OrderSupplierDto[]>([]);
   readonly activeOrderSupplierId = signal<string | null>(null);
   readonly uploadingAttachment = signal(false);
-  readonly attachmentType = signal('OTHER');
+  readonly attachmentType = linkedSignal({
+    source: this.refData.deliveryDocumentationSettings,
+    computation: (settings) => {
+      const docTypes = settings.deliveryDocumentationTypes;
+      return docTypes.length ? docTypes[0] : 'OTHER';
+    },
+  });
   selectedAttachment: File | null = null;
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
@@ -503,6 +510,19 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly hasDeliveryDocumentation = computed(() => {
     const allowedTypes = this.refData.deliveryDocumentationSettings().deliveryDocumentationTypes;
     return this.attachments().some((att) => allowedTypes.includes((att.type ?? '').toUpperCase()));
+  });
+  readonly showDeliveryDocWarning = computed(() => {
+    const settings = this.refData.deliveryDocumentationSettings();
+    const status = this.order()?.status;
+    // Only show when delivery docs are required, order is not yet delivered,
+    // and no qualifying delivery documentation has been uploaded yet.
+    // Internal transfers are exempt from the BDR requirement.
+    return (
+      settings.requireDeliveryDocumentation &&
+      status === 'CONFIRMED' &&
+      !this.isInternalTransfer() &&
+      !this.hasDeliveryDocumentation()
+    );
   });
   readonly invoiceEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() => {
     const allowedTypes = this.refData.deliveryDocumentationSettings().deliveryDocumentationTypes;
@@ -1472,6 +1492,27 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       }
     } catch {
       this.showToast('error', 'Failed to remove attachment.');
+    }
+  }
+
+  async updateAttachmentType(event: { att: OrderAttachmentDto; type: string }): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    const newType = event.type.toUpperCase();
+    // No-op if the type hasn't actually changed
+    if (event.att.type.toUpperCase() === newType) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<OrderAttachmentDto>>(`${API_URL}/orders/${id}/attachments/${event.att.id}`, { type: newType }),
+      );
+      if (res.success && res.data) {
+        this.attachments.update((prev) => prev.map((a) => (a.id === event.att.id ? res.data! : a)));
+        this.showToast('success', `Attachment type changed to ${newType}.`);
+      } else {
+        this.showToast('error', res.message ?? 'Failed to update attachment type.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to update attachment type.');
     }
   }
 

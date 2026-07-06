@@ -29,6 +29,7 @@ import {
   resolveOrderId,
   listOrderAttachments,
   createOrderAttachment,
+  updateOrderAttachmentType,
   deleteOrderAttachment,
   listOrderPayments,
   createOrderPayment,
@@ -850,6 +851,41 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Orders'],
         summary: 'Soft-delete an attachment from an order (file retained on disk)',
+      },
+    },
+  )
+  .patch(
+    '/:id/attachments/:attachmentId',
+    async ({ params, body }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+
+        const newType = String(body.type ?? '').trim().toUpperCase();
+        const configuredAttachmentTypes = (await getAttachmentTypeSettings()).attachmentTypes;
+        if (!configuredAttachmentTypes.includes(newType)) {
+          return { success: false, data: null, message: 'Invalid attachment type' };
+        }
+
+        const updated = await updateOrderAttachmentType(params.attachmentId, orderId, newType);
+        if (!updated) {
+          return { success: false, data: null, message: 'Attachment not found' };
+        }
+
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err) {
+        console.error('[Orders] Update attachment type failed:', err);
+        return { success: false, data: null, message: 'Failed to update attachment type' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), attachmentId: t.String() }),
+      body: t.Object({
+        type: t.String(),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Update the type of an order attachment',
       },
     },
   )

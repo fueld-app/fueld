@@ -17,6 +17,18 @@ import type { OrderAttachmentDto } from '@fueld/types';
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim uppercase tracking-wider">Attachments</h3>
       </div>
+
+      @if (showDeliveryDocWarning()) {
+        <div class="mt-3 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5">
+          <p class="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+            <strong>Delivery documentation required.</strong>
+            Upload your delivery document and select type
+            <span class="font-mono font-semibold">{{ deliveryDocTypes().join(', ') }}</span>
+            when uploading — or change an existing attachment's type below — before marking this order as delivered.
+          </p>
+        </div>
+      }
+
       <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
         <select
           [ngModel]="attachmentType()"
@@ -52,7 +64,18 @@ import type { OrderAttachmentDto } from '@fueld/types';
             @for (att of attachments(); track att.id) {
               <li class="flex items-center justify-between py-2 text-sm">
                 <div class="flex items-center gap-2 min-w-0">
-                  <span class="rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-ink-dim shrink-0">{{ att.type }}</span>
+                  <!-- Inline type selector — lets users fix a mis-typed attachment
+                       (e.g. uploaded as OTHER but should be BDR) without re-uploading -->
+                  <select
+                    [ngModel]="att.type"
+                    (ngModelChange)="typeChange.emit({ att, type: $event })"
+                    class="fueld-select-no-chevron w-20 sm:w-24 appearance-none rounded-md border border-gray-300 dark:border-line-strong px-1.5 py-0.5 text-xs font-semibold text-gray-600 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface shrink-0"
+                    [title]="'Change attachment type (currently ' + att.type + ')'"
+                  >
+                    @for (type of attachmentTypes(); track type) {
+                      <option [value]="type">{{ type }}</option>
+                    }
+                  </select>
                   <button
                     type="button"
                     (click)="open.emit(att)"
@@ -88,10 +111,13 @@ export class OrderAttachmentsCardComponent {
   readonly attachmentType = model('OTHER');
   readonly uploading = input(false);
   readonly hasFile = input(false);
+  readonly showDeliveryDocWarning = input(false);
+  readonly deliveryDocTypes = input<string[]>([]);
 
   readonly upload = output<void>();
   readonly open = output<OrderAttachmentDto>();
   readonly delete = output<OrderAttachmentDto>();
+  readonly typeChange = output<{ att: OrderAttachmentDto; type: string }>();
   readonly fileSelected = output<File>();
 
   protected onFileSelected(event: Event): void {

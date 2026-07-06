@@ -341,9 +341,12 @@
       [(attachmentType)]="attachmentType"
       [uploading]="uploadingAttachment()"
       [hasFile]="!!selectedAttachment"
+      [showDeliveryDocWarning]="showDeliveryDocWarning()"
+      [deliveryDocTypes]="refData.deliveryDocumentationSettings().deliveryDocumentationTypes"
       (upload)="uploadAttachment()"
       (open)="openAttachment($event)"
       (delete)="deleteAttachment($event)"
+      (typeChange)="updateAttachmentType($event)"
       (fileSelected)="onAttachmentSelected($event)"
     />
 } @placeholder { <div></div> }
