@@ -733,12 +733,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly supplierPaidAt = computed(() => this.activeOrderSupplier()?.paidAt ?? null);
 
-  readonly hasEnoughSupplierPaymentsForMarkPaid = computed(() => {
-    const cost = this.supplierLegCost();
-    if (cost <= 0) return false;
-    return this.supplierPaymentsTotal() >= cost - 0.005;
-  });
-
   readonly customerCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
     const lines = this.customerCreditLines().filter((line) => line.currency === currency);

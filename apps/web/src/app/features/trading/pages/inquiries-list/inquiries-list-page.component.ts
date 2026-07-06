@@ -122,9 +122,12 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (inq of inquiries(); track inq.id) {
-                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint"
+                <tr class="relative transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint"
                   (click)="onRowClick($event, inq.orderNumber || inq.id)"
                   (auxclick)="onRowAuxClick($event, inq.orderNumber || inq.id)">
+                  <td [attr.colspan]="100" class="absolute inset-0 p-0 border-0 z-0">
+                    <a [routerLink]="[baseRoute(), inq.orderNumber || inq.id]" class="block w-full h-full" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
+                  </td>
                   @for (col of visibleColumns(); track col.field) {
                     @switch (col.field) {
                       @case ('orderNumber') {
@@ -203,7 +206,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                       }
                     }
                   }
-                  <td class="px-4 py-3">
+                  <td class="relative z-10 px-4 py-3">
                     <a
                       [routerLink]="[baseRoute(), inq.orderNumber || inq.id]"
                       class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-brand-600 transition-colors"

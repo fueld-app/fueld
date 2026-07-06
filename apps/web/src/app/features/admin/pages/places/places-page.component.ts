@@ -219,7 +219,10 @@ const PLACE_TYPE_OPTIONS: DropdownOption[] = [
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-line">
             @for (place of places(); track place.id) {
-              <tr (click)="onRowClick($event, place.id)" (auxclick)="onRowAuxClick($event, place.id)" class="cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint">
+              <tr class="relative cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint" (click)="onRowClick($event, place.id)" (auxclick)="onRowAuxClick($event, place.id)">
+                <td [attr.colspan]="100" class="absolute inset-0 p-0 border-0 z-0">
+                  <a [routerLink]="['/places', place.id]" class="block w-full h-full" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
+                </td>
                 <td class="px-4 py-3"><a [routerLink]="['/places', place.id]" (click)="$event.stopPropagation()" class="font-medium text-brand-700 dark:text-brand-400 hover:underline">{{ place.name }}</a></td>
                 <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                   <span class="mr-1.5">{{ countryFlag(place) }}</span>{{ countryLabel(place.countryIso || place.country) }}
@@ -256,7 +259,7 @@ const PLACE_TYPE_OPTIONS: DropdownOption[] = [
                     <span class="text-xs text-gray-300 dark:text-muted">—</span>
                   }
                 </td>
-                <td class="px-4 py-3 text-right">
+                <td class="relative z-10 px-4 py-3 text-right">
                   <button
                     (click)="confirmDelete(place); $event.stopPropagation()"
                     class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors"

@@ -112,6 +112,15 @@ export function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
+/**
+ * Formats a raw product_type enum value for display on PDFs and labels.
+ * Replaces underscores with spaces (e.g. BARGING_FEE → "BARGING FEE",
+ * CREDIT_NOTE → "CREDIT NOTE").
+ */
+export function formatProductTypeLabel(productType: string): string {
+  return productType.replace(/_/g, ' ');
+}
+
 export function documentTypePrefix(documentType: DocumentType): string {
   switch (documentType) {
     case 'OFFER': return 'OFF';
@@ -955,7 +964,7 @@ function buildInvoiceDocument(data: {
     const lineTotal = qty * price;
     return [
       { text: String(idx + 1), alignment: 'center' },
-      { text: item.productType },
+      { text: formatProductTypeLabel(item.productType) },
       { text: formatNumberCompact(item.quantity, 3), alignment: 'right' },
       { text: item.unit },
       { text: formatPriceFixed(item.salesPrice, priceColDecimals), alignment: 'right' },
@@ -1356,7 +1365,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
-        label: item.productType,
+        label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
     items: order.items.map((item) => ({
@@ -1507,7 +1516,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
-        label: item.productType,
+        label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
     items: order.items.map((item) => ({
@@ -1739,9 +1748,12 @@ export function buildOfferDocument(data: {
     const qty = item.quantityMin && item.quantityMax
       ? `${formatNumberCompact(item.quantityMin, 0)} - ${formatNumberCompact(item.quantityMax, 0)}`
       : formatNumberCompact(item.quantity, 3);
-    const productCell: Content = item.description?.trim()
-      ? { text: [{ text: item.productType }, { text: `  ${item.description.trim()}`, fontSize: 8, color: '#374151' }] }
-      : { text: item.productType };
+    const desc = item.description?.trim();
+    const productCell: Content = item.productType === 'ITEM' && desc
+      ? { text: desc }
+      : desc
+        ? { text: [{ text: formatProductTypeLabel(item.productType) }, { text: `  ${desc}`, fontSize: 8, color: '#374151' }] }
+        : { text: formatProductTypeLabel(item.productType) };
 
     let priceCell: Content;
     if (item.salesPricingModel === 'FORMULA') {
@@ -2145,7 +2157,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
-        label: item.productType,
+        label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
     currency: order.currency ?? 'USD',
@@ -2532,9 +2544,12 @@ function buildProformaDocument(data: {
     const qty = parseFloat(item.quantity) || 0;
     const unitPrice = parseFloat(item.salesPrice ?? '0') || 0;
     const lineTotal = qty * unitPrice;
-    const productCell: Content = item.description?.trim()
-      ? { text: [{ text: item.productType }, { text: `  ${item.description.trim()}`, fontSize: 8, color: '#374151' }] }
-      : { text: item.productType };
+    const desc = item.description?.trim();
+    const productCell: Content = item.productType === 'ITEM' && desc
+      ? { text: desc }
+      : desc
+        ? { text: [{ text: formatProductTypeLabel(item.productType) }, { text: `  ${desc}`, fontSize: 8, color: '#374151' }] }
+        : { text: formatProductTypeLabel(item.productType) };
 
     let priceCell: Content;
     let totalCell: Content;
@@ -2963,7 +2978,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
-        label: item.productType,
+        label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
     items: order.items.map((item) => ({

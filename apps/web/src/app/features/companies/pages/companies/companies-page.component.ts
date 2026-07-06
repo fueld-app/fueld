@@ -257,7 +257,10 @@ interface CompanySearchResult {
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (company of companies(); track company.id) {
-                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, company.id)" (auxclick)="onRowAuxClick($event, company.id)">
+                <tr class="relative transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, company.id)" (auxclick)="onRowAuxClick($event, company.id)">
+                  <td [attr.colspan]="100" class="absolute inset-0 p-0 border-0 z-0">
+                    <a [routerLink]="['/companies', company.id]" class="block w-full h-full" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
+                  </td>
                   @if (isColVisible('name')) {
                   <td class="px-4 py-3">
                     <a [routerLink]="['/companies', company.id]" (click)="$event.stopPropagation()" class="font-medium text-gray-900 dark:text-ink hover:underline">{{ company.name }}</a>
@@ -346,7 +349,7 @@ interface CompanySearchResult {
                   </td>
                   }
                   @if (isColVisible('actions')) {
-                  <td class="px-4 py-3">
+                  <td class="relative z-10 px-4 py-3">
                     <button
                       (click)="confirmDelete(company, $event)"
                       class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-red-500 transition-colors"

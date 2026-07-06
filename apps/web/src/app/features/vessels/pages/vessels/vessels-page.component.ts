@@ -207,7 +207,10 @@ interface VesselSearchResult {
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (v of vessels(); track v.id) {
-                <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, v.id)" (auxclick)="onRowAuxClick($event, v.id)">
+                <tr class="relative hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="onRowClick($event, v.id)" (auxclick)="onRowAuxClick($event, v.id)">
+                  <td [attr.colspan]="100" class="absolute inset-0 p-0 border-0 z-0">
+                    <a [routerLink]="['/vessels', v.id]" class="block w-full h-full" tabindex="-1" aria-hidden="true" (click)="$event.stopPropagation()"></a>
+                  </td>
                   <td class="px-5 py-3">
                     <a [routerLink]="['/vessels', v.id]" (click)="$event.stopPropagation()" class="font-medium text-gray-900 dark:text-ink hover:underline">{{ v.name }}</a>
                     <div class="text-xs text-gray-400 dark:text-muted">
@@ -234,7 +237,7 @@ interface VesselSearchResult {
                       <span class="inline-flex rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-muted">Manual</span>
                     }
                   </td>
-                  <td class="px-5 py-3 text-right">
+                  <td class="relative z-10 px-5 py-3 text-right">
                     <button
                       (click)="confirmDelete(v, $event)"
                       class="rounded p-1 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors"
