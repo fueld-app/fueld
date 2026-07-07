@@ -158,7 +158,11 @@ interface VesselCompanyDto {
               @if (riskSummary()!.hasActiveOverride) {
                 <div class="rounded-lg bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 px-4 py-3">
                   <p class="text-sm font-medium text-amber-800 dark:text-amber-300">Override Active</p>
-                  <p class="text-xs text-amber-600 dark:text-amber-400">Credit temporarily unfrozen until {{ riskSummary()!.overrideExpiresAt | date:'medium' }}</p>
+                  @if (riskSummary()!.overrideExpiresAt) {
+                    <p class="text-xs text-amber-600 dark:text-amber-400">Credit temporarily unfrozen until {{ riskSummary()!.overrideExpiresAt | date:'medium' }}</p>
+                  } @else {
+                    <p class="text-xs text-amber-600 dark:text-amber-400">Credit unfrozen — <span class="font-semibold">permanent override</span> (no expiry)</p>
+                  }
                 </div>
               }
               @if (ignoredCreditVessels().length) {

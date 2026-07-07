@@ -221,7 +221,7 @@ export async function getRiskSummary(counterpartyId: string, tenantId: string): 
     where: and(
       eq(riskOverrides.counterpartyId, counterpartyId),
       eq(riskOverrides.status, 'APPROVED'),
-      sql`${riskOverrides.expiresAt} > now()`,
+      or(sql`${riskOverrides.expiresAt} IS NULL`, sql`${riskOverrides.expiresAt} > now()`),
     ),
   });
 
@@ -361,7 +361,7 @@ export async function isCreditFrozen(counterpartyId: string): Promise<boolean> {
     where: and(
       eq(riskOverrides.counterpartyId, counterpartyId),
       eq(riskOverrides.status, 'APPROVED'),
-      sql`${riskOverrides.expiresAt} > now()`,
+      or(sql`${riskOverrides.expiresAt} IS NULL`, sql`${riskOverrides.expiresAt} > now()`),
     ),
   });
 
@@ -390,7 +390,7 @@ export async function getFrozenCounterpartyIds(counterpartyIds: string[]): Promi
       and(
         inArray(riskOverrides.counterpartyId, idsWithHits),
         eq(riskOverrides.status, 'APPROVED'),
-        sql`${riskOverrides.expiresAt} > now()`,
+        or(sql`${riskOverrides.expiresAt} IS NULL`, sql`${riskOverrides.expiresAt} > now()`),
       ),
     );
 
@@ -465,8 +465,11 @@ export async function createOverride(
   userId: string,
   reason: string,
   settings: RiskMonitoringSettingsDto,
+  permanent: boolean = false,
 ): Promise<RiskOverrideDto> {
-  const expiresAt = new Date(Date.now() + settings.overrideExpiryDays * 24 * 60 * 60 * 1000);
+  const expiresAt = permanent
+    ? null
+    : new Date(Date.now() + settings.overrideExpiryDays * 24 * 60 * 60 * 1000);
   const autoApprove = settings.overrideRequiredApprovals <= 1;
 
   const [row] = await db
@@ -829,7 +832,7 @@ function overrideToDto(
     counterpartyName: counterpartyName ?? '',
     status: row.status as RiskOverrideDto['status'],
     reason: row.reason,
-    expiresAt: row.expiresAt.toISOString(),
+    expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
     requestedByUserId: row.requestedByUserId,
     requestedByUserName: requestedByName,
     approvals,

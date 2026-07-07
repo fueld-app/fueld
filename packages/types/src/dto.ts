@@ -2428,7 +2428,7 @@ export interface RiskOverrideDto {
   counterpartyName: string;
   status: RiskOverrideStatus;
   reason: string;
-  expiresAt: string;
+  expiresAt: string | null; // null = permanent
   requestedByUserId: string;
   requestedByUserName: string;
   approvals: RiskOverrideApprovalDto[];
@@ -2466,6 +2466,7 @@ export interface RiskSummaryDto {
 export interface CreateRiskOverrideDto {
   counterpartyId: string;
   reason: string;
+  permanent?: boolean; // if true, override never expires
 }
 
 export interface RiskOverrideDecisionDto {

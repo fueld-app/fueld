@@ -1423,10 +1423,15 @@ export class CompanyDetailStore {
     if (!c || !this.canManageRiskOverrides()) return;
     const reason = prompt('Reason for requesting a credit override:');
     if (!reason?.trim()) return;
+    const permanent = confirm(
+      'Make this override PERMANENT (no expiry)?\n\n' +
+      '• OK = Permanent — override never expires (use for known sanctioned-vessel situations)\n' +
+      '• Cancel = Temporary — expires after the configured override window (default 7 days)',
+    );
     this.overrideRequesting.set(true);
     try {
-      const override = await this.riskMonitoringService.requestOverride(c.id, reason.trim());
-      this.showToast('success', override?.status === 'APPROVED' ? 'Override activated' : 'Override requested — awaiting approval');
+      const override = await this.riskMonitoringService.requestOverride(c.id, reason.trim(), permanent);
+      this.showToast('success', override?.status === 'APPROVED' ? (permanent ? 'Permanent override activated' : 'Override activated') : 'Override requested — awaiting approval');
       await this.loadRiskSummary();
     } catch (err) {
       console.error('Failed to request override:', err);

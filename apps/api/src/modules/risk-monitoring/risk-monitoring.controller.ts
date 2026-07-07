@@ -183,6 +183,7 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
         auth.userId,
         body.reason,
         settings,
+        body.permanent ?? false,
       );
       return { success: true, data: override } satisfies ApiResponse<typeof override>;
     },
@@ -190,6 +191,7 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
       body: t.Object({
         counterpartyId: t.String(),
         reason: t.String({ minLength: 1 }),
+        permanent: t.Optional(t.Boolean()),
       }),
       detail: { tags: ['Risk Monitoring'], summary: 'Request a risk override' },
     },

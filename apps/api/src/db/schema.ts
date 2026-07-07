@@ -2355,7 +2355,7 @@ export const riskOverrides = pgTable('risk_overrides', {
   counterpartyId: uuid('counterparty_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
   status: riskOverrideStatusEnum('status').notNull().default('PENDING'),
   reason: text('reason').notNull(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }), // null = permanent (no expiry)
   requestedByUserId: uuid('requested_by_user_id').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
