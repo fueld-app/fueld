@@ -271,13 +271,28 @@ interface CompanySearchResultOption {
                               }
                             </td>
                             <td class="px-3 py-3 text-right">
-                              @if (override.status === 'APPROVED') {
-                                <button type="button"
-                                  class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
-                                  [disabled]="revokingOverrideId() === override.id"
-                                  (click)="revokeOverride(override)"
-                                >Revoke</button>
-                              }
+                              <div class="flex items-center justify-end gap-1.5">
+                                @if (override.status === 'APPROVED') {
+                                  <button type="button"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                                    [disabled]="revokingOverrideId() === override.id"
+                                    (click)="revokeOverride(override)"
+                                  >Revoke</button>
+                                } @else if (override.status === 'PENDING') {
+                                  <button type="button"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 px-2.5 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-500/20 transition-colors disabled:opacity-50"
+                                    [disabled]="pendingDecisionId() === override.id"
+                                    (click)="decidePendingOverride(override, 'APPROVED')"
+                                  >Approve</button>
+                                  <button type="button"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                                    [disabled]="pendingDecisionId() === override.id"
+                                    (click)="decidePendingOverride(override, 'REJECTED')"
+                                  >Reject</button>
+                                } @else {
+                                  <span class="text-xs text-gray-300 dark:text-muted/50">—</span>
+                                }
+                              </div>
                             </td>
                           </tr>
                         }
@@ -674,6 +689,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
       }
 
       await this.loadData();
+      if (!this.allOverridesCollapsed()) await this.loadAllOverrides();
     } catch (err) {
       console.error('Failed to decide pending override:', err);
       this.pendingOverridesError.set('Failed to record override decision.');
