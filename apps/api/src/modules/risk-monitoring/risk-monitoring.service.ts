@@ -658,6 +658,21 @@ export async function getPendingOverrides(tenantId: string): Promise<RiskOverrid
   return result;
 }
 
+export async function getAllOverrides(tenantId: string): Promise<RiskOverrideDto[]> {
+  const rows = await db
+    .select()
+    .from(riskOverrides)
+    .where(eq(riskOverrides.tenantId, tenantId))
+    .orderBy(desc(riskOverrides.createdAt));
+
+  const result: RiskOverrideDto[] = [];
+  for (const row of rows) {
+    const dto = await getOverrideById(row.id);
+    if (dto) result.push(dto);
+  }
+  return result;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  MANUAL RE-CHECK (triggered from company page)
 // ═══════════════════════════════════════════════════════════════════════

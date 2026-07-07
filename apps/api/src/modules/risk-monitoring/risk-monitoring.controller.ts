@@ -30,6 +30,7 @@ import {
   revokeOverride,
   getOverridesForCompany,
   getPendingOverrides,
+  getAllOverrides,
   getRiskMonitoringSettings,
   updateRiskMonitoringSettings,
 } from './risk-monitoring.service';
@@ -157,6 +158,21 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
     {
       detail: { tags: ['Risk Monitoring'], summary: 'Get all pending overrides' },
+    },
+  )
+
+  .get(
+    '/overrides/all',
+    async ({ auth, set }) => {
+      if (auth.role !== 'ADMIN' && auth.role !== 'CREDITMANAGER') {
+        set.status = 403;
+        return { success: false, data: null, message: 'Forbidden' } satisfies ApiResponse<null>;
+      }
+      const overrides = await getAllOverrides(auth.tenantId);
+      return { success: true, data: overrides } satisfies ApiResponse<typeof overrides>;
+    },
+    {
+      detail: { tags: ['Risk Monitoring'], summary: 'Get all overrides (all statuses)' },
     },
   )
 

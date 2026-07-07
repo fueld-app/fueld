@@ -180,6 +180,117 @@ interface CompanySearchResultOption {
         </div>
       }
 
+      <!-- All Overrides Overview -->
+      @if (canManageCreditOverrides()) {
+        <div class="mb-6">
+          @if (allOverridesCollapsed()) {
+            <button type="button"
+              class="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
+              (click)="loadAllOverrides()">
+              <svg class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 4a1 1 0 011 1v6.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L6 11.586V5a1 1 0 011-1zm0 12a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" transform="rotate(-90 10 10)"/></svg>
+              View All Overrides
+            </button>
+          } @else {
+            <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
+              <div class="flex flex-col gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 class="text-sm font-semibold text-gray-900 dark:text-ink">All Risk Overrides</h2>
+                  <p class="mt-1 text-xs text-gray-600 dark:text-ink-dim">Complete history of credit overrides — active, pending, expired, and revoked.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-line px-3 py-2 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors disabled:opacity-50"
+                    [disabled]="allOverridesLoading()"
+                    (click)="loadAllOverrides()"
+                  >Refresh</button>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-line px-3 py-2 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
+                    (click)="allOverridesCollapsed.set(true); allOverrides.set([])"
+                  >Collapse</button>
+                </div>
+              </div>
+
+              <div class="px-5 py-4">
+                @if (allOverridesLoading()) {
+                  <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-muted py-4">
+                    <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                    Loading overrides...
+                  </div>
+                } @else if (allOverridesError()) {
+                  <div class="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ allOverridesError() }}</div>
+                } @else if (!allOverrides().length) {
+                  <p class="text-sm text-gray-500 dark:text-muted py-4">No overrides found.</p>
+                } @else {
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                      <thead>
+                        <tr class="border-b border-gray-100 dark:border-line bg-gray-50/80 dark:bg-surface-2">
+                          <th class="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-ink-dim">Company</th>
+                          <th class="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-ink-dim">Status</th>
+                          <th class="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-ink-dim">Type</th>
+                          <th class="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-ink-dim">Reason</th>
+                          <th class="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-ink-dim">Requested By</th>
+                          <th class="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-ink-dim">Created</th>
+                          <th class="px-3 py-2.5 text-left font-medium text-gray-600 dark:text-ink-dim">Expires</th>
+                          <th class="px-3 py-2.5 text-right font-medium text-gray-600 dark:text-ink-dim">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-100 dark:divide-line">
+                        @for (override of allOverrides(); track override.id) {
+                          <tr class="hover:bg-gray-50/50 dark:hover:bg-surface-tint transition-colors">
+                            <td class="px-3 py-3">
+                              <a [routerLink]="['/companies', override.counterpartyId]" class="font-medium text-blue-700 dark:text-blue-400 hover:underline">{{ override.counterpartyName }}</a>
+                            </td>
+                            <td class="px-3 py-3">
+                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
+                                [class]="override.status === 'APPROVED' ? 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-400' : override.status === 'PENDING' ? 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400' : override.status === 'REVOKED' ? 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400' : 'bg-gray-100 dark:bg-gray-500/15 text-gray-600 dark:text-ink-dim'">
+                                {{ override.status }}
+                              </span>
+                            </td>
+                            <td class="px-3 py-3">
+                              @if (!override.expiresAt) {
+                                <span class="inline-flex items-center rounded-full bg-purple-100 dark:bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-700 dark:text-purple-400">Permanent</span>
+                              } @else {
+                                <span class="text-xs text-gray-500 dark:text-muted">Temporary</span>
+                              }
+                            </td>
+                            <td class="px-3 py-3 max-w-xs">
+                              <p class="truncate text-gray-800 dark:text-ink" [title]="override.reason">{{ override.reason }}</p>
+                            </td>
+                            <td class="px-3 py-3 text-xs text-gray-500 dark:text-muted">{{ override.requestedByUserName }}</td>
+                            <td class="px-3 py-3 text-xs text-gray-500 dark:text-muted">{{ formatDateTime(override.createdAt) }}</td>
+                            <td class="px-3 py-3 text-xs text-gray-500 dark:text-muted">
+                              @if (!override.expiresAt) {
+                                <span class="text-purple-600 dark:text-purple-400 font-medium">Never</span>
+                              } @else if (isExpired(override.expiresAt)) {
+                                <span class="text-red-500">{{ formatDateTime(override.expiresAt) }}</span>
+                              } @else {
+                                {{ formatDateTime(override.expiresAt) }}
+                              }
+                            </td>
+                            <td class="px-3 py-3 text-right">
+                              @if (override.status === 'APPROVED') {
+                                <button type="button"
+                                  class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-2.5 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                                  [disabled]="revokingOverrideId() === override.id"
+                                  (click)="revokeOverride(override)"
+                                >Revoke</button>
+                              }
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
       <!-- Table -->
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
@@ -411,6 +522,13 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   readonly pendingDecisionId = signal<string | null>(null);
   readonly pendingOverrideCompanyVessels = signal<Record<string, VesselCompanyDto[]>>({});
 
+  // All overrides overview
+  readonly allOverrides = signal<RiskOverrideDto[]>([]);
+  readonly allOverridesLoading = signal(false);
+  readonly allOverridesError = signal('');
+  readonly allOverridesCollapsed = signal(true);
+  readonly revokingOverrideId = signal<string | null>(null);
+
   // Delete
   readonly deleteTarget = signal<CreditLineDto | null>(null);
   readonly deleting = signal(false);
@@ -490,6 +608,42 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
       this.pendingOverridesError.set('Failed to load pending overrides.');
     } finally {
       this.pendingOverridesLoading.set(false);
+    }
+  }
+
+  async loadAllOverrides(): Promise<void> {
+    if (!this.canManageCreditOverrides()) return;
+    this.allOverridesLoading.set(true);
+    this.allOverridesError.set('');
+    this.allOverridesCollapsed.set(false);
+    try {
+      const overrides = await this.riskService.getAllOverrides();
+      this.allOverrides.set(overrides);
+    } catch (err) {
+      console.error('Failed to load all overrides:', err);
+      this.allOverridesError.set('Failed to load overrides.');
+    } finally {
+      this.allOverridesLoading.set(false);
+    }
+  }
+
+  async revokeOverride(override: RiskOverrideDto): Promise<void> {
+    if (this.revokingOverrideId() || !this.canManageCreditOverrides()) return;
+    if (!confirm(`Revoke override for ${override.counterpartyName}? Credit will be re-frozen if risk hits are still active.`)) return;
+    this.revokingOverrideId.set(override.id);
+    try {
+      const result = await this.riskService.revokeOverride(override.id);
+      if (!result) {
+        this.allOverridesError.set('Could not revoke override — it may no longer be active.');
+        return;
+      }
+      // Refresh both lists
+      await Promise.all([this.loadData(), this.loadAllOverrides()]);
+    } catch (err) {
+      console.error('Failed to revoke override:', err);
+      this.allOverridesError.set('Failed to revoke override.');
+    } finally {
+      this.revokingOverrideId.set(null);
     }
   }
 

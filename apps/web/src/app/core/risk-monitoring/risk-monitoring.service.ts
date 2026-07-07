@@ -72,6 +72,13 @@ export class RiskMonitoringService {
     return res.success ? res.data : [];
   }
 
+  async getAllOverrides(): Promise<RiskOverrideDto[]> {
+    const res = await firstValueFrom(
+      this.http.get<ApiResponse<RiskOverrideDto[]>>(`${API}/risk-monitoring/overrides/all`),
+    );
+    return res.success ? res.data : [];
+  }
+
   async requestOverride(counterpartyId: string, reason: string, permanent: boolean = false): Promise<RiskOverrideDto | null> {
     const res = await firstValueFrom(
       this.http.post<ApiResponse<RiskOverrideDto>>(`${API}/risk-monitoring/overrides`, { counterpartyId, reason, permanent }),
