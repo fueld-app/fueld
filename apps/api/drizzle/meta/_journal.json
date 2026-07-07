@@ -687,6 +687,13 @@
       "when": 1782638400000,
       "tag": "0097_supplier_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1782724800000,
+      "tag": "0098_risk_override_permanent",
+      "breakpoints": true
     }
   ]
 }
