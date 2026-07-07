@@ -56,6 +56,7 @@ import { RiskComplianceCardComponent } from '../components/risk-compliance-card/
           (tabChange)="store.onSanctionsTabChange($event)"
           (runCheck)="store.runManualCheck()"
           (requestOverride)="store.requestOverride()"
+          (revokeOverride)="store.revokeOverride()"
           (decideOverride)="store.decideOverride($event.override, $event.decision)"
           (openRiskHitVessel)="store.openRiskHitVessel($event)"
         />

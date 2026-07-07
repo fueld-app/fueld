@@ -1,4 +1,3 @@
-// ═══════════════════════════════════════════════════════════════════════
 //  Risk Monitoring Controller
 //
 //  GET    /risk-monitoring/summary/:counterpartyId
@@ -11,9 +10,9 @@
 //  GET    /risk-monitoring/overrides/pending
 //  POST   /risk-monitoring/overrides
 //  POST   /risk-monitoring/overrides/:id/decide
+//  DELETE /risk-monitoring/overrides/:id               (revoke active override)
 //  GET    /risk-monitoring/settings
 //  PUT    /risk-monitoring/settings
-// ═══════════════════════════════════════════════════════════════════════
 
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
@@ -28,6 +27,7 @@ import {
   getFrozenCounterpartyIds,
   createOverride,
   approveOrRejectOverride,
+  revokeOverride,
   getOverridesForCompany,
   getPendingOverrides,
   getRiskMonitoringSettings,
@@ -49,7 +49,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Risk Summary ───────────────────────────────────────────────
   .get(
     '/summary/:counterpartyId',
     async ({ params, auth }) => {
@@ -63,7 +62,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Check History ──────────────────────────────────────────────
   .get(
     '/checks/:counterpartyId',
     async ({ params, query }) => {
@@ -77,7 +75,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Active Hits ────────────────────────────────────────────────
   .get(
     '/hits/:counterpartyId',
     async ({ params, query }) => {
@@ -92,7 +89,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Manual Re-Check ───────────────────────────────────────────
   .post(
     '/check/:counterpartyId',
     async ({ params, auth, set }) => {
@@ -110,7 +106,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Frozen Status (single) ─────────────────────────────────────
   .get(
     '/frozen/:counterpartyId',
     async ({ params }) => {
@@ -123,7 +118,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Frozen Status (batch) ──────────────────────────────────────
   .post(
     '/frozen/batch',
     async ({ body }) => {
@@ -139,7 +133,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Overrides for Company ──────────────────────────────────────
   .get(
     '/overrides/:counterpartyId',
     async ({ params }) => {
@@ -152,7 +145,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Pending Overrides (for approval dashboard) ─────────────────
   .get(
     '/overrides',
     async ({ auth, set }) => {
@@ -168,7 +160,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Request Override ───────────────────────────────────────────
   .post(
     '/overrides',
     async ({ body, auth, set }) => {
@@ -197,7 +188,6 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Approve/Reject Override ────────────────────────────────────
   .post(
     '/overrides/:id/decide',
     async ({ params, body, auth, set }) => {
@@ -222,7 +212,26 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
     },
   )
 
-  // ─── Settings ───────────────────────────────────────────────────
+  .delete(
+    '/overrides/:id',
+    async ({ params, auth, set }) => {
+      if (auth.role !== 'ADMIN' && auth.role !== 'CREDITMANAGER') {
+        set.status = 403;
+        return { success: false, data: null, message: 'Forbidden' } satisfies ApiResponse<null>;
+      }
+      const result = await revokeOverride(params.id, auth.userId);
+      if (!result) {
+        set.status = 400;
+        return { success: false, data: null, message: 'Override not found or not currently active' } satisfies ApiResponse<null>;
+      }
+      return { success: true, data: result } satisfies ApiResponse<typeof result>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Risk Monitoring'], summary: 'Revoke an active risk override' },
+    },
+  )
+
   .get(
     '/settings',
     async ({ auth, set }) => {

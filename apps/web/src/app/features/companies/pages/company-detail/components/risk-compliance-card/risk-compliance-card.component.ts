@@ -157,12 +157,22 @@ interface VesselCompanyDto {
               }
               @if (riskSummary()!.hasActiveOverride) {
                 <div class="rounded-lg bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 px-4 py-3">
-                  <p class="text-sm font-medium text-amber-800 dark:text-amber-300">Override Active</p>
-                  @if (riskSummary()!.overrideExpiresAt) {
-                    <p class="text-xs text-amber-600 dark:text-amber-400">Credit temporarily unfrozen until {{ riskSummary()!.overrideExpiresAt | date:'medium' }}</p>
-                  } @else {
-                    <p class="text-xs text-amber-600 dark:text-amber-400">Credit unfrozen — <span class="font-semibold">permanent override</span> (no expiry)</p>
-                  }
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-medium text-amber-800 dark:text-amber-300">Override Active</p>
+                      @if (riskSummary()!.overrideExpiresAt) {
+                        <p class="text-xs text-amber-600 dark:text-amber-400">Credit temporarily unfrozen until {{ riskSummary()!.overrideExpiresAt | date:'medium' }}</p>
+                      } @else {
+                        <p class="text-xs text-amber-600 dark:text-amber-400">Credit unfrozen — <span class="font-semibold">permanent override</span> (no expiry)</p>
+                      }
+                    </div>
+                    @if (canManageRiskOverrides()) {
+                      <button type="button"
+                        class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 dark:border-amber-500/40 px-2.5 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                        [disabled]="overrideRequesting()"
+                        (click)="revokeOverride.emit()">Revoke</button>
+                    }
+                  </div>
                 </div>
               }
               @if (ignoredCreditVessels().length) {
@@ -319,6 +329,7 @@ export class RiskComplianceCardComponent {
   readonly tabChange = output<string>();
   readonly runCheck = output<void>();
   readonly requestOverride = output<void>();
+  readonly revokeOverride = output<void>();
   readonly decideOverride = output<{ override: RiskOverrideDto; decision: 'APPROVED' | 'REJECTED' }>();
   readonly openRiskHitVessel = output<RiskHitDto>();
 

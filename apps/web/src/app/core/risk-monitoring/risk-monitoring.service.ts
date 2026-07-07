@@ -86,6 +86,13 @@ export class RiskMonitoringService {
     return res.success ? res.data : null;
   }
 
+  async revokeOverride(overrideId: string): Promise<RiskOverrideDto | null> {
+    const res = await firstValueFrom(
+      this.http.delete<ApiResponse<RiskOverrideDto>>(`${API}/risk-monitoring/overrides/${overrideId}`),
+    );
+    return res.success ? res.data : null;
+  }
+
   async getSettings(): Promise<RiskMonitoringSettingsDto | null> {
     const res = await firstValueFrom(
       this.http.get<ApiResponse<RiskMonitoringSettingsDto>>(`${API}/risk-monitoring/settings`),

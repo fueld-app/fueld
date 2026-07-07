@@ -1483,6 +1483,34 @@ export class CompanyDetailStore {
     }
   }
 
+  async revokeOverride(): Promise<void> {
+    const summary = this.riskSummary();
+    if (!summary?.hasActiveOverride || !this.canManageRiskOverrides()) return;
+    if (!confirm('Revoke the active override? Credit will be re-frozen if risk hits are still active.')) return;
+    // Find the active override ID from the overrides list
+    const overrides = this.riskOverrides();
+    const active = overrides.find((o) => o.status === 'APPROVED');
+    if (!active) {
+      this.showToast('error', 'Could not find the active override to revoke');
+      return;
+    }
+    this.overrideRequesting.set(true);
+    try {
+      const result = await this.riskMonitoringService.revokeOverride(active.id);
+      if (!result) {
+        this.showToast('error', 'Could not revoke override');
+        return;
+      }
+      this.showToast('success', 'Override revoked — credit re-frozen if risk hits active');
+      await this.loadRiskSummary();
+    } catch (err) {
+      console.error('Failed to revoke override:', err);
+      this.showToast('error', 'Failed to revoke override');
+    } finally {
+      this.overrideRequesting.set(false);
+    }
+  }
+
   async openRiskHitVessel(hit: RiskHitDto): Promise<void> {
     const vesselName = this.extractVesselNameFromRiskHit(hit);
     if (!vesselName) return;

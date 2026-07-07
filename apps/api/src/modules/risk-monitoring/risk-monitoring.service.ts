@@ -558,6 +558,36 @@ export async function approveOrRejectOverride(
   return getOverrideById(overrideId);
 }
 
+/**
+ * Revoke an active (APPROVED) override.  This immediately re-freezes credit
+ * if there are still active risk hits.  Works for both temporary and
+ * permanent overrides.
+ */
+export async function revokeOverride(
+  overrideId: string,
+  userId: string,
+): Promise<RiskOverrideDto | null> {
+  const override = await db.query.riskOverrides.findFirst({
+    where: eq(riskOverrides.id, overrideId),
+  });
+  if (!override || override.status !== 'APPROVED') return null;
+
+  await db
+    .update(riskOverrides)
+    .set({ status: 'REVOKED', updatedAt: new Date() })
+    .where(eq(riskOverrides.id, overrideId));
+
+  // Record who revoked it
+  await db.insert(riskOverrideApprovals).values({
+    overrideId,
+    userId,
+    decision: 'REJECTED',
+    comment: 'Override revoked by user',
+  });
+
+  return getOverrideById(overrideId);
+}
+
 export async function getOverridesForCompany(counterpartyId: string): Promise<RiskOverrideDto[]> {
   const rows = await db
     .select()
