@@ -230,6 +230,8 @@ export async function createVessel(data: {
   grossTonnage?: number;
   buildYear?: number;
   seasearcherId?: string;
+  phone?: string;
+  email?: string;
 }) {
   const [created] = await db
     .insert(vessels)
@@ -249,6 +251,8 @@ export async function createVessel(data: {
       grossTonnage: data.grossTonnage,
       buildYear: data.buildYear,
       seasearcherId: data.seasearcherId,
+      phone: data.phone,
+      email: data.email,
     })
     .returning();
 

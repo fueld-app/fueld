@@ -446,6 +446,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         ?? null;
     }
 
+    // For confirmation/offer documents, prefer the vessel's phone number.
+    if ((this.emailDocumentType() === 'CONFIRMATION' || this.emailDocumentType() === 'OFFER')
+        && this.vessel()?.phone) {
+      return this.vessel()?.phone ?? null;
+    }
+
     if (this.order()?.brokerGetsAll && this.brokerContact()?.phone) {
       return this.brokerContact()?.phone ?? null;
     }

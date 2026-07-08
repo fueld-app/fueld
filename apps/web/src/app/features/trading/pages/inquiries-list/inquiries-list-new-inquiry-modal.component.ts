@@ -16,6 +16,7 @@ import { SearchableDropdownComponent, type DropdownOption } from '../../../../sh
 import type { ApiResponse, CounterpartyDto, VesselDto, PlaceDto, CreditLineDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
 import { AuthService } from '@app/core/auth/auth.service';
+import { toUtcIsoFromZonedDateInput } from '../order-detail/services/order-utils';
 
 interface CompanySearchResult {
   source: 'local' | 'seasearcher';
@@ -578,14 +579,22 @@ export class InquiriesListNewInquiryModalComponent {
     if (!this.canCreateInquiry()) return;
     this.creating.set(true);
     try {
+      // Convert date-only strings (YYYY-MM-DD) to UTC ISO strings using the
+      // selected place's timezone, matching how the order-detail page stores
+      // dates via toUtcIsoFromZonedDateInput. This prevents timezone-related
+      // off-by-one date shifts in both UTC- and UTC+12+ zones.
+      const placeTz = this.selectedPlace()?.timezone ?? 'UTC';
+      const toDateIso = (dateStr: string) =>
+        dateStr ? toUtcIsoFromZonedDateInput(dateStr, placeTz) : undefined;
+
       const res = await firstValueFrom(
         this.http.post<ApiResponse<any>>(`${API}/orders`, {
           clientId: this.newClientId(),
           vesselId: this.newVesselId(),
           placeId: this.newPlaceId(),
           salesRepId: this.newResponsibleUserId() || undefined,
-          eta: this.newEta() || undefined,
-          etd: this.newEtd() || undefined,
+          eta: toDateIso(this.newEta()),
+          etd: toDateIso(this.newEtd()),
           responseDeadlineAt: this.newResponseDeadline() || undefined,
         }),
       );

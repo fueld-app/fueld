@@ -17,7 +17,7 @@ import { StatusBadgeComponent } from '../../../../shared/components/status-badge
 import { type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import { ColumnPickerComponent, type ColumnOption } from '../../../../shared/components/column-picker/column-picker.component';
-import type { SortChangeEvent } from '../../../../shared/components';
+import type { SortChangeEvent, SortField } from '../../../../shared/components';
 import type { ApiResponse, OrderListRowDto, UserUiPreferences } from '@fueld/types';
 import { InquiriesListNewInquiryModalComponent } from './inquiries-list-new-inquiry-modal.component';
 import type { TeamUserOption } from './inquiries-list.types';
@@ -112,7 +112,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
               <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                 @for (col of visibleColumns(); track col.field) {
                   @if (col.sortable) {
-                    <th app-sort-header [field]="col.field" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">{{ col.label }}</th>
+                    <th app-sort-header [field]="col.field" [sortFields]="activeSortFields()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">{{ col.label }}</th>
                   } @else {
                     <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">{{ col.label }}</th>
                   }
@@ -415,12 +415,18 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly currentPage = signal(1);
   readonly pageSize = signal(25);
   readonly searchTerm = signal('');
-  readonly sortBy = signal('');
-  readonly sortDir = signal<'asc' | 'desc'>('asc');
+  readonly sortFields = signal<SortField[]>([]);
   readonly defaultSortBy = computed(() => this.isOrders() ? 'eta' : 'createdAt');
   readonly defaultSortDir = computed<'asc' | 'desc'>(() => 'desc');
-  readonly activeSortBy = computed(() => this.sortBy() || this.defaultSortBy());
-  readonly activeSortDir = computed<'asc' | 'desc'>(() => this.sortBy() ? this.sortDir() : this.defaultSortDir());
+  /** Computed sort fields including default when user hasn't explicitly sorted. */
+  readonly activeSortFields = computed<SortField[]>(() => {
+    const user = this.sortFields();
+    if (user.length > 0) return user;
+    return [{ field: this.defaultSortBy(), dir: this.defaultSortDir() }];
+  });
+  /** Backwards-compatible single sort field for API calls. */
+  readonly activeSortBy = computed(() => this.activeSortFields()[0]?.field ?? this.defaultSortBy());
+  readonly activeSortDir = computed<'asc' | 'desc'>(() => this.activeSortFields()[0]?.dir ?? this.defaultSortDir());
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // ─── Column configuration ─────────────────────────────────────────
@@ -678,8 +684,11 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       params.set('limit', String(this.pageSize()));
       if (this.searchTerm()) params.set('search', this.searchTerm());
       this.buildFilterParams(params);
-      if (this.activeSortBy()) params.set('sortBy', this.activeSortBy());
-      if (this.activeSortBy()) params.set('sortDir', this.activeSortDir());
+      const fields = this.activeSortFields();
+      if (fields.length > 0) {
+        params.set('sortBy', fields.map((f) => f.field).join(','));
+        params.set('sortDir', fields.map((f) => f.dir).join(','));
+      }
 
       const res = await firstValueFrom(
         this.http.get<ApiResponse<{ items: OrderListRowDto[]; total: number }>>(
@@ -842,8 +851,22 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   }
 
   onSort(event: SortChangeEvent): void {
-    this.sortBy.set(event.field);
-    this.sortDir.set(event.dir);
+    if (event.additive) {
+      // Shift+click: add or remove from the sort stack
+      const existing = this.sortFields();
+      const idx = existing.findIndex((s) => s.field === event.field);
+      if (idx >= 0) {
+        // Already sorted by this field — remove it
+        const next = existing.filter((_, i) => i !== idx);
+        this.sortFields.set(next);
+      } else {
+        // Add as secondary sort
+        this.sortFields.set([...existing, { field: event.field, dir: event.dir }]);
+      }
+    } else {
+      // Regular click: replace all sorts with this one
+      this.sortFields.set([{ field: event.field, dir: event.dir }]);
+    }
     this.currentPage.set(1);
     this.loadInquiries();
   }

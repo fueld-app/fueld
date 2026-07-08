@@ -942,9 +942,24 @@ export async function listOrders(query?: ListOrdersQuery) {
     invoicingCompany: invoicingCompany.name,
     createdAt: orders.createdAt,
   };
-  const sortCol = sortMap[query?.sortBy ?? ''] ?? orders.createdAt;
-  const defaultDir = query?.sortBy ? 'asc' : 'desc';
-  const sortFn = (query?.sortDir ?? defaultDir) === 'desc' ? desc : asc;
+
+  // Support multi-column sorting: sortBy and sortDir may contain comma-separated values
+  // (e.g. sortBy=eta,invoicingCompany&sortDir=desc,asc).
+  const sortByRaw = query?.sortBy ?? '';
+  const sortDirRaw = query?.sortDir ?? '';
+  const sortByFields = sortByRaw.split(',').map((s) => s.trim()).filter(Boolean);
+  const sortDirFields = sortDirRaw.split(',').map((s) => s.trim()).filter(Boolean);
+
+  let orderByClauses: any[];
+  if (sortByFields.length > 0) {
+    orderByClauses = sortByFields.map((field, i) => {
+      const col = sortMap[field] ?? orders.createdAt;
+      const dir = sortDirFields[i] ?? 'asc';
+      return dir === 'desc' ? desc(col) : asc(col);
+    });
+  } else {
+    orderByClauses = [desc(orders.createdAt)];
+  }
 
   const [rows, countResult] = await Promise.all([
     db
@@ -975,7 +990,7 @@ export async function listOrders(query?: ListOrdersQuery) {
       .leftJoin(users, eq(orders.salesRepId, users.id))
       .leftJoin(invoicingCompany, eq(orders.invoicingCompanyId, invoicingCompany.id))
       .where(where)
-      .orderBy(sortFn(sortCol))
+      .orderBy(...orderByClauses)
       .limit(limit)
       .offset(offset),
     db.select({ count: sql<number>`count(*)::int` }).from(orders).where(where),
