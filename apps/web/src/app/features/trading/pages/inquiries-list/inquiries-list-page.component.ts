@@ -775,7 +775,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       try {
         const res = await firstValueFrom(
           this.http.get<ApiResponse<Array<{ id: string; name: string }>>>(
-            `${API}/admin/settings/own-companies`,
+            `${API}/admin/settings/my-own-companies`,
           ),
         );
         if (res.success && Array.isArray(res.data)) {

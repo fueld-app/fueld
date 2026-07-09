@@ -467,6 +467,19 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     detail: { tags: ['Admin Settings'], summary: 'Get product options for current tenant' },
   })
 
+  // ── Own companies list (any authenticated user — needed for filter dropdowns) ──
+  .get('/my-own-companies', async () => {
+    try {
+      const data = await listOwnCompanies();
+      return { success: true, data: data.map((c) => ({ id: c.id, name: c.name })) } satisfies ApiResponse<Array<{ id: string; name: string }>>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get own companies for current tenant (any user)' },
+  })
+
   .get('/my-units', async () => {
     try {
       const data = await getUnitSettings();

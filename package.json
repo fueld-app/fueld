@@ -32,6 +32,11 @@
     "sharp": "^0.35.0"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^7.0.0-rc13"
+    "@plannotator/pi-extension": "^0.22.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc13",
+    "pi-memory": "^0.3.14",
+    "pi-search-hub": "^2.8.0",
+    "version": "^0.1.2",
+    "view": "^1.1.1"
   }
 }
