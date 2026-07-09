@@ -39,6 +39,7 @@ export class OrderCommunicationService {
     emailModal: any,
     orderNumber: string | null,
     showToast: (type: 'success' | 'error', msg: string) => void,
+    defaultPhoneOverride?: string | null,
   ): void {
     if (!orderId) return;
 
@@ -79,6 +80,7 @@ export class OrderCommunicationService {
             defaultBccEmails: d.defaultBccEmails ?? [],
             subject: d.subject,
             htmlBody: d.htmlBody,
+            defaultPhoneOverride,
           });
         },
         error: () => {

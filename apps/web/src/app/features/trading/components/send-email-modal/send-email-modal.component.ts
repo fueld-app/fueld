@@ -703,10 +703,12 @@ export class SendEmailModalComponent {
     defaultBccEmails?: Array<{ email: string; label: string | null }>;
     subject: string;
     htmlBody: string;
+    /** Override the defaultPhone input — avoids zoneless change-detection timing issues. */
+    defaultPhoneOverride?: string | null;
   }): void {
     this.subject = defaults.subject;
     this.htmlBody = defaults.htmlBody;
-    this.waPhoneNumber = this.defaultPhone() ?? '';
+    this.waPhoneNumber = defaults.defaultPhoneOverride ?? this.defaultPhone() ?? '';
     this.pdfPreviewUrl.set(null);
     const availableAttachmentIds = this.visibleExtraAttachments().map((attachment) => attachment.id);
     this.selectedAttachmentIds.set(

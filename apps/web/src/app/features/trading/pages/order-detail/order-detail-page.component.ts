@@ -2561,7 +2561,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   openSendEmailModal(docType: DocumentEmailType): void {
     this.emailDocumentType.set(docType);
-    this.commSvc.openSendEmailModal(docType, this.orderId(), this.activeOrderSupplier()?.id ?? null, this.emailModal(), this.order()?.orderNumber ?? null, (type, msg) => this.showToast(type, msg));
+    this.commSvc.openSendEmailModal(docType, this.orderId(), this.activeOrderSupplier()?.id ?? null, this.emailModal(), this.order()?.orderNumber ?? null, (type, msg) => this.showToast(type, msg), this.emailModalDefaultPhone());
   }
 
   openBookingEmailModal(): void {
