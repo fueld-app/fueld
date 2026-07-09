@@ -2520,6 +2520,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       openSendEmailModal: (dt: string) => self.openSendEmailModal(dt as any),
       openSendInquiryModal: () => self.openSendInquiryModal(),
       openBookingEmailModal: () => self.openBookingEmailModal(),
+      setEmailDocumentType: (dt: string) => self.emailDocumentType.set(dt as any),
       syncOrderSupplierRecords: (oid) => self.syncOrderSupplierRecords(oid),
       clearSavedDraftItemIds: (rows) => self.saveSvc.clearSavedDraftItemIds(rows),
       normalizeDetailRoute: (s, id) => self.normalizeDetailRoute(s, id),

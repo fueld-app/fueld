@@ -49,6 +49,7 @@ export interface OrderActionContext {
   openSendEmailModal: (docType: string) => void;
   openSendInquiryModal: () => void;
   openBookingEmailModal: () => void;
+  setEmailDocumentType: (docType: string) => void;
   syncOrderSupplierRecords: (orderId: string) => Promise<void>;
   clearSavedDraftItemIds: (rows: OrderItemRow[]) => void;
   normalizeDetailRoute: (status: OrderStatus, id: string) => Promise<void>;
@@ -330,6 +331,7 @@ export class OrderActionService {
     const status = ctx.order()?.status;
     const isFinalInvoice = status === 'DELIVERED' || status === 'INVOICED' || status === 'PAID';
     const documentTitle = isFinalInvoice ? 'Invoice' : 'Proforma Invoice';
+    ctx.setEmailDocumentType(isFinalInvoice ? 'INVOICE' : 'PROFORMA');
     const endpoint = isFinalInvoice ? `${API_URL}/orders/${id}/invoice/pdf` : `${API_URL}/orders/${id}/proforma/pdf`;
     const fileName = isFinalInvoice ? `Fueld_Invoice_${ctx.invoiceNumber()}.pdf` : `Proforma_Invoice_${ctx.order()?.orderNumber ?? id}.pdf`;
     const modal = ctx.pdfModal();
@@ -351,6 +353,9 @@ export class OrderActionService {
     if (!id) return;
     const isInquiry = ctx.isInquiryContext();
     const documentName = isInquiry ? 'Offer' : 'Confirmation';
+    // Set the email document type so emailModalDefaultPhone() returns the
+    // vessel's phone for WhatsApp sends from the PDF preview modal.
+    ctx.setEmailDocumentType(isInquiry ? 'OFFER' : 'CONFIRMATION');
     const modal = ctx.pdfModal();
     if (!modal) return;
     modal.showLoading(documentName);
@@ -368,6 +373,7 @@ export class OrderActionService {
   private async viewProformaPdf(ctx: OrderActionContext): Promise<void> {
     const id = ctx.orderId();
     if (!id) return;
+    ctx.setEmailDocumentType('NOMINATION');
     const modal = ctx.pdfModal();
     if (!modal) return;
     modal.showLoading('Nomination');
