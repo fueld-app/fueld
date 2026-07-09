@@ -89,11 +89,12 @@ export class OrderCommunicationService {
       });
   }
 
-  /** Open the send-email modal pre-filled with the Bunker Booking email. */
+    /** Open the send-email modal pre-filled with the Bunker Booking email. */
   openBookingEmailModal(
     orderId: string,
     emailModal: any,
     showToast: (type: 'success' | 'error', msg: string) => void,
+    defaultPhoneOverride?: string | null,
   ): void {
     if (!orderId) return;
 
@@ -117,6 +118,7 @@ export class OrderCommunicationService {
             defaultBccEmails: [],
             subject: d.subject,
             htmlBody: d.body,
+            defaultPhoneOverride,
           });
         },
         error: () => {

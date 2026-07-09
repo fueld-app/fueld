@@ -2567,7 +2567,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   openBookingEmailModal(): void {
     this.emailDocumentType.set('BUNKER_BOOKING');
     this.emailPdfFileName.set('');
-    this.commSvc.openBookingEmailModal(this.orderId(), this.emailModal(), (type, msg) => this.showToast(type, msg));
+    this.commSvc.openBookingEmailModal(this.orderId(), this.emailModal(), (type, msg) => this.showToast(type, msg), this.emailModalDefaultPhone());
   }
 
   onSendEmail(payload: SendEmailPayload): void {
