@@ -486,6 +486,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly isReadonly = computed(() => {
     const status = this.order()?.status;
+    // Admin and Finance users can edit Delivered and Invoiced orders
+    // (for pricing/invoicing corrections) without reopening them.
+    if ((status === OrderStatus.Delivered || status === OrderStatus.Invoiced)
+        && (this.auth.isAdmin() || this.auth.isFinance())) {
+      return false;
+    }
     return status === OrderStatus.Delivered
       || status === OrderStatus.Invoiced
       || status === OrderStatus.Paid
