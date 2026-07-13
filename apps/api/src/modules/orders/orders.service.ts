@@ -2114,6 +2114,7 @@ export async function updateOrderStatus(
           orderNumber: orders.orderNumber,
           tenantId: orders.tenantId,
           vesselName: vessels.name,
+          vesselPhone: vessels.phone,
           placeName: places.name,
           customerName: counterparties.name,
           purchaseOrderNumber: orders.purchaseOrderNumber,
@@ -2165,6 +2166,10 @@ export async function updateOrderStatus(
           etd: etdLabel ?? '',
           deliveryWindow,
           dates: datesLabel,
+          // Pass the vessel's phone so {{Phone}}/{{phone}} in the template
+          // resolves to the vessel's number, not the confirming user's number.
+          Phone: orderDetails.vesselPhone ?? '',
+          phone: orderDetails.vesselPhone ?? '',
         }, userId).catch((err) => {
           console.error(`[orders] WhatsApp ${eventType} notification failed:`, err);
         });
