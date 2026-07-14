@@ -653,6 +653,14 @@ export const routes: Routes = [
                   ),
                 title: 'Admin > Settings > Documents',
               },
+              {
+                path: 'broker-deals',
+                loadComponent: () =>
+                  import('./features/admin/pages/settings/broker-deals-settings-page.component').then(
+                    (m) => m.BrokerDealsSettingsPageComponent,
+                  ),
+                title: 'Admin > Settings > Broker Deals',
+              },
             ],
           },
           {

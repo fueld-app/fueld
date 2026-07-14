@@ -512,6 +512,39 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     detail: { tags: ['Admin Settings'], summary: 'Get broker deal settings for current tenant (any user)' },
   })
 
+  .put('/broker-deals', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).limit(1);
+      if (!tenant) throw new Error('No tenant found');
+      const settings = { ...(tenant.settings as any) };
+      settings.brokerDeals = body;
+      await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+      return { success: true, data: body } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      enabled: t.Boolean(),
+      defaultCommissionPerMt: t.Number(),
+      commissionCurrency: t.String(),
+      commissionUnit: t.String(),
+      reportTitle: t.String(),
+      reportStatuses: t.Array(t.String()),
+      reportDateField: t.String(),
+      reportDateFallback: t.String(),
+      hideInvoicingFields: t.Boolean(),
+      brokerDealLabel: t.String(),
+      commissionLabel: t.String(),
+      autoReleaseCredit: t.Boolean(),
+      autoReleaseBufferDays: t.Number(),
+      brokerCreditLabel: t.String(),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update broker deal settings (admin only)' },
+  })
+
   .get('/my-units', async () => {
     try {
       const data = await getUnitSettings();

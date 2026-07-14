@@ -1385,6 +1385,10 @@ export async function updateDeliveryDocumentationSettings(data: {
 
   const currentSettings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
   const settings = { ...(currentSettings as any) };
+
+  if (data.brokerDeals) {
+    settings.brokerDeals = data.brokerDeals;
+  }
   const docSettings = { ...(currentSettings.deliveryDocumentationSettings ?? {}) };
 
   if (data.requireDeliveryDocumentation !== undefined) {
