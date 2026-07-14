@@ -29,6 +29,9 @@ import {
   getReleaseTwoReports,
   updateReportSchedule,
   updateSavedReportView,
+  buildBrokerCommissionReport,
+  brokerCommissionReportToCsv,
+  brokerCommissionReportToXlsx,
 } from './reports.service';
 
 const reportFiltersSchema = t.Object({
@@ -343,4 +346,62 @@ export const reportsController = new Elysia({ prefix: '/reports' })
       productType: t.Optional(t.String()),
     }),
     detail: { tags: ['Reports'], summary: 'Get invoice drilldown for an aging bucket', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── Broker commission report ───────────────────────────────────
+  .get('/broker-commission', async ({ auth, query }) => {
+    const data = await buildBrokerCommissionReport(
+      auth.tenantId,
+      query.from,
+      query.to,
+      query.clientId ?? null,
+    );
+    return { success: true, data } satisfies ApiResponse<unknown>;
+  }, {
+    query: t.Object({
+      from: t.String(),
+      to: t.String(),
+      clientId: t.Optional(t.String()),
+    }),
+    detail: { tags: ['Reports'], summary: 'Broker commission report', security: [{ bearerAuth: [] }] },
+  })
+
+  .get('/broker-commission/export', async ({ auth, query, set }) => {
+    const report = await buildBrokerCommissionReport(
+      auth.tenantId,
+      query.from,
+      query.to,
+      query.clientId ?? null,
+    );
+    const csv = brokerCommissionReportToCsv(report);
+    set.headers['content-type'] = 'text/csv';
+    set.headers['content-disposition'] = `attachment; filename="broker_commission_${query.from}_${query.to}.csv"`;
+    return csv;
+  }, {
+    query: t.Object({
+      from: t.String(),
+      to: t.String(),
+      clientId: t.Optional(t.String()),
+    }),
+    detail: { tags: ['Reports'], summary: 'Export broker commission report as CSV', security: [{ bearerAuth: [] }] },
+  })
+
+  .get('/broker-commission/export.xlsx', async ({ auth, query, set }) => {
+    const report = await buildBrokerCommissionReport(
+      auth.tenantId,
+      query.from,
+      query.to,
+      query.clientId ?? null,
+    );
+    const buffer = brokerCommissionReportToXlsx(report);
+    set.headers['content-type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    set.headers['content-disposition'] = `attachment; filename="broker_commission_${query.from}_${query.to}.xlsx"`;
+    return new Response(buffer as ArrayBuffer);
+  }, {
+    query: t.Object({
+      from: t.String(),
+      to: t.String(),
+      clientId: t.Optional(t.String()),
+    }),
+    detail: { tags: ['Reports'], summary: 'Export broker commission report as XLSX', security: [{ bearerAuth: [] }] },
   });

@@ -99,6 +99,7 @@ export const creditController = new Elysia({ prefix: '/credit' })
         qualified: t.Optional(t.Boolean()),
         notes: t.Optional(t.String()),
         ownCompanyIds: t.Optional(t.Array(t.String())),
+        isBrokerCreditLine: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Credit'],
@@ -133,6 +134,7 @@ export const creditController = new Elysia({ prefix: '/credit' })
         notes: t.Optional(t.Nullable(t.String())),
         counterpartyIds: t.Optional(t.Array(t.String())),
         ownCompanyIds: t.Optional(t.Array(t.String())),
+        isBrokerCreditLine: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Credit'],

@@ -627,6 +627,8 @@ export interface OrderDto {
   totalNetProfit?: string;
   netMarginPct?: string | null;
   categoryKey?: string | null;
+  isBrokerDeal?: boolean;
+  commissionPerMt?: string | null;
   closedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -2039,6 +2041,7 @@ export interface CreditLineDto {
   qualified: boolean;
   performanceDays: number | null;
   notes: string | null;
+  isBrokerCreditLine?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -2054,6 +2057,7 @@ export interface CreateCreditLineDto {
   qualified?: boolean;
   notes?: string;
   ownCompanyIds?: string[];
+  isBrokerCreditLine?: boolean;
 }
 
 export interface UpdateCreditLineDto {
@@ -2066,6 +2070,7 @@ export interface UpdateCreditLineDto {
   notes?: string | null;
   counterpartyIds?: string[];
   ownCompanyIds?: string[];
+  isBrokerCreditLine?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2760,4 +2765,35 @@ export interface CreateInternalTransferDto {
   plannedArrivalAt?: string | null;
   eta?: string | null;
   etd?: string | null;
+}
+
+// ── Broker commission report ─────────────────────────────────────
+
+export interface BrokerCommissionReportOrderDto {
+  orderNumber: string;
+  vesselName: string;
+  placeName: string;
+  productType: string;
+  quantity: string;
+  unit: string;
+  commissionPerMt: string;
+  commissionAmount: string;
+  deliveredAt: string | null;
+  status: string;
+}
+
+export interface BrokerCommissionReportByCustomerDto {
+  customerId: string;
+  customerName: string;
+  orderCount: number;
+  totalQuantity: string;
+  totalCommission: string;
+  orders: BrokerCommissionReportOrderDto[];
+}
+
+export interface BrokerCommissionReportDto {
+  period: { from: string; to: string };
+  totalCommission: string;
+  currency: string;
+  byCustomer: BrokerCommissionReportByCustomerDto[];
 }

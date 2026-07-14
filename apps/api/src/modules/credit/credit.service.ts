@@ -47,9 +47,19 @@ async function calcUsedAmountForSupplier(counterpartyIds: string[]): Promise<str
         inArray(orderSuppliers.companyId, counterpartyIds),
         eq(orderSuppliers.paymentTermType, 'CREDIT'),
         inArray(orders.status, [...SUPPLIER_ACTIVE_STATUSES]),
-        // Exclude settled legs (two-sided settlement): supplier credit is
-        // released per-leg when paid_at is set, independent of order.status.
-        isNull(orderSuppliers.paidAt),
+        // Credit is still "in use" when:
+        // 1. Not manually marked paid (paidAt IS NULL), AND
+        // 2. For broker deals: not past the credit period from delivery
+        //    (deliveredAt + supplierCreditDays > now means still in use)
+        // For non-broker deals: only paidAt matters (same as before)
+        sql`(
+          ${orderSuppliers.paidAt} IS NOT NULL
+          OR (
+            ${orders.isBrokerDeal} = true
+            AND ${orders.deliveredAt} IS NOT NULL
+            AND ${orders.deliveredAt} + make_interval(days => COALESCE(${orderSuppliers.creditDays}, 30)) < now()
+          )
+        ) = false`,
       ),
     );
   return row?.total ?? '0';
@@ -136,6 +146,7 @@ interface RawCreditLine {
   fromDelivery: boolean;
   qualified: boolean;
   notes: string | null;
+  isBrokerCreditLine: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -173,6 +184,7 @@ async function enrichCreditLine(row: RawCreditLine): Promise<CreditLineDto> {
     qualified: row.qualified,
     performanceDays,
     notes: row.notes,
+    isBrokerCreditLine: row.isBrokerCreditLine,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -306,6 +318,7 @@ export async function createCreditLine(data: {
   qualified?: boolean;
   notes?: string;
   ownCompanyIds?: string[];
+  isBrokerCreditLine?: boolean;
 }) {
   const tenantRow = await db.query.tenants.findFirst();
   if (!tenantRow) throw new Error('No tenant found');
@@ -322,6 +335,7 @@ export async function createCreditLine(data: {
       fromDelivery: data.fromDelivery ?? false,
       qualified: data.qualified ?? false,
       notes: data.notes ?? null,
+      isBrokerCreditLine: data.isBrokerCreditLine ?? false,
     })
     .returning();
 
@@ -364,6 +378,7 @@ export async function updateCreditLine(
     notes?: string | null;
     counterpartyIds?: string[];
     ownCompanyIds?: string[];
+    isBrokerCreditLine?: boolean;
   },
 ) {
   const setFields: Record<string, unknown> = { updatedAt: new Date() };
@@ -373,6 +388,7 @@ export async function updateCreditLine(
   if (data.periodDays !== undefined) setFields['periodDays'] = data.periodDays;
   if (data.fromDelivery !== undefined) setFields['fromDelivery'] = data.fromDelivery;
   if (data.qualified !== undefined) setFields['qualified'] = data.qualified;
+  if (data.isBrokerCreditLine !== undefined) setFields['isBrokerCreditLine'] = data.isBrokerCreditLine;
   if (data.notes !== undefined) setFields['notes'] = data.notes;
 
   const [updated] = await db

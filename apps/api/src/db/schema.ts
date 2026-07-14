@@ -324,6 +324,23 @@ export interface TenantSettings {
   };
   // Broker settings
   brokerCcCustomer?: boolean;  // When brokerGetsAll, also CC the original customer contact (default false)
+  // Broker deal settings — tenant-specific feature gating (see docs/broker-deal-design.md)
+  brokerDeals?: {
+    enabled: boolean;                  // Master toggle — only show broker UI when true
+    defaultCommissionPerMt: number;   // Default commission rate (e.g., 3.00) — always same for all products/companies
+    commissionCurrency: string;      // Currency for commission (e.g., 'USD')
+    commissionUnit: string;          // Unit for commission calc: 'MT', 'GAL', 'BBL', etc. (default 'MT')
+    reportTitle: string;             // Report header (e.g., 'Moxie Brokerage — Monthly Commission Report')
+    reportStatuses: string[];        // Which statuses to include in report (default: ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'])
+    reportDateField: string;         // Primary date field for report period filtering (default 'deliveredAt')
+    reportDateFallback: string;      // Fallback date field if primary is null (default 'eta')
+    hideInvoicingFields: boolean;    // Hide invoicing company/bank account fields on broker deals (default true)
+    brokerDealLabel: string;        // Display label for the checkbox (default 'Broker Deal')
+    commissionLabel: string;        // Display label for the commission column/field (default 'Commission')
+    autoReleaseCredit: boolean;     // Auto-release supplier credit after credit period from delivery date (default: true)
+    autoReleaseBufferDays: number;   // Extra buffer days before auto-release (default: 0)
+    brokerCreditLabel: string;       // Label for broker credit lines in UI (default: 'Broker Credit')
+  };
   // Follow-up settings
   followUpSettings?: {
     defaultFollowUpDays: number;  // Default days ahead for follow-up date (default 90)
@@ -962,6 +979,11 @@ export const orders = pgTable('orders', {
   // Delivery
   deliveredAt: timestamp('delivered_at', { withTimezone: true }),
 
+  // Broker deal — flags this order as a broker deal (tenant acts as broker, not trader)
+  isBrokerDeal: boolean('is_broker_deal').notNull().default(false),
+  // Commission rate per unit (e.g., 3.00 for $3/MT). Nullable — only set on broker deals.
+  commissionPerMt: numeric('commission_per_mt', { precision: 12, scale: 4 }),
+
   // Inquiry response deadline — when the supplier should reply by
   responseDeadlineAt: timestamp('response_deadline_at', { withTimezone: true }),
 
@@ -1408,6 +1430,9 @@ export const creditLines = pgTable('credit_lines', {
   qualified: boolean('qualified').notNull().default(false),
 
   notes: text('notes'),
+
+  // Broker credit line — when true, tracks broker deal exposure on behalf of counterparties
+  isBrokerCreditLine: boolean('is_broker_credit_line').notNull().default(false),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

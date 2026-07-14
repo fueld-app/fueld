@@ -111,7 +111,7 @@ import {
 } from '../quickbooks/quickbooks.service';
 import { updateUserTeams } from './admin.service';
 import { sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
-import { whatsappNotificationRules } from '../../db/schema';
+import { whatsappNotificationRules, tenants } from '../../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { db } from '../../db';
 import {
@@ -478,6 +478,38 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get own companies for current tenant (any user)' },
+  })
+
+  // ── Broker deal settings (any authenticated user) ──────────────
+  .get('/my-broker-deal-settings', async () => {
+    try {
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).limit(1);
+      const bd = (tenant?.settings as any)?.brokerDeals ?? {};
+      return {
+        success: true,
+        data: {
+          enabled: bd.enabled ?? false,
+          defaultCommissionPerMt: bd.defaultCommissionPerMt ?? 0,
+          commissionCurrency: bd.commissionCurrency ?? 'USD',
+          commissionUnit: bd.commissionUnit ?? 'MT',
+          reportTitle: bd.reportTitle ?? 'Broker Commission Report',
+          reportStatuses: bd.reportStatuses ?? ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'],
+          reportDateField: bd.reportDateField ?? 'deliveredAt',
+          reportDateFallback: bd.reportDateFallback ?? 'eta',
+          hideInvoicingFields: bd.hideInvoicingFields ?? true,
+          brokerDealLabel: bd.brokerDealLabel ?? 'Broker Deal',
+          commissionLabel: bd.commissionLabel ?? 'Commission',
+          autoReleaseCredit: bd.autoReleaseCredit ?? true,
+          autoReleaseBufferDays: bd.autoReleaseBufferDays ?? 0,
+          brokerCreditLabel: bd.brokerCreditLabel ?? 'Broker Credit',
+        },
+      } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get broker deal settings for current tenant (any user)' },
   })
 
   .get('/my-units', async () => {

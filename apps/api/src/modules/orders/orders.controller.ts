@@ -89,6 +89,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           sortDir: query.sortDir as 'asc' | 'desc' | undefined,
           page: query.page ? parseInt(query.page, 10) : undefined,
           limit: query.limit ? parseInt(query.limit, 10) : undefined,
+          isBrokerDeal: query.isBrokerDeal === 'true' ? true : query.isBrokerDeal === 'false' ? false : undefined,
         });
         return { success: true, data: results } satisfies ApiResponse<typeof results>;
       } catch (err) {
@@ -115,6 +116,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         sortDir: t.Optional(t.String()),
         page: t.Optional(t.String()),
         limit: t.Optional(t.String()),
+        isBrokerDeal: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Orders'],
@@ -467,6 +469,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           responseDeadlineAt: body.responseDeadlineAt ?? null,
           eta: body.eta,
           etd: body.etd,
+          isBrokerDeal: body.isBrokerDeal ?? false,
+          commissionPerMt: body.commissionPerMt ?? null,
         });
 
         // Log activity
@@ -514,6 +518,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         responseDeadlineAt: t.Optional(t.Nullable(t.String())),
         eta: t.Optional(t.String()),
         etd: t.Optional(t.String()),
+        isBrokerDeal: t.Optional(t.Boolean()),
+        commissionPerMt: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Orders'],
@@ -574,6 +580,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         deliveryMethod: t.Optional(t.Nullable(t.String())),
         responseDeadlineAt: t.Optional(t.Nullable(t.String())),
         lossReason: t.Optional(t.Nullable(t.String())),
+        isBrokerDeal: t.Optional(t.Boolean()),
+        commissionPerMt: t.Optional(t.Nullable(t.String())),
       }),
       detail: {
         tags: ['Orders'],

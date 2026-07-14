@@ -694,6 +694,13 @@
       "when": 1782724800000,
       "tag": "0098_risk_override_permanent",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1784039809726,
+      "tag": "0099_broker_deals",
+      "breakpoints": true
     }
   ]
 }

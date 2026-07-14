@@ -58,6 +58,7 @@ interface ListOrdersQuery {
   sortDir?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+  isBrokerDeal?: boolean;  // filter by broker deal flag
 }
 
 interface CreateOrderInput {
@@ -91,6 +92,8 @@ interface CreateOrderInput {
   categoryKey?: string | null;
   deliveryMethod?: string | null;
   responseDeadlineAt?: string | null;
+  isBrokerDeal?: boolean;
+  commissionPerMt?: string | null;
 }
 
 interface UpdateOrderInput {
@@ -126,6 +129,8 @@ interface UpdateOrderInput {
   categoryKey?: string | null;
   deliveryMethod?: string | null;
   responseDeadlineAt?: string | null;
+  isBrokerDeal?: boolean;
+  commissionPerMt?: string | null;
 }
 
 interface SaveItemInput {
@@ -882,6 +887,10 @@ export async function listOrders(query?: ListOrdersQuery) {
     conditions.push(eq(orders.invoicingCompanyId, query.invoicingCompanyId));
   }
 
+  if (query?.isBrokerDeal !== undefined) {
+    conditions.push(eq(orders.isBrokerDeal, query.isBrokerDeal));
+  }
+
   if (query?.productTypes?.length) {
     conditions.push(
       sql`EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.product_type IN (${sql.join(query.productTypes.map((p) => sql`${p}`), sql`, `)}))`,
@@ -982,6 +991,8 @@ export async function listOrders(query?: ListOrdersQuery) {
         responseDeadlineAt: orders.responseDeadlineAt,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
+        isBrokerDeal: orders.isBrokerDeal,
+        commissionPerMt: orders.commissionPerMt,
       })
       .from(orders)
       .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
@@ -1262,6 +1273,8 @@ export async function getOrderById(idOrNumber: string) {
     deliveryMethod: row.deliveryMethod ?? null,
     responseDeadlineAt: row.responseDeadlineAt?.toISOString() ?? null,
     termsAndConditions: row.termsAndConditions ?? null,
+    isBrokerDeal: row.isBrokerDeal ?? false,
+    commissionPerMt: row.commissionPerMt != null ? String(row.commissionPerMt) : null,
     financingRateAnnual,
     financingDayCountConvention: orderEconomics.dayCountConvention,
     financingDays: orderEconomics.financingDays,
@@ -1410,6 +1423,8 @@ export async function createOrder(input: CreateOrderInput) {
     placeRemark,
     deliveryMethod: input.deliveryMethod ?? null,
     responseDeadlineAt: input.responseDeadlineAt ? new Date(input.responseDeadlineAt) : null,
+    isBrokerDeal: input.isBrokerDeal ?? false,
+    commissionPerMt: input.commissionPerMt ?? null,
   };
 
   const [created] = await db
@@ -1492,6 +1507,8 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
   if (input.categoryKey !== undefined) setData.categoryKey = input.categoryKey;
   if (input.deliveryMethod !== undefined) setData.deliveryMethod = input.deliveryMethod ?? null;
   if (input.responseDeadlineAt !== undefined) setData.responseDeadlineAt = input.responseDeadlineAt ? new Date(input.responseDeadlineAt) : null;
+  if (input.isBrokerDeal !== undefined) setData.isBrokerDeal = input.isBrokerDeal;
+  if (input.commissionPerMt !== undefined) setData.commissionPerMt = input.commissionPerMt;
 
   // Auto-set closedAt when status moves to CANCELLED, LOST, or PAID
   if (input.status === 'CANCELLED' || input.status === 'LOST' || input.status === 'PAID') {

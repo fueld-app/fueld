@@ -31,6 +31,9 @@ import type {
   SavedReportViewDto,
   TraderPerformanceReportDto,
   TraderPerformanceReportRowDto,
+  BrokerCommissionReportDto,
+  BrokerCommissionReportByCustomerDto,
+  BrokerCommissionReportOrderDto,
 } from '@fueld/types';
 import { Role } from '@fueld/types';
 import * as XLSX from 'xlsx';
@@ -40,6 +43,7 @@ import {
   invoices,
   orderItems,
   orders,
+  places,
   teams,
   tenants,
   type TenantSettings,
@@ -2276,4 +2280,169 @@ export function startReportsScheduleJob(): void {
   setTimeout(run, 20_000);
   setInterval(run, intervalMs);
   console.log('[Reports] Background job started (interval: 1h)');
+}
+
+// ── Broker commission report ─────────────────────────────────────
+
+export async function buildBrokerCommissionReport(
+  tenantId: string,
+  from: string,
+  to: string,
+  clientId?: string | null,
+): Promise<BrokerCommissionReportDto> {
+  // Load tenant settings for broker deal config
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  const bd = (tenant?.settings as any)?.brokerDeals ?? {};
+  const reportStatuses: string[] = bd.reportStatuses ?? ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'];
+  const reportDateField: string = bd.reportDateField ?? 'deliveredAt';
+  const reportDateFallback: string = bd.reportDateFallback ?? 'eta';
+  const defaultCommissionPerMt: string = String(bd.defaultCommissionPerMt ?? 0);
+  const commissionCurrency: string = bd.commissionCurrency ?? 'USD';
+
+  // Build the date filter using COALESCE with the configured fields
+  const dateColumn = reportDateField === 'eta' ? orders.eta : reportDateField === 'createdAt' ? orders.createdAt : orders.deliveredAt;
+  const fallbackColumn = reportDateFallback === 'eta' ? orders.eta : reportDateFallback === 'createdAt' ? orders.createdAt : orders.deliveredAt;
+
+  // Query broker deal orders with their items
+  const rows = await db
+    .select({
+      orderNumber: orders.orderNumber,
+      vesselName: vessels.name,
+      placeName: places.name,
+      customerName: counterparties.name,
+      customerId: orders.clientId,
+      productType: orderItems.productType,
+      quantity: orderItems.quantity,
+      unit: orderItems.unit,
+      commissionPerMt: orders.commissionPerMt,
+      deliveredAt: orders.deliveredAt,
+      status: orders.status,
+      primaryDate: dateColumn,
+      fallbackDate: fallbackColumn,
+    })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .innerJoin(vessels, eq(orders.vesselId, vessels.id))
+    .innerJoin(places, eq(orders.placeId, places.id))
+    .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
+    .where(
+      and(
+        eq(orders.tenantId, tenantId),
+        eq(orders.isBrokerDeal, true),
+        inArray(orders.status, reportStatuses),
+        ...(clientId ? [eq(orders.clientId, clientId)] : []),
+      ),
+    );
+
+  // Filter by date range using COALESCE(primary, fallback)
+  const fromDate = new Date(from);
+  const toDate = new Date(to + 'T23:59:59.999Z');
+  const filtered = rows.filter((r) => {
+    const date = r.primaryDate ?? r.fallbackDate;
+    if (!date) return false;
+    return date >= fromDate && date <= toDate;
+  });
+
+  // Group by customer
+  const byCustomerMap = new Map<string, BrokerCommissionReportByCustomerDto>();
+  let grandTotalCommission = 0;
+
+  for (const r of filtered) {
+    const rate = r.commissionPerMt != null ? parseFloat(String(r.commissionPerMt)) : parseFloat(defaultCommissionPerMt);
+    const qty = parseFloat(String(r.quantity)) || 0;
+    const commissionAmount = rate * qty;
+    grandTotalCommission += commissionAmount;
+
+    const order: BrokerCommissionReportOrderDto = {
+      orderNumber: r.orderNumber ?? '—',
+      vesselName: r.vesselName ?? '—',
+      placeName: r.placeName ?? '—',
+      productType: r.productType,
+      quantity: String(r.quantity),
+      unit: r.unit,
+      commissionPerMt: String(rate),
+      commissionAmount: commissionAmount.toFixed(2),
+      deliveredAt: r.deliveredAt?.toISOString() ?? null,
+      status: r.status,
+    };
+
+    const key = r.customerId;
+    const existing = byCustomerMap.get(key);
+    if (existing) {
+      existing.orders.push(order);
+      existing.orderCount++;
+      existing.totalCommission = (parseFloat(existing.totalCommission) + commissionAmount).toFixed(2);
+      existing.totalQuantity = (parseFloat(existing.totalQuantity) + qty).toFixed(3);
+    } else {
+      byCustomerMap.set(key, {
+        customerId: r.customerId,
+        customerName: r.customerName,
+        orderCount: 1,
+        totalQuantity: qty.toFixed(3),
+        totalCommission: commissionAmount.toFixed(2),
+        orders: [order],
+      });
+    }
+  }
+
+  return {
+    period: { from, to },
+    totalCommission: grandTotalCommission.toFixed(2),
+    currency: commissionCurrency,
+    byCustomer: Array.from(byCustomerMap.values()),
+  };
+}
+
+export function brokerCommissionReportToCsv(report: BrokerCommissionReportDto): string {
+  const rows: string[][] = [];
+  rows.push(['Broker Commission Report']);
+  rows.push([`Period: ${report.period.from} to ${report.period.to}`]);
+  rows.push([]);
+  rows.push(['Customer', 'Order #', 'Vessel', 'Place', 'Product', 'Quantity', 'Unit', 'Rate', 'Commission', 'Delivered At', 'Status']);
+
+  for (const cust of report.byCustomer) {
+    for (const o of cust.orders) {
+      rows.push([cust.customerName, o.orderNumber, o.vesselName, o.placeName, o.productType, o.quantity, o.unit, o.commissionPerMt, o.commissionAmount, o.deliveredAt ?? '', o.status]);
+    }
+    rows.push(['', '', '', '', '', 'Subtotal', '', '', cust.totalCommission, '', `${cust.orderCount} orders`]);
+    rows.push([]);
+  }
+  rows.push(['', '', '', '', '', 'TOTAL', '', '', report.totalCommission, '', '']);
+
+  return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+}
+
+export function brokerCommissionReportToXlsx(report: BrokerCommissionReportDto): ArrayBuffer {
+  const data: any[] = [];
+  for (const cust of report.byCustomer) {
+    for (const o of cust.orders) {
+      data.push({
+        Customer: cust.customerName,
+        'Order #': o.orderNumber,
+        Vessel: o.vesselName,
+        Place: o.placeName,
+        Product: o.productType,
+        Quantity: o.quantity,
+        Unit: o.unit,
+        Rate: o.commissionPerMt,
+        Commission: o.commissionAmount,
+        'Delivered At': o.deliveredAt ?? '',
+        Status: o.status,
+      });
+    }
+    data.push({
+      Customer: '', 'Order #': '', Vessel: '', Place: '', Product: '',
+      Quantity: '', Unit: 'Subtotal', Rate: '', Commission: cust.totalCommission,
+      'Delivered At': '', Status: `${cust.orderCount} orders`,
+    });
+  }
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Broker Commission');
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
 }
