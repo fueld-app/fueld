@@ -82,21 +82,34 @@ In `TenantSettings` (the JSONB `settings` column on `tenants`):
 // Broker deal settings — tenant-specific feature gating
 brokerDeals?: {
   enabled: boolean;                  // Master toggle — only show broker UI when true
-  defaultCommissionPerMt: number;   // Default commission rate (e.g., 3.00)
+  defaultCommissionPerMt: number;   // Default commission rate (e.g., 3.00) — always same for all products/companies
   commissionCurrency: string;        // Currency for commission (e.g., 'USD')
   commissionUnit: string;            // Unit for commission calc: 'MT', 'GAL', 'BBL', etc. (default 'MT')
   reportTitle: string;              // Report header (e.g., 'Moxie Brokerage — Monthly Commission Report')
-  reportStatuses: string[];          // Which statuses to include in report (default: ['DELIVERED', 'INVOICED', 'PAID'])
-  reportDateField: string;           // Which date field filters the report period: 'deliveredAt' | 'eta' | 'createdAt' (default 'deliveredAt')
+  reportStatuses: string[];          // Which statuses to include in report (default: ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'])
+  reportDateField: string;           // Primary date field for report period filtering (default 'deliveredAt')
   reportDateFallback: string;        // Fallback date field if primary is null (default 'eta')
   hideInvoicingFields: boolean;      // Hide invoicing company/bank account fields on broker deals (default true)
   brokerDealLabel: string;           // Display label for the checkbox (default 'Broker Deal')
   commissionLabel: string;           // Display label for the commission column (default 'Commission')
+  // Credit tracking
+  autoReleaseCredit: boolean;        // Auto-release supplier credit after credit period from delivery date (default: true)
+  autoReleaseBufferDays: number;     // Extra buffer days before auto-release (default: 0)
+  brokerCreditLabel: string;         // Label for broker credit lines in UI (default: 'Broker Credit')
 };
 ```
 
 **Every value above is configurable via Admin → Settings. Nothing is hardcoded.**
 If a setting is omitted, the defaults shown in parentheses apply.
+
+**Decisions confirmed with Moxie (July 2026):**
+- Moxie does both trading AND brokering → need separate broker credit lines
+- Commission is always $3/MT across all companies and products
+- Credit period starts from delivery date
+- Auto-release after credit period is fine — no "payment delayed" blocking needed
+- Mixed group/individual credit lines — some Ocean7 companies share a group line, others have individual lines
+- Report is manually generated (not auto-scheduled)
+- Report includes confirmed orders and above (not just delivered)
 
 This is read by:
 - Frontend: to show/hide the "Broker Deals" tab and the `isBrokerDeal` checkbox
@@ -108,9 +121,30 @@ This is read by:
 -- 00XX_broker_deals.sql
 ALTER TABLE orders ADD COLUMN is_broker_deal boolean NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN commission_per_mt numeric(12, 4);
+ALTER TABLE credit_lines ADD COLUMN is_broker_credit_line boolean NOT NULL DEFAULT false;
 ```
 
 Register in `meta/_journal.json` as usual.
+
+### 1d. Credit lines — add broker credit flag
+
+```sql
+ALTER TABLE credit_lines ADD COLUMN is_broker_credit_line boolean NOT NULL DEFAULT false;
+```
+
+- `is_broker_credit_line`: When `true`, this credit line tracks broker deal
+  exposure (on behalf of Ocean7 companies). When `false` (default), it tracks
+  regular trade exposure (Moxie's own) — same as today.
+- The existing `credit_line_counterparties` table already supports many-to-many
+  linking, so group credit lines (multiple Ocean7 companies) and individual
+  credit lines (single Ocean7 company) both work without schema changes.
+
+### 1e. No `paidBy` field needed
+
+The original design considered adding a `paid_by` enum to `order_suppliers`.
+This is NOT needed because Moxie confirmed they don't need to track who pays —
+the system auto-releases credit based on time (delivery date + credit days),
+not on manual payment confirmation.
 
 ---
 
@@ -197,6 +231,59 @@ If `commission_per_mt` is null on the order, fall back to
 Same data as the JSON endpoint, formatted as a spreadsheet with one row per
 order, grouped by customer.
 
+### 2e. Credit line usage — time-based auto-release for broker deals
+
+Modified `calcUsedAmountForSupplier` in `credit.service.ts`:
+
+For **regular credit lines** (`is_broker_credit_line = false`):
+- Same as today: credit released when `paidAt IS NOT NULL`
+
+For **broker credit lines** (`is_broker_credit_line = true`):
+- Credit auto-released when `deliveredAt + supplierCreditDays` has passed
+- No manual `paidAt` needed — Moxie confirmed they don't get payment confirmations
+- If `paidAt` IS set manually (early override), credit releases sooner
+- If `autoReleaseBufferDays` is configured, add extra days as safety margin
+
+```sql
+-- Broker credit usage: count orders still within credit period
+WHERE order_suppliers.companyId = ANY($counterpartyIds)
+  AND order_suppliers.paymentTermType = 'CREDIT'
+  AND orders.status = ANY($activeStatuses)
+  AND (
+    -- Released: manually marked paid
+    order_suppliers.paidAt IS NOT NULL
+    OR (
+      -- Released: broker deal past credit period
+      orders.is_broker_deal = true
+      AND orders.deliveredAt IS NOT NULL
+      AND orders.deliveredAt + (order_suppliers.creditDays || ' days')::interval
+          + ($bufferDays || ' days')::interval < now()
+    )
+  ) = false
+```
+
+The `is_broker_credit_line` flag on the credit line determines which orders
+to count:
+- `is_broker_credit_line = true`: count broker deals (`is_broker_deal = true`)
+  where the customer is one of the credit line's counterparties
+- `is_broker_credit_line = false`: count regular orders (same as today)
+
+This separates Moxie's own trading exposure from Ocean7's broker exposure,
+even when both use the same supplier (e.g., World Fuel).
+
+### 2f. Credit line API — accept broker credit flag
+
+In `createCreditLine` and `updateCreditLine` (credit.service.ts):
+
+```typescript
+isBrokerCreditLine?: boolean;
+```
+
+When `true`, the credit line is a broker credit line. The counterparties
+linked to the line are the Ocean7 companies (the "on behalf of" parties).
+The existing `creditLineCounterparties` table supports linking multiple
+companies (for group credit lines) or a single company (for individual lines).
+
 ---
 
 ## 3. Frontend Changes
@@ -256,6 +343,34 @@ A new page at `/reports/broker-commission` (or a modal from the Broker Deals tab
   - Total commission (in the configured `commissionCurrency`)
   - Expandable: individual orders with details
 - Export buttons (CSV, XLSX)
+- **Manually generated** (not auto-scheduled) — Moxie confirmed they generate
+  it when all deliveries and BDRs for the month are in
+
+### 3f. Credit line UI — broker credit lines
+
+**Admin → Credit → Suppliers:**
+- Regular credit lines show as before
+- Broker credit lines show with a badge from `brokerCreditLabel` setting (default: 'Broker Credit')
+- Shows linked Ocean7 companies (the counterparties on the credit line)
+- A filter toggle: "Show broker credit lines" (only visible when `brokerDeals.enabled`)
+- For group credit lines, all linked Ocean7 companies are shown
+- For individual credit lines, only one company is shown
+
+**Credit line creation form** (when `brokerDeals.enabled` is true):
+- New checkbox: "Broker Credit Line" (label from `brokerCreditLabel` setting)
+- When checked:
+  - The counterparties field labels as "On behalf of" (the Ocean7 companies)
+  - Multiple companies can be selected (for group credit lines)
+  - The credit limit and period apply to all selected companies collectively
+
+### 3g. Order detail — broker credit display
+
+When `isBrokerDeal = true` and the supplier has a broker credit line:
+- The payment terms card shows: "Broker credit — auto-releases {creditDays} days after delivery"
+- A countdown: "Credit releases in 12 days" (if within the period)
+- Or "Credit auto-released on {date}" (if past the period)
+- No "Record Payment" button for broker deals (payment is automatic)
+- The credit usage shows the Ocean7 company's exposure, not Moxie's own
 
 ---
 
@@ -396,9 +511,12 @@ from the tenant's `brokerDeals` settings — not hardcoded.
 - **Order flow**: Broker deals go through the same status flow
   (Inquiry → Confirmed → Delivered → Invoiced → Paid)
 - **Order items**: Same structure — products, quantities, prices
-- **Credit lines**: Moxie can link Ocean7's supplier credit lines to the
-  counterparty (Ocean7 company). The existing credit system already supports
-  supplier credit lines per counterparty.
+- **Credit lines**: Broker credit lines (`is_broker_credit_line = true`) track
+  Ocean7's exposure with suppliers. Regular credit lines (`is_broker_credit_line
+  = false`) track Moxie's own exposure. Both coexist — same supplier can have
+  both types of credit lines. Group lines link multiple Ocean7 companies;
+  individual lines link one. Credit auto-releases after the credit period
+  from delivery date (no manual payment confirmation needed).
 - **Documents**: Same document generation (confirmation, nomination, etc.)
 - **WhatsApp notifications**: Same notification system
 - **Search**: Broker deals appear in global search like regular orders
@@ -408,29 +526,35 @@ from the tenant's `brokerDeals` settings — not hardcoded.
 | Area | Change |
 |------|--------|
 | Orders table | +`is_broker_deal` boolean, +`commission_per_mt` numeric |
-| Tenant settings | +`brokerDeals` config block (11 configurable options) |
+| Credit lines table | +`is_broker_credit_line` boolean (separates Moxie's own vs broker credit) |
+| Tenant settings | +`brokerDeals` config block (14 configurable options) |
 | Order API | Accept + return broker deal fields; filter by `isBrokerDeal` |
+| Credit API | Accept + return `isBrokerCreditLine`; modified usage calc with time-based release |
 | Reports API | +`/reports/broker-commission` endpoint + exports (uses configurable statuses, date fields) |
 | Settings API | +`/admin/settings/my-broker-deal-settings` endpoint (returns all config) |
 | Admin settings UI | +"Broker Deals" settings section (all options configurable via UI) |
 | Sidebar | +"Broker Deals" tab (tenant-gated by `enabled` setting) |
-| Order detail | +broker deal checkbox (label from `brokerDealLabel` setting) + commission field (unit from `commissionUnit` setting) |
+| Order detail | +broker deal checkbox + commission field + broker credit display with auto-release countdown |
 | New inquiry modal | +"Broker Deal" checkbox (tenant-gated) |
 | Invoicing fields | Hidden on broker deals when `hideInvoicingFields` is true (configurable, default true) |
-| Commission report | Title from `reportTitle`, statuses from `reportStatuses`, date field from `reportDateField` — all configurable |
+| Credit line UI | +broker credit line badge, creation form, filter toggle (tenant-gated) |
+| Commission report | Title from `reportTitle`, statuses from `reportStatuses`, date field from `reportDateField` — all configurable, manually generated |
 
 ## 8. Implementation Order
 
-1. **Schema migration** — add columns + tenant settings type
-2. **API** — order create/update accepts broker fields; list filter
-3. **Commission report endpoint** — query + export
-4. **Frontend: admin settings** — broker deal config UI
-5. **Frontend: order detail** — broker deal checkbox + commission field
-6. **Frontend: new inquiry modal** — broker deal checkbox
-7. **Frontend: broker deals tab** — filtered list page
-8. **Frontend: commission report** — report page with date range + export
-9. **Test on staging** — verify end-to-end with Moxie's data
-10. **Deploy** — all servers
+1. **Schema migration** — add `is_broker_deal`, `commission_per_mt` to orders; add `is_broker_credit_line` to credit_lines; update tenant settings type
+2. **API: orders** — order create/update accepts broker fields; list filter by `isBrokerDeal`
+3. **API: credit** — credit line create/update accepts `isBrokerCreditLine`; modified usage calculation with time-based auto-release for broker deals
+4. **API: commission report** — `/reports/broker-commission` endpoint + CSV/XLSX export
+5. **API: settings** — `/admin/settings/my-broker-deal-settings` endpoint
+6. **Frontend: admin settings** — broker deal config UI (all 14 options)
+7. **Frontend: order detail** — broker deal checkbox + commission field + broker credit display with auto-release countdown
+8. **Frontend: new inquiry modal** — broker deal checkbox
+9. **Frontend: broker deals tab** — filtered list page with commission column
+10. **Frontend: credit line UI** — broker credit line badge, creation form, filter toggle
+11. **Frontend: commission report** — report page with date range + export (manually generated)
+12. **Test on staging** — verify end-to-end with Moxie's data
+13. **Deploy** — all servers
 
 ## 9. Alternative Considered & Rejected
 
