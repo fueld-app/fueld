@@ -33,7 +33,7 @@ const CUSTOMER_ACTIVE_STATUSES = ['INQUIRY', 'OFFER', 'CONFIRMED', 'DELIVERED', 
 //                     order.clientId IN counterpartyIds AND status is active
 // ═══════════════════════════════════════════════════════════════════════
 
-async function calcUsedAmountForSupplier(counterpartyIds: string[]): Promise<string> {
+async function calcUsedAmountForSupplier(counterpartyIds: string[], isBrokerCreditLine: boolean = false): Promise<string> {
   if (!counterpartyIds.length) return '0';
   const [row] = await db
     .select({
@@ -47,6 +47,13 @@ async function calcUsedAmountForSupplier(counterpartyIds: string[]): Promise<str
         inArray(orderSuppliers.companyId, counterpartyIds),
         eq(orderSuppliers.paymentTermType, 'CREDIT'),
         inArray(orders.status, [...SUPPLIER_ACTIVE_STATUSES]),
+        // Separate broker deal exposure from regular trade exposure:
+        // broker credit lines only count broker deals, regular credit lines
+        // only count non-broker deals — so Moxie's own trades don't inflate
+        // Ocean7's credit usage and vice versa.
+        isBrokerCreditLine
+          ? eq(orders.isBrokerDeal, true)
+          : eq(orders.isBrokerDeal, false),
         // Credit is still "in use" when:
         // 1. Not manually marked paid (paidAt IS NULL), AND
         // 2. For broker deals: not past the credit period from delivery
@@ -156,7 +163,7 @@ async function enrichCreditLine(row: RawCreditLine): Promise<CreditLineDto> {
 
   const usedAmount =
     row.type === 'SUPPLIER'
-      ? await calcUsedAmountForSupplier(sides.counterpartyIds)
+      ? await calcUsedAmountForSupplier(sides.counterpartyIds, row.isBrokerCreditLine)
       : await calcUsedAmountForCustomer(sides.counterpartyIds);
 
   const creditNum = parseFloat(row.creditAmount) || 0;
