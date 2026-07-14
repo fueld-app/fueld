@@ -20,6 +20,7 @@ import type {
 } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { BrokerDealService } from '@app/core/services/broker-deal.service';
 
 interface CompanySearchResult {
   source: 'local' | 'seasearcher';
@@ -100,6 +101,9 @@ interface CompanySearchResultOption {
                         </a>
                       } @empty {
                         <span class="text-gray-400 dark:text-muted">—</span>
+                      }
+                      @if (line.isBrokerCreditLine) {
+                        <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">{{ brokerDealSvc.settings().brokerCreditLabel }}</span>
                       }
                     </div>
                   </td>
@@ -288,6 +292,20 @@ interface CompanySearchResultOption {
                   class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                   placeholder="Optional notes..."></textarea>
               </div>
+
+              @if (brokerDealSvc.enabled()) {
+                <div>
+                  <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-ink-dim cursor-pointer">
+                    <input type="checkbox"
+                      [ngModel]="form().isBrokerCreditLine"
+                      (ngModelChange)="updateForm('isBrokerCreditLine', $event)"
+                      class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                    />
+                    {{ brokerDealSvc.settings().brokerCreditLabel }}
+                    <span class="text-gray-400 dark:text-muted font-normal">(tracks broker deal exposure on behalf of counterparties)</span>
+                  </label>
+                </div>
+              }
             </div>
 
             <div class="mt-5 flex justify-end gap-2">
@@ -329,6 +347,7 @@ export class SupplierCreditPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  protected readonly brokerDealSvc = inject(BrokerDealService);
   readonly parseFloat = parseFloat;
   readonly pageSize = 25;
 
@@ -355,7 +374,8 @@ export class SupplierCreditPageComponent implements OnInit {
     expires: string;
     periodDays: number;
     notes: string;
-  }>({ creditAmount: '', currency: 'USD', expires: '', periodDays: 30, notes: '' });
+    isBrokerCreditLine: boolean;
+  }>({ creditAmount: '', currency: 'USD', expires: '', periodDays: 30, notes: '', isBrokerCreditLine: false });
 
   // Counterparty multi-select
   readonly selectedCounterparties = signal<{ id: string; name: string }[]>([]);
@@ -552,7 +572,7 @@ export class SupplierCreditPageComponent implements OnInit {
   // --- Create / Edit ---
   openCreateModal(): void {
     this.editingId.set(null);
-    this.form.set({ creditAmount: '', currency: 'USD', expires: '', periodDays: 30, notes: '' });
+    this.form.set({ creditAmount: '', currency: 'USD', expires: '', periodDays: 30, notes: '', isBrokerCreditLine: false });
     this.selectedCounterparties.set([]);
     this.selectedOwnCompanyIds.set(new Set());
     this.companySearch.set('');
@@ -569,6 +589,7 @@ export class SupplierCreditPageComponent implements OnInit {
       expires: line.expires ?? '',
       periodDays: line.periodDays,
       notes: line.notes ?? '',
+      isBrokerCreditLine: line.isBrokerCreditLine ?? false,
     });
     this.selectedCounterparties.set(
       line.counterpartyIds.map((id, i) => ({ id, name: line.counterpartyNames[i] || id })),
@@ -635,6 +656,7 @@ export class SupplierCreditPageComponent implements OnInit {
             periodDays: f.periodDays,
             notes: f.notes || undefined,
             ownCompanyIds: ownCompanyIds.length ? ownCompanyIds : undefined,
+            isBrokerCreditLine: f.isBrokerCreditLine,
           } satisfies CreateCreditLineDto),
         );
       }
