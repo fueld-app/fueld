@@ -16,6 +16,7 @@ import { SearchableDropdownComponent, type DropdownOption } from '../../../../sh
 import type { ApiResponse, CounterpartyDto, VesselDto, PlaceDto, CreditLineDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
 import { AuthService } from '@app/core/auth/auth.service';
+import { BrokerDealService } from '@app/core/services/broker-deal.service';
 import { toUtcIsoFromZonedDateInput } from '../order-detail/services/order-utils';
 
 interface CompanySearchResult {
@@ -174,6 +175,20 @@ interface LliSearchResult {
             </div>
           </div>
 
+          @if (brokerDealSvc.enabled()) {
+            <div>
+              <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-ink-dim cursor-pointer">
+                <input type="checkbox"
+                  [ngModel]="newIsBrokerDeal()"
+                  (ngModelChange)="newIsBrokerDeal.set($event)"
+                  class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                {{ brokerDealSvc.settings().brokerDealLabel }}
+                <span class="text-gray-400 dark:text-muted font-normal">({{ brokerDealSvc.settings().defaultCommissionPerMt }} {{ brokerDealSvc.settings().commissionCurrency }}/{{ brokerDealSvc.settings().commissionUnit }} commission)</span>
+              </label>
+            </div>
+          }
+
           <div class="flex items-center justify-end gap-3 border-t border-gray-200 dark:border-line px-6 py-4">
             <button
               (click)="close.emit()"
@@ -204,6 +219,7 @@ interface LliSearchResult {
 })
 export class InquiriesListNewInquiryModalComponent {
   protected readonly auth = inject(AuthService);
+  protected readonly brokerDealSvc = inject(BrokerDealService);
   readonly open = input(false);
   readonly responsibleOptions = input<DropdownOption[]>([]);
   readonly close = output<void>();
@@ -220,6 +236,7 @@ export class InquiriesListNewInquiryModalComponent {
   readonly newEta = signal('');
   readonly newEtd = signal('');
   readonly newResponseDeadline = signal('');
+  readonly newIsBrokerDeal = signal(false);
 
   /* ---- loading / search ---- */
   readonly creating = signal(false);
@@ -596,6 +613,8 @@ export class InquiriesListNewInquiryModalComponent {
           eta: toDateIso(this.newEta()),
           etd: toDateIso(this.newEtd()),
           responseDeadlineAt: this.newResponseDeadline() || undefined,
+          isBrokerDeal: this.newIsBrokerDeal(),
+          commissionPerMt: this.newIsBrokerDeal() ? String(this.brokerDealSvc.settings().defaultCommissionPerMt) : undefined,
         }),
       );
       if (res.success) {
@@ -619,6 +638,7 @@ export class InquiriesListNewInquiryModalComponent {
     this.newEta.set('');
     this.newEtd.set('');
     this.newResponseDeadline.set('');
+    this.newIsBrokerDeal.set(false);
     this.selectedClient.set(null);
     this.selectedVessel.set(null);
     this.selectedPlace.set(null);
