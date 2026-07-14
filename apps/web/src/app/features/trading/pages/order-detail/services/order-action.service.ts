@@ -302,6 +302,8 @@ export class OrderActionService {
         agentContactId: o.agentContactId ?? null, termsAndConditions: o.termsAndConditions ?? null,
         categoryKey: o.categoryKey ?? null, eta: o.eta, etd: o.etd, deliveredAt: o.deliveredAt ?? null,
         deliveryMethod: (o as any).deliveryMethod ?? null,
+        isBrokerDeal: (o as any).isBrokerDeal ?? false,
+        commissionPerMt: (o as any).commissionPerMt ?? null,
       }));
       this.requireApiSuccess(orderRes);
 

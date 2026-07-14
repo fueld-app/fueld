@@ -97,6 +97,7 @@ import { OrderSaveService } from './services/order-save.service';
 import { OrderInventoryService } from './services/order-inventory.service';
 import { OrderPlattsService } from './services/order-platts.service';
 import { DateFormatService } from '@app/core/services/date-format.service';
+import { BrokerDealService } from '@app/core/services/broker-deal.service';
 import { OrderBrokerService } from './services/order-broker.service';
 import { OrderAgentService } from './services/order-agent.service';
 import { OrderActionService } from './services/order-action.service';
@@ -193,6 +194,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly agentSvc = inject(OrderAgentService);
   protected readonly plattsSvc = inject(OrderPlattsService);
   protected readonly dateFormatSvc = inject(DateFormatService);
+  protected readonly brokerDealSvc = inject(BrokerDealService);
   protected readonly actionSvc = inject(OrderActionService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
@@ -498,6 +500,31 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       || status === OrderStatus.Cancelled
       || status === OrderStatus.Lost;
   });
+
+  // Broker deal — tenant-gated feature
+  readonly brokerDealsEnabled = computed(() => this.brokerDealSvc.enabled());
+  readonly isBrokerDeal = computed(() => this.order()?.isBrokerDeal ?? false);
+  readonly showInvoicingFields = computed(() => {
+    if (!this.isBrokerDeal()) return true;
+    return !this.brokerDealSvc.settings().hideInvoicingFields;
+  });
+  readonly commissionPerMt = computed(() => this.order()?.commissionPerMt ?? null);
+  readonly brokerDealLabel = computed(() => this.brokerDealSvc.settings().brokerDealLabel);
+
+  onBrokerDealToggle(value: boolean): void {
+    this.order.update((o) => (o ? { ...o, isBrokerDeal: value } : o));
+    if (value && !this.order()?.commissionPerMt) {
+      // Default to tenant's default commission rate
+      const defaultRate = this.brokerDealSvc.settings().defaultCommissionPerMt;
+      if (defaultRate > 0) {
+        this.order.update((o) => (o ? { ...o, commissionPerMt: String(defaultRate) } : o));
+      }
+    }
+  }
+
+  onCommissionPerMtChange(value: string): void {
+    this.order.update((o) => (o ? { ...o, commissionPerMt: value || null } : o));
+  }
 
   readonly allowDeliveredEdit = computed(() => {
     const status = this.order()?.status;
@@ -970,6 +997,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.loadOrder();
     this.checkWhatsAppLinked();
     this.dateFormatSvc.load();
+    this.brokerDealSvc.load();
   }
 
   ngAfterViewInit(): void {

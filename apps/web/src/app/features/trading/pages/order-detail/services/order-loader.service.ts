@@ -81,6 +81,8 @@ export class OrderLoaderService {
       deliveryMethod: d.deliveryMethod ?? null,
       responseDeadlineAt: d.responseDeadlineAt ?? null,
       createdAt: d.createdAt, updatedAt: d.updatedAt,
+      isBrokerDeal: d.isBrokerDeal ?? false,
+      commissionPerMt: d.commissionPerMt ?? null,
     };
 
     result.items = (d.items ?? []).map((item: any) => ({
