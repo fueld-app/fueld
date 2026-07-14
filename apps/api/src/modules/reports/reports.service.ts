@@ -54,6 +54,7 @@ import {
 import { sendNotificationEmail } from '../../lib/email';
 import { logActivity } from '../activity/activity.service';
 import { calculateOrderEconomics, calculateRevenueBase, getFinancingRateAnnual } from '../orders/order-financing';
+import { generateOrderNumber, syncPrimaryOrderSupplierFromLegacy } from '../orders/orders.service';
 
 const MANAGE_SHARED_REPORT_ROLES: Role[] = [
   Role.Admin,
@@ -2445,4 +2446,80 @@ export function brokerCommissionReportToXlsx(report: BrokerCommissionReportDto):
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Broker Commission');
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+}
+
+export async function createCommissionOrdersFromReport(
+  tenantId: string,
+  from: string,
+  to: string,
+): Promise<Array<{ orderNumber: string | null; customerName: string; commissionAmount: string }>> {
+  const report = await buildBrokerCommissionReport(tenantId, from, to);
+  const result: Array<{ orderNumber: string | null; customerName: string; commissionAmount: string }> = [];
+
+  for (const cust of report.byCustomer) {
+    if (parseFloat(cust.totalCommission) <= 0) continue;
+
+    // Find a vessel and place from the broker deals for this customer
+    const [sampleOrder] = await db
+      .select({
+        vesselId: orders.vesselId,
+        placeId: orders.placeId,
+      })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.tenantId, tenantId),
+          eq(orders.isBrokerDeal, true),
+          eq(orders.clientId, cust.customerId),
+        ),
+      )
+      .limit(1);
+
+    if (!sampleOrder) continue;
+
+    // Generate order number
+    const orderNumber = await generateOrderNumber(tenantId);
+
+    // Create the commission order (regular order, NOT a broker deal)
+    const [created] = await db
+      .insert(orders)
+      .values({
+        tenantId,
+        orderNumber,
+        clientId: cust.customerId,
+        vesselId: sampleOrder.vesselId,
+        placeId: sampleOrder.placeId,
+        currency: report.currency,
+        status: 'CONFIRMED',
+        isBrokerDeal: false,
+        customerNote: `Brokerage commission for ${from} to ${to}: ${cust.orderCount} deliveries, ${cust.totalQuantity} total`,
+      })
+      .returning();
+
+    if (created) {
+      // Add a single line item for the commission
+      await db.insert(orderItems).values({
+        orderId: created.id,
+        productType: 'BROKERAGE_COMMISSION',
+        quantity: cust.totalQuantity,
+        unit: 'MT',
+        costPrice: '0',
+        costCurrency: report.currency,
+        salesPrice: cust.totalCommission,
+        salesCurrency: report.currency,
+        profit: cust.totalCommission,
+        sortOrder: 0,
+      });
+
+      await syncPrimaryOrderSupplierFromLegacy(created);
+
+      result.push({
+        orderNumber: created.orderNumber,
+        customerName: cust.customerName,
+        commissionAmount: cust.totalCommission,
+      });
+    }
+  }
+
+  return result;
 }

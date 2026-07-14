@@ -72,15 +72,18 @@ export class OrderActionService {
   private readonly supplierSvc = inject(OrderSupplierService);
 
   async onAction(action: string, ctx: OrderActionContext): Promise<void> {
+    const isBrokerDeal = ctx.order()?.isBrokerDeal ?? false;
     switch (action) {
       case 'generate-invoice':
+        if (isBrokerDeal) { ctx.showToast('error', 'Invoices are not generated for broker deals — supplier invoices the customer directly.'); break; }
         if (!ctx.hasLineItems()) { ctx.showToast('error', 'Add at least one line item before viewing Invoice/Proforma.'); break; }
         if (!ctx.hasBankAccount()) { ctx.showToast('error', 'Select a bank account before viewing Invoice/Proforma.'); break; }
         await this.viewInvoicePdf(ctx);
         break;
       case 'view-offer':
         if (!ctx.hasLineItems()) { ctx.showToast('error', 'Add at least one line item before generating Confirmation PDF.'); break; }
-        if (!ctx.hasInvoicingCompany()) { ctx.showToast('error', 'Select an invoicing company before generating Confirmation PDF.'); break; }
+        // Broker deals don't require an invoicing company — the confirmation shows without prices
+        if (!isBrokerDeal && !ctx.hasInvoicingCompany()) { ctx.showToast('error', 'Select an invoicing company before generating Confirmation PDF.'); break; }
         if (!ctx.hasEta()) { ctx.showToast('error', 'Set an ETA before generating Confirmation PDF.'); break; }
         await this.viewOfferPdf(ctx);
         break;
@@ -99,6 +102,7 @@ export class OrderActionService {
         this.openCancelInquiryModal(ctx);
         break;
       case 'send-email':
+        if (isBrokerDeal) { ctx.showToast('error', 'Invoices are not generated for broker deals.'); break; }
         if (!ctx.isResponsibleUser()) { ctx.showToast('error', 'Only the responsible user can send this email.'); break; }
         ctx.openSendEmailModal('INVOICE');
         break;
@@ -115,6 +119,7 @@ export class OrderActionService {
         ctx.openSendEmailModal('NOMINATION');
         break;
       case 'send-proforma':
+        if (isBrokerDeal) { ctx.showToast('error', 'Proforma invoices are not generated for broker deals.'); break; }
         if (!ctx.hasEta()) { ctx.showToast('error', 'Set an ETA before sending.'); break; }
         ctx.openSendEmailModal('PROFORMA');
         break;

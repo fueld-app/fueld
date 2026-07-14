@@ -561,7 +561,7 @@ function deriveOrderDeliveredAtIso(
   return latestMs > 0 ? new Date(latestMs).toISOString() : null;
 }
 
-async function syncPrimaryOrderSupplierFromLegacy(order: {
+export async function syncPrimaryOrderSupplierFromLegacy(order: {
   id: string;
   supplierId: string | null;
   supplierContactId: string | null;
@@ -805,7 +805,7 @@ function normalizeOrderNumberTemplate(template: string): string {
 
 // ─── Generate next order number ───────────────────────────────────────
 
-async function generateOrderNumber(tenantId: string): Promise<string> {
+export async function generateOrderNumber(tenantId: string): Promise<string> {
   // Atomically increment the sequence counter
   const [seq] = await db
     .insert(orderNumberSequences)

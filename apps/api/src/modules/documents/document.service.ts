@@ -1662,6 +1662,7 @@ export function buildOfferDocument(data: {
   supplierResponseText?: string | null;
   printMeta?: DocumentPrintMeta | null;
   purchaseOrderNumber?: string | null;
+  hidePrices?: boolean;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -1734,12 +1735,18 @@ export function buildOfferDocument(data: {
   }
 
   // Items table
-  const tableHeader: TableCell[] = [
-    { text: 'Product', style: 'tableHeader' },
-    { text: 'Quantity', style: 'tableHeader', alignment: 'right' },
-    { text: 'Unit', style: 'tableHeader' },
-    { text: 'Price', style: 'tableHeader', alignment: 'right' },
-  ];
+  const tableHeader: TableCell[] = data.hidePrices
+    ? [
+        { text: 'Product', style: 'tableHeader' },
+        { text: 'Quantity', style: 'tableHeader', alignment: 'right' },
+        { text: 'Unit', style: 'tableHeader' },
+      ]
+    : [
+        { text: 'Product', style: 'tableHeader' },
+        { text: 'Quantity', style: 'tableHeader', alignment: 'right' },
+        { text: 'Unit', style: 'tableHeader' },
+        { text: 'Price', style: 'tableHeader', alignment: 'right' },
+      ];
 
   // Compute fixed decimal places for price column so all items align
   const priceColDecimals = computePriceColumnDecimals(data.items);
@@ -1755,26 +1762,30 @@ export function buildOfferDocument(data: {
         ? { text: [{ text: formatProductTypeLabel(item.productType) }, { text: `  ${desc}`, fontSize: 8, color: '#374151' }] }
         : { text: formatProductTypeLabel(item.productType) };
 
-    let priceCell: Content;
-    if (item.salesPricingModel === 'FORMULA') {
-      const parts: Content[] = [];
-      if (item.salesReferenceName) parts.push({ text: item.salesReferenceName, bold: true, fontSize: 9 });
-      if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
-      if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
-      if (item.salesPriceFinalized) {
-        parts.push({ text: `\n→ ${formatPriceFixed(item.salesPrice, priceColDecimals)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
-      }
-      priceCell = { text: parts, alignment: 'right' };
-    } else {
-      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPriceFixed(item.salesPrice, priceColDecimals)}`, alignment: 'right' };
-    }
-
-    return [
+    const baseRow: TableCell[] = [
       productCell as TableCell,
       { text: qty, alignment: 'right' },
       { text: item.unit },
-      priceCell as TableCell,
     ];
+
+    if (!data.hidePrices) {
+      let priceCell: Content;
+      if (item.salesPricingModel === 'FORMULA') {
+        const parts: Content[] = [];
+        if (item.salesReferenceName) parts.push({ text: item.salesReferenceName, bold: true, fontSize: 9 });
+        if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
+        if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
+        if (item.salesPriceFinalized) {
+          parts.push({ text: `\n→ ${formatPriceFixed(item.salesPrice, priceColDecimals)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
+        }
+        priceCell = { text: parts, alignment: 'right' };
+      } else {
+        priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPriceFixed(item.salesPrice, priceColDecimals)}`, alignment: 'right' };
+      }
+      baseRow.push(priceCell as TableCell);
+    }
+
+    return baseRow;
   });
 
   // Delivery date string
@@ -2182,9 +2193,8 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     docTitle: documentTitle,
     verifyUrl: null as string | null,
     printMeta: null,
+    hidePrices: (order as any).isBrokerDeal ?? false,
   };
-
-  // QR code removed from offers — only shown on invoices and proforma invoices
 
   const docDefinition = buildOfferDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);

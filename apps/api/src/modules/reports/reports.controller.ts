@@ -32,6 +32,7 @@ import {
   buildBrokerCommissionReport,
   brokerCommissionReportToCsv,
   brokerCommissionReportToXlsx,
+  createCommissionOrdersFromReport,
 } from './reports.service';
 
 const reportFiltersSchema = t.Object({
@@ -404,4 +405,15 @@ export const reportsController = new Elysia({ prefix: '/reports' })
       clientId: t.Optional(t.String()),
     }),
     detail: { tags: ['Reports'], summary: 'Export broker commission report as XLSX', security: [{ bearerAuth: [] }] },
+  })
+
+  .post('/broker-commission/create-orders', async ({ auth, body }) => {
+    const orders = await createCommissionOrdersFromReport(auth.tenantId, body.from, body.to);
+    return { success: true, data: orders } satisfies ApiResponse<unknown>;
+  }, {
+    body: t.Object({
+      from: t.String(),
+      to: t.String(),
+    }),
+    detail: { tags: ['Reports'], summary: 'Create commission orders from broker report (admin only)', security: [{ bearerAuth: [] }] },
   });

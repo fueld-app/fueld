@@ -60,6 +60,18 @@ import { BrokerDealService } from '@app/core/services/broker-deal.service';
               class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
               XLSX
             </a>
+            <button (click)="createCommissionOrders()" [disabled]="creatingOrders()"
+              class="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-1.5">
+              @if (creatingOrders()) {
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Creating…
+              } @else {
+                Create Commission Orders
+              }
+            </button>
           </div>
         }
       </div>
@@ -142,6 +154,7 @@ export class BrokerCommissionReportPageComponent implements OnInit {
   readonly fromDate = signal('');
   readonly toDate = signal('');
   readonly loading = signal(false);
+  readonly creatingOrders = signal(false);
   readonly report = signal<BrokerCommissionReportDto | null>(null);
 
   readonly reportTitle = computed(() => this.brokerDealSvc.settings().reportTitle);
@@ -185,6 +198,27 @@ export class BrokerCommissionReportPageComponent implements OnInit {
 
   xlsxUrl(): string {
     return `${API}/reports/broker-commission/export.xlsx?from=${this.fromDate()}&to=${this.toDate()}`;
+  }
+
+  async createCommissionOrders(): Promise<void> {
+    this.creatingOrders.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/reports/broker-commission/create-orders`, {
+          from: this.fromDate(),
+          to: this.toDate(),
+        }),
+      );
+      if (res.success && res.data) {
+        const count = (res.data as any[]).length;
+        const total = (res.data as any[]).reduce((sum, o) => sum + parseFloat(o.commissionAmount), 0);
+        alert(`Created ${count} commission order(s) totaling $${total.toFixed(2)}.\n\nThese are regular orders (not broker deals) with the commission amount as profit. They appear in margin analysis and active orders.`);
+      }
+    } catch {
+      alert('Failed to create commission orders.');
+    } finally {
+      this.creatingOrders.set(false);
+    }
   }
 
   totalOrders(r: BrokerCommissionReportDto): number {
