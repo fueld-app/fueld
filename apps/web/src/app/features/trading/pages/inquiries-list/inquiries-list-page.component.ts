@@ -46,8 +46,21 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
     <div>
       <!-- Header -->
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">{{ titleText() }}</h1>
-        <p class="mt-1 text-sm text-gray-500 dark:text-muted">{{ subtitleText() }}</p>
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">{{ titleText() }}</h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-muted">{{ subtitleText() }}</p>
+          </div>
+          @if (isBrokerDeals()) {
+            <a routerLink="/reports/broker-commission"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" clip-rule="evenodd" />
+              </svg>
+              Commission Report
+            </a>
+          }
+        </div>
       </div>
 
       <!-- Search bar + Filter button -->

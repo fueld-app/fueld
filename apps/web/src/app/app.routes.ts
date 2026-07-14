@@ -88,6 +88,15 @@ export const routes: Routes = [
           ),
         title: 'Reports',
       },
+      {
+        path: 'reports/broker-commission',
+        canActivate: [lightGuard],
+        loadComponent: () =>
+          import('./features/reports/pages/broker-commission-report/broker-commission-report-page.component').then(
+            (m) => m.BrokerCommissionReportPageComponent,
+          ),
+        title: 'Broker Commission Report',
+      },
       // ── Trading ──
       {
         path: 'trading',
