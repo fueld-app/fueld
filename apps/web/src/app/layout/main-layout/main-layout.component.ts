@@ -27,6 +27,7 @@ import {
   AppHealthService,
   formatAppVersionLabel,
 } from '../../core/runtime/app-health.service';
+import { BrokerDealService } from '../../core/services/broker-deal.service';
 
 import { API } from '@app/core/config/api';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
@@ -190,7 +191,7 @@ interface NavItem {
   label: string;
   icon: string;
   route?: string;
-  children?: { label: string; route: string; allowedRoles?: string[]; hiddenForRoles?: string[] }[];
+  children?: { label: string; route: string; allowedRoles?: string[]; hiddenForRoles?: string[]; requiresBrokerDeals?: boolean }[];
   adminOnly?: boolean;
   /** When set, item is visible to these roles (and always to ADMIN). */
   allowedRoles?: string[];
@@ -221,8 +222,9 @@ const NAVIGATION: NavItem[] = [
       { label: 'Cancelled Orders', route: '/trading/cancelled-orders' },
       { label: 'Lost Inquiries', route: '/trading/lost-inquiries' },
       { label: 'Inquiries', route: '/trading/inquiries' },
-    ],
-  },
+      { label: 'Broker Deals', route: '/trading/broker-deals', requiresBrokerDeals: true },
+      ],
+    },
   {
     label: 'Credit',
     icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
@@ -840,6 +842,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly titleService = inject(Title);
   private readonly updateService = inject(AppUpdateService);
   private readonly appHealthService = inject(AppHealthService);
+  private readonly brokerDealSvc = inject(BrokerDealService);
   private routerSub: Subscription | null = null;
   private priceSub: Subscription | null = null;
   private rfqSub: Subscription | null = null;
@@ -897,6 +900,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     void this.appHealthService.refresh();
+    void this.brokerDealSvc.load();
 
     // Tick every 30s so the relative "X min ago" label refreshes
     this.pricesTickTimer = setInterval(() => this.pricesTick.update((n) => n + 1), 30_000);
@@ -1091,10 +1095,21 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   readonly openGroups = signal<Set<string>>(new Set());
   readonly navItems = computed(() => {
     const role = this.auth.user()?.role;
+    const brokerDealsEnabled = this.brokerDealSvc.enabled();
     return NAVIGATION.filter((item) => {
       if (item.adminOnly) return this.auth.isAdmin();
       if (item.hiddenForRoles && role && item.hiddenForRoles.includes(role)) return false;
       if (item.allowedRoles) return role ? item.allowedRoles.includes(role) : false;
+      return true;
+    }).map((item) => {
+      // Filter out children that require broker deals when feature is disabled
+      if (item.children && !brokerDealsEnabled) {
+        return { ...item, children: item.children.filter((c) => !c.requiresBrokerDeals) };
+      }
+      return item;
+    }).filter((item) => {
+      // Hide parent if all children were filtered out
+      if (item.children && item.children.length === 0) return false;
       return true;
     });
   });

@@ -346,10 +346,11 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly newInquiryModal = inject(NewInquiryModalService);
   private queryParamSub?: Subscription;
 
-  readonly mode = input<'inquiries' | 'active-orders' | 'delivered-orders' | 'invoiced-orders' | 'completed-orders' | 'cancelled-orders' | 'lost-inquiries' | undefined>('inquiries');
+  readonly mode = input<'inquiries' | 'active-orders' | 'delivered-orders' | 'invoiced-orders' | 'completed-orders' | 'cancelled-orders' | 'lost-inquiries' | 'broker-deals' | undefined>('inquiries');
   readonly resolvedMode = computed(() => this.mode() ?? 'inquiries');
 
-  readonly isOrders = computed(() => this.resolvedMode() !== 'inquiries' && this.resolvedMode() !== 'lost-inquiries');
+  readonly isBrokerDeals = computed(() => this.resolvedMode() === 'broker-deals');
+  readonly isOrders = computed(() => this.resolvedMode() !== 'inquiries' && this.resolvedMode() !== 'lost-inquiries' && this.resolvedMode() !== 'broker-deals');
   readonly isActiveOrders = computed(() => this.resolvedMode() === 'active-orders');
   readonly isDeliveredOrders = computed(() => this.resolvedMode() === 'delivered-orders');
   readonly isInvoicedOrders = computed(() => this.resolvedMode() === 'invoiced-orders');
@@ -369,7 +370,9 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
               ? '/trading/cancelled-orders'
               : this.isLostInquiries()
                 ? '/trading/lost-inquiries'
-                : '/trading/inquiries'
+                : this.isBrokerDeals()
+                  ? '/trading/broker-deals'
+                  : '/trading/inquiries'
   ));
   readonly titleText = computed(() => (
     this.isActiveOrders()
@@ -384,7 +387,9 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
               ? 'Cancelled Orders'
               : this.isLostInquiries()
                 ? 'Lost Inquiries'
-                : 'Inquiries'
+                : this.isBrokerDeals()
+                  ? 'Broker Deals'
+                  : 'Inquiries'
   ));
   readonly subtitleText = computed(() =>
     this.isActiveOrders()
@@ -399,7 +404,9 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
               ? 'Orders that have been cancelled.'
               : this.isLostInquiries()
                 ? 'Inquiries that were lost or cancelled before confirmation.'
-                : 'Manage bunker inquiries and offers before confirmation.',
+                : this.isBrokerDeals()
+                  ? 'Broker deals with commission tracking.'
+                  : 'Manage bunker inquiries and offers before confirmation.',
   );
   readonly searchPlaceholder = computed(() =>
     this.isOrders()
@@ -657,7 +664,10 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   // ─── Data loading ─────────────────────────────────────────────────
 
   private applyStatusFilter(params: URLSearchParams): void {
-    if (this.isActiveOrders()) {
+    if (this.isBrokerDeals()) {
+      // Broker deals shows all statuses — no status filter
+      return;
+    } else if (this.isActiveOrders()) {
       params.set('statuses', 'CONFIRMED');
     } else if (this.isDeliveredOrders()) {
       params.set('statuses', 'DELIVERED');
@@ -680,6 +690,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     try {
       const params = new URLSearchParams();
       this.applyStatusFilter(params);
+      if (this.isBrokerDeals()) params.set('isBrokerDeal', 'true');
       params.set('page', String(this.currentPage()));
       params.set('limit', String(this.pageSize()));
       if (this.searchTerm()) params.set('search', this.searchTerm());

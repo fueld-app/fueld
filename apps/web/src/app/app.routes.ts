@@ -191,6 +191,22 @@ export const routes: Routes = [
             title: 'Trading > Lost Inquiries',
           },
           {
+            path: 'broker-deals',
+            loadComponent: () =>
+              import('./features/trading/pages/broker-deals-list/broker-deals-list-page.component').then(
+                (m) => m.BrokerDealsListPageComponent,
+              ),
+            title: 'Trading > Broker Deals',
+          },
+          {
+            path: 'broker-deals/:id',
+            loadComponent: () =>
+              import('./features/trading/pages/order-detail/order-detail-page.component').then(
+                (m) => m.OrderDetailPageComponent,
+              ),
+            title: 'Trading > Broker Deals',
+          },
+          {
             path: 'completed-orders/:id',
             canActivate: [lightGuard],
             loadComponent: () =>
