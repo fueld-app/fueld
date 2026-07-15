@@ -715,6 +715,13 @@
       "when": 1784104000626,
       "tag": "0101_vessel_capacities_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1784138607000,
+      "tag": "0102_hide_on_documents",
+      "breakpoints": true
     }
   ]
 }

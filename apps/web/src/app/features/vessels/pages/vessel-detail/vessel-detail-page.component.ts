@@ -12,7 +12,7 @@ import {
   afterNextRender,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
@@ -126,7 +126,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 @Component({
   selector: 'app-vessel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, DatePipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent, VesselPersonsCardComponent, VesselDetailDeleteModalComponent, VesselDetailMergeModalComponent],
+  imports: [DateLabelPipe, DatePipe, FormsModule, RouterLink, RouterLinkActive, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent, VesselPersonsCardComponent, VesselDetailDeleteModalComponent, VesselDetailMergeModalComponent],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
   `],
@@ -320,17 +320,19 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
       <!-- Tab navigation -->
       <div class="mb-6 -mx-4 px-4 md:mx-0 md:px-0">
         <nav class="flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-line pb-px scrollbar-hide" aria-label="Vessel sections">
-          <button type="button" (click)="vesselActiveTab.set('overview')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'overview' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Overview</button>
-          <button type="button" (click)="vesselActiveTab.set('enrichment')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'enrichment' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Enrichment</button>
-          <button type="button" (click)="vesselActiveTab.set('orders')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'orders' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Orders</button>
-          <button type="button" (click)="vesselActiveTab.set('companies')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'companies' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Companies</button>
-          <button type="button" (click)="vesselActiveTab.set('crew')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'crew' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Crew</button>
-          <button type="button" (click)="vesselActiveTab.set('comments')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'comments' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Comments</button>
-          <button type="button" (click)="vesselActiveTab.set('activity')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'activity' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Activity</button>
+          <a [routerLink]="['/vessels', vesselId(), 'overview']" routerLinkActive="border-blue-600 text-blue-700 dark:text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700">Overview</a>
+          @if (vessel()?.seasearcherId) {
+            <a [routerLink]="['/vessels', vesselId(), 'enrichment']" routerLinkActive="border-blue-600 text-blue-700 dark:text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700">Enrichment</a>
+          }
+          <a [routerLink]="['/vessels', vesselId(), 'orders']" routerLinkActive="border-blue-600 text-blue-700 dark:text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700">Orders</a>
+          <a [routerLink]="['/vessels', vesselId(), 'companies']" routerLinkActive="border-blue-600 text-blue-700 dark:text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700">Companies</a>
+          <a [routerLink]="['/vessels', vesselId(), 'crew']" routerLinkActive="border-blue-600 text-blue-700 dark:text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700">Crew</a>
+          <a [routerLink]="['/vessels', vesselId(), 'comments']" routerLinkActive="border-blue-600 text-blue-700 dark:text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700">Comments</a>
+          <a [routerLink]="['/vessels', vesselId(), 'activity']" routerLinkActive="border-blue-600 text-blue-700 dark:text-blue-400" [routerLinkActiveOptions]="{exact: true}" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700">Activity</a>
         </nav>
       </div>
 
-      @if (vesselActiveTab() === 'overview') {
+      @if (activeTab() === 'overview') {
       <div class="grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
 
         <!-- ═══ Left group: own data ═══ -->
@@ -713,7 +715,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
         </div>
       </div>
-      } @else if (vesselActiveTab() === 'enrichment') {
+      } @else if (activeTab() === 'enrichment') {
       <div class="grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
 
         <!-- ═══ Right group: enrichment data ═══ -->
@@ -990,7 +992,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         }
 
       </div>
-      } @else if (vesselActiveTab() === 'orders') {
+      } @else if (activeTab() === 'orders') {
       <!-- Orders tab -->
       @if (vesselOrders().length || ordersLoading()) {
         <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden">
@@ -1032,7 +1034,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
       } @else {
         <p class="text-sm text-gray-400 dark:text-muted py-8 text-center">No orders for this vessel.</p>
       }
-      } @else if (vesselActiveTab() === 'companies') {
+      } @else if (activeTab() === 'companies') {
       <!-- Companies tab -->
       <app-vessel-detail-companies-card
         [vesselCompanies]="vesselCompanies()"
@@ -1073,7 +1075,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         (createNewContact)="createNewContact()"
         (addNewContact)="addingNewContact.set(true)"
       />
-      } @else if (vesselActiveTab() === 'crew') {
+      } @else if (activeTab() === 'crew') {
       <!-- Crew tab -->
       <app-vessel-persons-card
         [vesselId]="vesselId()"
@@ -1081,10 +1083,10 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         [titleOptions]="vesselPersonTitles()"
         (personsChange)="vesselPersons.set($event)"
       />
-      } @else if (vesselActiveTab() === 'comments') {
+      } @else if (activeTab() === 'comments') {
       <!-- Comments tab -->
       <app-comments-card entityType="vessel" [entityId]="vessel()!.id" />
-      } @else if (vesselActiveTab() === 'activity') {
+      } @else if (activeTab() === 'activity') {
       <!-- Activity tab -->
       <app-activity-timeline entityType="vessel" [entityId]="vessel()!.id" />
       }
@@ -1177,8 +1179,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
 
   // Tabs
   readonly vesselInfoTab = signal<'info' | 'dimensions'>('info');
-  readonly vesselDetailTab = signal<'comments' | 'activity'>('comments');
-  readonly vesselActiveTab = signal<'overview' | 'enrichment' | 'orders' | 'companies' | 'crew' | 'comments' | 'activity'>('overview');
+  readonly activeTab = signal<string>('overview');
 
   // Editing
   readonly editing = signal(false);
@@ -1426,15 +1427,19 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
+    const tab = this.route.snapshot.paramMap.get('tab');
+    this.activeTab.set(tab ?? 'overview');
     this.loadRoleOptions();
     this.loadVesselTypes();
     this.loadVesselPersonTitles();
     if (id) this.loadVessel(id);
 
-    // React to same-route navigation (e.g. clicking related vessel links)
+    // React to same-route navigation (e.g. clicking related vessel links or tab changes)
     this.routeSub = this.route.paramMap.pipe(skip(1)).subscribe((params) => {
       const newId = params.get('id');
-      if (newId) {
+      const newTab = params.get('tab') ?? 'overview';
+      this.activeTab.set(newTab);
+      if (newId && newId !== this.vessel()?.id) {
         this.resetState();
         this.loadVessel(newId);
       }

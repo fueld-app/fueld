@@ -179,6 +179,8 @@ interface SaveItemInput {
   plannedInventoryAt?: string | null;
   // Broker deal — per-line-item commission
   commissionPerUnit?: string | null;
+  // Hide from customer-facing documents
+  hideOnDocuments?: boolean | null;
 }
 
 interface FinalizeItemPriceInput {
@@ -1351,6 +1353,8 @@ export async function getOrderById(idOrNumber: string) {
       taxAmount: i.taxAmount ?? null,
       // Broker deal — per-line-item commission
       commissionPerUnit: i.commissionPerUnit ?? null,
+      // Hide from customer-facing documents
+      hideOnDocuments: i.hideOnDocuments ?? false,
     })),
   };
 }
@@ -1660,6 +1664,8 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       plannedInventoryAt: item.plannedInventoryAt ? new Date(item.plannedInventoryAt) : null,
       // Broker deal — per-line-item commission
       commissionPerUnit: item.commissionPerUnit ?? null,
+      // Hide from customer-facing documents
+      hideOnDocuments: item.hideOnDocuments ?? false,
     };
   });
 

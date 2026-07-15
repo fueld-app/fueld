@@ -494,6 +494,11 @@ export const routes: Routes = [
       },
       {
         path: 'vessels/:id',
+        redirectTo: 'vessels/:id/overview',
+        pathMatch: 'full',
+      },
+      {
+        path: 'vessels/:id/:tab',
         loadComponent: () =>
           import('./features/vessels/pages/vessel-detail/vessel-detail-page.component').then(
             (m) => m.VesselDetailPageComponent,

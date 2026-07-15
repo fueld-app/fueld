@@ -1106,6 +1106,11 @@ export const orderItems = pgTable('order_items', {
 
   customerNote: text('customer_note'),
 
+  // Hide this line item from customer-facing documents (confirmations, nominations,
+  // proforma, invoices). Used for broker commission line items that should not
+  // appear on customer documents but are included in margin calculations.
+  hideOnDocuments: boolean('hide_on_documents').notNull().default(false),
+
   // Broker deal — per-line-item commission rate (e.g., 3.00 for $3/unit)
   commissionPerUnit: numeric('commission_per_unit', { precision: 12, scale: 4 }),
 
