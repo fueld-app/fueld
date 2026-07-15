@@ -718,6 +718,92 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             (personsChange)="vesselPersons.set($event)"
           />
 
+          <!-- Product Capacities -->
+          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
+            <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
+              <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Capacities</h2>
+            </div>
+            <div class="flex-1 min-h-0 overflow-y-auto p-4">
+              @if (vesselCapacities().length > 0) {
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                  @for (cap of vesselCapacities(); track cap.id) {
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <dt class="text-gray-500 dark:text-muted">{{ cap.productType }}</dt>
+                        <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ cap.capacity ?? '—' }} {{ cap.unit }}</dd>
+                      </div>
+                      <button (click)="deleteCapacity(cap.id)" class="text-gray-300 hover:text-red-500 transition-colors" title="Remove">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                        </svg>
+                      </button>
+                    </div>
+                  }
+                </dl>
+              } @else {
+                <p class="text-sm text-gray-400 dark:text-muted">No capacities set.</p>
+              }
+              <!-- Add capacity form -->
+              <div class="mt-4 flex items-end gap-2">
+                <div class="flex-1">
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Product</label>
+                  <select #capProduct class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm bg-white dark:bg-surface text-gray-700 dark:text-ink-dim">
+                    <option value="">— Select —</option>
+                    @for (p of productsList(); track p) { <option [value]="p">{{ p }}</option> }
+                  </select>
+                </div>
+                <div class="w-24">
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Capacity</label>
+                  <input #capValue type="number" step="0.001" placeholder="0" class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-right" />
+                </div>
+                <div class="w-16">
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Unit</label>
+                  <select #capUnit class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm bg-white dark:bg-surface text-gray-700 dark:text-ink-dim">
+                    <option value="MT">MT</option>
+                    <option value="GAL">GAL</option>
+                    <option value="BBL">BBL</option>
+                    <option value="CBM">CBM</option>
+                  </select>
+                </div>
+                <button (click)="addCapacity(capProduct.value, capValue.value ? +capValue.value : null, capUnit.value)"
+                  class="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800">
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Attachments -->
+          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
+            <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
+              <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Files</h2>
+              <label class="inline-flex items-center gap-1 rounded-md bg-brand-50 dark:bg-brand-700/15 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-700/20 cursor-pointer transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                Upload
+                <input type="file" class="hidden" (change)="uploadAttachment($any($event.target).files[0])" />
+              </label>
+            </div>
+            <div class="flex-1 min-h-0 overflow-y-auto p-4">
+              @if (vesselAttachments().length > 0) {
+                <ul class="space-y-2">
+                  @for (att of vesselAttachments(); track att.id) {
+                    <li class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 dark:border-line px-3 py-2 hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">
+                      <a [href]="att.filePath" target="_blank" class="flex items-center gap-2 min-w-0 flex-1 text-sm text-gray-700 dark:text-ink-dim hover:text-brand-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" /></svg>
+                        <span class="truncate">{{ att.fileName }}</span>
+                      </a>
+                      <button (click)="deleteAttachment(att.id)" class="text-gray-300 hover:text-red-500 transition-colors shrink-0" title="Delete">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="text-sm text-gray-400 dark:text-muted">No files uploaded yet.</p>
+              }
+            </div>
+          </div>
+
         <!-- ═══ Right group: enrichment data ═══ -->
         <div class="contents">
 
@@ -1061,6 +1147,9 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly vessel = signal<VesselDto | null>(null);
   readonly vesselPersons = signal<Array<{ id: string; name: string; title: string; phone?: string | null; email?: string | null }>>([]);
   readonly vesselPersonTitles = signal<string[]>(['Captain']);
+  readonly vesselCapacities = signal<Array<{ id: string; productType: string; capacity: string | null; unit: string }>>([]);
+  readonly vesselAttachments = signal<Array<{ id: string; fileName: string; filePath: string; mimeType: string; fileSize: number; createdAt: string }>>([]);
+  readonly productsList = signal<string[]>([]);
   readonly vesselId = computed(() => this.vessel()?.id ?? '');
   readonly syncing = signal(false);
   readonly creditEnforcementSaving = signal(false);
@@ -1413,6 +1502,9 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
         this.loadMovements(res.data.seasearcherId);
         this.loadVesselCompanies(id);
         this.loadVesselRiskImpacts(id);
+        this.loadVesselCapacities(id);
+        this.loadVesselAttachments(id);
+        this.loadProducts();
       }
     } catch (err) {
       console.error('Failed to load vessel:', err);
@@ -2054,6 +2146,79 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     } finally {
       this.creditImpactLoading.set(false);
     }
+  }
+
+  // ── Vessel Capacities ──
+  private async loadVesselCapacities(vesselId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<any[]>>(`${API}/vessels/local/${vesselId}/capacities`),
+      );
+      if (res.success && res.data) this.vesselCapacities.set(res.data);
+    } catch { this.vesselCapacities.set([]); }
+  }
+
+  async addCapacity(productType: string, capacity: number | null, unit: string): Promise<void> {
+    const id = this.vesselId();
+    if (!id || !productType) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/vessels/local/${id}/capacities`, { productType, capacity, unit }),
+      );
+      if (res.success) await this.loadVesselCapacities(id);
+    } catch { this.showToast('error', 'Failed to add capacity.'); }
+  }
+
+  async deleteCapacity(capacityId: string): Promise<void> {
+    const id = this.vesselId();
+    if (!id) return;
+    try {
+      await firstValueFrom(this.http.delete(`${API}/vessels/local/${id}/capacities/${capacityId}`));
+      this.vesselCapacities.update((list) => list.filter((c) => c.id !== capacityId));
+    } catch { this.showToast('error', 'Failed to delete capacity.'); }
+  }
+
+  // ── Vessel Attachments ──
+  private async loadVesselAttachments(vesselId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<any[]>>(`${API}/vessels/local/${vesselId}/attachments`),
+      );
+      if (res.success && res.data) this.vesselAttachments.set(res.data);
+    } catch { this.vesselAttachments.set([]); }
+  }
+
+  async uploadAttachment(file: File): Promise<void> {
+    const id = this.vesselId();
+    if (!id) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/vessels/local/${id}/attachments`, formData),
+      );
+      if (res.success && res.data) {
+        this.vesselAttachments.update((list) => [res.data, ...list]);
+      }
+    } catch { this.showToast('error', 'Failed to upload file.'); }
+  }
+
+  async deleteAttachment(attachmentId: string): Promise<void> {
+    const id = this.vesselId();
+    if (!id) return;
+    try {
+      await firstValueFrom(this.http.delete(`${API}/vessels/local/${id}/attachments/${attachmentId}`));
+      this.vesselAttachments.update((list) => list.filter((a) => a.id !== attachmentId));
+    } catch { this.showToast('error', 'Failed to delete file.'); }
+  }
+
+  private async loadProducts(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ products: string[] }>>(`${API}/admin/settings/my-products`),
+      );
+      if (res.success && res.data?.products) this.productsList.set(res.data.products);
+    } catch { /* ignore */ }
   }
 
   seizureHitsForImpact(impact: VesselCreditImpact): RiskHitDto[] {

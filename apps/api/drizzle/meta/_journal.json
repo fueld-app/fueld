@@ -708,6 +708,13 @@
       "when": 1784097182285,
       "tag": "0100_order_item_commission",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1784104000626,
+      "tag": "0101_vessel_capacities_attachments",
+      "breakpoints": true
     }
   ]
 }

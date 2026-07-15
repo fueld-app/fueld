@@ -4,7 +4,7 @@
 
 import { eq, ilike, or, and, sql, inArray, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { vessels, orders, counterparties, places, vesselCompanies, companyContacts, users, vesselPersons } from '../../db/schema';
+import { vessels, orders, counterparties, places, vesselCompanies, companyContacts, users, vesselPersons, vesselCapacities, vesselAttachments } from '../../db/schema';
 import type { VesselCompanyRole } from '@fueld/types';
 import {
   seasearcherVesselDetail,
@@ -877,5 +877,92 @@ export async function deleteVesselPerson(personId: string) {
     .delete(vesselPersons)
     .where(eq(vesselPersons.id, personId))
     .returning({ id: vesselPersons.id });
+  return deleted ?? null;
+}
+
+// ── VESSEL CAPACITIES ──────────────────────────────────────────────
+
+export async function listVesselCapacities(vesselId: string) {
+  return db
+    .select()
+    .from(vesselCapacities)
+    .where(eq(vesselCapacities.vesselId, vesselId))
+    .orderBy(asc(vesselCapacities.productType));
+}
+
+export async function upsertVesselCapacity(vesselId: string, input: {
+  productType: string;
+  capacity?: number | null;
+  unit?: string;
+}) {
+  const [existing] = await db
+    .select({ id: vesselCapacities.id })
+    .from(vesselCapacities)
+    .where(and(eq(vesselCapacities.vesselId, vesselId), eq(vesselCapacities.productType, input.productType)))
+    .limit(1);
+
+  if (existing) {
+    const [updated] = await db
+      .update(vesselCapacities)
+      .set({
+        capacity: input.capacity?.toString() ?? null,
+        unit: input.unit ?? 'MT',
+        updatedAt: new Date(),
+      })
+      .where(eq(vesselCapacities.id, existing.id))
+      .returning();
+    return updated;
+  }
+
+  const [created] = await db
+    .insert(vesselCapacities)
+    .values({
+      vesselId,
+      productType: input.productType,
+      capacity: input.capacity?.toString() ?? null,
+      unit: input.unit ?? 'MT',
+    })
+    .returning();
+  return created;
+}
+
+export async function deleteVesselCapacity(capacityId: string) {
+  const [deleted] = await db
+    .delete(vesselCapacities)
+    .where(eq(vesselCapacities.id, capacityId))
+    .returning({ id: vesselCapacities.id });
+  return deleted ?? null;
+}
+
+// ── VESSEL ATTACHMENTS ─────────────────────────────────────────────
+
+export async function listVesselAttachments(vesselId: string) {
+  return db
+    .select()
+    .from(vesselAttachments)
+    .where(eq(vesselAttachments.vesselId, vesselId))
+    .orderBy(desc(vesselAttachments.createdAt));
+}
+
+export async function createVesselAttachment(input: {
+  vesselId: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedBy?: string;
+}) {
+  const [created] = await db
+    .insert(vesselAttachments)
+    .values(input)
+    .returning();
+  return created;
+}
+
+export async function deleteVesselAttachment(attachmentId: string) {
+  const [deleted] = await db
+    .delete(vesselAttachments)
+    .where(eq(vesselAttachments.id, attachmentId))
+    .returning({ id: vesselAttachments.id, filePath: vesselAttachments.filePath });
   return deleted ?? null;
 }

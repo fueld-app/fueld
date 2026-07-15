@@ -48,6 +48,12 @@ import {
   createVesselPerson,
   updateVesselPerson,
   deleteVesselPerson,
+  listVesselCapacities,
+  upsertVesselCapacity,
+  deleteVesselCapacity,
+  listVesselAttachments,
+  createVesselAttachment,
+  deleteVesselAttachment,
 } from './vessel.service';
 import type { ApiResponse, VesselCompanyRole } from '@fueld/types';
 
@@ -707,4 +713,125 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
       params: t.Object({ id: t.String(), personId: t.String() }),
       detail: { tags: ['Vessels'], summary: 'Remove a person from a vessel' },
     },
-  );;
+  )
+
+  // ── VESSEL CAPACITIES ──────────────────────────────────────────────
+  .get(
+    '/local/:id/capacities',
+    async ({ params }) => {
+      try {
+        const data = await listVesselCapacities(params.id);
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err: any) {
+        return { success: false, data: [], message: 'Failed to load capacities' };
+      }
+    },
+    { params: t.Object({ id: t.String() }), detail: { tags: ['Vessels'], summary: 'List product capacities for a vessel' } },
+  )
+  .post(
+    '/local/:id/capacities',
+    async ({ params, body }) => {
+      try {
+        const data = await upsertVesselCapacity(params.id, {
+          productType: body.productType,
+          capacity: body.capacity,
+          unit: body.unit ?? 'MT',
+        });
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err: any) {
+        return { success: false, data: null, message: err.message ?? 'Failed to save capacity' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({ productType: t.String(), capacity: t.Optional(t.Nullable(t.Number())), unit: t.Optional(t.String()) }),
+      detail: { tags: ['Vessels'], summary: 'Add or update a product capacity for a vessel' },
+    },
+  )
+  .delete(
+    '/local/:id/capacities/:capacityId',
+    async ({ params }) => {
+      try {
+        const deleted = await deleteVesselCapacity(params.capacityId);
+        if (!deleted) return { success: false, data: null, message: 'Capacity not found' };
+        return { success: true, data: deleted } satisfies ApiResponse<typeof deleted>;
+      } catch (err: any) {
+        return { success: false, data: null, message: 'Failed to delete capacity' };
+      }
+    },
+    { params: t.Object({ id: t.String(), capacityId: t.String() }), detail: { tags: ['Vessels'], summary: 'Remove a product capacity from a vessel' } },
+  )
+
+  // ── VESSEL ATTACHMENTS ─────────────────────────────────────────────
+  .get(
+    '/local/:id/attachments',
+    async ({ params }) => {
+      try {
+        const data = await listVesselAttachments(params.id);
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err: any) {
+        return { success: false, data: [], message: 'Failed to load attachments' };
+      }
+    },
+    { params: t.Object({ id: t.String() }), detail: { tags: ['Vessels'], summary: 'List attachments for a vessel' } },
+  )
+  .post(
+    '/local/:id/attachments',
+    async ({ params, body, auth }) => {
+      try {
+        const file = body.file;
+        const ext = (file.name.split('.').pop() ?? '').toLowerCase();
+        const allowedExtensions = new Set(['pdf', 'xls', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'doc', 'docx']);
+        if (!allowedExtensions.has(ext)) {
+          return { success: false, data: null, message: 'Only PDF, Office, CSV or image files are allowed' };
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          return { success: false, data: null, message: 'Attachment must be under 10 MB' };
+        }
+        const filename = `${params.id}-${crypto.randomUUID()}.${ext}`;
+        const { join } = await import('path');
+        const { mkdir } = await import('fs/promises');
+        const dir = join(process.cwd(), 'uploads/attachments');
+        await mkdir(dir, { recursive: true });
+        await Bun.write(join(dir, filename), file);
+        const record = await createVesselAttachment({
+          vesselId: params.id,
+          fileName: file.name,
+          filePath: `/uploads/attachments/${filename}`,
+          mimeType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+          uploadedBy: auth.sub,
+        });
+        if (!record) return { success: false, data: null, message: 'Failed to save attachment' };
+        return { success: true, data: record } satisfies ApiResponse<typeof record>;
+      } catch (err: any) {
+        console.error('[Vessels] Upload attachment failed:', err);
+        return { success: false, data: null, message: 'Failed to upload attachment' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({ file: t.File() }),
+      detail: { tags: ['Vessels'], summary: 'Upload an attachment for a vessel' },
+    },
+  )
+  .delete(
+    '/local/:id/attachments/:attachmentId',
+    async ({ params }) => {
+      try {
+        const deleted = await deleteVesselAttachment(params.attachmentId);
+        if (!deleted) return { success: false, data: null, message: 'Attachment not found' };
+        const { unlink } = await import('fs/promises');
+        const { join } = await import('path');
+        const prefix = '/uploads/attachments/';
+        if (deleted.filePath.startsWith(prefix)) {
+          await unlink(join(process.cwd(), 'uploads/attachments', deleted.filePath.slice(prefix.length)));
+        }
+        return { success: true, data: deleted } satisfies ApiResponse<typeof deleted>;
+      } catch (err: any) {
+        console.error('[Vessels] Delete attachment failed:', err);
+        return { success: false, data: null, message: 'Failed to delete attachment' };
+      }
+    },
+    { params: t.Object({ id: t.String(), attachmentId: t.String() }), detail: { tags: ['Vessels'], summary: 'Delete a vessel attachment' } },
+  );

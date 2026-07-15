@@ -862,7 +862,32 @@ export const vessels = pgTable('vessels', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-//  9b. VESSEL PERSONS (captain, supercargo, etc.)
+//  9b. VESSEL CAPACITIES (per-product capacity tracking)
+export const vesselCapacities = pgTable('vessel_capacities', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  vesselId: uuid('vessel_id').notNull().references(() => vessels.id, { onDelete: 'cascade' }),
+  productType: text('product_type').notNull(),
+  capacity: numeric('capacity', { precision: 12, scale: 3 }),
+  unit: text('unit').notNull().default('MT'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  vesselProductUnique: uniqueIndex('vessel_capacities_vessel_product_idx').on(table.vesselId, table.productType),
+}));
+
+//  9c. VESSEL ATTACHMENTS (file uploads)
+export const vesselAttachments = pgTable('vessel_attachments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  vesselId: uuid('vessel_id').notNull().references(() => vessels.id, { onDelete: 'cascade' }),
+  fileName: text('file_name').notNull(),
+  filePath: text('file_path').notNull(),
+  mimeType: text('mime_type').notNull(),
+  fileSize: integer('file_size').notNull(),
+  uploadedBy: uuid('uploaded_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+//  9d. VESSEL PERSONS (captain, supercargo, etc.)
 export const vesselPersons = pgTable('vessel_persons', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
