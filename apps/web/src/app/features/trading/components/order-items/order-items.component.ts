@@ -1454,9 +1454,9 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     return this.profitForRow(row) - this.financingCostForRow(row);
   }
 
-  /** Commission unit from tenant settings (e.g., 'MT', 'GAL'). */
+  /** Commission unit — now implicit per line item, this is just a fallback. */
   brokerUnit(): string {
-    return this.brokerDealSvc.settings().commissionUnit || 'MT';
+    return 'MT';
   }
 
   /** Broker deal profit = commissionPerUnit × quantity (in base unit). */

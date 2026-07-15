@@ -5,36 +5,18 @@ import { API_URL } from '../config/api';
 
 export interface BrokerDealSettings {
   enabled: boolean;
-  defaultCommissionPerMt: number;
-  commissionCurrency: string;
-  commissionUnit: string;
-  reportTitle: string;
+  defaultCommissionRate: number;
   reportStatuses: string[];
-  reportDateField: string;
-  reportDateFallback: string;
-  hideInvoicingFields: boolean;
-  brokerDealLabel: string;
-  commissionLabel: string;
   autoReleaseCredit: boolean;
   autoReleaseBufferDays: number;
-  brokerCreditLabel: string;
 }
 
 const DEFAULT_SETTINGS: BrokerDealSettings = {
   enabled: false,
-  defaultCommissionPerMt: 0,
-  commissionCurrency: 'USD',
-  commissionUnit: 'MT',
-  reportTitle: 'Broker Commission Report',
+  defaultCommissionRate: 0,
   reportStatuses: ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'],
-  reportDateField: 'deliveredAt',
-  reportDateFallback: 'eta',
-  hideInvoicingFields: true,
-  brokerDealLabel: 'Broker Deal',
-  commissionLabel: 'Commission',
   autoReleaseCredit: true,
   autoReleaseBufferDays: 0,
-  brokerCreditLabel: 'Broker Credit',
 };
 
 /** Shared service for tenant-configurable broker deal settings. */

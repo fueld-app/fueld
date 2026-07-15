@@ -324,22 +324,13 @@ export interface TenantSettings {
   };
   // Broker settings
   brokerCcCustomer?: boolean;  // When brokerGetsAll, also CC the original customer contact (default false)
-  // Broker deal settings — tenant-specific feature gating (see docs/broker-deal-design.md)
+  // Broker deal settings — tenant-specific feature gating
   brokerDeals?: {
-    enabled: boolean;                  // Master toggle — only show broker UI when true
-    defaultCommissionPerMt: number;   // Default commission rate (e.g., 3.00) — always same for all products/companies
-    commissionCurrency: string;      // Currency for commission (e.g., 'USD')
-    commissionUnit: string;          // Unit for commission calc: 'MT', 'GAL', 'BBL', etc. (default 'MT')
-    reportTitle: string;             // Report header (e.g., 'Moxie Brokerage — Monthly Commission Report')
-    reportStatuses: string[];        // Which statuses to include in report (default: ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'])
-    reportDateField: string;         // Primary date field for report period filtering (default 'deliveredAt')
-    reportDateFallback: string;      // Fallback date field if primary is null (default 'eta')
-    hideInvoicingFields: boolean;    // Hide invoicing company/bank account fields on broker deals (default true)
-    brokerDealLabel: string;        // Display label for the checkbox (default 'Broker Deal')
-    commissionLabel: string;        // Display label for the commission column/field (default 'Commission')
-    autoReleaseCredit: boolean;     // Auto-release supplier credit after credit period from delivery date (default: true)
-    autoReleaseBufferDays: number;   // Extra buffer days before auto-release (default: 0)
-    brokerCreditLabel: string;       // Label for broker credit lines in UI (default: 'Broker Credit')
+    enabled: boolean;                  // Master toggle
+    defaultCommissionRate: number;     // Default commission rate per unit (e.g., 3.00)
+    reportStatuses: string[];          // Which statuses to include in report (default: ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'])
+    autoReleaseCredit: boolean;        // Auto-release supplier credit after credit period (default: true)
+    autoReleaseBufferDays: number;     // Extra buffer days before auto-release (default: 0)
   };
   // Follow-up settings
   followUpSettings?: {

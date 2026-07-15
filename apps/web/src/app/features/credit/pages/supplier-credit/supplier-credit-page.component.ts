@@ -103,7 +103,7 @@ interface CompanySearchResultOption {
                         <span class="text-gray-400 dark:text-muted">—</span>
                       }
                       @if (line.isBrokerCreditLine) {
-                        <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">{{ brokerDealSvc.settings().brokerCreditLabel }}</span>
+                        <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">Broker Credit</span>
                       }
                     </div>
                   </td>
@@ -301,7 +301,7 @@ interface CompanySearchResultOption {
                       (ngModelChange)="updateForm('isBrokerCreditLine', $event)"
                       class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                     />
-                    {{ brokerDealSvc.settings().brokerCreditLabel }}
+                    Broker Credit
                     <span class="text-gray-400 dark:text-muted font-normal">(tracks broker deal exposure on behalf of counterparties)</span>
                   </label>
                 </div>

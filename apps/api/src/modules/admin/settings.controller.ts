@@ -485,23 +485,16 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     try {
       const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).limit(1);
       const bd = (tenant?.settings as any)?.brokerDeals ?? {};
+      // Support both old field name (defaultCommissionPerMt) and new (defaultCommissionRate)
+      const defaultRate = bd.defaultCommissionRate ?? bd.defaultCommissionPerMt ?? 0;
       return {
         success: true,
         data: {
           enabled: bd.enabled ?? false,
-          defaultCommissionPerMt: bd.defaultCommissionPerMt ?? 0,
-          commissionCurrency: bd.commissionCurrency ?? 'USD',
-          commissionUnit: bd.commissionUnit ?? 'MT',
-          reportTitle: bd.reportTitle ?? 'Broker Commission Report',
+          defaultCommissionRate: defaultRate,
           reportStatuses: bd.reportStatuses ?? ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'],
-          reportDateField: bd.reportDateField ?? 'deliveredAt',
-          reportDateFallback: bd.reportDateFallback ?? 'eta',
-          hideInvoicingFields: bd.hideInvoicingFields ?? true,
-          brokerDealLabel: bd.brokerDealLabel ?? 'Broker Deal',
-          commissionLabel: bd.commissionLabel ?? 'Commission',
           autoReleaseCredit: bd.autoReleaseCredit ?? true,
           autoReleaseBufferDays: bd.autoReleaseBufferDays ?? 0,
-          brokerCreditLabel: bd.brokerCreditLabel ?? 'Broker Credit',
         },
       } satisfies ApiResponse<unknown>;
     } catch (err) {
@@ -528,19 +521,10 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     body: t.Object({
       enabled: t.Boolean(),
-      defaultCommissionPerMt: t.Number(),
-      commissionCurrency: t.String(),
-      commissionUnit: t.String(),
-      reportTitle: t.String(),
+      defaultCommissionRate: t.Number(),
       reportStatuses: t.Array(t.String()),
-      reportDateField: t.String(),
-      reportDateFallback: t.String(),
-      hideInvoicingFields: t.Boolean(),
-      brokerDealLabel: t.String(),
-      commissionLabel: t.String(),
       autoReleaseCredit: t.Boolean(),
       autoReleaseBufferDays: t.Number(),
-      brokerCreditLabel: t.String(),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update broker deal settings (admin only)' },
   })

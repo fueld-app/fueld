@@ -183,8 +183,8 @@ interface LliSearchResult {
                   (ngModelChange)="newIsBrokerDeal.set($event)"
                   class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                 />
-                {{ brokerDealSvc.settings().brokerDealLabel }}
-                <span class="text-gray-400 dark:text-muted font-normal">({{ brokerDealSvc.settings().defaultCommissionPerMt }} {{ brokerDealSvc.settings().commissionCurrency }}/{{ brokerDealSvc.settings().commissionUnit }} commission)</span>
+                {{ 'Broker Deal' }}
+                <span class="text-gray-400 dark:text-muted font-normal">({{ brokerDealSvc.settings().defaultCommissionRate }}/unit commission)</span>
               </label>
             </div>
           }
@@ -614,7 +614,7 @@ export class InquiriesListNewInquiryModalComponent {
           etd: toDateIso(this.newEtd()),
           responseDeadlineAt: this.newResponseDeadline() || undefined,
           isBrokerDeal: this.newIsBrokerDeal(),
-          commissionPerMt: this.newIsBrokerDeal() ? String(this.brokerDealSvc.settings().defaultCommissionPerMt) : undefined,
+          commissionPerMt: this.newIsBrokerDeal() ? String(this.brokerDealSvc.settings().defaultCommissionRate) : undefined,
         }),
       );
       if (res.success) {

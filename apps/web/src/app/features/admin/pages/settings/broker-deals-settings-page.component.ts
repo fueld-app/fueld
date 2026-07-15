@@ -21,7 +21,7 @@ import { SettingsToastService } from './settings-toast.service';
       <div class="mb-6">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Broker Deals</h1>
         <p class="mt-1 text-sm text-gray-500 dark:text-muted">
-          Enable broker deal functionality, configure commission rates, and customize reporting.
+          Enable broker deal functionality and configure commission defaults.
         </p>
       </div>
 
@@ -41,117 +41,48 @@ import { SettingsToastService } from './settings-toast.service';
                 class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
               <div>
                 <span class="text-sm font-semibold text-gray-900 dark:text-ink">Enable Broker Deals</span>
-                <p class="text-xs text-gray-500 dark:text-muted mt-0.5">Shows the Broker Deals tab, checkboxes on orders, and commission tracking.</p>
+                <p class="text-xs text-gray-500 dark:text-muted mt-0.5">Shows the Broker Deals tab, broker deal checkbox in order settings, and commission tracking on line items.</p>
               </div>
             </label>
           </div>
 
           @if (enabled()) {
-            <!-- Commission settings -->
+            <!-- Commission default -->
             <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
               <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim mb-4">Commission</h3>
-              <div class="grid grid-cols-3 gap-4">
-                <div>
-                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Default Rate</label>
-                  <input type="number" step="0.01" [ngModel]="defaultCommissionPerMt()" (ngModelChange)="defaultCommissionPerMt.set(+$event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Currency</label>
-                  <input type="text" [ngModel]="commissionCurrency()" (ngModelChange)="commissionCurrency.set($event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Unit</label>
-                  <select [ngModel]="commissionUnit()" (ngModelChange)="commissionUnit.set($event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface">
-                    <option value="MT">MT</option>
-                    <option value="GAL">GAL</option>
-                    <option value="BBL">BBL</option>
-                    <option value="CBM">CBM</option>
-                  </select>
-                </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Default Commission Rate (per unit)</label>
+                <input type="number" step="0.01" [ngModel]="defaultCommissionRate()" (ngModelChange)="defaultCommissionRate.set(+$event)"
+                  class="w-32 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
+                <p class="text-xs text-gray-500 dark:text-muted mt-1">Pre-fills each line item's commission field. Can be overridden per line item (including set to 0 for items without commission).</p>
               </div>
             </div>
 
             <!-- Report settings -->
             <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
               <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim mb-4">Commission Report</h3>
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Report Title</label>
-                  <input type="text" [ngModel]="reportTitle()" (ngModelChange)="reportTitle.set($event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Report Date Field</label>
-                    <select [ngModel]="reportDateField()" (ngModelChange)="reportDateField.set($event)"
-                      class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface">
-                      <option value="deliveredAt">Delivered Date</option>
-                      <option value="eta">ETA</option>
-                      <option value="createdAt">Created Date</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Date Fallback</label>
-                    <select [ngModel]="reportDateFallback()" (ngModelChange)="reportDateFallback.set($event)"
-                      class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface">
-                      <option value="eta">ETA</option>
-                      <option value="deliveredAt">Delivered Date</option>
-                      <option value="createdAt">Created Date</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Report Statuses (comma-separated)</label>
-                  <input type="text" [ngModel]="reportStatusesStr()" (ngModelChange)="reportStatusesStr.set($event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
-                    placeholder="CONFIRMED,DELIVERED,INVOICED,PAID" />
-                </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Report Statuses (comma-separated)</label>
+                <input type="text" [ngModel]="reportStatusesStr()" (ngModelChange)="reportStatusesStr.set($event)"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                  placeholder="CONFIRMED,DELIVERED,INVOICED,PAID" />
+                <p class="text-xs text-gray-500 dark:text-muted mt-1">Which order statuses to include in the monthly commission report.</p>
               </div>
             </div>
 
             <!-- Credit settings -->
             <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
-              <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim mb-4">Credit & Invoicing</h3>
+              <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim mb-4">Credit Auto-Release</h3>
               <div class="space-y-3">
                 <label class="flex items-center gap-3 cursor-pointer">
                   <input type="checkbox" [ngModel]="autoReleaseCredit()" (ngModelChange)="autoReleaseCredit.set($event)"
                     class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                  <span class="text-sm text-gray-700 dark:text-ink-dim">Auto-release supplier credit after credit period</span>
+                  <span class="text-sm text-gray-700 dark:text-ink-dim">Auto-release supplier credit after credit period from delivery date</span>
                 </label>
                 <div>
                   <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Buffer days (extra days before auto-release)</label>
                   <input type="number" [ngModel]="autoReleaseBufferDays()" (ngModelChange)="autoReleaseBufferDays.set(+$event)"
                     class="w-24 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
-                </div>
-                <label class="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" [ngModel]="hideInvoicingFields()" (ngModelChange)="hideInvoicingFields.set($event)"
-                    class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                  <span class="text-sm text-gray-700 dark:text-ink-dim">Hide invoicing fields on broker deals</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Labels -->
-            <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
-              <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim mb-4">Labels</h3>
-              <div class="grid grid-cols-3 gap-4">
-                <div>
-                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Deal Label</label>
-                  <input type="text" [ngModel]="brokerDealLabel()" (ngModelChange)="brokerDealLabel.set($event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Commission Label</label>
-                  <input type="text" [ngModel]="commissionLabel()" (ngModelChange)="commissionLabel.set($event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Credit Line Label</label>
-                  <input type="text" [ngModel]="brokerCreditLabel()" (ngModelChange)="brokerCreditLabel.set($event)"
-                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
                 </div>
               </div>
             </div>
@@ -185,19 +116,10 @@ export class BrokerDealsSettingsPageComponent implements OnInit {
   readonly saving = signal(false);
 
   readonly enabled = signal(false);
-  readonly defaultCommissionPerMt = signal(3);
-  readonly commissionCurrency = signal('USD');
-  readonly commissionUnit = signal('MT');
-  readonly reportTitle = signal('Broker Commission Report');
+  readonly defaultCommissionRate = signal(3);
   readonly reportStatusesStr = signal('CONFIRMED,DELIVERED,INVOICED,PAID');
-  readonly reportDateField = signal('deliveredAt');
-  readonly reportDateFallback = signal('eta');
-  readonly hideInvoicingFields = signal(true);
-  readonly brokerDealLabel = signal('Broker Deal');
-  readonly commissionLabel = signal('Commission');
   readonly autoReleaseCredit = signal(true);
   readonly autoReleaseBufferDays = signal(0);
-  readonly brokerCreditLabel = signal('Broker Credit');
 
   ngOnInit(): void {
     this.load();
@@ -212,19 +134,10 @@ export class BrokerDealsSettingsPageComponent implements OnInit {
       if (res.success && res.data) {
         const d = res.data;
         this.enabled.set(d.enabled);
-        this.defaultCommissionPerMt.set(d.defaultCommissionPerMt);
-        this.commissionCurrency.set(d.commissionCurrency);
-        this.commissionUnit.set(d.commissionUnit);
-        this.reportTitle.set(d.reportTitle);
+        this.defaultCommissionRate.set(d.defaultCommissionRate);
         this.reportStatusesStr.set(d.reportStatuses.join(','));
-        this.reportDateField.set(d.reportDateField);
-        this.reportDateFallback.set(d.reportDateFallback);
-        this.hideInvoicingFields.set(d.hideInvoicingFields);
-        this.brokerDealLabel.set(d.brokerDealLabel);
-        this.commissionLabel.set(d.commissionLabel);
         this.autoReleaseCredit.set(d.autoReleaseCredit);
         this.autoReleaseBufferDays.set(d.autoReleaseBufferDays);
-        this.brokerCreditLabel.set(d.brokerCreditLabel);
       }
     } catch {
       // defaults are fine
@@ -238,20 +151,11 @@ export class BrokerDealsSettingsPageComponent implements OnInit {
     try {
       const res = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API}/admin/settings/broker-deals`, {
-            enabled: this.enabled(),
-            defaultCommissionPerMt: this.defaultCommissionPerMt(),
-            commissionCurrency: this.commissionCurrency(),
-            commissionUnit: this.commissionUnit(),
-            reportTitle: this.reportTitle(),
-            reportStatuses: this.reportStatusesStr().split(',').map((s) => s.trim()).filter(Boolean),
-            reportDateField: this.reportDateField(),
-            reportDateFallback: this.reportDateFallback(),
-            hideInvoicingFields: this.hideInvoicingFields(),
-            brokerDealLabel: this.brokerDealLabel(),
-            commissionLabel: this.commissionLabel(),
-            autoReleaseCredit: this.autoReleaseCredit(),
-            autoReleaseBufferDays: this.autoReleaseBufferDays(),
-            brokerCreditLabel: this.brokerCreditLabel(),
+          enabled: this.enabled(),
+          defaultCommissionRate: this.defaultCommissionRate(),
+          reportStatuses: this.reportStatusesStr().split(',').map((s) => s.trim()).filter(Boolean),
+          autoReleaseCredit: this.autoReleaseCredit(),
+          autoReleaseBufferDays: this.autoReleaseBufferDays(),
         }),
       );
       if (res.success) {

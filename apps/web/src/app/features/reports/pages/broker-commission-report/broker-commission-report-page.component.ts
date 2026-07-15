@@ -157,7 +157,7 @@ export class BrokerCommissionReportPageComponent implements OnInit {
   readonly creatingOrders = signal(false);
   readonly report = signal<BrokerCommissionReportDto | null>(null);
 
-  readonly reportTitle = computed(() => this.brokerDealSvc.settings().reportTitle);
+  readonly reportTitle = computed(() => 'Broker Commission Report');
 
   ngOnInit(): void {
     this.brokerDealSvc.load();

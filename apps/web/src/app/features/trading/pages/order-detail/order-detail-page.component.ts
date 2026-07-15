@@ -506,16 +506,16 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly isBrokerDeal = computed(() => this.order()?.isBrokerDeal ?? false);
   readonly showInvoicingFields = computed(() => {
     if (!this.isBrokerDeal()) return true;
-    return !this.brokerDealSvc.settings().hideInvoicingFields;
+    return false; // Always hide invoicing fields on broker deals
   });
   readonly commissionPerMt = computed(() => this.order()?.commissionPerMt ?? null);
-  readonly brokerDealLabel = computed(() => this.brokerDealSvc.settings().brokerDealLabel);
+  readonly brokerDealLabel = computed(() => 'Broker Deal');
 
   onBrokerDealToggle(value: boolean): void {
     this.order.update((o) => (o ? { ...o, isBrokerDeal: value } : o));
     if (value && !this.order()?.commissionPerMt) {
       // Default to tenant's default commission rate
-      const defaultRate = this.brokerDealSvc.settings().defaultCommissionPerMt;
+      const defaultRate = this.brokerDealSvc.settings().defaultCommissionRate;
       if (defaultRate > 0) {
         this.order.update((o) => (o ? { ...o, commissionPerMt: String(defaultRate) } : o));
       }
