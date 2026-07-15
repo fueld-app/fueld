@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { counterparties, creditLines, orders, orderSuppliers, orderItems } from '../src/db/schema';
+import { counterparties, creditLines, orders, orderSuppliers, orderItems, tenants } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
 async function loadCreditService() {
   return import('../src/modules/credit/credit.service');
+}
+
+/** Set broker deal settings on the tenant. */
+async function setBrokerDealSettings(tenantId: string, settings: Record<string, unknown>) {
+  const db = await getDb();
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  if (!tenant) throw new Error('Tenant not found');
+  const newSettings = { ...(tenant.settings as any), brokerDeals: { enabled: true, defaultCommissionRate: 3, reportStatuses: ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'], autoReleaseCredit: true, autoReleaseBufferDays: 0, ...settings } };
+  await db.update(tenants).set({ settings: newSettings, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
 }
 
 /**
@@ -50,10 +59,8 @@ describe('broker credit auto-release', () => {
     });
 
     expect(line).toBeTruthy();
-    // C1 BUG: getCreditLineById doesn't select isBrokerCreditLine, so it's undefined
-    // Verify via DB instead
-    const [dbRow] = await db.select().from(creditLines).where(eq(creditLines.id, line.id)).limit(1);
-    expect(dbRow?.isBrokerCreditLine).toBe(true);
+    // C1 FIXED: isBrokerCreditLine is now returned by getCreditLineById
+    expect(line.isBrokerCreditLine).toBe(true);
   });
 
   it('credit line update accepts isBrokerCreditLine flag', async () => {
@@ -83,9 +90,8 @@ describe('broker credit auto-release', () => {
 
     const updated = await updateCreditLine(line.id, { isBrokerCreditLine: true });
     expect(updated).toBeTruthy();
-    // Verify via DB that the flag was updated
-    const [dbRow2] = await db.select().from(creditLines).where(eq(creditLines.id, line.id)).limit(1);
-    expect(dbRow2?.isBrokerCreditLine).toBe(true);
+    // C1 FIXED: isBrokerCreditLine is now selected in queries
+    expect(updated?.isBrokerCreditLine).toBe(true);
   });
 
   it('regular credit line excludes broker deals from usage', async () => {
@@ -245,15 +251,13 @@ describe('broker credit auto-release', () => {
       sortOrder: 0,
     });
 
-    // C1 BUG: isBrokerCreditLine not selected in getCreditLineById query,
-    // so calcUsedAmountForSupplier receives undefined (treated as false = regular line).
-    // This means the broker credit line counts regular orders ($300), NOT broker deals ($500).
+    // C1 FIXED: isBrokerCreditLine is now selected in queries, so
+    // calcUsedAmountForSupplier correctly filters for broker deals.
+    // Broker credit line should now count only broker deals ($50000),
+    // NOT regular orders ($30000).
     const fetched = await getCreditLineById(line.id);
     expect(fetched).toBeTruthy();
-    // CURRENT BEHAVIOR (broken): counts regular orders (costPrice=300 × qty=100 = 30000)
-    // instead of broker deals (costPrice=500 × qty=100 = 50000)
-    // FIXME when C1 is fixed: expect(parseFloat(fetched!.usedAmount)).toBe(50000);
-    expect(parseFloat(fetched!.usedAmount)).toBe(30000);
+    expect(parseFloat(fetched!.usedAmount)).toBe(50000);
   });
 
   it('auto-releases broker credit after deliveredAt + creditDays has passed', async () => {
@@ -318,9 +322,9 @@ describe('broker credit auto-release', () => {
       sortOrder: 0,
     });
 
-    // C1 BUG: broker credit line treated as regular → filters is_broker_deal=false
-    // So the broker deal is NOT counted at all → usedAmount = 0
-    // When C1 is fixed: broker deal should be auto-released (past credit period) → usedAmount = 0
+    // C1 FIXED: broker credit line now correctly filters for is_broker_deal=true.
+    // The broker deal was delivered 60 days ago with 30-day credit period,
+    // so it should be auto-released (usedAmount = 0).
     const fetched = await getCreditLineById(line.id);
     expect(fetched).toBeTruthy();
     expect(parseFloat(fetched!.usedAmount)).toBe(0);
@@ -388,5 +392,148 @@ describe('broker credit auto-release', () => {
     const fetched = await getCreditLineById(line.id);
     expect(fetched).toBeTruthy();
     expect(parseFloat(fetched!.usedAmount)).toBe(0);
+  });
+
+  it('bufferDays keeps credit in use when past creditDays but within buffer (C2 fixed)', async () => {
+    const seeded = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, getCreditLineById } = await loadCreditService();
+
+    // Set bufferDays = 40 — credit period is 30 + 40 = 70 days
+    await setBrokerDealSettings(seeded.tenant.id, { autoReleaseBufferDays: 40, autoReleaseCredit: true });
+
+    const [supplier] = await db.insert(counterparties).values({
+      tenantId: seeded.tenant.id,
+      name: 'Test Supplier',
+      type: 'SUPPLIER',
+      types: ['SUPPLIER'],
+      country: 'USA',
+    }).returning();
+
+    const line = await createCreditLine({
+      counterpartyIds: [supplier.id],
+      type: 'SUPPLIER',
+      creditAmount: '100000',
+      currency: 'USD',
+      periodDays: 30,
+      isBrokerCreditLine: true,
+    });
+
+    // Broker deal delivered 50 days ago — past 30-day credit period
+    // but within 30 + 40 = 70 day period (with buffer)
+    const recentDate = new Date();
+    recentDate.setDate(recentDate.getDate() - 50);
+
+    const [brokerOrder] = await db.insert(orders).values({
+      tenantId: seeded.tenant.id,
+      orderNumber: 'TEST-BD-BUFFER',
+      clientId: seeded.client.id,
+      vesselId: seeded.vessel.id,
+      placeId: seeded.place.id,
+      status: 'CONFIRMED',
+      isBrokerDeal: true,
+      supplierId: supplier.id,
+      supplierPaymentTermType: 'CREDIT',
+      supplierCreditDays: 30,
+      deliveredAt: recentDate,
+      currency: 'USD',
+    }).returning();
+
+    const [os] = await db.insert(orderSuppliers).values({
+      orderId: brokerOrder.id,
+      companyId: supplier.id,
+      paymentTermType: 'CREDIT',
+      creditDays: 30,
+      isPrimary: true,
+    }).returning();
+
+    await db.insert(orderItems).values({
+      orderId: brokerOrder.id,
+      orderSupplierId: os.id,
+      productType: 'VLSFO',
+      quantity: '100',
+      unit: 'MT',
+      costPrice: '500',
+      costCurrency: 'USD',
+      salesPrice: '600',
+      salesCurrency: 'USD',
+      sortOrder: 0,
+    });
+
+    // Credit should still be in use (50 days < 70 days with buffer)
+    const fetched = await getCreditLineById(line.id);
+    expect(fetched).toBeTruthy();
+    expect(parseFloat(fetched!.usedAmount)).toBe(50000); // costPrice=500 × qty=100
+  });
+
+  it('autoReleaseCredit=false prevents time-based release (C3 fixed)', async () => {
+    const seeded = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, getCreditLineById } = await loadCreditService();
+
+    // Disable auto-release — only manual paidAt should release credit
+    await setBrokerDealSettings(seeded.tenant.id, { autoReleaseCredit: false });
+
+    const [supplier] = await db.insert(counterparties).values({
+      tenantId: seeded.tenant.id,
+      name: 'Test Supplier',
+      type: 'SUPPLIER',
+      types: ['SUPPLIER'],
+      country: 'USA',
+    }).returning();
+
+    const line = await createCreditLine({
+      counterpartyIds: [supplier.id],
+      type: 'SUPPLIER',
+      creditAmount: '100000',
+      currency: 'USD',
+      periodDays: 30,
+      isBrokerCreditLine: true,
+    });
+
+    // Broker deal delivered 90 days ago (well past 30-day credit period)
+    const oldDate = new Date();
+    oldDate.setDate(oldDate.getDate() - 90);
+
+    const [brokerOrder] = await db.insert(orders).values({
+      tenantId: seeded.tenant.id,
+      orderNumber: 'TEST-BD-NORELEASE',
+      clientId: seeded.client.id,
+      vesselId: seeded.vessel.id,
+      placeId: seeded.place.id,
+      status: 'CONFIRMED',
+      isBrokerDeal: true,
+      supplierId: supplier.id,
+      supplierPaymentTermType: 'CREDIT',
+      supplierCreditDays: 30,
+      deliveredAt: oldDate,
+      currency: 'USD',
+    }).returning();
+
+    const [os] = await db.insert(orderSuppliers).values({
+      orderId: brokerOrder.id,
+      companyId: supplier.id,
+      paymentTermType: 'CREDIT',
+      creditDays: 30,
+      isPrimary: true,
+    }).returning();
+
+    await db.insert(orderItems).values({
+      orderId: brokerOrder.id,
+      orderSupplierId: os.id,
+      productType: 'VLSFO',
+      quantity: '100',
+      unit: 'MT',
+      costPrice: '500',
+      costCurrency: 'USD',
+      salesPrice: '600',
+      salesCurrency: 'USD',
+      sortOrder: 0,
+    });
+
+    // Credit should STILL be in use — autoReleaseCredit=false prevents time-based release
+    const fetched = await getCreditLineById(line.id);
+    expect(fetched).toBeTruthy();
+    expect(parseFloat(fetched!.usedAmount)).toBe(50000); // still in use
   });
 });

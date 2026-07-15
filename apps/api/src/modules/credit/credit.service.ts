@@ -14,6 +14,7 @@ import {
   orderItems,
   creditLineCompanies,
   creditLineCounterparties,
+  tenants,
 } from '../../db/schema';
 import type { CreditLineDto, CreditLineType } from '@fueld/types';
 
@@ -33,7 +34,12 @@ const CUSTOMER_ACTIVE_STATUSES = ['INQUIRY', 'OFFER', 'CONFIRMED', 'DELIVERED', 
 //                     order.clientId IN counterpartyIds AND status is active
 // ═══════════════════════════════════════════════════════════════════════
 
-async function calcUsedAmountForSupplier(counterpartyIds: string[], isBrokerCreditLine: boolean = false): Promise<string> {
+async function calcUsedAmountForSupplier(
+  counterpartyIds: string[],
+  isBrokerCreditLine: boolean = false,
+  bufferDays: number = 0,
+  autoReleaseCredit: boolean = true,
+): Promise<string> {
   if (!counterpartyIds.length) return '0';
   const [row] = await db
     .select({
@@ -56,15 +62,18 @@ async function calcUsedAmountForSupplier(counterpartyIds: string[], isBrokerCred
           : eq(orders.isBrokerDeal, false),
         // Credit is still "in use" when:
         // 1. Not manually marked paid (paidAt IS NULL), AND
-        // 2. For broker deals: not past the credit period from delivery
-        //    (deliveredAt + supplierCreditDays > now means still in use)
+        // 2. For broker deals (when autoReleaseCredit is enabled):
+        //    not past the credit period from delivery
+        //    (deliveredAt + supplierCreditDays + bufferDays < now means still in use)
         // For non-broker deals: only paidAt matters (same as before)
+        // For broker deals when autoReleaseCredit is false: only paidAt releases credit
         sql`(
           ${orderSuppliers.paidAt} IS NOT NULL
           OR (
             ${orders.isBrokerDeal} = true
+            AND ${autoReleaseCredit ? sql`TRUE` : sql`FALSE`}
             AND ${orders.deliveredAt} IS NOT NULL
-            AND ${orders.deliveredAt} + make_interval(days => COALESCE(${orderSuppliers.creditDays}, 30)) < now()
+            AND ${orders.deliveredAt} + make_interval(days => COALESCE(${orderSuppliers.creditDays}, 30) + ${bufferDays}) < now()
           )
         ) = false`,
       ),
@@ -161,9 +170,19 @@ interface RawCreditLine {
 async function enrichCreditLine(row: RawCreditLine): Promise<CreditLineDto> {
   const sides = await fetchCreditLineSides(row.id);
 
+  // Load tenant broker deal settings for auto-release config
+  let bufferDays = 0;
+  let autoReleaseCredit = true;
+  const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, row.tenantId)).limit(1);
+  const bd = (tenant?.settings as any)?.brokerDeals;
+  if (bd) {
+    bufferDays = bd.autoReleaseBufferDays ?? 0;
+    autoReleaseCredit = bd.autoReleaseCredit ?? true;
+  }
+
   const usedAmount =
     row.type === 'SUPPLIER'
-      ? await calcUsedAmountForSupplier(sides.counterpartyIds, row.isBrokerCreditLine)
+      ? await calcUsedAmountForSupplier(sides.counterpartyIds, row.isBrokerCreditLine, bufferDays, autoReleaseCredit)
       : await calcUsedAmountForCustomer(sides.counterpartyIds);
 
   const creditNum = parseFloat(row.creditAmount) || 0;
@@ -245,6 +264,7 @@ export async function listCreditLines(query?: {
       fromDelivery: creditLines.fromDelivery,
       qualified: creditLines.qualified,
       notes: creditLines.notes,
+      isBrokerCreditLine: creditLines.isBrokerCreditLine,
       createdAt: creditLines.createdAt,
       updatedAt: creditLines.updatedAt,
     })
@@ -299,6 +319,7 @@ export async function getCreditLineById(id: string): Promise<CreditLineDto | nul
       fromDelivery: creditLines.fromDelivery,
       qualified: creditLines.qualified,
       notes: creditLines.notes,
+      isBrokerCreditLine: creditLines.isBrokerCreditLine,
       createdAt: creditLines.createdAt,
       updatedAt: creditLines.updatedAt,
     })

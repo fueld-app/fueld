@@ -481,9 +481,9 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   })
 
   // ── Broker deal settings (any authenticated user) ──────────────
-  .get('/my-broker-deal-settings', async () => {
+  .get('/my-broker-deal-settings', async ({ auth }) => {
     try {
-      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).limit(1);
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
       const bd = (tenant?.settings as any)?.brokerDeals ?? {};
       // Support both old field name (defaultCommissionPerMt) and new (defaultCommissionRate)
       const defaultRate = bd.defaultCommissionRate ?? bd.defaultCommissionPerMt ?? 0;
@@ -508,7 +508,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .put('/broker-deals', async ({ auth, body }) => {
     try {
       requireAdmin(auth);
-      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).limit(1);
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
       if (!tenant) throw new Error('No tenant found');
       const settings = { ...(tenant.settings as any) };
       settings.brokerDeals = body;

@@ -32,7 +32,7 @@ import type {
   VesselDto,
 } from '@fueld/types';
 
-export type CompanyDetailTab = 'overview' | 'commercial' | 'fleet' | 'group' | 'risk';
+export type CompanyDetailTab = 'overview' | 'commercial' | 'fleet' | 'group' | 'risk' | 'comments' | 'activity';
 
 interface CompanyOfficeDto {
   id: string;

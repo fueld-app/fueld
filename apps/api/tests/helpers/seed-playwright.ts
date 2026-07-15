@@ -542,6 +542,10 @@ async function main(): Promise<void> {
   console.log(`✅ Seeded 2FA user: ${twoFaEmail}`);
   console.log(`✅ Seeded own company: ${ownCompanyName}`);
   console.log(`✅ Seeded trading entities: client=${clientName}, vessel=${vesselName}, place=${placeName}`);
+
+  // Enable broker deals for E2E testing
+  await sql`UPDATE tenants SET settings = jsonb_set(COALESCE(settings, '{}'::jsonb), '{brokerDeals}', '{"enabled":true,"defaultCommissionRate":3,"reportStatuses":["CONFIRMED","DELIVERED","INVOICED","PAID"],"autoReleaseCredit":true,"autoReleaseBufferDays":0}', true) WHERE id = ${tenant.id}`;
+  console.log(`✅ Enabled broker deals for tenant: ${tenant.name}`);
 }
 
 await main()

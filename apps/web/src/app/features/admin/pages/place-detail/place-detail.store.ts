@@ -20,7 +20,7 @@ import type {
 } from '@fueld/types';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
 
-export type PlaceDetailTab = 'overview' | 'traffic' | 'structure' | 'commercial';
+export type PlaceDetailTab = 'overview' | 'traffic' | 'structure' | 'commercial' | 'comments' | 'activity';
 
 interface PlaceEnrichment {
   geoJsonObject: unknown | null;

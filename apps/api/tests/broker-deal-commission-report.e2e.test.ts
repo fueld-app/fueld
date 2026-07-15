@@ -410,4 +410,52 @@ describe('broker commission report e2e', () => {
     expect(report.data?.data?.byCustomer.length).toBe(0);
     expect(parseFloat(report.data?.data?.totalCommission)).toBe(0);
   });
+
+  it('create-commission-orders endpoint rejected for non-admin users (H4 fixed)', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    // seedAuthBasics creates a TRADER (not ADMIN)
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    const res = await requestJson('/reports/broker-commission/create-orders', {
+      method: 'POST',
+      token,
+      body: { from: '2026-01-01', to: '2026-01-31' },
+    });
+
+    // H4 FIXED: endpoint now requires admin role
+    expect(res.status).toBe(403);
+    expect(res.data?.success).toBe(false);
+  });
+
+  it('unit conversion: commission uses raw quantity, not converted (M1 — known gap)', async () => {
+    // The design doc says "Quantity conversion uses the existing unitConversionFactor on order items."
+    // The implementation does NOT use unitConversionFactor — it uses raw quantity.
+    // This test documents the current behavior: commission = rate × raw quantity (no conversion).
+    // When M1 is fixed, update this test to expect the converted amount.
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    // Create a broker deal with GAL units and conversion factor 0.003785 (1 GAL = 0.003785 MT)
+    // 1000 GAL at $3/GAL should be $3000 if converted, or $3000 if not converted (raw × rate)
+    // But the report uses raw quantity (1000) × rate (3) = 3000, NOT converted (3.785 × 3 = 11.355)
+    await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      commissionPerUnit: '3',
+      quantity: '1000',
+      unit: 'GAL',
+      status: 'CONFIRMED',
+      deliveredAt: '2026-07-10',
+      unitConversionFactor: '0.003785',
+    });
+
+    const report = await requestJson('/reports/broker-commission?from=2026-07-01&to=2026-07-31', { token });
+    expect(report.data?.success).toBe(true);
+    // Current behavior: raw quantity (1000) × rate (3) = 3000
+    // Design doc intent: converted qty (3.785) × rate (3) = 11.355
+    // FIXME when M1 is fixed: expect(parseFloat(report.data?.data?.totalCommission)).toBe(11.36);
+    expect(parseFloat(report.data?.data?.totalCommission)).toBe(3000);
+  });
 });

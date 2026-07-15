@@ -397,6 +397,22 @@ export const routes: Routes = [
               ),
             title: 'Risk',
           },
+          {
+            path: 'comments',
+            loadComponent: () =>
+              import('./features/companies/pages/company-detail/tabs/comments-tab/comments-tab.component').then(
+                (m) => m.CompanyCommentsTabComponent,
+              ),
+            title: 'Companies > Comments',
+          },
+          {
+            path: 'activity',
+            loadComponent: () =>
+              import('./features/companies/pages/company-detail/tabs/activity-tab/activity-tab.component').then(
+                (m) => m.CompanyActivityTabComponent,
+              ),
+            title: 'Companies > Activity',
+          },
         ],
       },
       // ── Places ──
@@ -448,6 +464,22 @@ export const routes: Routes = [
                 (m) => m.PlaceCommercialTabComponent,
               ),
             title: 'Places > Commercial',
+          },
+          {
+            path: 'comments',
+            loadComponent: () =>
+              import('./features/admin/pages/place-detail/tabs/comments-tab/comments-tab.component').then(
+                (m) => m.PlaceCommentsTabComponent,
+              ),
+            title: 'Places > Comments',
+          },
+          {
+            path: 'activity',
+            loadComponent: () =>
+              import('./features/admin/pages/place-detail/tabs/activity-tab/activity-tab.component').then(
+                (m) => m.PlaceActivityTabComponent,
+              ),
+            title: 'Places > Activity',
           },
         ],
       },

@@ -988,9 +988,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               }
             }
 
-            <!-- Comments (compact, 4th position) -->
-            <app-comments-card class="block min-[900px]:order-[7] min-[900px]:h-[449px] overflow-hidden" entityType="vessel" [entityId]="vessel()!.id" />
-
             <!-- Sanctions -->
             @if (enrichment()!['isSanctioned']) {
               <div class="rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-surface shadow-sm min-[900px]:order-[8]">
@@ -1006,11 +1003,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm p-5 text-center min-[900px]:order-2">
               <p class="text-sm text-gray-400 dark:text-muted">Enrichment data unavailable</p>
             </div>
-            <!-- Comments (when no enrichment) -->
-            <app-comments-card class="block min-[900px]:order-4 min-[900px]:h-[449px] overflow-hidden" entityType="vessel" [entityId]="vessel()!.id" />
           }
-          <!-- Comments (when no enrichment) -->
-          <app-comments-card class="block min-[900px]:order-4 min-[900px]:h-[449px] overflow-hidden" entityType="vessel" [entityId]="vessel()!.id" />
 
         </div>
 
@@ -1084,11 +1077,29 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           </div>
         }
 
-        <!-- Activity History -->
-        <div class="min-[900px]:order-[22] min-[900px]:col-span-2 min-[1600px]:col-span-3 min-[2000px]:col-span-4">
-          <app-activity-timeline entityType="vessel" [entityId]="vessel()!.id" />
-        </div>
+      </div>
 
+      <!-- Activity & Comments Tabs -->
+      <div class="mt-6">
+        <div class="flex items-center gap-1 border-b border-gray-200 dark:border-line overflow-x-auto scrollbar-none">
+          <button type="button" (click)="vesselDetailTab.set('comments')"
+            class="whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+            [class]="vesselDetailTab() === 'comments' ? 'border-brand-600 text-brand-700 dark:text-brand-400' : 'border-transparent text-gray-500 dark:text-muted hover:text-gray-700 hover:border-gray-300'">
+            Comments
+          </button>
+          <button type="button" (click)="vesselDetailTab.set('activity')"
+            class="whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+            [class]="vesselDetailTab() === 'activity' ? 'border-brand-600 text-brand-700 dark:text-brand-400' : 'border-transparent text-gray-500 dark:text-muted hover:text-gray-700 hover:border-gray-300'">
+            Activity
+          </button>
+        </div>
+        <div class="mt-4">
+          @if (vesselDetailTab() === 'comments') {
+            <app-comments-card entityType="vessel" [entityId]="vessel()!.id" />
+          } @else if (vesselDetailTab() === 'activity') {
+            <app-activity-timeline entityType="vessel" [entityId]="vessel()!.id" />
+          }
+        </div>
       </div>
 
       <!-- Delete Confirmation -->
@@ -1179,6 +1190,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
 
   // Tabs
   readonly vesselInfoTab = signal<'info' | 'dimensions'>('info');
+  readonly vesselDetailTab = signal<'comments' | 'activity'>('comments');
 
   // Editing
   readonly editing = signal(false);

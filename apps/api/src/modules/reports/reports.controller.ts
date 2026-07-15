@@ -407,7 +407,11 @@ export const reportsController = new Elysia({ prefix: '/reports' })
     detail: { tags: ['Reports'], summary: 'Export broker commission report as XLSX', security: [{ bearerAuth: [] }] },
   })
 
-  .post('/broker-commission/create-orders', async ({ auth, body }) => {
+  .post('/broker-commission/create-orders', async ({ auth, body, set }) => {
+    if (auth.role !== 'ADMIN') {
+      set.status = 403;
+      return { success: false, data: null, message: 'Admin access required' };
+    }
     const orders = await createCommissionOrdersFromReport(auth.tenantId, body.from, body.to);
     return { success: true, data: orders } satisfies ApiResponse<unknown>;
   }, {

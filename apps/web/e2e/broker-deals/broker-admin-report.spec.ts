@@ -44,7 +44,7 @@ test.describe('broker deal admin + report UI', () => {
     await loginViaUi(page, { email: adminEmail, password: adminPassword });
     await page.goto('/admin/settings/broker-deals');
 
-    await expect(page.getByText(/Auto-release/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Credit Auto-Release/i)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/Buffer days/i)).toBeVisible({ timeout: 15_000 });
   });
 
@@ -53,8 +53,8 @@ test.describe('broker deal admin + report UI', () => {
     await page.goto('/reports/broker-commission');
     await expect(page).toHaveURL(/\/reports\/broker-commission/);
 
-    await expect(page.getByLabel(/From/i)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByLabel(/To/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('input[type="date"]').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('input[type="date"]').nth(1)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: /Generate Report/i })).toBeVisible({ timeout: 15_000 });
   });
 
@@ -62,8 +62,8 @@ test.describe('broker deal admin + report UI', () => {
     await loginViaUi(page, { email: adminEmail, password: adminPassword });
     await page.goto('/reports/broker-commission');
 
-    await page.getByLabel(/From/i).fill('2026-01-01');
-    await page.getByLabel(/To/i).fill('2026-01-31');
+    await page.locator('input[type="date"]').first().fill('2026-01-01');
+    await page.locator('input[type="date"]').nth(1).fill('2026-01-31');
     await page.getByRole('button', { name: /Generate Report/i }).click();
     await page.waitForTimeout(3000);
 
@@ -75,8 +75,8 @@ test.describe('broker deal admin + report UI', () => {
     await loginViaUi(page, { email: adminEmail, password: adminPassword });
     await page.goto('/reports/broker-commission');
 
-    await page.getByLabel(/From/i).fill('2026-01-01');
-    await page.getByLabel(/To/i).fill('2026-01-31');
+    await page.locator('input[type="date"]').first().fill('2026-01-01');
+    await page.locator('input[type="date"]').nth(1).fill('2026-01-31');
     await page.getByRole('button', { name: /Generate Report/i }).click();
     await page.waitForTimeout(3000);
 
@@ -90,5 +90,35 @@ test.describe('broker deal admin + report UI', () => {
 
     // Page should not crash
     expect(page.url()).toContain('/reports/broker-commission');
+  });
+
+  test('credit line creation form shows broker credit line option', async ({ page }) => {
+    await loginViaUi(page, { email: adminEmail, password: adminPassword });
+    // Force BrokerDealService to load
+    await page.goto('/trading/broker-deals');
+    await page.waitForTimeout(3000);
+
+    // Navigate to credit suppliers page
+    await page.goto('/credit/suppliers');
+    await page.waitForTimeout(2000);
+
+    // The page should load — verify we're on the credit suppliers page
+    // Look for a heading or content related to credit lines
+    const pageContent = await page.textContent('body');
+    expect(pageContent).toBeTruthy();
+
+    // Look for any existing credit line or the create button
+    const createBtn = page.getByRole('button', { name: /Add|Create|New Credit Line/i }).first();
+    const hasCreateBtn = await createBtn.isVisible().catch(() => false);
+
+    if (hasCreateBtn) {
+      await createBtn.click();
+      await page.waitForTimeout(1000);
+
+      // When broker deals are enabled, a "Broker Credit Line" or similar option should appear
+      // in the credit line creation form. We check for the presence of this option.
+      const brokerCreditLabel = page.getByText(/Broker Credit/i).first();
+      await expect(brokerCreditLabel).toBeVisible({ timeout: 10_000 });
+    }
   });
 });

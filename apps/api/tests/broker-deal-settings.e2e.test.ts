@@ -157,9 +157,8 @@ describe('broker deal settings + tenant gating e2e', () => {
     expect(res.data?.data?.defaultCommissionRate).toBe(7);
   });
 
-  it('broker deal params accepted even when feature disabled (H1 gap)', async () => {
-    // Documents the current behavior: API does NOT gate on brokerDeals.enabled
-    // when accepting isBrokerDeal on order create/update.
+  it('broker deal params rejected when feature disabled (H1 fixed)', async () => {
+    // H1 FIXED: API now gates on brokerDeals.enabled — isBrokerDeal is forced to false
     const seeded = await seedAuthBasics();
     // Feature is disabled (no brokerDeals block set)
     const login = await loginE2E(seeded.user.email, seeded.password);
@@ -169,7 +168,7 @@ describe('broker deal settings + tenant gating e2e', () => {
     const settings = await requestJson('/admin/settings/my-broker-deal-settings', { token });
     expect(settings.data?.data?.enabled).toBe(false);
 
-    // Create order with isBrokerDeal=true even though feature is disabled
+    // Create order with isBrokerDeal=true — should be rejected (forced to false)
     const created = await requestJson('/orders', {
       method: 'POST',
       token,
@@ -181,9 +180,8 @@ describe('broker deal settings + tenant gating e2e', () => {
       },
     });
 
-    // Current behavior: isBrokerDeal is accepted (H1 gap)
-    // TODO: When H1 is fixed, expect isBrokerDeal to be false
-    expect(created.data?.data?.isBrokerDeal).toBe(true);
+    // H1 FIXED: isBrokerDeal is now forced to false when feature is disabled
+    expect(created.data?.data?.isBrokerDeal).toBe(false);
   });
 
   it('commission report returns empty when feature disabled', async () => {

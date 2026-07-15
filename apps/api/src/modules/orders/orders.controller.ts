@@ -42,8 +42,19 @@ import {
 import { logActivity } from '../activity/activity.service';
 import type { ApiResponse } from '@fueld/types';
 import { db } from '../../db';
-import { users } from '../../db/schema';
+import { users, tenants } from '../../db/schema';
 import { eq } from 'drizzle-orm';
+
+/** Check if broker deals are enabled for the tenant. If not, strip broker deal fields from request body. */
+async function gateBrokerDealFields(tenantId: string, body: Record<string, unknown>): Promise<void> {
+  const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  const bd = (tenant?.settings as any)?.brokerDeals ?? {};
+  if (!bd.enabled) {
+    // Feature disabled — strip broker deal fields
+    body.isBrokerDeal = false;
+    body.commissionPerMt = null;
+  }
+}
 import { getAttachmentTypeSettings, getInquiryCancelReasonSettings, getBookingEmailSettings } from '../admin/settings.service';
 import { composeBookingEmail, resolveBookingRecipients } from '../documents/booking-email.service';
 import { sendDocumentEmail } from '../documents/mail.service';
@@ -439,6 +450,9 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           return { success: false, data: null, message: 'User has no tenant' };
         }
 
+        // Gate broker deal fields by tenant setting
+        await gateBrokerDealFields(user.tenantId, body as Record<string, unknown>);
+
         const order = await createOrder({
           tenantId: user.tenantId,
           clientId: body.clientId,
@@ -535,6 +549,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       try {
         const orderId = await resolveOrderId(params.id);
         if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        // Gate broker deal fields by tenant setting
+        await gateBrokerDealFields(auth.tenantId, body as Record<string, unknown>);
         const updated = await updateOrder(orderId, body, auth.sub);
         if (!updated) {
           return { success: false, data: null, message: 'Order not found' };

@@ -2,8 +2,6 @@ import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CompanyDetailStore } from '../company-detail.store';
 import { CompanyInfoCardComponent } from '../components/company-info-card/company-info-card.component';
 import { ContactsCardComponent } from '../components/contacts-card/contacts-card.component';
-import { CommentsCardComponent } from '@app/shared/components/comments-card/comments-card.component';
-import { ActivityTimelineComponent } from '@app/shared/components/activity-timeline/activity-timeline.component';
 
 @Component({
   selector: 'app-overview-tab',
@@ -11,8 +9,6 @@ import { ActivityTimelineComponent } from '@app/shared/components/activity-timel
   imports: [
     CompanyInfoCardComponent,
     ContactsCardComponent,
-    CommentsCardComponent,
-    ActivityTimelineComponent,
   ],
   template: `
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -44,12 +40,7 @@ import { ActivityTimelineComponent } from '@app/shared/components/activity-timel
           [companyId]="store.company()!.id"
           (mutated)="store.loadContacts(store.company()!.id)"
         />
-        <app-comments-card entityType="company" [entityId]="store.company()!.id" />
       </div>
-    </div>
-
-    <div class="mt-6">
-      <app-activity-timeline entityType="company" [entityId]="store.company()!.id" />
     </div>
   `,
 })
