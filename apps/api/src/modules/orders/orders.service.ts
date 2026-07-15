@@ -1346,6 +1346,11 @@ export async function getOrderById(idOrNumber: string) {
       inventorySkuId: i.inventorySkuId ?? null,
       warehouseId: i.warehouseId ?? null,
       plannedInventoryAt: i.plannedInventoryAt ? i.plannedInventoryAt.toISOString() : null,
+      // Tax
+      taxRate: i.taxRate ?? null,
+      taxAmount: i.taxAmount ?? null,
+      // Broker deal — per-line-item commission
+      commissionPerUnit: i.commissionPerUnit ?? null,
     })),
   };
 }
