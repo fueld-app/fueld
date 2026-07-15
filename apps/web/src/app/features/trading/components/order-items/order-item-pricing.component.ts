@@ -139,7 +139,7 @@ type PricingSide = 'cost' | 'sales';
               </svg>
             </span>
           </div>
-          @if (row().unit !== row().costUnit) {
+          @if (row().unit !== row().costUnit && !isBrokerDeal()) {
             <div class="mt-1 flex items-center gap-1 justify-end">
               <span class="text-[10px] text-gray-500 dark:text-muted">{{ conversionLabel(row().unit, row().costUnit) }}</span>
               <input type="number" step="0.0001" min="0"
@@ -245,7 +245,7 @@ type PricingSide = 'cost' | 'sales';
               </svg>
             </span>
           </div>
-          @if (row().unit !== row().salesUnit) {
+          @if (row().unit !== row().salesUnit && !isBrokerDeal()) {
             <div class="mt-1 flex items-center gap-1 justify-end">
               <span class="text-[10px] text-gray-500 dark:text-muted">{{ conversionLabel(row().unit, row().salesUnit) }}</span>
               <input type="number" step="0.0001" min="0"
@@ -286,6 +286,7 @@ export class OrderItemPricingComponent {
   readonly plattsMatches = input<PlattsSuggestionsResponseDto['items'][number]['matches']>([]);
   readonly plattsEntryId = input<string | null | undefined>(null);
   readonly decimalPrecision = input<number>(5);
+  readonly isBrokerDeal = input(false);
 
   readonly fieldChange = output<{ field: string; value: unknown }>();
   readonly plattsSelect = output<string>();

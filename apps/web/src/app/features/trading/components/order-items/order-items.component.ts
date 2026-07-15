@@ -238,6 +238,7 @@ import type {
                     [plattsMatches]="plattsMatches(row.id)"
                     [plattsEntryId]="row.costPlattsEntryId"
                     [decimalPrecision]="decimalPrecisionInput()"
+                    [isBrokerDeal]="isBrokerDeal()"
                     (fieldChange)="onBrokerPricingChange(i, $event)"
                     (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
                   />
@@ -256,6 +257,7 @@ import type {
                     [plattsMatches]="plattsMatches(row.id)"
                     [plattsEntryId]="row.costPlattsEntryId"
                     [decimalPrecision]="decimalPrecisionInput()"
+                    [isBrokerDeal]="isBrokerDeal()"
                     (fieldChange)="onPricingFieldChange(i, 'cost', $event)"
                     (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
                   />
@@ -274,6 +276,7 @@ import type {
                     [plattsMatches]="plattsMatches(row.id)"
                     [plattsEntryId]="row.salesPlattsEntryId"
                     [decimalPrecision]="decimalPrecisionInput()"
+                    [isBrokerDeal]="isBrokerDeal()"
                     (fieldChange)="onPricingFieldChange(i, 'sales', $event)"
                     (plattsSelect)="selectPlattsMatch(i, 'sales', $event)"
                   />
@@ -668,6 +671,7 @@ import type {
                 [plattsMatches]="plattsMatches(row.id)"
                 [plattsEntryId]="row.costPlattsEntryId"
                 [decimalPrecision]="decimalPrecisionInput()"
+                    [isBrokerDeal]="isBrokerDeal()"
                 (fieldChange)="onBrokerPricingChange(i, $event)"
                 (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
               />
@@ -687,6 +691,7 @@ import type {
                 [plattsMatches]="plattsMatches(row.id)"
                 [plattsEntryId]="row.costPlattsEntryId"
                 [decimalPrecision]="decimalPrecisionInput()"
+                    [isBrokerDeal]="isBrokerDeal()"
                 (fieldChange)="onPricingFieldChange(i, 'cost', $event)"
                 (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
               />
@@ -706,6 +711,7 @@ import type {
                 [plattsMatches]="plattsMatches(row.id)"
                 [plattsEntryId]="row.salesPlattsEntryId"
                 [decimalPrecision]="decimalPrecisionInput()"
+                    [isBrokerDeal]="isBrokerDeal()"
                 (fieldChange)="onPricingFieldChange(i, 'sales', $event)"
                 (plattsSelect)="selectPlattsMatch(i, 'sales', $event)"
               />
