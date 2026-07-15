@@ -60,24 +60,35 @@ test.describe('broker deals UI', () => {
     const { authHeaders } = await import('../helpers/auth');
     const headers = await authHeaders(page);
 
-    // Get seed data via API
-    const clientsRes = await page.request.get('http://localhost:3000/companies?type=CLIENT', { headers });
-    const clients = (await clientsRes.json()).data?.items ?? [];
-    const vesselsRes = await page.request.get('http://localhost:3000/vessels', { headers });
-    const vessels = (await vesselsRes.json()).data?.items ?? [];
-    const placesRes = await page.request.get('http://localhost:3000/places', { headers });
-    const places = (await placesRes.json()).data?.items ?? [];
+    // Get seed data via API (correct paths from trading.ts helper)
+    const [clientsRes, vesselsRes, placesRes] = await Promise.all([
+      page.request.get('http://localhost:3000/companies/local?type=CLIENT&limit=1', { headers }),
+      page.request.get('http://localhost:3000/vessels/local?limit=1', { headers }),
+      page.request.get('http://localhost:3000/lloyds/places/local?limit=1', { headers }),
+    ]);
+
+    if (!clientsRes.ok() || !vesselsRes.ok() || !placesRes.ok()) {
+      throw new Error('Failed to fetch seeded entities from API for order creation.');
+    }
+
+    const clientsJson = await clientsRes.json();
+    const vesselsJson = await vesselsRes.json();
+    const placesJson = await placesRes.json();
+
+    const clientId = clientsJson.data?.companies?.[0]?.id;
+    const vesselId = vesselsJson.data?.vessels?.[0]?.id;
+    const placeId = placesJson.data?.places?.[0]?.id;
 
     // Assert seed data exists
-    expect(clients.length).toBeGreaterThan(0);
-    expect(vessels.length).toBeGreaterThan(0);
-    expect(places.length).toBeGreaterThan(0);
+    expect(clientId).toBeTruthy();
+    expect(vesselId).toBeTruthy();
+    expect(placeId).toBeTruthy();
 
     const created = await page.request.post('http://localhost:3000/orders', {
       data: {
-        clientId: clients[0].id,
-        vesselId: vessels[0].id,
-        placeId: places[0].id,
+        clientId,
+        vesselId,
+        placeId,
         isBrokerDeal: true,
         commissionPerMt: '3.00',
       },
