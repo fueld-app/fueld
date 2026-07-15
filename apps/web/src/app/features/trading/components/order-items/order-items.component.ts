@@ -395,13 +395,13 @@ import type {
                 [warehouseOptions]="warehouseOptionsInput()"
                 [inventorySkuOptions]="inventorySkuOptionsInput()"
                 [availability]="availabilityByRowId()[row.id]"
-                [colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? 5 : 0)"
+                [colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 1 : 5) : 0)"
                 (fieldChange)="onInventoryFieldChange(i, $event)"
               />
             }
           } @empty {
             <tr>
-              <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? 5 : 0)" class="px-4 py-12 text-center">
+              <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 1 : 5) : 0)" class="px-4 py-12 text-center">
                 <p class="text-sm text-gray-400 dark:text-muted">No line items yet.</p>
                 @if (!readonly()) {
                   <button
@@ -416,7 +416,7 @@ import type {
           }
         </tbody>
         <!-- Totals row (hidden for LIGHT users — no financial numbers) -->
-        @if (rows().length > 0 && canSeePrices()) {
+        @if (rows().length > 0 && canSeePrices() && !isBrokerDeal()) {
           <tfoot>
             <tr class="border-t-2 border-gray-200 dark:border-line bg-gray-50/50 font-semibold dark:bg-surface-2">
               <td class="px-4 py-3 text-right text-gray-600 dark:text-ink-dim">Totals</td>
@@ -653,6 +653,26 @@ import type {
             </div>
 
             @if (canSeePrices()) {
+            @if (isBrokerDeal()) {
+            <!-- Broker deal: single Price field -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Price</label>
+              <app-order-item-pricing
+                [row]="row"
+                side="cost"
+                [readonly]="readonly()"
+                [formulaPricingEnabled]="formulaPricingEnabled()"
+                [priceRefOptions]="priceRefOptions()"
+                [currencyOptions]="currencyOptions()"
+                [unitOptions]="unitOptions()"
+                [plattsMatches]="plattsMatches(row.id)"
+                [plattsEntryId]="row.costPlattsEntryId"
+                [decimalPrecision]="decimalPrecisionInput()"
+                (fieldChange)="onBrokerPricingChange(i, $event)"
+                (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
+              />
+            </div>
+            } @else {
             <!-- Cost -->
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Cost</label>
@@ -764,6 +784,7 @@ import type {
               }
             </div>
             }
+            }
 
             <!-- Delivered Qty (mobile) -->
             @if (allowDeliveredEdit()) {
@@ -791,7 +812,7 @@ import type {
       }
 
       <!-- Mobile totals bar -->
-      @if (rows().length > 0 && canSeePrices()) {
+      @if (rows().length > 0 && canSeePrices() && !isBrokerDeal()) {
         <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
           <div class="flex items-center justify-between text-sm">
             <span class="font-medium text-gray-600 dark:text-ink-dim">Gross Profit</span>
