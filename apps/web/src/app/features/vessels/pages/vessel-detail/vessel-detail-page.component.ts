@@ -317,7 +317,21 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         </div>
       }
 
-      <div class="vessel-card-grid grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
+      <!-- Tab navigation -->
+      <div class="mb-6 -mx-4 px-4 md:mx-0 md:px-0">
+        <nav class="flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-line pb-px scrollbar-hide" aria-label="Vessel sections">
+          <button type="button" (click)="vesselActiveTab.set('overview')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'overview' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Overview</button>
+          <button type="button" (click)="vesselActiveTab.set('enrichment')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'enrichment' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Enrichment</button>
+          <button type="button" (click)="vesselActiveTab.set('orders')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'orders' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Orders</button>
+          <button type="button" (click)="vesselActiveTab.set('companies')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'companies' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Companies</button>
+          <button type="button" (click)="vesselActiveTab.set('crew')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'crew' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Crew</button>
+          <button type="button" (click)="vesselActiveTab.set('comments')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'comments' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Comments</button>
+          <button type="button" (click)="vesselActiveTab.set('activity')" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none" [class]="vesselActiveTab() === 'activity' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'">Activity</button>
+        </nav>
+      </div>
+
+      @if (vesselActiveTab() === 'overview') {
+      <div class="grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
 
         <!-- ═══ Left group: own data ═══ -->
         <div class="contents">
@@ -611,113 +625,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             </div>
           </div>
 
-          <!-- Orders -->
-          @if (vesselOrders().length || ordersLoading()) {
-            <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-3 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
-              <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Orders</h2>
-                @if (vesselOrders().length) {
-                  <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ vesselOrders().length }}</span>
-                }
-              </div>
-              @if (ordersLoading()) {
-                <div class="flex-1 flex items-center justify-center py-8">
-                  <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                </div>
-              } @else {
-                <div class="flex-1 min-h-0 overflow-auto">
-                  <table class="w-full text-sm">
-                    <thead class="sticky top-0 z-10">
-                      <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60 dark:bg-surface-2">
-                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Status</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Client</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Port</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">ETA</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Created</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                      @for (o of vesselOrders(); track o.id) {
-                        <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint"
-                          (click)="onOrderRowClick($event, o.id, o.status)"
-                          (auxclick)="$event.button === 1 && openOrderInNewTab(o.id, o.status)"
-                        >
-                          <td class="px-5 py-2.5">
-                            <a
-                              [routerLink]="orderRoute(o.id, o.status)"
-                              (click)="$event.stopPropagation()"
-                              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                              [class]="statusBadgeClass(o.status)"
-                            >
-                              {{ o.status }}
-                            </a>
-                          </td>
-                          <td class="px-5 py-2.5 text-gray-900 dark:text-ink font-medium">{{ o.clientName }}</td>
-                          <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.placeName }}</td>
-                          <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.eta ? (o.eta | dateLabel) : '—' }}</td>
-                          <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.createdAt | dateLabel }}</td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              }
-            </div>
-          }
-
-          <!-- Vessel Companies -->
-          <app-vessel-detail-companies-card
-            [vesselCompanies]="vesselCompanies()"
-            [seasearcherSuggestions]="seasearcherSuggestions()"
-            [loading]="companiesLoading()"
-            [saving]="savingCompany()"
-            [showAddForm]="showAddCompany()"
-            [editingCompanyId]="editingCompanyId()"
-            [selectedCompany]="selectedCompany()"
-            [companySearch]="companySearch()"
-            [searchResults]="companySearchResults()"
-            [companyForm]="companyForm()"
-            [companyContacts]="companyContacts()"
-            [contactsLoading]="companyContactsLoading()"
-            [addingNewContact]="addingNewContact()"
-            [newContactName]="newContactName()"
-            [newContactRole]="newContactRole()"
-            [newContactEmail]="newContactEmail()"
-            [newContactPhone]="newContactPhone()"
-            [creatingContact]="creatingContact()"
-            [roleOptions]="roleOptions()"
-            [roleExists]="selectedCompanyRoleExists()"
-            [expandedNotes]="expandedNotes()"
-            (add)="openAddCompany()"
-            (edit)="openEditCompany($event)"
-            (delete)="deleteVesselCompany($event.id, $event.companyName, $event.role)"
-            (save)="saveVesselCompany()"
-            (cancel)="cancelCompanyForm()"
-            (clearSelected)="clearSelectedCompany()"
-            (selectCompany)="selectCompany($event)"
-            (companySearchChange)="onCompanySearch($event)"
-            (linkSeasearcher)="linkSeasearcherCompany($event)"
-            (newContactNameChange)="newContactName.set($event)"
-            (newContactRoleChange)="newContactRole.set($event)"
-            (newContactEmailChange)="newContactEmail.set($event)"
-            (newContactPhoneChange)="newContactPhone.set($event)"
-            (cancelNewContact)="cancelNewContact()"
-            (createNewContact)="createNewContact()"
-            (addNewContact)="addingNewContact.set(true)"
-          />
-        </div>
-
-          <!-- Vessel Persons (crew) -->
-          <app-vessel-persons-card
-            [vesselId]="vesselId()"
-            [persons]="vesselPersons()"
-            [titleOptions]="vesselPersonTitles()"
-            (personsChange)="vesselPersons.set($event)"
-          />
-
           <!-- Product Capacities -->
           <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
             <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
@@ -803,6 +710,11 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               }
             </div>
           </div>
+
+        </div>
+      </div>
+      } @else if (vesselActiveTab() === 'enrichment') {
+      <div class="grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
 
         <!-- ═══ Right group: enrichment data ═══ -->
         <div class="contents">
@@ -1078,29 +990,104 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         }
 
       </div>
-
-      <!-- Activity & Comments Tabs -->
-      <div class="mt-6">
-        <div class="flex items-center gap-1 border-b border-gray-200 dark:border-line overflow-x-auto scrollbar-none">
-          <button type="button" (click)="vesselDetailTab.set('comments')"
-            class="whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
-            [class]="vesselDetailTab() === 'comments' ? 'border-brand-600 text-brand-700 dark:text-brand-400' : 'border-transparent text-gray-500 dark:text-muted hover:text-gray-700 hover:border-gray-300'">
-            Comments
-          </button>
-          <button type="button" (click)="vesselDetailTab.set('activity')"
-            class="whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
-            [class]="vesselDetailTab() === 'activity' ? 'border-brand-600 text-brand-700 dark:text-brand-400' : 'border-transparent text-gray-500 dark:text-muted hover:text-gray-700 hover:border-gray-300'">
-            Activity
-          </button>
+      } @else if (vesselActiveTab() === 'orders') {
+      <!-- Orders tab -->
+      @if (vesselOrders().length || ordersLoading()) {
+        <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden">
+          <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Orders</h2>
+            @if (vesselOrders().length) {
+              <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ vesselOrders().length }}</span>
+            }
+          </div>
+          <div class="overflow-auto max-h-[600px]">
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-surface-2">
+                <tr class="border-b border-gray-100 dark:border-line">
+                  <th class="px-5 py-2.5 text-left font-medium text-gray-500 dark:text-muted">Order #</th>
+                  <th class="px-5 py-2.5 text-left font-medium text-gray-500 dark:text-muted">Status</th>
+                  <th class="px-5 py-2.5 text-left font-medium text-gray-500 dark:text-muted">Client</th>
+                  <th class="px-5 py-2.5 text-left font-medium text-gray-500 dark:text-muted">Port</th>
+                  <th class="px-5 py-2.5 text-left font-medium text-gray-500 dark:text-muted">ETA</th>
+                  <th class="px-5 py-2.5 text-left font-medium text-gray-500 dark:text-muted">Created</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-line">
+                @for (o of vesselOrders(); track o.id) {
+                  <tr class="hover:bg-gray-50 dark:hover:bg-surface-tint cursor-pointer" (click)="goToOrder(o.id)" (auxclick)="openOrderInNewTab(o.id, o.status)">
+                    <td class="px-5 py-2.5 font-mono text-xs text-gray-500 dark:text-muted">{{ o.orderNumber ?? '—' }}</td>
+                    <td class="px-5 py-2.5">
+                      <a [routerLink]="orderRoute(o.id, o.status)" (click)="$event.stopPropagation()" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" [class]="statusBadgeClass(o.status)">{{ o.status }}</a>
+                    </td>
+                    <td class="px-5 py-2.5 text-gray-900 dark:text-ink font-medium">{{ o.clientName }}</td>
+                    <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.placeName }}</td>
+                    <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.eta ? (o.eta | dateLabel) : '—' }}</td>
+                    <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.createdAt | dateLabel }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="mt-4">
-          @if (vesselDetailTab() === 'comments') {
-            <app-comments-card entityType="vessel" [entityId]="vessel()!.id" />
-          } @else if (vesselDetailTab() === 'activity') {
-            <app-activity-timeline entityType="vessel" [entityId]="vessel()!.id" />
-          }
-        </div>
-      </div>
+      } @else {
+        <p class="text-sm text-gray-400 dark:text-muted py-8 text-center">No orders for this vessel.</p>
+      }
+      } @else if (vesselActiveTab() === 'companies') {
+      <!-- Companies tab -->
+      <app-vessel-detail-companies-card
+        [vesselCompanies]="vesselCompanies()"
+        [seasearcherSuggestions]="seasearcherSuggestions()"
+        [loading]="companiesLoading()"
+        [saving]="savingCompany()"
+        [showAddForm]="showAddCompany()"
+        [editingCompanyId]="editingCompanyId()"
+        [selectedCompany]="selectedCompany()"
+        [companySearch]="companySearch()"
+        [searchResults]="companySearchResults()"
+        [companyForm]="companyForm()"
+        [companyContacts]="companyContacts()"
+        [contactsLoading]="companyContactsLoading()"
+        [addingNewContact]="addingNewContact()"
+        [newContactName]="newContactName()"
+        [newContactRole]="newContactRole()"
+        [newContactEmail]="newContactEmail()"
+        [newContactPhone]="newContactPhone()"
+        [creatingContact]="creatingContact()"
+        [roleOptions]="roleOptions()"
+        [roleExists]="selectedCompanyRoleExists()"
+        [expandedNotes]="expandedNotes()"
+        (add)="openAddCompany()"
+        (edit)="openEditCompany($event)"
+        (delete)="deleteVesselCompany($event.id, $event.companyName, $event.role)"
+        (save)="saveVesselCompany()"
+        (cancel)="cancelCompanyForm()"
+        (clearSelected)="clearSelectedCompany()"
+        (selectCompany)="selectCompany($event)"
+        (companySearchChange)="onCompanySearch($event)"
+        (linkSeasearcher)="linkSeasearcherCompany($event)"
+        (newContactNameChange)="newContactName.set($event)"
+        (newContactRoleChange)="newContactRole.set($event)"
+        (newContactEmailChange)="newContactEmail.set($event)"
+        (newContactPhoneChange)="newContactPhone.set($event)"
+        (cancelNewContact)="cancelNewContact()"
+        (createNewContact)="createNewContact()"
+        (addNewContact)="addingNewContact.set(true)"
+      />
+      } @else if (vesselActiveTab() === 'crew') {
+      <!-- Crew tab -->
+      <app-vessel-persons-card
+        [vesselId]="vesselId()"
+        [persons]="vesselPersons()"
+        [titleOptions]="vesselPersonTitles()"
+        (personsChange)="vesselPersons.set($event)"
+      />
+      } @else if (vesselActiveTab() === 'comments') {
+      <!-- Comments tab -->
+      <app-comments-card entityType="vessel" [entityId]="vessel()!.id" />
+      } @else if (vesselActiveTab() === 'activity') {
+      <!-- Activity tab -->
+      <app-activity-timeline entityType="vessel" [entityId]="vessel()!.id" />
+      }
 
       <!-- Delete Confirmation -->
       <app-vessel-detail-delete-modal
@@ -1191,6 +1178,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   // Tabs
   readonly vesselInfoTab = signal<'info' | 'dimensions'>('info');
   readonly vesselDetailTab = signal<'comments' | 'activity'>('comments');
+  readonly vesselActiveTab = signal<'overview' | 'enrichment' | 'orders' | 'companies' | 'crew' | 'comments' | 'activity'>('overview');
 
   // Editing
   readonly editing = signal(false);

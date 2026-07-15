@@ -95,24 +95,18 @@ describe('broker deal settings + tenant gating e2e', () => {
       },
     });
 
-    // The PUT endpoint may fail with a DB error due to JSONB serialization.
-    // If it fails, verify that the error is handled gracefully.
-    if (putRes.data?.success === true) {
-      expect(putRes.data?.data?.enabled).toBe(true);
-      expect(putRes.data?.data?.defaultCommissionRate).toBe(4);
+    // PUT should succeed and persist settings
+    expect(putRes.status).toBe(200);
+    expect(putRes.data?.success).toBe(true);
+    expect(putRes.data?.data?.enabled).toBe(true);
+    expect(putRes.data?.data?.defaultCommissionRate).toBe(4);
 
-      // Verify via GET
-      const getRes = await requestJson('/admin/settings/my-broker-deal-settings', { token: adminToken });
-      expect(getRes.data?.data?.enabled).toBe(true);
-      expect(getRes.data?.data?.defaultCommissionRate).toBe(4);
-    } else {
-      // PUT endpoint has a known DB error with JSONB serialization in test env
-      // Document the failure — the endpoint returns success: false with an error message
-      console.log('PUT endpoint failed (known DB issue):', putRes.data?.message);
-      // Verify the error is handled gracefully (not a 500 crash)
-      expect(putRes.status).toBe(200);
-      expect(putRes.data?.success).toBe(false);
-    }
+    // Verify via GET that settings were persisted
+    const getRes = await requestJson('/admin/settings/my-broker-deal-settings', { token: adminToken });
+    expect(getRes.data?.data?.enabled).toBe(true);
+    expect(getRes.data?.data?.defaultCommissionRate).toBe(4);
+    expect(getRes.data?.data?.reportStatuses).toEqual(['DELIVERED', 'PAID']);
+    expect(getRes.data?.data?.autoReleaseBufferDays).toBe(5);
   });
 
   it('PUT broker-deals rejected for non-admin users', async () => {

@@ -80,16 +80,9 @@ test.describe('broker deal admin + report UI', () => {
     await page.getByRole('button', { name: /Generate Report/i }).click();
     await page.waitForTimeout(3000);
 
-    // Check if CSV/XLSX export links are present (only show after report is generated)
-    const csvLink = page.getByRole('link', { name: 'CSV' });
-    const csvVisible = await csvLink.isVisible().catch(() => false);
-
-    if (csvVisible) {
-      await expect(page.getByRole('link', { name: 'XLSX' })).toBeVisible({ timeout: 5_000 });
-    }
-
-    // Page should not crash
-    expect(page.url()).toContain('/reports/broker-commission');
+    // Assert CSV and XLSX export links are present after report generation
+    await expect(page.getByRole('link', { name: 'CSV' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('link', { name: 'XLSX' })).toBeVisible({ timeout: 10_000 });
   });
 
   test('credit line creation form shows broker credit line option', async ({ page }) => {
@@ -107,18 +100,13 @@ test.describe('broker deal admin + report UI', () => {
     const pageContent = await page.textContent('body');
     expect(pageContent).toBeTruthy();
 
-    // Look for any existing credit line or the create button
+    // Assert the create button exists and click it
     const createBtn = page.getByRole('button', { name: /Add|Create|New Credit Line/i }).first();
-    const hasCreateBtn = await createBtn.isVisible().catch(() => false);
+    await expect(createBtn).toBeVisible({ timeout: 10_000 });
+    await createBtn.click();
+    await page.waitForTimeout(1000);
 
-    if (hasCreateBtn) {
-      await createBtn.click();
-      await page.waitForTimeout(1000);
-
-      // When broker deals are enabled, a "Broker Credit Line" or similar option should appear
-      // in the credit line creation form. We check for the presence of this option.
-      const brokerCreditLabel = page.getByText(/Broker Credit/i).first();
-      await expect(brokerCreditLabel).toBeVisible({ timeout: 10_000 });
-    }
+    // When broker deals are enabled, a "Broker Credit Line" option should appear
+    await expect(page.getByText(/Broker Credit/i).first()).toBeVisible({ timeout: 10_000 });
   });
 });

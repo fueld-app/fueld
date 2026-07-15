@@ -17,8 +17,9 @@ import { tenants, orders, orderItems } from '../src/db/schema';
  * - CSV and XLSX export endpoints return correct data
  * - Empty report when no broker deals match criteria
  *
- * NOTE: The report reads commission from orderItems.commissionPerUnit, NOT
- * orders.commissionPerMt. Items must be saved with commissionPerUnit set.
+ * NOTE: The report reads commission from orderItems.commissionPerUnit (an improvement
+ * over the design doc's per-order commissionPerMt — allows per-line-item rates).
+ * Items must be saved with commissionPerUnit set.
  */
 
 async function enableBrokerDeals(tenantId: string, overrides?: Record<string, unknown>) {
@@ -39,7 +40,9 @@ async function enableBrokerDeals(tenantId: string, overrides?: Record<string, un
   await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
 }
 
-/** Create a broker deal order, add items with commission, and set status. */
+/** Create a broker deal order, add items with commission, and set status.
+ *  Commission rate is set per-line-item via commissionPerUnit (an improvement over the design doc's per-order rate).
+ */
 async function createBrokerDeal(
   token: string,
   clientId: string,
@@ -68,7 +71,7 @@ async function createBrokerDeal(
   });
   const orderId = created.data?.data?.id as string;
 
-  // Save order items with commission
+  // Save order items with per-item commission rate
   const item: Record<string, unknown> = {
     productType: 'VLSFO',
     quantity: opts.quantity ?? '100',

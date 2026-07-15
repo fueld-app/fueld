@@ -508,7 +508,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .put('/broker-deals', async ({ auth, body }) => {
     try {
       requireAdmin(auth);
-      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
       if (!tenant) throw new Error('No tenant found');
       const settings = { ...(tenant.settings as any) };
       settings.brokerDeals = body;
