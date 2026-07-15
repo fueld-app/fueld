@@ -81,7 +81,7 @@ import type {
             @if (canSeePrices()) {
               @if (isBrokerDeal()) {
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Price</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]">Comm./{{ brokerUnit() }}</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]">Comm./Unit</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Profit ({{ baseCurrency() }})</th>
               } @else {
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Cost</th>
