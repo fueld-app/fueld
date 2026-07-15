@@ -33,9 +33,16 @@
   },
   "dependencies": {
     "@plannotator/pi-extension": "^0.22.0",
+    "@ryan_nookpi/pi-extension-diff-review": "^0.2.7",
+    "@tmustier/pi-files-widget": "^0.2.0",
     "@whiskeysockets/baileys": "^7.0.0-rc13",
+    "pi-claude-auth": "^0.1.3",
+    "pi-cmux": "^0.1.16",
+    "pi-keyrouter": "^0.4.0",
     "pi-memory": "^0.3.14",
     "pi-search-hub": "^2.8.0",
+    "pi-subagents": "^0.34.0",
+    "pi-vision-tool": "^1.3.7",
     "version": "^0.1.2",
     "view": "^1.1.1"
   }

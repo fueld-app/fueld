@@ -78,12 +78,16 @@ import type {
               <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[110px]">Del. Qty</th>
             }
             @if (canSeePrices()) {
-              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Cost</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Sell</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Gross ({{ baseCurrency() }})</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Financing</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Net</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]">Tax</th>
+              @if (isBrokerDeal()) {
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Price</th>
+              } @else {
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Cost</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Sell</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Gross ({{ baseCurrency() }})</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Financing</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Net</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]">Tax</th>
+              }
             }
             @if (!readonly()) {
               <th class="w-0 p-0"></th>
@@ -220,43 +224,62 @@ import type {
               }
 
               @if (canSeePrices()) {
-              <!-- Cost (price + currency) -->
-              <td class="px-4 py-2 align-top">
-                <app-order-item-pricing
-                  [row]="row"
-                  side="cost"
-                  [readonly]="readonly()"
-                  [formulaPricingEnabled]="formulaPricingEnabled()"
-                  [priceRefOptions]="priceRefOptions()"
-                  [currencyOptions]="currencyOptions()"
-                  [unitOptions]="unitOptions()"
-                  [plattsMatches]="plattsMatches(row.id)"
-                  [plattsEntryId]="row.costPlattsEntryId"
-                  [decimalPrecision]="decimalPrecisionInput()"
-                  (fieldChange)="onPricingFieldChange(i, 'cost', $event)"
-                  (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
-                />
-              </td>
+              @if (isBrokerDeal()) {
+                <!-- Broker deal: single Price field (sets both cost & sales) -->
+                <td class="px-4 py-2 align-top">
+                  <app-order-item-pricing
+                    [row]="row"
+                    side="cost"
+                    [readonly]="readonly()"
+                    [formulaPricingEnabled]="formulaPricingEnabled()"
+                    [priceRefOptions]="priceRefOptions()"
+                    [currencyOptions]="currencyOptions()"
+                    [unitOptions]="unitOptions()"
+                    [plattsMatches]="plattsMatches(row.id)"
+                    [plattsEntryId]="row.costPlattsEntryId"
+                    [decimalPrecision]="decimalPrecisionInput()"
+                    (fieldChange)="onBrokerPricingChange(i, $event)"
+                    (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
+                  />
+                </td>
+              } @else {
+                <!-- Cost (price + currency) -->
+                <td class="px-4 py-2 align-top">
+                  <app-order-item-pricing
+                    [row]="row"
+                    side="cost"
+                    [readonly]="readonly()"
+                    [formulaPricingEnabled]="formulaPricingEnabled()"
+                    [priceRefOptions]="priceRefOptions()"
+                    [currencyOptions]="currencyOptions()"
+                    [unitOptions]="unitOptions()"
+                    [plattsMatches]="plattsMatches(row.id)"
+                    [plattsEntryId]="row.costPlattsEntryId"
+                    [decimalPrecision]="decimalPrecisionInput()"
+                    (fieldChange)="onPricingFieldChange(i, 'cost', $event)"
+                    (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
+                  />
+                </td>
 
-              <!-- Sell (price + currency + unit) -->
-              <td class="px-4 py-2 align-top">
-                <app-order-item-pricing
-                  [row]="row"
-                  side="sales"
-                  [readonly]="readonly()"
-                  [formulaPricingEnabled]="formulaPricingEnabled()"
-                  [priceRefOptions]="priceRefOptions()"
-                  [currencyOptions]="currencyOptions()"
-                  [unitOptions]="unitOptions()"
-                  [plattsMatches]="plattsMatches(row.id)"
-                  [plattsEntryId]="row.salesPlattsEntryId"
-                  [decimalPrecision]="decimalPrecisionInput()"
-                  (fieldChange)="onPricingFieldChange(i, 'sales', $event)"
-                  (plattsSelect)="selectPlattsMatch(i, 'sales', $event)"
-                />
-              </td>
+                <!-- Sell (price + currency + unit) -->
+                <td class="px-4 py-2 align-top">
+                  <app-order-item-pricing
+                    [row]="row"
+                    side="sales"
+                    [readonly]="readonly()"
+                    [formulaPricingEnabled]="formulaPricingEnabled()"
+                    [priceRefOptions]="priceRefOptions()"
+                    [currencyOptions]="currencyOptions()"
+                    [unitOptions]="unitOptions()"
+                    [plattsMatches]="plattsMatches(row.id)"
+                    [plattsEntryId]="row.salesPlattsEntryId"
+                    [decimalPrecision]="decimalPrecisionInput()"
+                    (fieldChange)="onPricingFieldChange(i, 'sales', $event)"
+                    (plattsSelect)="selectPlattsMatch(i, 'sales', $event)"
+                  />
+                </td>
 
-              <!-- Gross Profit (auto-calculated) -->
+                <!-- Gross Profit (auto-calculated) -->
               <td class="px-4 py-3 pt-4 text-right tabular-nums"
                 [class.text-green-600]="!isFormulaUnfinalized(row) && profitForRow(row) > 0"
                 [class.text-red-600]="!isFormulaUnfinalized(row) && profitForRow(row) < 0"
@@ -319,6 +342,7 @@ import type {
                   }
                 }
               </td>
+              }
               }
 
               <!-- Reorder + Delete -->
@@ -825,6 +849,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly readonly = input(false);
   readonly allowDeliveredEdit = input(false);
   readonly canSeePrices = input(true);
+  readonly isBrokerDeal = input(false);
   readonly currency = input('USD');
   readonly financingRateAnnual = input(0.08);
   readonly financingDays = input(0);
@@ -1166,6 +1191,29 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     const field = fieldMap[event.field];
     if (field) {
       this.updateField(index, field, event.value);
+    }
+  }
+
+  /** Broker deal pricing: update both cost and sales sides simultaneously. */
+  onBrokerPricingChange(index: number, event: { field: string; value: unknown }): void {
+    // Update the cost side
+    this.onPricingFieldChange(index, 'cost', event);
+    // Sync the sales side to match
+    const salesFieldMap: Record<string, keyof OrderItemRow> = {
+      price: 'salesPrice',
+      currency: 'salesCurrency',
+      unit: 'salesUnit',
+      referenceId: 'salesReferenceId',
+      premium: 'salesPremium',
+      barging: 'salesBarging',
+      pricingModel: 'salesPricingModel',
+      conversionFactor: 'unitConversionFactor',
+      bargingUnit: 'salesBargingUnit',
+      creditDays: 'salesCreditDays',
+    };
+    const salesField = salesFieldMap[event.field];
+    if (salesField) {
+      this.updateField(index, salesField, event.value);
     }
   }
 
