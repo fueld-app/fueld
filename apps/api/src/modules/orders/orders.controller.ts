@@ -760,6 +760,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             salesCreditDays: t.Optional(t.Nullable(t.Number())),
             salesPriceFinalized: t.Optional(t.Nullable(t.Boolean())),
             taxRate: t.Optional(t.Nullable(t.String())),
+            commissionPerUnit: t.Optional(t.Nullable(t.String())),
           }),
         ),
       }),

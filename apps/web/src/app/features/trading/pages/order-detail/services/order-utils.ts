@@ -40,6 +40,7 @@ export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuant
       warehouseId: r.warehouseId ?? null,
       plannedInventoryAt: r.plannedInventoryAt ?? null,
       taxRate: r.taxRate != null ? String(r.taxRate) : null,
+      commissionPerUnit: r.commissionPerUnit != null ? String(r.commissionPerUnit) : null,
     };
   });
 }

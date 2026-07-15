@@ -122,6 +122,7 @@ export class OrderLoaderService {
       plannedInventoryAt: item.plannedInventoryAt ?? null,
       taxRate: item.taxRate != null ? parseFloat(item.taxRate) : null,
       taxAmount: item.taxAmount != null ? parseFloat(item.taxAmount) : null,
+      commissionPerUnit: (item as any).commissionPerUnit != null ? parseFloat((item as any).commissionPerUnit) : null,
     }));
 
     if (ownRes.success) result.ownCompanies = ownRes.data;

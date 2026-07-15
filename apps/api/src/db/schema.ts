@@ -1090,6 +1090,9 @@ export const orderItems = pgTable('order_items', {
 
   customerNote: text('customer_note'),
 
+  // Broker deal — per-line-item commission rate (e.g., 3.00 for $3/unit)
+  commissionPerUnit: numeric('commission_per_unit', { precision: 12, scale: 4 }),
+
   // ── Inventory linkage (optional; only set for tracked SKUs) ───────
   // When set, this line participates in inventory rules: stock checks at
   // confirmation, reservation creation, and movement on delivery.

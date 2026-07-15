@@ -701,6 +701,13 @@
       "when": 1784039809726,
       "tag": "0099_broker_deals",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1784097182285,
+      "tag": "0100_order_item_commission",
+      "breakpoints": true
     }
   ]
 }

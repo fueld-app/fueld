@@ -47,6 +47,8 @@ export interface OrderItemRow {
   // Tax
   taxRate?: number | null;
   taxAmount?: number | null;
+  // Broker deal — per-line-item commission
+  commissionPerUnit?: number | null;
 }
 
 import { PricingModel } from '@fueld/types';

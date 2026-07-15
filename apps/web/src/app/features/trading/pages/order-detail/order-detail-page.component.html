@@ -44,8 +44,13 @@
         [category]="order()?.categoryKey ?? ''"
         [currencyOptions]="refData.configuredCurrencies()"
         [categoryOptions]="refData.orderCategories()"
+        [brokerDealsEnabled]="brokerDealsEnabled()"
+        [isBrokerDeal]="isBrokerDeal()"
+        [brokerDealLabel]="brokerDealLabel()"
+        [isReadonly]="isReadonly()"
         (currencyChange)="onCurrencyChange($event)"
         (categoryChange)="onCategoryChange($event)"
+        (brokerDealChange)="onBrokerDealToggle($event)"
       />
     </div>
   </app-trading-detail-header>
@@ -223,31 +228,6 @@
   </div>
 </app-trading-detail-meta-cards>
 
-@if (brokerDealsEnabled() && !isInternalTransfer()) {
-  <div class="mt-3 flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-surface-2 px-4 py-3">
-    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-ink-dim cursor-pointer">
-      <input type="checkbox"
-        [checked]="isBrokerDeal()"
-        (change)="onBrokerDealToggle($any($event.target).checked)"
-        [disabled]="isReadonly()"
-        class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-      />
-      {{ brokerDealLabel() }}
-    </label>
-    @if (isBrokerDeal()) {
-      <div class="flex items-center gap-2">
-        <label class="text-sm text-gray-500 dark:text-muted">Commission per MT:</label>
-        <input type="number" step="0.01"
-          [value]="commissionPerMt() ?? ''"
-          (input)="onCommissionPerMtChange($any($event.target).value)"
-          [disabled]="isReadonly()"
-          class="w-24 rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
-        />
-        <span class="text-xs text-gray-400 dark:text-muted">{{ brokerDealSvc.settings().commissionCurrency }}</span>
-      </div>
-    }
-  </div>
-}
 
 @if (isInquiryContext() && !isInternalTransfer()) {
   <!-- Moved to Suppliers tab — lazy-loaded -->

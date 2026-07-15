@@ -5,6 +5,9 @@ import {
   output,
   signal,
   HostListener,
+  ElementRef,
+  ViewChild,
+  inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { DropdownOption } from '@app/shared/components/searchable-dropdown/searchable-dropdown.component';
@@ -14,7 +17,7 @@ import type { DropdownOption } from '@app/shared/components/searchable-dropdown/
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule],
   template: `
-    <div class="relative">
+    <div class="relative" #trigger>
       <button
         (click)="toggle()"
         class="inline-flex items-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface p-2 text-sm text-gray-500 dark:text-muted shadow-sm hover:bg-gray-50 dark:hover:bg-surface-tint hover:text-gray-700 transition-colors"
@@ -28,13 +31,13 @@ import type { DropdownOption } from '@app/shared/components/searchable-dropdown/
       @if (isOpen()) {
         <div class="fixed inset-0 z-40" (click)="close()"></div>
         <div
-          class="fixed z-50 w-48 rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface p-3 shadow-lg"
+          class="fixed z-50 w-56 rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface p-3 shadow-lg"
           [style]="positionStyle()"
         >
           <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Currency</label>
           <select
             [ngModel]="currency()"
-            (ngModelChange)="currencyChange.emit($event); close()"
+            (ngModelChange)="currencyChange.emit($event)"
             class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-2 py-1.5 text-sm text-gray-900 dark:text-ink outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           >
             @for (c of currencyOptions(); track c.value) {
@@ -44,7 +47,7 @@ import type { DropdownOption } from '@app/shared/components/searchable-dropdown/
           <label class="mt-2 mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Category</label>
           <select
             [ngModel]="category()"
-            (ngModelChange)="categoryChange.emit($event); close()"
+            (ngModelChange)="categoryChange.emit($event)"
             class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-2 py-1.5 text-sm text-gray-900 dark:text-ink outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
           >
             <option value="">— None —</option>
@@ -52,6 +55,20 @@ import type { DropdownOption } from '@app/shared/components/searchable-dropdown/
               <option [value]="c.key">{{ c.label }}</option>
             }
           </select>
+
+          @if (brokerDealsEnabled()) {
+            <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+              <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-ink-dim cursor-pointer">
+                <input type="checkbox"
+                  [checked]="isBrokerDeal()"
+                  (change)="brokerDealChange.emit($any($event.target).checked)"
+                  [disabled]="isReadonly()"
+                  class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                {{ brokerDealLabel() }}
+              </label>
+            </div>
+          }
         </div>
       }
     </div>
@@ -62,19 +79,35 @@ export class OrderSettingsDropdownComponent {
   readonly category = input<string>('');
   readonly currencyOptions = input<DropdownOption[]>([]);
   readonly categoryOptions = input<{ key: string; label: string }[]>([]);
+  // Broker deal
+  readonly brokerDealsEnabled = input(false);
+  readonly isBrokerDeal = input(false);
+  readonly brokerDealLabel = input('Broker Deal');
+  readonly isReadonly = input(false);
 
   readonly currencyChange = output<string>();
   readonly categoryChange = output<string>();
+  readonly brokerDealChange = output<boolean>();
 
   protected readonly isOpen = signal(false);
   protected positionStyle = signal('top: 0px; left: 0px');
+
+  @ViewChild('trigger', { static: true }) triggerRef!: ElementRef<HTMLElement>;
 
   protected toggle(): void {
     if (this.isOpen()) {
       this.close();
     } else {
-      this.isOpen.set(true);
+      this.open();
     }
+  }
+
+  protected open(): void {
+    const rect = this.triggerRef.nativeElement.getBoundingClientRect();
+    const top = rect.bottom + 4;
+    const left = Math.max(0, rect.right - 224); // 224 = w-56 = 14rem
+    this.positionStyle.set(`top: ${top}px; left: ${left}px`);
+    this.isOpen.set(true);
   }
 
   protected close(): void {

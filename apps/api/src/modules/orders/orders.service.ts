@@ -177,6 +177,8 @@ interface SaveItemInput {
   inventorySkuId?: string | null;
   warehouseId?: string | null;
   plannedInventoryAt?: string | null;
+  // Broker deal — per-line-item commission
+  commissionPerUnit?: string | null;
 }
 
 interface FinalizeItemPriceInput {
@@ -1651,6 +1653,8 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       inventorySkuId: item.inventorySkuId ?? null,
       warehouseId: item.warehouseId ?? null,
       plannedInventoryAt: item.plannedInventoryAt ? new Date(item.plannedInventoryAt) : null,
+      // Broker deal — per-line-item commission
+      commissionPerUnit: item.commissionPerUnit ?? null,
     };
   });
 

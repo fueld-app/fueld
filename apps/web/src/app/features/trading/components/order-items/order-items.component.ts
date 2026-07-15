@@ -20,6 +20,7 @@ import {
   type DropdownOption,
 } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
+import { BrokerDealService } from '../../../../core/services/broker-deal.service';
 import { OrderItemPricingComponent } from './order-item-pricing.component';
 import { OrderItemInventoryBandComponent } from './order-item-inventory-band.component';
 
@@ -80,6 +81,8 @@ import type {
             @if (canSeePrices()) {
               @if (isBrokerDeal()) {
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Price</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]">Comm./{{ brokerUnit() }}</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Profit ({{ baseCurrency() }})</th>
               } @else {
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Cost</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Sell</th>
@@ -90,7 +93,7 @@ import type {
               }
             }
             @if (!readonly()) {
-              <th class="w-0 p-0"></th>
+              <th class="w-12 p-0"></th>
             }
           </tr>
         </thead>
@@ -243,6 +246,23 @@ import type {
                     (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
                   />
                 </td>
+                <!-- Broker deal: Commission per unit -->
+                <td class="px-4 py-2 align-top">
+                  @if (readonly()) {
+                    <span class="text-sm text-gray-500 dark:text-muted">{{ row.commissionPerUnit ?? '—' }}</span>
+                  } @else {
+                    <input type="number" step="0.01" min="0"
+                      [ngModel]="row.commissionPerUnit ?? ''"
+                      (ngModelChange)="updateField(i, 'commissionPerUnit', +$event || null)"
+                      placeholder="0"
+                      class="w-20 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+                    />
+                  }
+                </td>
+                <!-- Broker deal: Profit (commission × quantity) -->
+                <td class="px-4 py-3 text-right tabular-nums text-sm font-semibold text-green-600 dark:text-green-400">
+                  {{ brokerProfitForRow(row) | number:'1.2-2' }}
+                </td>
               } @else {
                 <!-- Cost (price + currency) -->
                 <td class="px-4 py-2 align-top">
@@ -350,7 +370,7 @@ import type {
 
               <!-- Reorder + Delete -->
               @if (!readonly()) {
-                <td class="relative w-0 p-0">
+                <td class="relative w-12 p-0">
                   <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
                     <button
                       type="button"
@@ -398,13 +418,13 @@ import type {
                 [warehouseOptions]="warehouseOptionsInput()"
                 [inventorySkuOptions]="inventorySkuOptionsInput()"
                 [availability]="availabilityByRowId()[row.id]"
-                [colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 1 : 5) : 0)"
+                [colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 3 : 5) : 0)"
                 (fieldChange)="onInventoryFieldChange(i, $event)"
               />
             }
           } @empty {
             <tr>
-              <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 1 : 5) : 0)" class="px-4 py-12 text-center">
+              <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 3 : 5) : 0)" class="px-4 py-12 text-center">
                 <p class="text-sm text-gray-400 dark:text-muted">No line items yet.</p>
                 @if (!readonly()) {
                   <button
@@ -902,6 +922,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly displayCurrencyChange = output<string>();
 
   private readonly wsService = inject(WebSocketService);
+  private readonly brokerDealSvc = inject(BrokerDealService);
   private fxSub: Subscription | null = null;
   private readonly fxRates = signal<Record<string, number>>({ USD: 1 });
 
@@ -1431,6 +1452,23 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   netProfitForRow(row: OrderItemRow): number {
     if (this.isFormulaUnfinalized(row)) return 0;
     return this.profitForRow(row) - this.financingCostForRow(row);
+  }
+
+  /** Commission unit from tenant settings (e.g., 'MT', 'GAL'). */
+  brokerUnit(): string {
+    return this.brokerDealSvc.settings().commissionUnit || 'MT';
+  }
+
+  /** Broker deal profit = commissionPerUnit × quantity (in base unit). */
+  brokerProfitForRow(row: OrderItemRow): number {
+    const rate = row.commissionPerUnit ?? 0;
+    const qty = row.quantity ?? 0;
+    return rate * qty;
+  }
+
+  /** Total broker deal profit across all rows. */
+  brokerTotalProfit(): number {
+    return this.rows().reduce((s, r) => s + this.brokerProfitForRow(r), 0);
   }
 
   /** True when either side is formula-priced but not yet finalized. */

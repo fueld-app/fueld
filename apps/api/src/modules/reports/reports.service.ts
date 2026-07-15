@@ -2320,7 +2320,7 @@ export async function buildBrokerCommissionReport(
       productType: orderItems.productType,
       quantity: orderItems.quantity,
       unit: orderItems.unit,
-      commissionPerMt: orders.commissionPerMt,
+      commissionPerMt: orderItems.commissionPerUnit,
       deliveredAt: orders.deliveredAt,
       status: orders.status,
       primaryDate: dateColumn,
