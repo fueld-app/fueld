@@ -8,10 +8,11 @@
 
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { integrationCredentials, tenants, users, orders, invoices, orderItems, counterparties } from '../../db/schema';
+import { integrationCredentials, tenants, users, orders, invoices, orderItems, counterparties, type TenantSettings } from '../../db/schema';
 import { encrypt, decrypt } from '../../lib/crypto';
 import { randomBytes } from 'crypto';
 import type { IntegrationStatusDto } from '@fueld/types';
+import { sendNotificationEmail } from '../../lib/email';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -670,6 +671,14 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
   const { token, realmId } = tokenInfo;
   const apiBase = getQBConfig().environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
 
+  // Load product mappings from TenantSettings
+  const [tenantRow] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  const qbSettings = ((tenantRow?.settings ?? {}) as TenantSettings).quickbooksSettings;
+  const productMappings = new Map<string, string>();
+  for (const m of qbSettings?.productMappings ?? []) {
+    productMappings.set(m.productType.toLowerCase(), m.qbItemId);
+  }
+
   // Find a fallback Item in QB (for SalesItemLineDetail)
   let fallbackItemId = '1'; // Default to first item
   try {
@@ -701,7 +710,7 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
       Amount: amount,
       DetailType: 'SalesItemLineDetail',
       Description: desc,
-      SalesItemLineDetail: { ItemRef: { value: fallbackItemId } },
+      SalesItemLineDetail: { ItemRef: { value: productMappings.get(item.productType.toLowerCase()) ?? fallbackItemId } },
     };
   });
 
@@ -746,6 +755,33 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
   // Store the QB invoice ID
   await upsertCredential(tenantId, `qb_invoice_${invoiceId}`, qbInvoice.Id, '');
   console.log(`[QB] Created invoice ${qbInvoice.DocNumber} (QB ID: ${qbInvoice.Id}) for Fueld invoice ${invoice.invoiceNumber}`);
+
+  // Send notification email (e.g. to Kathy at backoffice@channeltx.com)
+  if (qbSettings?.notifyEmail) {
+    try {
+      const html = `
+        <div style="font-family:Arial,sans-serif;color:#111827;line-height:1.5;max-width:600px;">
+          <h2 style="margin:0 0 8px;">Invoice synced to QuickBooks</h2>
+          <p style="margin:0 0 16px;color:#6b7280;">The following invoice has been pushed to QuickBooks Online:</p>
+          <table style="width:100%;font-size:14px;">
+            <tr><td style="padding:4px 0;color:#6b7280;">Fueld Invoice:</td><td style="padding:4px 0;font-weight:500;">${invoice.invoiceNumber}</td></tr>
+            <tr><td style="padding:4px 0;color:#6b7280;">Order:</td><td style="padding:4px 0;font-weight:500;">${order.orderNumber ?? ''}</td></tr>
+            <tr><td style="padding:4px 0;color:#6b7280;">QuickBooks Invoice:</td><td style="padding:4px 0;font-weight:500;">${qbInvoice.DocNumber} (ID: ${qbInvoice.Id})</td></tr>
+          </table>
+          <p style="margin-top:16px;color:#9ca3af;font-size:11px;">This is an automated notification from Fueld.</p>
+        </div>
+      `;
+      await sendNotificationEmail(
+        [qbSettings.notifyEmail],
+        `Invoice ${invoice.invoiceNumber} synced to QuickBooks`,
+        html,
+        { textContent: `Invoice ${invoice.invoiceNumber} (Order ${order.orderNumber ?? ''}) has been synced to QuickBooks as invoice ${qbInvoice.DocNumber}.` },
+      );
+    } catch (emailErr) {
+      console.error('[QB] Failed to send notification email:', emailErr);
+    }
+  }
+
   return { qbInvoiceId: qbInvoice.Id, qbInvoiceNumber: qbInvoice.DocNumber };
 }
 
@@ -840,4 +876,45 @@ export async function getOrderSyncStatus(orderId: string): Promise<{
   }
 
   return getInvoiceSyncStatus(invoice.id);
+}
+
+/**
+ * Fetch active Items/Services from QuickBooks for product mapping UI.
+ */
+export async function getQBItems(): Promise<Array<{ id: string; name: string; type: string }>> {
+  const tokenInfo = await getValidAccessToken();
+  if (!tokenInfo) throw new Error('QuickBooks is not connected.');
+
+  const { token, realmId } = tokenInfo;
+  const apiBase = getQBConfig().environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
+
+  const res = await fetch(
+    `${apiBase}/v3/company/${realmId}/query?query=${encodeURIComponent('SELECT Id, Name, Type FROM Item WHERE Active = true ORDER BY Name MAXRESULTS 100')}`,
+    { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } },
+  );
+
+  if (!res.ok) throw new Error(`Failed to fetch QB items: ${res.status}`);
+
+  const data = await res.json() as { QueryResponse?: { Item?: { Id: string; Name: string; Type: string }[] } };
+  return (data.QueryResponse?.Item ?? []).map((item) => ({ id: item.Id, name: item.Name, type: item.Type }));
+}
+
+/**
+ * Get QuickBooks integration settings for the current tenant.
+ */
+export async function getQuickBooksSettings(): Promise<{
+  notifyEmail: string;
+  autoSyncInvoices: boolean;
+  productMappings: { productType: string; qbItemId: string; qbItemName: string }[];
+}> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as TenantSettings;
+  const qb = settings.quickbooksSettings;
+  return {
+    notifyEmail: qb?.notifyEmail ?? '',
+    autoSyncInvoices: qb?.autoSyncInvoices ?? false,
+    productMappings: qb?.productMappings ?? [],
+  };
 }

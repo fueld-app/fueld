@@ -96,6 +96,7 @@ import {
 } from './settings.service';
 import { getCommentsDigestSettings } from '../comments/comments-digest.service';
 import { getDailyPricingEmailSettings, getCustomerContactOptions } from '../reports/daily-pricing.service';
+import { getQuickBooksSettings, getQBItems } from '../quickbooks/quickbooks.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
   getIntegrationStatus,
@@ -761,6 +762,56 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       emailSubject: t.Optional(t.String()),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update daily pricing email settings (admin only)' },
+  })
+
+  .get('/my-quickbooks-settings', async () => {
+    try {
+      const data = await getQuickBooksSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get QuickBooks integration settings for current tenant' },
+  })
+
+  .get('/quickbooks-items', async () => {
+    try {
+      const data = await getQBItems();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'List QuickBooks Items/Services for product mapping' },
+  })
+
+  .put('/quickbooks-settings', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      if (!tenant) throw new Error('No tenant found');
+      const settings = { ...(tenant.settings as any) };
+      settings.quickbooksSettings = body;
+      await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+      return { success: true, data: body } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      notifyEmail: t.Optional(t.String()),
+      autoSyncInvoices: t.Boolean(),
+      productMappings: t.Array(t.Object({
+        productType: t.String(),
+        qbItemId: t.String(),
+        qbItemName: t.String(),
+      })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update QuickBooks integration settings (admin only)' },
   })
 
   .get('/my-vessel-types', async () => {

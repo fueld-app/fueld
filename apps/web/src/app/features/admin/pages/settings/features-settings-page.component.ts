@@ -325,6 +325,75 @@ import { ThroughputReportService } from '@app/core/services/throughput-report.se
             }
           </div>
 
+          <!-- QuickBooks Integration -->
+          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">🔗 QuickBooks Integration</h3>
+            <p class="mt-1 text-xs text-gray-500 dark:text-muted">
+              Map FUELD products to QuickBooks Items and notify Kathy when invoices are pushed.
+            </p>
+
+            <div class="mt-4 space-y-4 border-t border-gray-100 dark:border-line pt-4">
+              <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Notification Email</label>
+                <input
+                  type="email"
+                  [ngModel]="qbNotifyEmail()"
+                  (ngModelChange)="qbNotifyEmail.set($event)"
+                  placeholder="backoffice@channeltx.com"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                />
+                <p class="mt-1 text-xs text-gray-400 dark:text-muted">Sent when an invoice is pushed to QuickBooks</p>
+              </div>
+
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  [ngModel]="qbAutoSync()"
+                  (ngModelChange)="qbAutoSync.set($event)"
+                  class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span class="text-sm text-gray-700 dark:text-ink-dim">Auto-sync invoices to QuickBooks on creation (otherwise use manual Sync button)</span>
+              </label>
+
+              <div>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-2">Product Mappings (FUELD → QuickBooks)</label>
+                @if (qbItems().length === 0) {
+                  <p class="text-xs text-gray-400 dark:text-muted italic">Connect QuickBooks first to load available Items/Services.</p>
+                } @else {
+                  <div class="max-h-60 overflow-y-auto rounded-lg border border-gray-200 dark:border-line">
+                    <table class="w-full text-sm">
+                      <thead>
+                        <tr class="border-b border-gray-100 dark:border-line bg-gray-50 dark:bg-surface-2 sticky top-0">
+                          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-muted">FUELD Product</th>
+                          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-muted">QuickBooks Item</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-50 dark:divide-line">
+                        @for (product of configuredProducts(); track product) {
+                          <tr>
+                            <td class="px-3 py-2 text-gray-700 dark:text-ink-dim">{{ product }}</td>
+                            <td class="px-3 py-2">
+                              <select
+                                [ngModel]="getMappedItemId(product)"
+                                (ngModelChange)="updateProductMapping(product, $event)"
+                                class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 text-xs focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
+                              >
+                                <option value="">— Not mapped —</option>
+                                @for (item of qbItems(); track item.id) {
+                                  <option [value]="item.id">{{ item.name }}</option>
+                                }
+                              </select>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+
           <!-- Save button -->
           <div class="flex justify-end">
             <button
@@ -386,6 +455,13 @@ export class FeaturesSettingsPageComponent implements OnInit {
   readonly pricingPreviewing = signal(false);
   readonly customerContacts = signal<Array<{ id: string; name: string; email: string | null; companyName: string }>>([]);
 
+  // QuickBooks settings
+  readonly qbNotifyEmail = signal('');
+  readonly qbAutoSync = signal(false);
+  readonly qbProductMappings = signal<Array<{ productType: string; qbItemId: string; qbItemName: string }>>([]);
+  readonly qbItems = signal<Array<{ id: string; name: string; type: string }>>([]);
+  readonly configuredProducts = signal<string[]>([]);
+
   ngOnInit(): void {
     this.load();
   }
@@ -393,7 +469,7 @@ export class FeaturesSettingsPageComponent implements OnInit {
   async load(): Promise<void> {
     this.loading.set(true);
     try {
-      const [photoRes, throughputRes, digestRes, pricingRes, contactsRes] = await Promise.all([
+      const [photoRes, throughputRes, digestRes, pricingRes, contactsRes, qbRes, productsRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<{
           enabled: boolean; photoCategories: string[]; maxFileSizeMb: number;
         }>>(`${API}/admin/settings/my-photo-gallery-settings`)),
@@ -407,7 +483,19 @@ export class FeaturesSettingsPageComponent implements OnInit {
           enabled: boolean; placeId: string | null; placeName: string | null; hourUtc: number; recipientContactIds: string[]; extraEmails: string[]; lookbackHours: number; emailSubject: string;
         }>>(`${API}/admin/settings/my-daily-pricing-settings`)),
         firstValueFrom(this.http.get<ApiResponse<{ id: string; name: string; email: string | null; companyName: string }[]>>(`${API}/admin/settings/daily-pricing-contacts`)),
+        firstValueFrom(this.http.get<ApiResponse<{ notifyEmail: string; autoSyncInvoices: boolean; productMappings: { productType: string; qbItemId: string; qbItemName: string }[] }>>(`${API}/admin/settings/my-quickbooks-settings`)),
+        firstValueFrom(this.http.get<ApiResponse<{ products: string[] }>>(`${API}/admin/settings/my-products`)),
       ]);
+
+      // Try to load QB items (may fail if QB not connected)
+      try {
+        const qbItemsRes = await firstValueFrom(this.http.get<ApiResponse<{ id: string; name: string; type: string }[]>>(`${API}/admin/settings/quickbooks-items`));
+        if (qbItemsRes.success && qbItemsRes.data) {
+          this.qbItems.set(qbItemsRes.data);
+        }
+      } catch {
+        // QB not connected — items list will be empty
+      }
 
       if (photoRes.success && photoRes.data) {
         this.photoGalleryEnabled.set(photoRes.data.enabled);
@@ -437,6 +525,14 @@ export class FeaturesSettingsPageComponent implements OnInit {
       if (contactsRes.success && contactsRes.data) {
         this.customerContacts.set(contactsRes.data);
       }
+      if (qbRes.success && qbRes.data) {
+        this.qbNotifyEmail.set(qbRes.data.notifyEmail ?? '');
+        this.qbAutoSync.set(qbRes.data.autoSyncInvoices ?? false);
+        this.qbProductMappings.set(qbRes.data.productMappings ?? []);
+      }
+      if (productsRes.success && productsRes.data) {
+        this.configuredProducts.set(productsRes.data.products ?? []);
+      }
     } catch {
       this.toastSvc.show('error', 'Failed to load feature settings.');
     } finally {
@@ -452,7 +548,7 @@ export class FeaturesSettingsPageComponent implements OnInit {
         .map((c) => c.trim().toUpperCase())
         .filter((c) => c.length > 0);
 
-      const [photoRes, throughputRes, digestRes, pricingRes] = await Promise.all([
+      const [photoRes, throughputRes, digestRes, pricingRes, qbRes] = await Promise.all([
         firstValueFrom(this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/photo-gallery`, {
           enabled: this.photoGalleryEnabled(),
           photoCategories: photoCategories.length ? photoCategories : ['BEFORE', 'AFTER', 'TANK_SEAL', 'OTHER'],
@@ -480,9 +576,14 @@ export class FeaturesSettingsPageComponent implements OnInit {
           lookbackHours: this.pricingLookbackHours(),
           emailSubject: this.pricingEmailSubject(),
         })),
+        firstValueFrom(this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/quickbooks-settings`, {
+          notifyEmail: this.qbNotifyEmail(),
+          autoSyncInvoices: this.qbAutoSync(),
+          productMappings: this.qbProductMappings(),
+        })),
       ]);
 
-      if (photoRes.success && throughputRes.success && digestRes.success && pricingRes.success) {
+      if (photoRes.success && throughputRes.success && digestRes.success && pricingRes.success && qbRes.success) {
         this.toastSvc.show('success', 'Feature settings saved.');
         // Invalidate cached services so nav menu updates
         this.brokerDealSvc.invalidateCache();
@@ -531,6 +632,25 @@ export class FeaturesSettingsPageComponent implements OnInit {
       }
       return [...ids, contactId];
     });
+  }
+
+  updateProductMapping(productType: string, qbItemId: string): void {
+    const qbItem = this.qbItems().find((i) => i.id === qbItemId);
+    this.qbProductMappings.update((mappings) => {
+      const existing = mappings.find((m) => m.productType === productType);
+      if (existing) {
+        return mappings.map((m) =>
+          m.productType === productType
+            ? { ...m, qbItemId, qbItemName: qbItem?.name ?? '' }
+            : m,
+        );
+      }
+      return [...mappings, { productType, qbItemId, qbItemName: qbItem?.name ?? '' }];
+    });
+  }
+
+  getMappedItemId(productType: string): string {
+    return this.qbProductMappings().find((m) => m.productType === productType)?.qbItemId ?? '';
   }
 
   async previewPricing(): Promise<void> {

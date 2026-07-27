@@ -309,6 +309,12 @@ export interface TenantSettings {
     lookbackHours?: number;       // look back this many hours for delivered prices (default 24)
     emailSubject?: string;        // custom subject line
   };
+  // QuickBooks integration settings (Feature 4: QuickBooks Integration)
+  quickbooksSettings?: {
+    notifyEmail?: string;          // email to notify when invoice pushed to QB (e.g. Kathy)
+    autoSyncInvoices?: boolean;    // auto-push invoices to QB on creation (default false = manual)
+    productMappings?: { productType: string; qbItemId: string; qbItemName: string }[];
+  };
   // Microsoft email sending
   approvedEmailDomains?: string[];            // Restrict Microsoft connect to these domains (empty/null = any)
   microsoftConnectForceUserEmail?: boolean;    // Force Microsoft connect to match the user's Fueld email
