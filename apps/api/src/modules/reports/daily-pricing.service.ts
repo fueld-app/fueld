@@ -124,6 +124,7 @@ async function getPostedPrices(
   since: Date,
 ): Promise<PostedPrice[]> {
   // Query order items from delivered/invoiced/paid orders at the dock within the lookback window
+  // Use COALESCE(deliveredAt, createdAt) since some orders don't have deliveredAt set
   const rows = await db
     .select({
       productType: orderItems.productType,
@@ -142,10 +143,12 @@ async function getPostedPrices(
         eq(orders.tenantId, tenantId),
         eq(orders.placeId, placeId),
         inArray(orders.status, ['DELIVERED', 'INVOICED', 'PAID']),
-        gte(orders.deliveredAt, since),
+        sql`COALESCE(${orders.deliveredAt}, ${orders.createdAt}) >= ${since}`,
+        // Only fuel products (GAL unit, exclude disposal/service/fee items)
+        sql`LOWER(${orderItems.salesUnit}) = 'gal' OR LOWER(${orderItems.unit}) = 'gal'`,
       ),
     )
-    .orderBy(desc(orders.deliveredAt));
+    .orderBy(desc(orders.deliveredAt), desc(orders.createdAt));
 
   // Keep only the latest price per product type (first occurrence wins since sorted by deliveredAt desc)
   const seen = new Set<string>();
