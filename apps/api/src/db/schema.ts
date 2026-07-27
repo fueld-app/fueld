@@ -290,6 +290,15 @@ export interface TenantSettings {
     defaultUnit?: string;        // e.g. 'Gallons'
     groupByCategory?: boolean;   // group by orderCategories
   };
+  // Comments Digest Email feature settings (Feature 2: Comments Digest)
+  commentsDigest?: {
+    enabled?: boolean;
+    hourUtc?: number;             // when to send daily digest (default 10 = 5am CST)
+    recipientRoles?: string[];    // roles that receive the digest (default: all)
+    extraEmails?: string[];
+    includeActivityLog?: boolean; // include status changes + updates (default true)
+    entityTypes?: string[];       // e.g. ['order', 'vessel'] — null/empty = all
+  };
   // Microsoft email sending
   approvedEmailDomains?: string[];            // Restrict Microsoft connect to these domains (empty/null = any)
   microsoftConnectForceUserEmail?: boolean;    // Force Microsoft connect to match the user's Fueld email

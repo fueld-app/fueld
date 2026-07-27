@@ -38,6 +38,7 @@ import {
   exportThroughputXlsx,
 } from './reports.service';
 import { getThroughputReportSettings } from '../admin/settings.service';
+import { previewCommentsDigest, getCommentsDigestSettings } from '../comments/comments-digest.service';
 
 const reportFiltersSchema = t.Object({
   from: t.Optional(t.String()),
@@ -459,4 +460,16 @@ export const reportsController = new Elysia({ prefix: '/reports' })
       to: t.Optional(t.String()),
     }),
     detail: { tags: ['Reports'], summary: 'Export throughput report as XLSX', security: [{ bearerAuth: [] }] },
+  })
+
+  .get('/comments-digest/preview', async ({ auth }) => {
+    try {
+      const result = await previewCommentsDigest(auth.tenantId);
+      return { success: true, data: result } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Reports'], summary: 'Preview comments digest email content', security: [{ bearerAuth: [] }] },
   });

@@ -743,6 +743,13 @@
       "when": 1784138900000,
       "tag": "0105_channeltx_throughput_report_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1784139000000,
+      "tag": "0106_channeltx_comments_digest_settings",
+      "breakpoints": true
     }
   ]
 }

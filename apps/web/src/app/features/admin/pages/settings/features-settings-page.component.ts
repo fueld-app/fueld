@@ -131,6 +131,73 @@ import { ThroughputReportService } from '@app/core/services/throughput-report.se
             }
           </div>
 
+          <!-- Comments Digest -->
+          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">📧 Daily Comments Digest</h3>
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
+                  Daily email with full activity rundown (comments + status changes) sent to all team members.
+                </p>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer ml-4">
+                <input
+                  type="checkbox"
+                  [ngModel]="digestEnabled()"
+                  (ngModelChange)="digestEnabled.set($event)"
+                  class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span class="text-sm font-medium text-gray-700 dark:text-ink-dim">
+                  {{ digestEnabled() ? 'Enabled' : 'Disabled' }}
+                </span>
+              </label>
+            </div>
+
+            @if (digestEnabled()) {
+              <div class="mt-4 space-y-3 border-t border-gray-100 dark:border-line pt-4">
+                <div class="flex items-center gap-4">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Send Time (UTC hour)</label>
+                    <input
+                      type="number"
+                      [ngModel]="digestHourUtc()"
+                      (ngModelChange)="digestHourUtc.set(+$event)"
+                      min="0"
+                      max="23"
+                      class="w-20 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                    />
+                    <span class="ml-2 text-xs text-gray-400 dark:text-muted">{{ digestHourUtc() }}:00 UTC</span>
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    [ngModel]="digestIncludeActivityLog()"
+                    (ngModelChange)="digestIncludeActivityLog.set($event)"
+                    class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-ink-dim">Include activity log (status changes + updates)</span>
+                </label>
+                <button
+                  type="button"
+                  (click)="previewDigest()"
+                  [disabled]="digestPreviewing()"
+                  class="text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 transition-colors inline-flex items-center gap-1.5"
+                >
+                  @if (digestPreviewing()) {
+                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Loading preview…
+                  } @else {
+                    Preview Digest
+                  }
+                </button>
+              </div>
+            }
+          </div>
+
           <!-- Save button -->
           <div class="flex justify-end">
             <button
@@ -173,6 +240,13 @@ export class FeaturesSettingsPageComponent implements OnInit {
   readonly throughputDefaultUnit = signal('Gallons');
   readonly throughputGroupByCategory = signal(false);
 
+  // Comments Digest settings
+  readonly digestEnabled = signal(false);
+  readonly digestHourUtc = signal(10);
+  readonly digestIncludeActivityLog = signal(true);
+  readonly digestPreviewing = signal(false);
+  readonly digestPreviewHtml = signal('');
+
   ngOnInit(): void {
     this.load();
   }
@@ -180,13 +254,16 @@ export class FeaturesSettingsPageComponent implements OnInit {
   async load(): Promise<void> {
     this.loading.set(true);
     try {
-      const [photoRes, throughputRes] = await Promise.all([
+      const [photoRes, throughputRes, digestRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<{
           enabled: boolean; photoCategories: string[]; maxFileSizeMb: number;
         }>>(`${API}/admin/settings/my-photo-gallery-settings`)),
         firstValueFrom(this.http.get<ApiResponse<{
           enabled: boolean; defaultUnit: string; groupByCategory: boolean;
         }>>(`${API}/admin/settings/my-throughput-report-settings`)),
+        firstValueFrom(this.http.get<ApiResponse<{
+          enabled: boolean; hourUtc: number; includeActivityLog: boolean; recipientRoles: string[]; extraEmails: string[]; entityTypes: string[];
+        }>>(`${API}/admin/settings/my-comments-digest-settings`)),
       ]);
 
       if (photoRes.success && photoRes.data) {
@@ -198,6 +275,11 @@ export class FeaturesSettingsPageComponent implements OnInit {
         this.throughputEnabled.set(throughputRes.data.enabled);
         this.throughputDefaultUnit.set(throughputRes.data.defaultUnit);
         this.throughputGroupByCategory.set(throughputRes.data.groupByCategory);
+      }
+      if (digestRes.success && digestRes.data) {
+        this.digestEnabled.set(digestRes.data.enabled);
+        this.digestHourUtc.set(digestRes.data.hourUtc);
+        this.digestIncludeActivityLog.set(digestRes.data.includeActivityLog);
       }
     } catch {
       this.toastSvc.show('error', 'Failed to load feature settings.');
@@ -214,7 +296,7 @@ export class FeaturesSettingsPageComponent implements OnInit {
         .map((c) => c.trim().toUpperCase())
         .filter((c) => c.length > 0);
 
-      const [photoRes, throughputRes] = await Promise.all([
+      const [photoRes, throughputRes, digestRes] = await Promise.all([
         firstValueFrom(this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/photo-gallery`, {
           enabled: this.photoGalleryEnabled(),
           photoCategories: photoCategories.length ? photoCategories : ['BEFORE', 'AFTER', 'TANK_SEAL', 'OTHER'],
@@ -225,9 +307,17 @@ export class FeaturesSettingsPageComponent implements OnInit {
           defaultUnit: this.throughputDefaultUnit(),
           groupByCategory: this.throughputGroupByCategory(),
         })),
+        firstValueFrom(this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/comments-digest`, {
+          enabled: this.digestEnabled(),
+          hourUtc: this.digestHourUtc(),
+          recipientRoles: ['ADMIN', 'TRADER', 'TEAMLEAD', 'OPERATIONSMANAGER', 'FINANCE', 'CREDITMANAGER', 'LIGHT'],
+          extraEmails: [],
+          includeActivityLog: this.digestIncludeActivityLog(),
+          entityTypes: [],
+        })),
       ]);
 
-      if (photoRes.success && throughputRes.success) {
+      if (photoRes.success && throughputRes.success && digestRes.success) {
         this.toastSvc.show('success', 'Feature settings saved.');
         // Invalidate cached services so nav menu updates
         this.brokerDealSvc.invalidateCache();
@@ -241,6 +331,31 @@ export class FeaturesSettingsPageComponent implements OnInit {
       this.toastSvc.show('error', 'Failed to save feature settings.');
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  async previewDigest(): Promise<void> {
+    this.digestPreviewing.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ html: string; entryCount: number; orderCount: number }>>(`${API}/reports/comments-digest/preview`),
+      );
+      if (res.success && res.data) {
+        // Open preview in a new window
+        const w = window.open('', '_blank', 'width=700,height=800');
+        if (w) {
+          w.document.write(res.data.html);
+          w.document.close();
+        } else {
+          this.toastSvc.show('error', 'Popup blocked. Allow popups to preview the digest.');
+        }
+      } else {
+        this.toastSvc.show('error', 'Failed to generate preview.');
+      }
+    } catch {
+      this.toastSvc.show('error', 'Failed to generate preview.');
+    } finally {
+      this.digestPreviewing.set(false);
     }
   }
 }

@@ -94,6 +94,7 @@ import {
   getDateFormatSettings,
   updateDateFormatSettings,
 } from './settings.service';
+import { getCommentsDigestSettings } from '../comments/comments-digest.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
   getIntegrationStatus,
@@ -669,6 +670,45 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       groupByCategory: t.Boolean(),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update throughput report settings (admin only)' },
+  })
+
+  .get('/my-comments-digest-settings', async () => {
+    try {
+      const data = await getCommentsDigestSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get comments digest settings for current tenant' },
+  })
+
+  .put('/comments-digest', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      if (!tenant) throw new Error('No tenant found');
+      const settings = { ...(tenant.settings as any) };
+      // Preserve lastSentAt from existing settings
+      const existing = settings.commentsDigest ?? {};
+      settings.commentsDigest = { ...body, lastSentAt: existing.lastSentAt ?? '' };
+      await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+      return { success: true, data: settings.commentsDigest } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      enabled: t.Boolean(),
+      hourUtc: t.Number({ minimum: 0, maximum: 23 }),
+      recipientRoles: t.Array(t.String()),
+      extraEmails: t.Optional(t.Array(t.String())),
+      includeActivityLog: t.Boolean(),
+      entityTypes: t.Optional(t.Array(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update comments digest settings (admin only)' },
   })
 
   .get('/my-vessel-types', async () => {
