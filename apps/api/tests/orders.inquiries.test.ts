@@ -524,6 +524,50 @@ describe('orders: item aggregates', () => {
       'SERVICE',
     ]);
   });
+
+  it('sanitizes "null" string quantities from frontend (defensive fix for invalid input syntax for type numeric)', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const { createOrder, saveOrderItems } = await loadOrdersService();
+
+    const created = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    // Simulate the bug: frontend sends String(null) = "null" for items without quantity
+    // (e.g. Cancellation, Demurrage, Overtime additional cost items)
+    const items = await saveOrderItems(created.id, [
+      {
+        productType: 'LSMGO',
+        quantity: '30',
+        unit: 'MT',
+        costPrice: '1768.61',
+        costCurrency: 'USD',
+        salesPrice: '1768.61',
+        salesCurrency: 'USD',
+      },
+      {
+        productType: 'ITEM',
+        quantity: 'null' as any, // The bug: String(null) = "null"
+        unit: 'MT',
+        costPrice: 'null' as any,
+        costCurrency: 'USD',
+        salesPrice: 'null' as any,
+        salesCurrency: 'USD',
+        description: 'Cancellation',
+      },
+    ]);
+
+    expect(items).toHaveLength(2);
+    // The "null" quantity should be sanitized to '0' (NOT NULL column)
+    expect(items[1]?.quantity).toBe('0.000');
+    // Nullable numeric fields should be actual null, not the string "null"
+    expect(items[1]?.costPrice).toBeNull();
+    expect(items[1]?.salesPrice).toBeNull();
+  });
 });
 
 describe('orders: attachments, payments, and lookups', () => {

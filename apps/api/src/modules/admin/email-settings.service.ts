@@ -147,12 +147,23 @@ export interface TemplateVariables {
 
 /**
  * Render a template string by replacing {{variable}} and ${variable} placeholders.
+ * Supports {{#if variable}}...{{/if}} conditional blocks — content is included
+ * only when the variable is truthy, removed when falsy.
  */
 export function renderTemplate(template: string, vars: TemplateVariables): string {
-  return template.replace(/\{\{(\w+)\}\}|\$\{(\w+)\}/g, (_, moustacheKey: string, dollarKey: string) => {
+  // First, process {{#if var}}...{{/if}} conditional blocks
+  let result = template.replace(/\{\{#if (\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_, varName: string, content: string) => {
+    const value = (vars as any)[varName];
+    return value ? content : '';
+  });
+
+  // Then, process {{variable}} and ${variable} placeholders
+  result = result.replace(/\{\{(\w+)\}\}|\$\{(\w+)\}/g, (_, moustacheKey: string, dollarKey: string) => {
     const key = moustacheKey || dollarKey;
     return (vars as any)[key] ?? '';
   });
+
+  return result;
 }
 
 /**
@@ -186,4 +197,11 @@ export const TEMPLATE_VARIABLES = [
   { key: 'deliveryMethod', label: 'Delivery method', example: 'Via Barge' },
   { key: 'products', label: 'Product / Quantity lines block', example: 'Product: VLSFO 0.5%\nQnty: 350 - 400 MT' },
   { key: 'Phone', label: 'Recipient phone number (WhatsApp)', example: '+4526131217' },
+];
+
+/**
+ * Conditional block syntax documentation for admin UI.
+ */
+export const TEMPLATE_CONDITIONALS = [
+  { syntax: '{{#if variable}}...{{/if}}', description: 'Show content only when the variable has a value', example: '{{#if agent}}Agent: ${agent}\n{{/if}}' },
 ];

@@ -113,6 +113,7 @@ export const documentTypeEnum = pgEnum('document_type', [
   'PROFORMA_INVOICE',
   'INVOICE',
   'OTHER',
+  'BROKER_CONFIRMATION',
 ]);
 
 export const riskProviderClassEnum = pgEnum('risk_provider_class', [
@@ -277,6 +278,18 @@ export interface TenantSettings {
   portDocumentationSettings?: {
     enabled?: boolean;
   };
+  // Photo Gallery feature settings (Feature 6: Upload Photos)
+  photoGallerySettings?: {
+    enabled?: boolean;
+    photoCategories?: string[];  // e.g. ['BEFORE', 'AFTER', 'TANK_SEAL', 'OTHER']
+    maxFileSizeMb?: number;      // default 10
+  };
+  // Throughput / Sales report feature settings (Feature 1: Sales Reporting by Product)
+  throughputReport?: {
+    enabled?: boolean;
+    defaultUnit?: string;        // e.g. 'Gallons'
+    groupByCategory?: boolean;   // group by orderCategories
+  };
   // Microsoft email sending
   approvedEmailDomains?: string[];            // Restrict Microsoft connect to these domains (empty/null = any)
   microsoftConnectForceUserEmail?: boolean;    // Force Microsoft connect to match the user's Fueld email
@@ -399,7 +412,7 @@ export interface TenantSettings {
       name: string;
       description?: string | null;
       reportMode?: 'SUMMARY' | 'EXCEPTIONS';
-      reportType: 'SUMMARY' | 'MARGIN_ANALYSIS';
+      reportType: 'SUMMARY' | 'MARGIN_ANALYSIS' | 'THROUGHPUT';
       deliveryMode?: 'HTML' | 'CSV' | 'XLSX' | 'CSV_XLSX';
       bodyMode?: 'HTML_SUMMARY' | 'ATTACHMENT_ONLY';
       hourUtc: number;
@@ -1138,6 +1151,7 @@ export const orderAttachments = pgTable('order_attachments', {
   filePath: text('file_path').notNull(),
   mimeType: text('mime_type').notNull(),
   fileSize: integer('file_size').notNull(),
+  category: text('category'),
   uploadedBy: uuid('uploaded_by').references(() => users.id),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

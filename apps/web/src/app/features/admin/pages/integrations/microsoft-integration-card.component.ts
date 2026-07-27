@@ -119,7 +119,9 @@ export class MicrosoftIntegrationCardComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toastService = inject(IntegrationsToastService);
 
-  readonly integration = input.required<IntegrationStatusDto | undefined>();
+  /** Optional input — used when rendered directly (e.g. IntegrationsPageComponent).
+   *  When rendered via router-outlet, status comes from the shared toast service. */
+  readonly integration = input<IntegrationStatusDto | undefined>(undefined);
 
   readonly msClientId = signal('');
   readonly msClientSecret = signal('');
@@ -129,7 +131,8 @@ export class MicrosoftIntegrationCardComponent implements OnInit {
   readonly msSaveError = signal('');
 
   status(): IntegrationStatusDto | null {
-    return this.integration() ?? null;
+    // Prefer the shared service (populated by the shell), fall back to input binding
+    return this.toastService.getProvider('MICROSOFT') ?? this.integration() ?? null;
   }
 
   ngOnInit(): void {
@@ -164,6 +167,8 @@ export class MicrosoftIntegrationCardComponent implements OnInit {
         this.msSaveSuccess.set('Microsoft 365 credentials saved successfully.');
         this.msClientSecret.set('');
         this.toastService.show('success', 'Microsoft 365 credentials saved successfully.');
+        // Reload integration statuses so the badge updates
+        await this.toastService.loadIntegrations();
       } else {
         this.msSaveError.set(res.message ?? 'Failed to save Microsoft credentials.');
       }

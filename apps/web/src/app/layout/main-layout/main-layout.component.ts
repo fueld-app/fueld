@@ -28,6 +28,7 @@ import {
   formatAppVersionLabel,
 } from '../../core/runtime/app-health.service';
 import { BrokerDealService } from '../../core/services/broker-deal.service';
+import { ThroughputReportService } from '../../core/services/throughput-report.service';
 
 import { API } from '@app/core/config/api';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
@@ -191,7 +192,7 @@ interface NavItem {
   label: string;
   icon: string;
   route?: string;
-  children?: { label: string; route: string; allowedRoles?: string[]; hiddenForRoles?: string[]; requiresBrokerDeals?: boolean }[];
+  children?: { label: string; route: string; allowedRoles?: string[]; hiddenForRoles?: string[]; requiresBrokerDeals?: boolean; requiresThroughputReport?: boolean }[];
   adminOnly?: boolean;
   /** When set, item is visible to these roles (and always to ADMIN). */
   allowedRoles?: string[];
@@ -208,8 +209,12 @@ const NAVIGATION: NavItem[] = [
   {
     label: 'Reports',
     icon: 'M3 3h18v18H3V3zm4 12h2V9H7v6zm4 0h2V6h-2v9zm4 0h2v-4h-2v4z',
-    route: '/reports',
     hiddenForRoles: ['LIGHT'],
+    children: [
+      { label: 'Reports Dashboard', route: '/reports' },
+      { label: 'Throughput Report', route: '/reports/throughput', requiresThroughputReport: true },
+      { label: 'Broker Commission', route: '/reports/broker-commission', requiresBrokerDeals: true },
+    ],
   },
   {
     label: 'Trading',
@@ -843,6 +848,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly updateService = inject(AppUpdateService);
   private readonly appHealthService = inject(AppHealthService);
   private readonly brokerDealSvc = inject(BrokerDealService);
+  private readonly throughputReportSvc = inject(ThroughputReportService);
   private routerSub: Subscription | null = null;
   private priceSub: Subscription | null = null;
   private rfqSub: Subscription | null = null;
@@ -901,6 +907,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     void this.appHealthService.refresh();
     void this.brokerDealSvc.load();
+    void this.throughputReportSvc.load();
 
     // Tick every 30s so the relative "X min ago" label refreshes
     this.pricesTickTimer = setInterval(() => this.pricesTick.update((n) => n + 1), 30_000);
@@ -1096,15 +1103,21 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   readonly navItems = computed(() => {
     const role = this.auth.user()?.role;
     const brokerDealsEnabled = this.brokerDealSvc.enabled();
+    const throughputEnabled = this.throughputReportSvc.enabled();
     return NAVIGATION.filter((item) => {
       if (item.adminOnly) return this.auth.isAdmin();
       if (item.hiddenForRoles && role && item.hiddenForRoles.includes(role)) return false;
       if (item.allowedRoles) return role ? item.allowedRoles.includes(role) : false;
       return true;
     }).map((item) => {
-      // Filter out children that require broker deals when feature is disabled
-      if (item.children && !brokerDealsEnabled) {
-        return { ...item, children: item.children.filter((c) => !c.requiresBrokerDeals) };
+      // Filter out children that require features that are disabled
+      if (item.children) {
+        const filtered = item.children.filter((c) => {
+          if (c.requiresBrokerDeals && !brokerDealsEnabled) return false;
+          if (c.requiresThroughputReport && !throughputEnabled) return false;
+          return true;
+        });
+        return { ...item, children: filtered };
       }
       return item;
     }).filter((item) => {

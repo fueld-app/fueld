@@ -46,6 +46,8 @@ import {
   updateCompanyTypeSettings,
   getAttachmentTypeSettings,
   updateAttachmentTypeSettings,
+  getPhotoGallerySettings,
+  getThroughputReportSettings,
   getVesselTypeSettings,
   updateVesselTypeSettings,
   getVesselPersonTitleSettings,
@@ -599,6 +601,74 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get attachment type options for current tenant' },
+  })
+
+  .get('/my-photo-gallery-settings', async () => {
+    try {
+      const data = await getPhotoGallerySettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get photo gallery settings for current tenant' },
+  })
+
+  .put('/photo-gallery', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      if (!tenant) throw new Error('No tenant found');
+      const settings = { ...(tenant.settings as any) };
+      settings.photoGallerySettings = body;
+      await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+      return { success: true, data: body } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      enabled: t.Boolean(),
+      photoCategories: t.Array(t.String()),
+      maxFileSizeMb: t.Number(),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update photo gallery settings (admin only)' },
+  })
+
+  .get('/my-throughput-report-settings', async () => {
+    try {
+      const data = await getThroughputReportSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get throughput report settings for current tenant' },
+  })
+
+  .put('/throughput-report', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      if (!tenant) throw new Error('No tenant found');
+      const settings = { ...(tenant.settings as any) };
+      settings.throughputReport = body;
+      await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+      return { success: true, data: body } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      enabled: t.Boolean(),
+      defaultUnit: t.String(),
+      groupByCategory: t.Boolean(),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update throughput report settings (admin only)' },
   })
 
   .get('/my-vessel-types', async () => {

@@ -1240,6 +1240,7 @@ export interface OrderAttachmentDto {
   filePath: string;
   mimeType: string;
   fileSize: number;
+  category: string | null;
   uploadedBy: string | null;
   createdAt: string;
 }
@@ -1961,10 +1962,25 @@ export interface SavedReportViewDto {
   createdByName: string | null;
 }
 
-export type ReportScheduleType = 'SUMMARY' | 'MARGIN_ANALYSIS';
+export type ReportScheduleType = 'SUMMARY' | 'MARGIN_ANALYSIS' | 'THROUGHPUT';
 export type ReportScheduleDeliveryMode = 'HTML' | 'CSV' | 'XLSX' | 'CSV_XLSX';
 export type ReportScheduleBodyMode = 'HTML_SUMMARY' | 'ATTACHMENT_ONLY';
 export type ReportScheduleMode = 'SUMMARY' | 'EXCEPTIONS';
+
+/** Throughput / Sales report — volumes by product type for a date range. */
+export interface ThroughputReportRowDto {
+  productType: string;
+  totalQuantity: number;
+  unit: string;
+  orderCount: number;
+}
+
+export interface ThroughputReportDto {
+  from: string | null;
+  to: string | null;
+  rows: ThroughputReportRowDto[];
+  totalOrderCount: number;
+}
 
 /** Scheduled report delivery configuration. */
 export interface ReportScheduleDto {

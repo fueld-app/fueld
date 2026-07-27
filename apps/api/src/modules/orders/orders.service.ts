@@ -1582,6 +1582,14 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
   const supplierIds = new Set(supplierRows.map((row) => row.id));
   const defaultOrderSupplierId = supplierRows.length === 1 ? supplierRows[0]!.id : null;
 
+  // Sanitize numeric string fields — convert literal "null"/"undefined" strings to actual null.
+  // This prevents Postgres "invalid input syntax for type numeric: 'null'" errors when
+  // the frontend sends String(null) = "null" for fields that should be null.
+  const sanitizeNumeric = (value: string | null | undefined): string | null => {
+    if (value == null || value === '' || value === 'null' || value === 'undefined') return null;
+    return value;
+  };
+
   // Insert new items with profit calculation (base currency)
   const values = items.map((item, index) => {
     const orderSupplierId = item.orderSupplierId ?? defaultOrderSupplierId;
@@ -1620,29 +1628,29 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       sortOrder: index,
       orderSupplierId: orderSupplierId ?? null,
       productType: item.productType as any,
-      quantity: item.quantity,
-      quantityMin: item.quantityMin ?? null,
-      quantityMax: item.quantityMax ?? null,
+      quantity: sanitizeNumeric(item.quantity) ?? '0',
+      quantityMin: sanitizeNumeric(item.quantityMin),
+      quantityMax: sanitizeNumeric(item.quantityMax),
       unit: item.unit ?? 'MT',
       costUnit: item.costUnit ?? item.unit ?? 'MT',
       salesUnit: item.salesUnit ?? item.unit ?? 'MT',
-      costConversionFactor: item.costConversionFactor ?? '1',
-      unitConversionFactor: item.unitConversionFactor ?? '1',
+      costConversionFactor: sanitizeNumeric(item.costConversionFactor) ?? '1',
+      unitConversionFactor: sanitizeNumeric(item.unitConversionFactor) ?? '1',
       description: item.description ?? null,
-      costPrice: item.costPrice ?? null,
+      costPrice: sanitizeNumeric(item.costPrice),
       costCurrency,
-      salesPrice: item.salesPrice ?? null,
+      salesPrice: sanitizeNumeric(item.salesPrice),
       salesCurrency,
       profit: profit.toFixed(4),
       paymentTerms: item.paymentTerms as any ?? null,
       customerNote: item.customerNote ?? null,
-      deliveredQuantity: item.deliveredQuantity ?? null,
+      deliveredQuantity: sanitizeNumeric(item.deliveredQuantity),
       // Formula pricing (cost side)
       costPricingModel: (item.costPricingModel as any) ?? 'FIXED',
       costReferenceId: item.costReferenceId ?? null,
       costPlattsEntryId: item.costPlattsEntryId ?? null,
-      costPremium: item.costPremium ?? null,
-      costBarging: item.costBarging ?? null,
+      costPremium: sanitizeNumeric(item.costPremium),
+      costBarging: sanitizeNumeric(item.costBarging),
       costBargingUnit: item.costBargingUnit ?? null,
       costCreditDays: item.costCreditDays ?? null,
       costPriceFinalized: item.costPriceFinalized ?? false,
@@ -1650,20 +1658,20 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       salesPricingModel: (item.salesPricingModel as any) ?? 'FIXED',
       salesReferenceId: item.salesReferenceId ?? null,
       salesPlattsEntryId: item.salesPlattsEntryId ?? null,
-      salesPremium: item.salesPremium ?? null,
-      salesBarging: item.salesBarging ?? null,
+      salesPremium: sanitizeNumeric(item.salesPremium),
+      salesBarging: sanitizeNumeric(item.salesBarging),
       salesBargingUnit: item.salesBargingUnit ?? null,
       salesCreditDays: item.salesCreditDays ?? null,
       salesPriceFinalized: item.salesPriceFinalized ?? false,
       // Tax
-      taxRate: item.taxRate ?? null,
+      taxRate: sanitizeNumeric(item.taxRate),
       taxAmount,
       // Inventory linkage
       inventorySkuId: item.inventorySkuId ?? null,
       warehouseId: item.warehouseId ?? null,
       plannedInventoryAt: item.plannedInventoryAt ? new Date(item.plannedInventoryAt) : null,
       // Broker deal — per-line-item commission
-      commissionPerUnit: item.commissionPerUnit ?? null,
+      commissionPerUnit: sanitizeNumeric(item.commissionPerUnit),
       // Hide from customer-facing documents
       hideOnDocuments: item.hideOnDocuments ?? false,
     };
@@ -1753,6 +1761,33 @@ export async function listOrderAttachments(orderId: string) {
     filePath: row.filePath,
     mimeType: row.mimeType,
     fileSize: row.fileSize,
+    category: row.category,
+    uploadedBy: row.uploadedBy,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+export async function listOrderPhotos(orderId: string) {
+  const rows = await db
+    .select()
+    .from(orderAttachments)
+    .where(
+      and(
+        eq(orderAttachments.orderId, orderId),
+        isNull(orderAttachments.deletedAt),
+        ilike(orderAttachments.mimeType, 'image/%'),
+      ),
+    );
+
+  return rows.map((row) => ({
+    id: row.id,
+    orderId: row.orderId,
+    type: row.type,
+    fileName: row.fileName,
+    filePath: row.filePath,
+    mimeType: row.mimeType,
+    fileSize: row.fileSize,
+    category: row.category,
     uploadedBy: row.uploadedBy,
     createdAt: row.createdAt.toISOString(),
   }));
@@ -1765,6 +1800,7 @@ export async function createOrderAttachment(input: {
   filePath: string;
   mimeType: string;
   fileSize: number;
+  category?: string | null;
   uploadedBy?: string | null;
 }) {
   const [created] = await db
@@ -1776,6 +1812,7 @@ export async function createOrderAttachment(input: {
       filePath: input.filePath,
       mimeType: input.mimeType,
       fileSize: input.fileSize,
+      category: input.category ?? null,
       uploadedBy: input.uploadedBy ?? null,
     })
     .returning();
@@ -1791,6 +1828,19 @@ export async function updateOrderAttachmentType(
   const [updated] = await db
     .update(orderAttachments)
     .set({ type: type.toUpperCase() })
+    .where(and(eq(orderAttachments.id, attachmentId), eq(orderAttachments.orderId, orderId)))
+    .returning();
+  return updated ?? null;
+}
+
+export async function updateOrderAttachmentCategory(
+  attachmentId: string,
+  orderId: string,
+  category: string | null,
+): Promise<typeof orderAttachments.$inferSelect | null> {
+  const [updated] = await db
+    .update(orderAttachments)
+    .set({ category })
     .where(and(eq(orderAttachments.id, attachmentId), eq(orderAttachments.orderId, orderId)))
     .returning();
   return updated ?? null;

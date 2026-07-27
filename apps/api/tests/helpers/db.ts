@@ -513,6 +513,7 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
       file_path text NOT NULL,
       mime_type text NOT NULL,
       file_size integer NOT NULL,
+      category text,
       uploaded_by uuid REFERENCES users(id),
       deleted_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
@@ -522,6 +523,11 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
   await sql`
     ALTER TABLE order_attachments
     ADD COLUMN IF NOT EXISTS deleted_at timestamptz
+  `;
+
+  await sql`
+    ALTER TABLE order_attachments
+    ADD COLUMN IF NOT EXISTS category text
   `;
 
   await sql`

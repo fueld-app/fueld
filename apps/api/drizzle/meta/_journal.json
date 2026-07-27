@@ -722,6 +722,27 @@
       "when": 1784138607000,
       "tag": "0102_hide_on_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1784138700000,
+      "tag": "0103_order_attachments_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1784138800000,
+      "tag": "0104_channeltx_photo_gallery_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1784138900000,
+      "tag": "0105_channeltx_throughput_report_settings",
+      "breakpoints": true
     }
   ]
 }

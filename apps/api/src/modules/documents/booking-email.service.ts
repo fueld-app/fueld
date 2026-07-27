@@ -17,6 +17,7 @@ interface BookingItem {
   quantityMin?: string | null;
   quantityMax?: string | null;
   unit?: string | null;
+  description?: string | null;
 }
 
 interface BookingOrder {
@@ -144,7 +145,10 @@ export function renderBookingEmail(order: BookingOrder, captainName: string, tim
   const deliveryMethod = order.deliveryMethod ?? '';
 
   const products = (order.items ?? [])
-    .map((item) => `Product: ${item.productType}\nQnty: ${formatQty(item)}`)
+    .map((item) => {
+      const desc = item.description ? ` - ${item.description}` : '';
+      return `Product: ${item.productType}${desc}\nQnty: ${formatQty(item)}`;
+    })
     .join('\n');
 
   const vars: Record<string, string> = {
@@ -178,7 +182,10 @@ export async function composeBookingEmail(order: BookingOrder): Promise<{ subjec
     agent: order.agent?.name ?? '',
     physicalSupplier: order.supplier?.name ?? '',
     deliveryMethod: order.deliveryMethod ?? '',
-    products: (order.items ?? []).map((item) => `Product: ${item.productType}\nQnty: ${formatQty(item)}`).join('\n'),
+    products: (order.items ?? []).map((item) => {
+      const desc = item.description ? ` - ${item.description}` : '';
+      return `Product: ${item.productType}${desc}\nQnty: ${formatQty(item)}`;
+    }).join('\n'),
     orderNumber: order.orderNumber ?? '',
   };
 

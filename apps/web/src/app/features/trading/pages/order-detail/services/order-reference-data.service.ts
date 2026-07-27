@@ -6,6 +6,7 @@ import type { DropdownOption } from '@app/shared/components/searchable-dropdown/
 import { API_URL } from '@app/core/config/api';
 
 export interface TeamUserOption { id: string; name: string; email?: string }
+export interface PhotoGallerySettings { enabled: boolean; photoCategories: string[]; maxFileSizeMb: number }
 
 @Service()
 export class OrderReferenceDataService {
@@ -19,6 +20,7 @@ export class OrderReferenceDataService {
   readonly configuredDeliveryMethods = signal<string[]>([]);
   readonly configuredPriceReferences = signal<{ id: string; name: string; code: string }[]>([]);
   readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
+  readonly photoGallerySettings = signal<PhotoGallerySettings>({ enabled: false, photoCategories: ['BEFORE', 'AFTER', 'TANK_SEAL', 'OTHER'], maxFileSizeMb: 10 });
   readonly deliveryDocumentationSettings = signal<DeliveryDocumentationSettingsDto>({
     requireDeliveryDocumentation: false,
     deliveryDocumentationTypes: [],
@@ -40,7 +42,7 @@ export class OrderReferenceDataService {
     if (this._eagerLoaded) return;
     this._eagerLoaded = true;
     try {
-      const [usersRes, productsRes, unitsRes, currenciesRes, categoriesRes, attachmentTypesRes, deliveryDocRes, deliveryMethodsRes] = await Promise.all([
+      const [usersRes, productsRes, unitsRes, currenciesRes, categoriesRes, attachmentTypesRes, deliveryDocRes, deliveryMethodsRes, photoGalleryRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<TeamUserOption[]>>(`${API_URL}/lloyds/users`)),
         firstValueFrom(this.http.get<ApiResponse<{ products: string[] }>>(`${API_URL}/admin/settings/my-products`)),
         firstValueFrom(this.http.get<ApiResponse<{ units: string[] }>>(`${API_URL}/admin/settings/my-units`)),
@@ -49,6 +51,7 @@ export class OrderReferenceDataService {
         firstValueFrom(this.http.get<ApiResponse<{ attachmentTypes: string[] }>>(`${API_URL}/admin/settings/my-attachment-types`)),
         firstValueFrom(this.http.get<ApiResponse<DeliveryDocumentationSettingsDto>>(`${API_URL}/admin/settings/my-delivery-documentation`)),
         firstValueFrom(this.http.get<ApiResponse<{ deliveryMethods: string[]; defaultDeliveryMethod: string }>>(`${API_URL}/admin/settings/my-delivery-methods`)),
+        firstValueFrom(this.http.get<ApiResponse<PhotoGallerySettings>>(`${API_URL}/admin/settings/my-photo-gallery-settings`)),
       ]);
 
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
@@ -58,6 +61,7 @@ export class OrderReferenceDataService {
       if (deliveryMethodsRes.success) this.configuredDeliveryMethods.set(deliveryMethodsRes.data.deliveryMethods ?? []);
       if (categoriesRes.success) this.orderCategories.set(categoriesRes.data.categories ?? []);
       if (attachmentTypesRes.success && attachmentTypesRes.data.attachmentTypes.length) this.configuredAttachmentTypes.set(attachmentTypesRes.data.attachmentTypes);
+      if (photoGalleryRes.success) this.photoGallerySettings.set(photoGalleryRes.data);
       if (deliveryDocRes.success) this.deliveryDocumentationSettings.set(deliveryDocRes.data);
     } catch { /* silently ignore */ }
   }

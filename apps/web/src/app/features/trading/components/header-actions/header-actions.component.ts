@@ -22,6 +22,7 @@ export type HeaderAction =
   | 'generate-invoice'
   | 'view-offer'
   | 'view-proforma'
+  | 'view-broker-confirmation'
   | 'convert-to-order'
   | 'cancel-inquiry'
   | 'cancel-order'
@@ -31,10 +32,12 @@ export type HeaderAction =
   | 'send-nomination'
   | 'send-proforma'
   | 'send-invoice'
+  | 'send-broker-confirmation'
   | 'send-port-documentation'
   | 'send-inquiry'
   | 'send-booking'
   | 'mark-delivered'
+  | 'mark-invoiced'
   | 'mark-paid'
   | 'sync-quickbooks'
   | 'reopen-order';
@@ -62,6 +65,12 @@ const ACTIONS: ActionItem[] = [
     label: 'View Nomination',
     icon: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z',
     color: 'text-purple-600',
+  },
+  {
+    key: 'view-broker-confirmation',
+    label: 'View Broker Confirmation',
+    icon: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z',
+    color: 'text-amber-600',
   },
   {
     key: 'generate-invoice',
@@ -126,6 +135,12 @@ const ACTIONS: ActionItem[] = [
     color: 'text-indigo-600',
   },
   {
+    key: 'send-broker-confirmation',
+    label: 'Send Broker Confirmation',
+    icon: SEND_ICON,
+    color: 'text-amber-600',
+  },
+  {
     key: 'send-port-documentation',
     label: 'Send Port Documentation',
     icon: SEND_ICON,
@@ -143,6 +158,12 @@ const ACTIONS: ActionItem[] = [
     label: 'Mark Delivered',
     icon: 'M8.25 18.75a1.5 1.5 0 0 1-1.5-1.5v-6.879a2.25 2.25 0 0 1 .659-1.591l5.625-5.625a2.25 2.25 0 0 1 3.182 0l.625.625a2.25 2.25 0 0 1 0 3.182l-5.625 5.625a2.25 2.25 0 0 1-1.591.659H8.25v4.5h9a.75.75 0 0 1 0 1.5h-9Z',
     color: 'text-emerald-600',
+  },
+  {
+    key: 'mark-invoiced',
+    label: 'Mark Invoiced',
+    icon: 'M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+    color: 'text-indigo-600',
   },
   {
     key: 'mark-paid',
@@ -220,6 +241,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
   readonly hasSupplier = input<boolean>(false);
   readonly hasBankAccount = input<boolean>(false);
   readonly hasLineItems = input<boolean>(false);
+  readonly hasBroker = input<boolean>(false);
   readonly hasEnoughPayments = input<boolean>(false);
   readonly hasPortDocumentationDocuments = input<boolean>(false);
   readonly portDocumentationEnabled = input<boolean>(false);
@@ -275,6 +297,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
     const hasSupplier = this.hasSupplier();
     const hasBankAccount = this.hasBankAccount();
     const hasLineItems = this.hasLineItems();
+    const hasBroker = this.hasBroker();
     const portDocumentationEnabled = this.portDocumentationEnabled();
     const isAdmin = this.isAdmin();
     const canReopen = isAdmin && (status === OrderStatus.Delivered || status === OrderStatus.Invoiced);
@@ -284,6 +307,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
       || status === OrderStatus.Invoiced
       || status === OrderStatus.Paid;
     const canMarkDelivered = status === OrderStatus.Confirmed;
+    const canMarkInvoiced = status === OrderStatus.Delivered;
     const canMarkPaid = status !== OrderStatus.Paid;
     const canCancelOrder =
       status === OrderStatus.Confirmed
@@ -297,15 +321,19 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
             .filter((action) =>
               action.key === 'view-offer'
               || action.key === 'generate-invoice'
+              || action.key === 'view-broker-confirmation'
               || action.key === 'convert-to-order'
               || action.key === 'cancel-inquiry'
               || action.key === 'send-offer'
               || action.key === 'send-proforma'
+              || action.key === 'send-broker-confirmation'
               || action.key === 'send-inquiry',
             )
             .map((action) =>
               action.key === 'view-offer'
                 ? { ...action, label: 'View Offer PDF', disabled: !hasInvoicingCompany || !hasLineItems }
+                : action.key === 'view-broker-confirmation'
+                  ? { ...action, disabled: !hasBroker || !hasLineItems }
                 : action.key === 'generate-invoice'
                   ? { ...action, label: 'View Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
                   : action.key === 'convert-to-order'
@@ -316,6 +344,8 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                         ? { ...action, disabled: !hasBankAccount || !hasLineItems }
                         : action.key === 'send-inquiry'
                           ? { ...action, disabled: !hasLineItems }
+                        : action.key === 'send-broker-confirmation'
+                          ? { ...action, disabled: !hasBroker || !hasLineItems }
                           : action,
             );
 
@@ -337,6 +367,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
             && action.key !== 'send-proforma'
             && (action.key !== 'send-port-documentation' || portDocumentationEnabled)
             && (action.key !== 'mark-paid' || canMarkPaid)
+            && (action.key !== 'mark-invoiced' || canMarkInvoiced)
             && (action.key !== 'reopen-order' || canReopen),
           )
           .map((action) =>
@@ -350,12 +381,16 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                 ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
               : action.key === 'view-proforma'
                 ? { ...action, disabled: !hasSupplier || !hasLineItems }
+              : action.key === 'view-broker-confirmation'
+                ? { ...action, disabled: !hasBroker || !hasLineItems }
               : action.key === 'send-nomination'
                 ? { ...action, disabled: !hasSupplier || !hasLineItems }
               : action.key === 'send-confirmation'
                 ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
               : action.key === 'send-invoice'
                 ? { ...action, label: showInvoiceAsFinal ? 'Send Invoice' : 'Send Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
+              : action.key === 'send-broker-confirmation'
+                ? { ...action, disabled: !hasBroker || !hasLineItems }
               : action.key === 'send-port-documentation'
                 ? { ...action, disabled: false }
               : action.key === 'mark-delivered'

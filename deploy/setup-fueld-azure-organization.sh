@@ -20,8 +20,13 @@ set -euo pipefail
 FUELD_ORG_NAME="fueld"
 
 # Tenants to create apps for
+# Format: "tenant-name:domain"
+# The script is idempotent — it skips tenants whose app registration
+# already exists, so it is safe to re-run after adding new entries.
 TENANTS=(
+  "riviera-marine:riviera-marine.fueld.app"
   "channeltx:channeltx.fueld.app"
+  "moxie:moxie.fueld.app"
 )
 
 # Microsoft Graph API IDs
@@ -96,8 +101,13 @@ echo ""
 
 mkdir -p deploy/instances
 credentials_file="deploy/instances/fueld-azure-apps-credentials.txt"
+created_count=0
+skipped_count=0
 
-cat > "$credentials_file" <<EOF
+# Only write a fresh credentials file header if the file doesn't already exist.
+# This preserves existing credentials from prior runs (idempotency).
+if [ ! -f "$credentials_file" ]; then
+  cat > "$credentials_file" <<EOF
 # Fueld Azure AD App Registrations
 # Organization: ${FUELD_ORG_NAME}
 # Tenant ID: ${TENANT_ID}
@@ -107,11 +117,27 @@ cat > "$credentials_file" <<EOF
 #     Do NOT commit to git. This file is gitignored by default.
 #
 EOF
+fi
 
 for tenant_config in "${TENANTS[@]}"; do
   IFS=':' read -r tenant_name domain <<< "$tenant_config"
   redirect_uri="https://${domain}/api/auth/microsoft/callback"
   app_name="Fueld — ${tenant_name}"
+  env_var_prefix="${tenant_name//-/_}"
+
+  # ── Idempotency check: skip if this app already exists ──
+  existing_app_id=$(az ad app list \
+    --filter "displayName eq '${app_name}'" \
+    --query '[0].appId' \
+    -o tsv 2>/dev/null || true)
+
+  if [ -n "$existing_app_id" ] && [ "$existing_app_id" != "" ]; then
+    echo "   ⏭   Skipping ${tenant_name} — app already exists (App ID: ${existing_app_id})"
+    echo "      Existing credentials are preserved in ${credentials_file} (from prior run)."
+    echo ""
+    skipped_count=$((skipped_count + 1))
+    continue
+  fi
 
   echo "   Creating app for ${tenant_name} (${domain})..."
 
@@ -156,16 +182,17 @@ for tenant_config in "${TENANTS[@]}"; do
   # Append to credentials file
   cat >> "$credentials_file" <<EOF
 ## ${tenant_name} (${domain})
-AZURE_APP_ID_${tenant_name//-/_}=${app_id}
-AZURE_CLIENT_SECRET_${tenant_name//-/_}=${secret_value}
-AZURE_TENANT_ID_${tenant_name//-/_}=${TENANT_ID}
-AZURE_REDIRECT_URI_${tenant_name//-/_}=${redirect_uri}
+AZURE_APP_ID_${env_var_prefix}=${app_id}
+AZURE_CLIENT_SECRET_${env_var_prefix}=${secret_value}
+AZURE_TENANT_ID_${env_var_prefix}=${TENANT_ID}
+AZURE_REDIRECT_URI_${env_var_prefix}=${redirect_uri}
 
 EOF
 
+  created_count=$((created_count + 1))
 done
 
-echo "   ✓ All app registrations created"
+echo "   ✓ Done — ${created_count} created, ${skipped_count} already existed (skipped)"
 echo ""
 
 # ── Step 3: Summary ────────────────────────────────────────────────────
@@ -175,16 +202,25 @@ echo "════════════════════════�
 echo ""
 echo "  Organization: ${FUELD_ORG_NAME}"
 echo "  Tenant ID:    ${TENANT_ID}"
+echo "  Created:      ${created_count} new app(s)"
+echo "  Skipped:      ${skipped_count} existing app(s)"
 echo ""
-echo "  Credentials saved to: ${credentials_file}"
-echo ""
+if [ "$created_count" -gt 0 ]; then
+  echo "  Credentials saved to: ${credentials_file}"
+  echo ""
+fi
 echo "  ── Next steps ──"
 echo ""
 echo "  1. (Optional) Add a custom domain:"
 echo "     https://portal.azure.com → Microsoft Entra ID → Custom domain names"
 echo "     Add fueld.app and verify ownership via DNS"
 echo ""
-echo "  2. For each Fueld tenant, enter credentials in Admin → Integrations:"
+if [ "$created_count" -gt 0 ]; then
+echo "  2. For each NEWLY created Fueld tenant, enter credentials in Admin → Integrations:"
+else
+echo "  2. No new apps were created — all tenants already exist."
+echo "     If you need to update credentials, see the rotation section in the docs."
+fi
 for tenant_config in "${TENANTS[@]}"; do
   IFS=':' read -r tenant_name domain <<< "$tenant_config"
   echo "     • ${tenant_name}: https://${domain}"

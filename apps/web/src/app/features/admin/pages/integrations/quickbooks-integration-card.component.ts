@@ -240,7 +240,9 @@ export class QuickBooksIntegrationCardComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toastService = inject(IntegrationsToastService);
 
-  readonly integration = input.required<IntegrationStatusDto | undefined>();
+  /** Optional input — used when rendered directly. When rendered via router-outlet,
+   *  status comes from the shared toast service. */
+  readonly integration = input<IntegrationStatusDto | undefined>(undefined);
 
   readonly qbConnectionType = signal<'online' | 'desktop'>('online');
   readonly qbDesktopCompanyName = signal('');
@@ -251,7 +253,7 @@ export class QuickBooksIntegrationCardComponent implements OnInit {
   readonly qbErrorMessage = signal('');
 
   status(): IntegrationStatusDto | null {
-    return this.integration() ?? null;
+    return this.toastService.getProvider('QUICKBOOKS') ?? this.integration() ?? null;
   }
 
   /** True if the QBO access token expires within 24 hours. */

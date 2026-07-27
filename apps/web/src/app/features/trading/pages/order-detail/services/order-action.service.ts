@@ -41,7 +41,7 @@ export interface OrderActionContext {
   availableInquiryCancelReasons: () => string[];
   deliveryDocumentationSettings: () => DeliveryDocumentationSettingsDto;
   getEffectiveDeliveredQuantity: (row: OrderItemRow) => number | null;
-  buildItemPayload: (rows: OrderItemRow[], options?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | null>[];
+  buildItemPayload: (rows: OrderItemRow[], options?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | boolean | null>[];
   pdfModal: () => { showLoading: (title: string) => void; setBlob: (blob: Blob, fileName: string, verifyUrl: string | null) => void; showError: () => void } | null;
   convertModalRef: () => { show: () => void; close: () => void } | null;
   cancelModalRef: () => { show: () => void; close: () => void } | null;
@@ -94,6 +94,11 @@ export class OrderActionService {
         if (!ctx.hasEta()) { ctx.showToast('error', 'Set an ETA before generating Nomination PDF.'); break; }
         await this.viewProformaPdf(ctx);
         break;
+      case 'view-broker-confirmation':
+        if (!ctx.hasLineItems()) { ctx.showToast('error', 'Add at least one line item before generating Broker Confirmation PDF.'); break; }
+        if (!ctx.order()?.brokerId) { ctx.showToast('error', 'Select a broker before generating Broker Confirmation PDF.'); break; }
+        await this.viewBrokerConfirmationPdf(ctx);
+        break;
       case 'convert-to-order':
         this.openConvertToOrderModal(ctx);
         break;
@@ -113,6 +118,10 @@ export class OrderActionService {
       case 'send-confirmation':
         if (!ctx.hasEta()) { ctx.showToast('error', 'Set an ETA before sending.'); break; }
         ctx.openSendEmailModal('CONFIRMATION');
+        break;
+      case 'send-broker-confirmation':
+        if (!ctx.order()?.brokerId) { ctx.showToast('error', 'Select a broker before sending broker confirmation.'); break; }
+        ctx.openSendEmailModal('BROKER_CONFIRMATION');
         break;
       case 'send-nomination':
         if (!ctx.hasEta()) { ctx.showToast('error', 'Set an ETA before sending.'); break; }
@@ -144,6 +153,9 @@ export class OrderActionService {
         break;
       case 'mark-delivered':
         await this.markDelivered(ctx);
+        break;
+      case 'mark-invoiced':
+        await this.markInvoiced(ctx);
         break;
       case 'reopen-order':
         await this.reopenOrder(ctx);
@@ -271,6 +283,13 @@ export class OrderActionService {
     ctx.showToast('success', 'Order reopened for editing.');
   }
 
+  private async markInvoiced(ctx: OrderActionContext): Promise<void> {
+    const status = ctx.order()?.status;
+    if (status !== 'DELIVERED') { ctx.showToast('error', 'Only delivered orders can be marked as invoiced.'); return; }
+    await this.setOrderStatus(ctx, 'INVOICED');
+    ctx.showToast('success', 'Order marked as invoiced.');
+  }
+
   private async setOrderStatus(ctx: OrderActionContext, status: string): Promise<void> {
     const id = ctx.orderId();
     if (!id) return;
@@ -314,7 +333,7 @@ export class OrderActionService {
 
       await ctx.syncOrderSupplierRecords(id);
       const itemRows = ctx.itemRows();
-      const itemPayload = ctx.buildItemPayload(itemRows).map((item: Record<string, string | null>) => ({
+      const itemPayload = ctx.buildItemPayload(itemRows).map((item: Record<string, string | boolean | null>) => ({
         ...item,
         costCurrency: item['costCurrency'] ?? o.currency,
         salesCurrency: item['salesCurrency'] ?? o.currency,
@@ -395,6 +414,24 @@ export class OrderActionService {
     } catch {
       modal.showError();
       ctx.showToast('error', 'Failed to generate nomination PDF.');
+    }
+  }
+
+  private async viewBrokerConfirmationPdf(ctx: OrderActionContext): Promise<void> {
+    const id = ctx.orderId();
+    if (!id) return;
+    ctx.setEmailDocumentType('BROKER_CONFIRMATION');
+    const modal = ctx.pdfModal();
+    if (!modal) return;
+    modal.showLoading('Broker Confirmation');
+    try {
+      const res = await firstValueFrom(this.http.get(`${API_URL}/orders/${id}/broker-confirmation/pdf`, { responseType: 'blob', observe: 'response' }));
+      const blob = res.body;
+      if (!blob) throw new Error('Missing PDF body');
+      modal.setBlob(blob, `BrokerConfirmation_${ctx.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
+    } catch {
+      modal.showError();
+      ctx.showToast('error', 'Failed to generate broker confirmation PDF.');
     }
   }
 

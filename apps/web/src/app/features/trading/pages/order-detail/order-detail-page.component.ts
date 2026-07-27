@@ -15,7 +15,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { map, skip, type Subscription } from 'rxjs';
 import {
   OrderStatus,
   PaymentTermType,
@@ -61,6 +61,7 @@ import { OrderPaymentTermsCardComponent } from './components/order-payment-terms
 import { OrderNotesTermsCardComponent } from './components/order-notes-terms-card/order-notes-terms-card.component';
 import { OrderDeliveryCardComponent } from './components/order-delivery-card/order-delivery-card.component';
 import { OrderAttachmentsCardComponent } from './components/order-attachments-card/order-attachments-card.component';
+import { OrderPhotoGalleryComponent } from './components/order-photo-gallery/order-photo-gallery.component';
 import { OrderSettingsDropdownComponent } from './components/order-settings-dropdown/order-settings-dropdown.component';
 import { OrderPlattsSignalsComponent } from './components/order-platts-signals/order-platts-signals.component';
 import { OrderSecondaryTabsComponent } from './components/order-secondary-tabs/order-secondary-tabs.component';
@@ -143,6 +144,7 @@ import type {
     OrderDeliveryCardComponent,
     OrderPaymentsCardComponent,
     OrderAttachmentsCardComponent,
+  OrderPhotoGalleryComponent,
     OrderSettingsDropdownComponent,
     OrderPlattsSignalsComponent,
     OrderSecondaryTabsComponent,
@@ -306,6 +308,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly vesselSearchLoading = signal(false);
   readonly placeSearchLoading = signal(false);
   readonly attachments = signal<OrderAttachmentDto[]>([]);
+  readonly orderPhotos = computed(() => this.attachments().filter((a) => a.mimeType.startsWith('image/')));
+  readonly photoGalleryEnabled = computed(() => this.refData.photoGallerySettings().enabled);
+  readonly photoUploadCategory = signal('BEFORE');
+  readonly uploadingPhoto = signal(false);
+  readonly photoUploadProgress = signal('');
+  selectedPhotos: File[] = [];
   readonly supplierNomination = signal<SupplierNominationSummaryDto | null>(null);
   readonly orderSuppliers = signal<OrderSupplierDto[]>([]);
   readonly activeOrderSupplierId = signal<string | null>(null);
@@ -960,6 +968,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   private _initialLoadComplete = false;
   private _autosavePaused = false;
+  private routeSub: Subscription | null = null;
 
   constructor() {
     // Reactive autosave — watches mutable signals; fires on any change
@@ -998,6 +1007,21 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.checkWhatsAppLinked();
     this.dateFormatSvc.load();
     this.brokerDealSvc.load();
+
+    // React to same-route navigation (e.g. global search clicking another order).
+    // Angular reuses the component when only the :id param changes, so ngOnInit
+    // does not fire again. This subscription reloads the order when the id changes.
+    this.routeSub = this.route.paramMap.pipe(skip(1)).subscribe((params) => {
+      const newId = params.get('id') ?? '';
+      // Compare against the loaded order's id (not the route signal) because
+      // toSignal(orderId) updates before this callback fires, making a
+      // comparison against orderId() always false.
+      const loadedId = this.order()?.id;
+      if (newId && newId !== loadedId) {
+        this.resetStateForNewOrder();
+        this.loadOrder();
+      }
+    });
   }
 
   ngAfterViewInit(): void {
@@ -1007,6 +1031,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   ngOnDestroy(): void {
     this.saveSvc.cancelAutoSave();
     this.plattsSvc.cancelTimer();
+    this.routeSub?.unsubscribe();
   }
 
 
@@ -1060,6 +1085,29 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         queryParamsHandling: 'preserve',
       });
     }
+  }
+
+  private resetStateForNewOrder(): void {
+    // Cancel any pending auto-save from the previous order
+    this.saveSvc.cancelAutoSave();
+    this.plattsSvc.cancelTimer();
+
+    // Reset state so stale data from the previous order doesn't flash
+    this._initialLoadComplete = false;
+    this._autosavePaused = false;
+    this.order.set(null);
+    this.client.set(null);
+    this.supplier.set(null);
+    this.suppliers.set([]);
+    this.itemRows.set([]);
+    this.orderSuppliers.set([]);
+    this.activeOrderSupplierId.set(null);
+    this.bankAccounts.set([]);
+    this.customerContact.set(null);
+    this.supplierContact.set(null);
+    this.invoiceNumber.set('');
+    this.showCustomerPaymentNote.set(false);
+    this.showSupplierPaymentNote.set(false);
   }
 
   private async loadOrder(): Promise<void> {
@@ -1637,6 +1685,92 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       }
     } catch {
       this.showToast('error', 'Failed to update attachment type.');
+    }
+  }
+
+  // ─── Photo Gallery ──────────────────────────────────────────────────
+
+  onPhotoSelected(files: File[]): void {
+    this.selectedPhotos = files;
+  }
+
+  async uploadPhoto(): Promise<void> {
+    const id = this.orderId();
+    if (!id || this.selectedPhotos.length === 0) return;
+    this.uploadingPhoto.set(true);
+    const total = this.selectedPhotos.length;
+    let successCount = 0;
+    let failCount = 0;
+    try {
+      for (let i = 0; i < this.selectedPhotos.length; i++) {
+        this.photoUploadProgress.set(`Uploading ${i + 1} of ${total}…`);
+        try {
+          const form = new FormData();
+          form.append('file', this.selectedPhotos[i]!);
+          form.append('type', 'PHOTO');
+          form.append('category', this.photoUploadCategory());
+          const res = await firstValueFrom(
+            this.http.post<ApiResponse<OrderAttachmentDto>>(`${API_URL}/orders/${id}/attachments`, form),
+          );
+          if (res.success && res.data) {
+            this.attachments.update((prev) => [res.data, ...prev]);
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch {
+          failCount++;
+        }
+      }
+      if (successCount > 0 && failCount === 0) {
+        this.showToast('success', `${successCount} photo${successCount === 1 ? '' : 's'} uploaded.`);
+      } else if (successCount > 0 && failCount > 0) {
+        this.showToast('success', `${successCount} uploaded, ${failCount} failed.`);
+      } else {
+        this.showToast('error', 'Failed to upload photos.');
+      }
+      this.selectedPhotos = [];
+      this.photoUploadProgress.set('');
+    } finally {
+      this.uploadingPhoto.set(false);
+    }
+  }
+
+  async deletePhoto(photo: OrderAttachmentDto): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<{ deleted: boolean }>>(`${API_URL}/orders/${id}/attachments/${photo.id}`),
+      );
+      if (res.success) {
+        this.attachments.update((prev) => prev.filter((a) => a.id !== photo.id));
+        this.showToast('success', 'Photo removed.');
+      } else {
+        this.showToast('error', res.message ?? 'Failed to remove photo.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to remove photo.');
+    }
+  }
+
+  async updatePhotoCategory(event: { photo: OrderAttachmentDto; category: string }): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<OrderAttachmentDto>>(`${API_URL}/orders/${id}/attachments/${event.photo.id}`, {
+          type: event.photo.type,
+          category: event.category,
+        }),
+      );
+      if (res.success && res.data) {
+        this.attachments.update((prev) => prev.map((a) => (a.id === event.photo.id ? res.data! : a)));
+      } else {
+        this.showToast('error', res.message ?? 'Failed to update photo category.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to update photo category.');
     }
   }
 

@@ -40,6 +40,9 @@ apps/*/.netlify/
 # Local doc-generation scratch artifacts (e.g. exported PDFs from manual runs)
 tmp/*.pdf
 
+# Azure AD app registration credentials (contains client secrets — do not commit)
+deploy/instances/fueld-azure-apps-credentials.txt
+
 # Pi coding agent local config
 .pi/
 

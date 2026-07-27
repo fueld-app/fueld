@@ -158,7 +158,7 @@ For each tenant, enter the credentials from the script output:
 | **SSO Provider** | `Microsoft Entra ID (Azure AD)` |
 | **SSO Enabled** | Toggle ON |
 | **Force Microsoft email match** | ON (recommended) — prevents users from connecting personal Outlook accounts |
-| **Approved email domains** | Add your organization's domain(s), e.g., `channeltx.com` |
+| **Approved email domains** | Add your organization's domain(s), e.g., `channeltx.com`, `moxiebrokerage.com` |
 
 ### Test the integration
 
@@ -185,6 +185,11 @@ TENANTS=(
 )
 ```
 
+The domain in the array is the **Fueld instance domain** (where the Fueld app is hosted),
+used for the OAuth redirect URI. It is **not** the customer's email domain.
+For example, Moxie's Fueld instance is at `moxie.fueld.app`, but their email domain
+is `moxiebrokerage.com` — that goes in the approved email domains setting (Step 3 below).
+
 ### 2. Re-run the script
 
 ```bash
@@ -192,7 +197,9 @@ az login --tenant <tenant-id> --allow-no-subscriptions
 ./deploy/setup-fueld-azure-organization.sh <tenant-id>
 ```
 
-The script is idempotent — it will create the new app without affecting existing ones.
+The script is **idempotent** — it checks whether an app registration already exists
+(by display name) and skips it. Only new tenants get app registrations and credentials
+appended to the credentials file. Existing tenants' credentials are preserved.
 
 ### 3. Configure the new tenant in Fueld
 
@@ -337,6 +344,12 @@ AZURE_APP_ID_channeltx=bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
 AZURE_CLIENT_SECRET_channeltx=yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
 AZURE_TENANT_ID_channeltx=12345678-1234-1234-1234-123456789012
 AZURE_REDIRECT_URI_channeltx=https://channeltx.fueld.app/api/auth/microsoft/callback
+
+## moxie (moxie.fueld.app)
+AZURE_APP_ID_moxie=cccccccc-cccc-cccc-cccc-cccccccccccc
+AZURE_CLIENT_SECRET_moxie=zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
+AZURE_TENANT_ID_moxie=12345678-1234-1234-1234-123456789012
+AZURE_REDIRECT_URI_moxie=https://moxie.fueld.app/api/auth/microsoft/callback
 ```
 
 > 🔒 **Security**: This file is gitignored by convention. Do not commit it to the repository. Store it in a password manager or secure vault.

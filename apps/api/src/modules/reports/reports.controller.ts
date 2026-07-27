@@ -7,6 +7,7 @@ import type {
   ReportExceptionType,
   ReportScheduleDto,
   SavedReportViewDto,
+  ThroughputReportDto,
 } from '@fueld/types';
 import { authGuard } from '../auth/auth.guard';
 import {
@@ -33,7 +34,10 @@ import {
   brokerCommissionReportToCsv,
   brokerCommissionReportToXlsx,
   createCommissionOrdersFromReport,
+  buildThroughputReport,
+  exportThroughputXlsx,
 } from './reports.service';
+import { getThroughputReportSettings } from '../admin/settings.service';
 
 const reportFiltersSchema = t.Object({
   from: t.Optional(t.String()),
@@ -164,7 +168,7 @@ export const reportsController = new Elysia({ prefix: '/reports' })
         name: t.String({ minLength: 1 }),
         description: t.Optional(t.String()),
         reportMode: t.Optional(t.Union([t.Literal('SUMMARY'), t.Literal('EXCEPTIONS')])),
-        reportType: t.Union([t.Literal('SUMMARY'), t.Literal('MARGIN_ANALYSIS')]),
+        reportType: t.Union([t.Literal('SUMMARY'), t.Literal('MARGIN_ANALYSIS'), t.Literal('THROUGHPUT')]),
         deliveryMode: t.Optional(t.Union([t.Literal('HTML'), t.Literal('CSV'), t.Literal('XLSX'), t.Literal('CSV_XLSX')])),
         bodyMode: t.Optional(t.Union([t.Literal('HTML_SUMMARY'), t.Literal('ATTACHMENT_ONLY')])),
         hourUtc: t.Number({ minimum: 0, maximum: 23 }),
@@ -193,7 +197,7 @@ export const reportsController = new Elysia({ prefix: '/reports' })
         name: t.String({ minLength: 1 }),
         description: t.Optional(t.String()),
         reportMode: t.Optional(t.Union([t.Literal('SUMMARY'), t.Literal('EXCEPTIONS')])),
-        reportType: t.Union([t.Literal('SUMMARY'), t.Literal('MARGIN_ANALYSIS')]),
+        reportType: t.Union([t.Literal('SUMMARY'), t.Literal('MARGIN_ANALYSIS'), t.Literal('THROUGHPUT')]),
         deliveryMode: t.Optional(t.Union([t.Literal('HTML'), t.Literal('CSV'), t.Literal('XLSX'), t.Literal('CSV_XLSX')])),
         bodyMode: t.Optional(t.Union([t.Literal('HTML_SUMMARY'), t.Literal('ATTACHMENT_ONLY')])),
         hourUtc: t.Number({ minimum: 0, maximum: 23 }),
@@ -420,4 +424,39 @@ export const reportsController = new Elysia({ prefix: '/reports' })
       to: t.String(),
     }),
     detail: { tags: ['Reports'], summary: 'Create commission orders from broker report (admin only)', security: [{ bearerAuth: [] }] },
+  })
+
+  // ─── Throughput / Sales Report (Feature 1) ─────────────────────────
+  .get('/throughput', async ({ auth, query, set }) => {
+    const settings = await getThroughputReportSettings();
+    if (!settings.enabled) {
+      set.status = 403;
+      return { success: false, data: null, message: 'Throughput report is not enabled for this tenant' } satisfies ApiResponse<null>;
+    }
+    const data = await buildThroughputReport(auth.tenantId, query.from, query.to);
+    return { success: true, data } satisfies ApiResponse<ThroughputReportDto>;
+  }, {
+    query: t.Object({
+      from: t.Optional(t.String()),
+      to: t.Optional(t.String()),
+    }),
+    detail: { tags: ['Reports'], summary: 'Get throughput / sales report by product type', security: [{ bearerAuth: [] }] },
+  })
+
+  .get('/throughput/export.xlsx', async ({ auth, query, set }) => {
+    const settings = await getThroughputReportSettings();
+    if (!settings.enabled) {
+      set.status = 403;
+      return { success: false, data: null, message: 'Throughput report is not enabled for this tenant' } satisfies ApiResponse<null>;
+    }
+    const { content, fileName } = await exportThroughputXlsx(auth.tenantId, query.from, query.to);
+    set.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
+    return content;
+  }, {
+    query: t.Object({
+      from: t.Optional(t.String()),
+      to: t.Optional(t.String()),
+    }),
+    detail: { tags: ['Reports'], summary: 'Export throughput report as XLSX', security: [{ bearerAuth: [] }] },
   });

@@ -157,10 +157,12 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
         }
       </div>
 
-      <!-- Collections Widget -->
-      <div class="mt-8">
-        <app-collections-widget [overdueInvoices]="collections().items" />
-      </div>
+      <!-- Collections Widget (hidden for LITE users) -->
+      @if (auth.canSeePrices()) {
+        <div class="mt-8">
+          <app-collections-widget [overdueInvoices]="collections().items" />
+        </div>
+      }
 
       <!-- Follow-Ups Widget -->
       <app-dashboard-follow-ups-widget
@@ -206,7 +208,7 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
                       @if (company.responsibleUserName && showResponsibleInFrozenCounterparties()) {
                         <span>Responsible: {{ company.responsibleUserName }}</span>
                       }
-                      @if (company.creditLimit && +company.creditLimit > 0) {
+                      @if (company.creditLimit && +company.creditLimit > 0 && auth.canSeePrices()) {
                         <span>Limit: {{ formatUsd(parseNumber(company.creditLimit)) }}</span>
                       }
                     </div>
@@ -521,10 +523,10 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly kpiCards = computed(() => {
     const cards = [
       { label: 'Total Orders', value: this.teamStats().activeOrders.toString(), description: 'Count of all non-inquiry, non-cancelled orders in the selected period.' },
-      { label: 'Overdue Invoices', value: this.collections().items.length.toString(), description: 'Number of unpaid invoices past their due date.' },
     ];
     if (this.auth.canSeePrices()) {
       cards.push(
+        { label: 'Overdue Invoices', value: this.collections().items.length.toString(), description: 'Number of unpaid invoices past their due date.' },
         { label: 'Total Revenue YTD', value: this.teamStats().totalRevenueYTD, description: 'Sum of sell price × qty × unit conversion factor, converted to USD via FX rates. Excludes inquiries and cancelled orders.' },
         { label: 'Gross Profit YTD', value: this.teamStats().totalGrossProfitYTD ?? '—', description: 'Total revenue minus total cost, both converted to USD via FX rates.' },
         { label: 'Net Profit YTD', value: this.teamStats().totalNetProfitYTD ?? '—', description: 'Gross profit minus estimated financing cost based on payment term differences.' },

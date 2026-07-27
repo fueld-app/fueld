@@ -1354,6 +1354,46 @@ export async function updateAttachmentTypeSettings(attachmentTypes: string[]): P
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  PHOTO GALLERY SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getPhotoGallerySettings(): Promise<{
+  enabled: boolean;
+  photoCategories: string[];
+  maxFileSizeMb: number;
+}> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const pgs = settings.photoGallerySettings;
+  return {
+    enabled: pgs?.enabled ?? false,
+    photoCategories: pgs?.photoCategories ?? ['BEFORE', 'AFTER', 'TANK_SEAL', 'OTHER'],
+    maxFileSizeMb: pgs?.maxFileSizeMb ?? 10,
+  };
+}
+
+//  THROUGHPUT REPORT SETTINGS
+
+export async function getThroughputReportSettings(): Promise<{
+  enabled: boolean;
+  defaultUnit: string;
+  groupByCategory: boolean;
+}> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const tr = settings.throughputReport;
+  return {
+    enabled: tr?.enabled ?? false,
+    defaultUnit: tr?.defaultUnit ?? 'Gallons',
+    groupByCategory: tr?.groupByCategory ?? false,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  DELIVERY DOCUMENTATION SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 

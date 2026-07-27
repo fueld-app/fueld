@@ -30,7 +30,7 @@ function isLightColor(hex: string): boolean {
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'INQUIRY' | 'BUNKER_BOOKING';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'INQUIRY' | 'BUNKER_BOOKING' | 'BROKER_CONFIRMATION';
 
 export interface SendDocumentEmailOptions {
   /** Document type being sent */
@@ -45,8 +45,8 @@ export interface SendDocumentEmailOptions {
   senderEmail: string;
   /** Sender's display name */
   senderName: string;
-  /** Primary recipient email */
-  recipientEmail: string;
+  /** Primary recipient email(s) */
+  recipientEmails: string[];
   /** CC email addresses */
   ccEmails: string[];
   /** BCC email addresses */
@@ -122,9 +122,9 @@ async function sendViaGraph(options: SendDocumentEmailOptions, accessToken: stri
         contentType: 'HTML',
         content: options.htmlBody,
       },
-      toRecipients: [
-        { emailAddress: { address: options.recipientEmail } },
-      ],
+      toRecipients: options.recipientEmails.map((email) => ({
+        emailAddress: { address: email },
+      })),
       ...(attachments.length > 0 ? {
         attachments: [
           ...attachments.map((attachment) => ({
@@ -187,7 +187,7 @@ async function sendViaSmtp(options: SendDocumentEmailOptions): Promise<void> {
   await transporter.sendMail({
     from: fromAddress,
     replyTo: `"${options.senderName}" <${options.senderEmail}>`,
-    to: options.recipientEmail,
+    to: options.recipientEmails.join(', '),
     cc: options.ccEmails.length > 0 ? options.ccEmails.join(', ') : undefined,
     bcc: options.bccEmails.length > 0 ? options.bccEmails.join(', ') : undefined,
     subject: options.subject,
@@ -210,18 +210,22 @@ async function sendViaSmtp(options: SendDocumentEmailOptions): Promise<void> {
  * then falls back to SMTP.
  * Logs the result to the email_log table.
  */
-export async function sendDocumentEmail(options: SendDocumentEmailOptions): Promise<{ channel: 'GRAPH' | 'SMTP' }> {
+export async function sendDocumentEmail(options: SendDocumentEmailOptions): Promise<{ channel: 'GRAPH' | 'SMTP'; tokenExpiredWarning?: string }> {
   let channel: 'GRAPH' | 'SMTP' = 'SMTP';
   let error: string | null = null;
+  let tokenExpiredWarning: string | undefined;
 
   try {
     // Try to acquire a Graph token from the user's stored Microsoft refresh token
-    const graphToken = await acquireGraphTokenForUser(options.sentByUserId);
-    if (graphToken) {
+    const graphResult = await acquireGraphTokenForUser(options.sentByUserId);
+    if (graphResult.token) {
       channel = 'GRAPH';
-      await sendViaGraph(options, graphToken);
+      await sendViaGraph(options, graphResult.token);
     } else {
       channel = 'SMTP';
+      if (graphResult.tokenExpired) {
+        tokenExpiredWarning = 'Your Microsoft 365 connection has expired. Please re-link your account in Admin → Integrations.';
+      }
       await sendViaSmtp(options);
     }
   } catch (err: any) {
@@ -232,7 +236,7 @@ export async function sendDocumentEmail(options: SendDocumentEmailOptions): Prom
   }
 
   await logEmail(options, channel, 'SENT', null);
-  return { channel };
+  return { channel, tokenExpiredWarning };
 }
 
 async function logEmail(
@@ -248,7 +252,7 @@ async function logEmail(
       documentType: options.documentType,
       sentByUserId: options.sentByUserId,
       sentFromEmail: options.senderEmail,
-      sentTo: options.recipientEmail,
+      sentTo: options.recipientEmails.join(', '),
       ccEmails: options.ccEmails.length > 0 ? options.ccEmails.join(', ') : null,
       bccEmails: options.bccEmails.length > 0 ? options.bccEmails.join(', ') : null,
       subject: options.subject,
@@ -457,6 +461,11 @@ export function buildDocumentEmailHtml(params: {
       greeting: 'Dear Captain',
       intro: `Bunkers have been booked for <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
     },
+    BROKER_CONFIRMATION: {
+      title: 'Broker Confirmation',
+      greeting: 'Dear Broker',
+      intro: `Please find attached the broker confirmation for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+    },
   };
 
   const l = labels[params.documentType];
@@ -547,6 +556,7 @@ export function buildDocumentEmailSubject(params: {
     PORT_DOCUMENTATION: 'Port Documentation',
     INQUIRY: 'Inquiry',
     BUNKER_BOOKING: 'Bunker Booking',
+    BROKER_CONFIRMATION: 'Broker Confirmation',
   };
 
   if (params.documentType === 'INVOICE' && params.invoiceNumber) {

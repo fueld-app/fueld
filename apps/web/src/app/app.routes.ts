@@ -97,6 +97,15 @@ export const routes: Routes = [
           ),
         title: 'Broker Commission Report',
       },
+      {
+        path: 'reports/throughput',
+        canActivate: [lightGuard],
+        loadComponent: () =>
+          import('./features/reports/pages/throughput-report/throughput-report-page.component').then(
+            (m) => m.ThroughputReportPageComponent,
+          ),
+        title: 'Throughput / Sales Report',
+      },
       // ── Trading ──
       {
         path: 'trading',
@@ -697,6 +706,14 @@ export const routes: Routes = [
                     (m) => m.BrokerDealsSettingsPageComponent,
                   ),
                 title: 'Admin > Settings > Broker Deals',
+              },
+              {
+                path: 'features',
+                loadComponent: () =>
+                  import('./features/admin/pages/settings/features-settings-page.component').then(
+                    (m) => m.FeaturesSettingsPageComponent,
+                  ),
+                title: 'Admin > Settings > Features',
               },
             ],
           },

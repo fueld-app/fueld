@@ -33,7 +33,7 @@ import { API_URL } from '@app/core/config/api';
 //  - WhatsApp send option
 // ═══════════════════════════════════════════════════════════════════════
 
-export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'BUNKER_BOOKING';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'BUNKER_BOOKING' | 'BROKER_CONFIRMATION';
 
 export interface SendEmailAttachmentOption {
   id: string;
@@ -45,7 +45,7 @@ export interface SendEmailAttachmentOption {
 export interface SendEmailPayload {
   documentType: DocumentEmailType;
   orderSupplierId?: string | null;
-  recipientEmail: string;
+  recipientEmails: string[];
   ccEmails: string[];
   bccEmails: string[];
   subject: string;
@@ -67,6 +67,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
   INVOICE: 'Invoice',
   PORT_DOCUMENTATION: 'Port Documentation',
   BUNKER_BOOKING: 'Bunker Booking',
+  BROKER_CONFIRMATION: 'Broker Confirmation',
 };
 
 @Component({
@@ -696,7 +697,7 @@ export class SendEmailModalComponent {
   }
 
   showWith(defaults: {
-    recipientEmail: string;
+    recipientEmails: string[];
     ccEmails: string[];
     bccEmails?: string[];
     defaultCcEmails?: Array<{ email: string; label: string | null }>;
@@ -730,8 +731,10 @@ export class SendEmailModalComponent {
 
     setTimeout(() => {
       // Set To
-      if (defaults.recipientEmail) {
-        this.toInput()?.setTags([{ email: defaults.recipientEmail }]);
+      if (defaults.recipientEmails?.length) {
+        this.toInput()?.setTags(
+          defaults.recipientEmails.map((email) => ({ email })),
+        );
       }
 
       // Set CC - mark admin defaults as locked
@@ -829,6 +832,7 @@ export class SendEmailModalComponent {
       INVOICE: 'invoice',
       PORT_DOCUMENTATION: 'invoice',
       BUNKER_BOOKING: 'invoice',
+      BROKER_CONFIRMATION: 'broker-confirmation',
     };
 
     this.loadingPreview.set(true);
@@ -917,7 +921,7 @@ export class SendEmailModalComponent {
     this.sendEmail.emit({
       documentType: this.documentType(),
       orderSupplierId: this.documentType() === 'NOMINATION' ? this.nominationOrderSupplierId() : null,
-      recipientEmail: toEmails[0],
+      recipientEmails: toEmails,
       ccEmails: this.ccInput()?.getEmails() ?? [],
       bccEmails: this.bccInput()?.getEmails() ?? [],
       subject: this.subject,

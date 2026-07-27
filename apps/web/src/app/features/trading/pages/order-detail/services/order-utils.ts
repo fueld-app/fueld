@@ -1,7 +1,7 @@
 import type { OrderItemRow } from '../../../components/order-items/order-item.types';
 import type { OrderSupplierDto } from '@fueld/types';
 
-export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuantity = false): Record<string, string | null>[] {
+export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuantity = false): Record<string, string | boolean | null>[] {
   return rows.map((r) => {
     const deliveredQuantity = fillMissingDeliveredQuantity
       ? getEffectiveDeliveredQuantity(r)
@@ -10,9 +10,9 @@ export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuant
     return {
       orderSupplierId: r.orderSupplierId ?? null,
       productType: r.productType,
-      quantity: String(r.quantity),
+      quantity: r.quantity != null ? String(r.quantity) : '0',
       quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
-      quantityMax: String(r.quantity),
+      quantityMax: r.quantityMax != null ? String(r.quantityMax) : null,
       unit: r.unit, costUnit: r.costUnit, salesUnit: r.salesUnit,
       costConversionFactor: r.costConversionFactor != null ? String(r.costConversionFactor) : '1',
       unitConversionFactor: r.unitConversionFactor != null ? String(r.unitConversionFactor) : '1',
@@ -41,6 +41,7 @@ export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuant
       plannedInventoryAt: r.plannedInventoryAt ?? null,
       taxRate: r.taxRate != null ? String(r.taxRate) : null,
       commissionPerUnit: r.commissionPerUnit != null ? String(r.commissionPerUnit) : null,
+      hideOnDocuments: r.hideOnDocuments ?? false,
     };
   });
 }

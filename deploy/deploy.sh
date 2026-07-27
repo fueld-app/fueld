@@ -176,6 +176,26 @@ log "Health check passed ✓"
 # ─── 5. Promote frontend after API health passes ─────────────────────
 if [ -d "$APP_DIR/staging/web" ]; then
   log "Promoting frontend after healthy API start..."
+
+  # Guard: detect and fix double-nested browser/browser/browser/ directory
+  # The expected structure is staging/web/browser/index.html (nginx root = /opt/fueld/web/browser)
+  # Double nesting occurs when browser/browser/browser/index.html exists but browser/browser/index.html does not
+  if [ -d "$APP_DIR/staging/web/browser/browser" ] && [ -f "$APP_DIR/staging/web/browser/browser/index.html" ] && [ ! -f "$APP_DIR/staging/web/browser/index.html" ]; then
+    warn "Detected double-nested browser/browser/browser/ — flattening..."
+    mv "$APP_DIR/staging/web/browser/browser" "$APP_DIR/staging/web/browser-flat"
+    cp -a "$APP_DIR/staging/web/browser-flat/"* "$APP_DIR/staging/web/browser/" 2>/dev/null || true
+    rm -rf "$APP_DIR/staging/web/browser-flat"
+    log "Double-nested directory flattened"
+  fi
+
+  # Guard: verify index.html exists in browser/ before promoting
+  if [ ! -f "$APP_DIR/staging/web/browser/index.html" ]; then
+    err "index.html not found in frontend build — aborting frontend promotion"
+    err "Contents of staging/web:"
+    ls -la "$APP_DIR/staging/web/" | head -20
+    exit 1
+  fi
+
   rm -rf "$APP_DIR/web"
   mv "$APP_DIR/staging/web" "$APP_DIR/web"
   log "Frontend deployed"

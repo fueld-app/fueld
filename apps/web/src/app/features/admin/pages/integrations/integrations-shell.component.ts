@@ -2,16 +2,11 @@ import {
   Component,
   ChangeDetectionStrategy,
   inject,
-  signal,
   OnInit,
   OnDestroy,
 } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, ActivatedRoute } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom, Subscription } from 'rxjs';
-import type { ApiResponse, IntegrationStatusDto } from '@fueld/types';
-
-import { API } from '@app/core/config/api';
+import { Subscription } from 'rxjs';
 import { IntegrationsToastService } from './integrations-toast.service';
 
 @Component({
@@ -63,12 +58,8 @@ import { IntegrationsToastService } from './integrations-toast.service';
   `,
 })
 export class IntegrationsShellComponent implements OnInit, OnDestroy {
-  private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
   readonly toastService = inject(IntegrationsToastService);
-
-  readonly loading = signal(true);
-  readonly integrations = signal<IntegrationStatusDto[]>([]);
 
   private routeSub: Subscription | null = null;
 
@@ -91,26 +82,11 @@ export class IntegrationsShellComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.loadIntegrations();
+    // Load integration statuses into the shared service for child components
+    this.toastService.loadIntegrations();
   }
 
   ngOnDestroy(): void {
     this.routeSub?.unsubscribe();
-  }
-
-  async loadIntegrations(): Promise<void> {
-    this.loading.set(true);
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<IntegrationStatusDto[]>>(`${API}/admin/settings/integrations`),
-      );
-      if (res.success) {
-        this.integrations.set(res.data);
-      }
-    } catch (err) {
-      console.error('Failed to load integrations:', err);
-    } finally {
-      this.loading.set(false);
-    }
   }
 }

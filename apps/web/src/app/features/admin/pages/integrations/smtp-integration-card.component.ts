@@ -169,7 +169,9 @@ export class SmtpIntegrationCardComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toastService = inject(IntegrationsToastService);
 
-  readonly integration = input.required<IntegrationStatusDto | undefined>();
+  /** Optional input — used when rendered directly. When rendered via router-outlet,
+   *  status comes from the shared toast service. */
+  readonly integration = input<IntegrationStatusDto | undefined>(undefined);
 
   readonly smtpHost = signal('');
   readonly smtpPort = signal('587');
@@ -187,7 +189,7 @@ export class SmtpIntegrationCardComponent implements OnInit {
   readonly smtpTestError = signal('');
 
   status(): IntegrationStatusDto | null {
-    return this.integration() ?? null;
+    return this.toastService.getProvider('SMTP') ?? this.integration() ?? null;
   }
 
   ngOnInit(): void {
@@ -232,6 +234,7 @@ export class SmtpIntegrationCardComponent implements OnInit {
         this.smtpSaveSuccess.set('SMTP settings saved successfully.');
         this.smtpPass.set('');
         this.toastService.show('success', 'SMTP settings saved successfully.');
+        await this.toastService.loadIntegrations();
       } else {
         this.smtpSaveError.set(res.message ?? 'Failed to save SMTP settings.');
       }

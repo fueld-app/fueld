@@ -31,7 +31,7 @@ let mockGraphToken: string | null = null;
 const originalModule = await import('../src/modules/auth/microsoft-oauth.service');
 mock.module('../src/modules/auth/microsoft-oauth.service', () => ({
   ...originalModule,
-  acquireGraphTokenForUser: async () => mockGraphToken,
+  acquireGraphTokenForUser: async () => ({ token: mockGraphToken, tokenExpired: false }),
 }));
 
 // ── Mock WhatsApp group message to capture calls ──
@@ -236,7 +236,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           token,
           body: {
             documentType: 'INVOICE',
-            recipientEmail: 'client@example.com',
+            recipientEmails: ['client@example.com'],
             subject: 'Invoice #001',
             htmlBody: '<p>Invoice</p>',
           },
@@ -250,7 +250,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           token,
           body: {
             documentType: 'OFFER',
-            recipientEmail: 'buyer@example.com',
+            recipientEmails: ['buyer@example.com'],
             ccEmails: ['cc1@example.com'],
             subject: 'Offer for bunker',
             htmlBody: '<p>Offer</p>',
@@ -296,7 +296,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           token,
           body: {
             documentType: 'INVOICE',
-            recipientEmail: 'client@example.com',
+            recipientEmails: ['client@example.com'],
             subject: 'Invoice with PDF',
             htmlBody: '<p>Invoice</p>',
           },
@@ -330,7 +330,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           token,
           body: {
             documentType: 'INVOICE',
-            recipientEmail: 'finance@example.com',
+            recipientEmails: ['finance@example.com'],
             subject: 'Invoice email',
             htmlBody: '<p>body</p>',
           },
@@ -365,7 +365,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           token,
           body: {
             documentType: 'OFFER',
-            recipientEmail: 'buyer@example.com',
+            recipientEmails: ['buyer@example.com'],
             subject: 'Offer email',
             htmlBody: '<p>offer</p>',
           },

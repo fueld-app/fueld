@@ -322,7 +322,7 @@ describe('document.service formatting helpers', () => {
 
     const text = collectTextValues(doc).join(' | ');
     expect(text).toContain('we are pleased to offer to you the following');
-    expect(text).toContain('50 - 75');
+    expect(text).toContain('50.00 - 75.00');
     expect(text).toContain('USD/MT  612.50');
   });
 
@@ -423,8 +423,10 @@ describe('document.service formatting helpers', () => {
     expect(text).toContain('INVOICE');
     expect(text).toContain('REMITTANCE INSTRUCTIONS');
     expect(text).toContain('Total amount due to Fueld Trading Ltd');
-    expect(text).toContain('FRAUD PREVENTION');
-    expect(text).toContain('Verify domain: example.com');
+    // Fraud prevention section removed — QR is now in remittance section
+    expect(text).not.toContain('FRAUD PREVENTION');
+    // Verify text changed from "Verify domain:" to "Verify:" to fit narrower column
+    expect(text).toContain('Verify: example.com');
 
     const content = doc.content as unknown as Array<Record<string, unknown>>;
     const tableBlock = content.find((entry) => !!entry.table && !!entry.layout);

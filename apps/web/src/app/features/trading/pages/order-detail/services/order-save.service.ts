@@ -107,7 +107,7 @@ export class OrderSaveService {
     options: {
       itemRows: () => OrderItemRow[];
       hasMultipleOrderSuppliers: () => boolean;
-      buildItemPayload: (rows: OrderItemRow[], opts?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | null>[];
+      buildItemPayload: (rows: OrderItemRow[], opts?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | boolean | null>[];
       syncSupplierRecords: (orderId: string) => Promise<void>;
       clearSavedDraftIds: (rows: OrderItemRow[]) => void;
       loadCustomerCreditLines: (clientId: string) => Promise<void>;
@@ -149,7 +149,7 @@ export class OrderSaveService {
 
       await options.syncSupplierRecords(id);
 
-      const itemPayload = options.buildItemPayload(autoSaveRows).map((item: Record<string, string | null>) => ({
+      const itemPayload = options.buildItemPayload(autoSaveRows).map((item: Record<string, string | boolean | null>) => ({
         ...item,
         costCurrency: item['costCurrency'] ?? o.currency,
         salesCurrency: item['salesCurrency'] ?? o.currency,

@@ -9,7 +9,7 @@ let mockGraphToken: string | null = null;
 const originalModule = await import('../src/modules/auth/microsoft-oauth.service');
 mock.module('../src/modules/auth/microsoft-oauth.service', () => ({
   ...originalModule,
-  acquireGraphTokenForUser: async () => mockGraphToken,
+  acquireGraphTokenForUser: async () => ({ token: mockGraphToken, tokenExpired: false }),
 }));
 
 // Import e2e helpers *after* mock is registered so the app picks it up
@@ -238,7 +238,7 @@ describe('documents + verify controller e2e', () => {
       token,
       body: {
         documentType: 'INVOICE',
-        recipientEmail: 'finance@example.com',
+        recipientEmails: ['finance@example.com'],
         subject: 'Test',
         htmlBody: '<p>test</p>',
       },
@@ -293,7 +293,7 @@ describe('documents + verify controller e2e', () => {
         body: {
           documentType: 'INVOICE',
           orderSupplierId: null,
-          recipientEmail: 'finance@example.com',
+          recipientEmails: ['finance@example.com'],
           subject: 'Invoice Test',
           htmlBody: '<p>Invoice body</p>',
         },
@@ -334,7 +334,7 @@ describe('documents + verify controller e2e', () => {
         token,
         body: {
           documentType: 'OFFER',
-          recipientEmail: 'buyer@example.com',
+          recipientEmails: ['buyer@example.com'],
           subject: 'Offer for MV TEST',
           htmlBody: '<p>Offer body</p>',
         },
@@ -369,7 +369,7 @@ describe('documents + verify controller e2e', () => {
         token,
         body: {
           documentType: 'NOMINATION',
-          recipientEmail: 'supplier@example.com',
+          recipientEmails: ['supplier@example.com'],
           subject: 'Nomination',
           htmlBody: '<p>Nomination body</p>',
         },
@@ -484,7 +484,7 @@ describe('documents + verify controller e2e', () => {
     });
     expect(defaultsWithSelection.status).toBe(200);
     expect(defaultsWithSelection.data?.success).toBe(true);
-    expect(defaultsWithSelection.data?.data?.recipientEmail).toBe('secondary.supplier@example.com');
+    expect(defaultsWithSelection.data?.data?.recipientEmails).toContain('secondary.supplier@example.com');
 
     mockGraphToken = 'graph-multi-nom-token';
     const originalFetch = globalThis.fetch;
@@ -498,7 +498,7 @@ describe('documents + verify controller e2e', () => {
         body: {
           documentType: 'NOMINATION',
           orderSupplierId: selectedSupplier.id,
-          recipientEmail: 'secondary.supplier@example.com',
+          recipientEmails: ['secondary.supplier@example.com'],
           subject: 'Nomination B',
           htmlBody: '<p>Nomination body</p>',
         },
@@ -544,7 +544,7 @@ describe('documents + verify controller e2e', () => {
         token,
         body: {
           documentType: 'PROFORMA',
-          recipientEmail: 'accounting@example.com',
+          recipientEmails: ['accounting@example.com'],
           subject: 'Proforma Invoice',
           htmlBody: '<p>Proforma body</p>',
         },
@@ -568,7 +568,7 @@ describe('documents + verify controller e2e', () => {
       token,
       body: {
         documentType: 'BOGUS_TYPE',
-        recipientEmail: 'test@example.com',
+        recipientEmails: ['test@example.com'],
         subject: 'Test',
         htmlBody: '<p>test</p>',
       },
@@ -586,7 +586,7 @@ describe('documents + verify controller e2e', () => {
       token,
       body: {
         documentType: 'INVOICE',
-        recipientEmail: 'valid@example.com',
+        recipientEmails: ['valid@example.com'],
         ccEmails: ['not-an-email'],
         subject: 'Test',
         htmlBody: '<p>test</p>',
@@ -733,7 +733,7 @@ describe('documents + verify controller e2e', () => {
 
     expect(res.status).toBe(200);
     expect(res.data?.success).toBe(true);
-    expect(res.data?.data?.recipientEmail).toBe('agent.ops@example.com');
+    expect(res.data?.data?.recipientEmails).toContain('agent.ops@example.com');
     expect(res.data?.data?.recipientName).toBe('Agent Ops');
   });
 
@@ -784,7 +784,7 @@ describe('documents + verify controller e2e', () => {
       token,
       body: {
         documentType: 'OFFER',
-        recipientEmail: 'test@example.com',
+        recipientEmails: ['test@example.com'],
         subject: 'Test',
         htmlBody: '<p>test</p>',
       },
@@ -798,7 +798,7 @@ describe('documents + verify controller e2e', () => {
       token,
       body: {
         documentType: 'INVOICE',
-        recipientEmail: 'test@example.com',
+        recipientEmails: ['test@example.com'],
         subject: 'Test',
         htmlBody: '<p>test</p>',
       },
@@ -812,7 +812,7 @@ describe('documents + verify controller e2e', () => {
       token,
       body: {
         documentType: 'PROFORMA',
-        recipientEmail: 'test@example.com',
+        recipientEmails: ['test@example.com'],
         subject: 'Test',
         htmlBody: '<p>test</p>',
       },

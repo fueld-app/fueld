@@ -118,6 +118,9 @@ const DOC_LABELS: Record<DocumentType, string> = {
                   </div>
                 }
               </div>
+              <p class="mt-3 text-xs text-gray-500 dark:text-muted">
+                <strong>Conditional blocks:</strong> Use <code class="font-mono text-brand-700 dark:text-brand-400" [textContent]="conditionalSyntax"></code> to show content only when a variable has a value. Example: <code class="font-mono text-brand-700 dark:text-brand-400" [textContent]="conditionalExample"></code>
+              </p>
             </details>
           </div>
 
@@ -157,9 +160,10 @@ const DOC_LABELS: Record<DocumentType, string> = {
                     <textarea
                       [ngModel]="getBody(docType)"
                       (ngModelChange)="setBody(docType, $event)"
-                      rows="5"
+                      rows="12"
                       [placeholder]="'<p>Dear Customer,</p><p>Please find attached the ' + '{{' + 'documentLabel' + '}}' + ' for ' + '{{' + 'vesselName' + '}}' + ' at ' + '{{' + 'portName' + '}}' + '.</p>'"
-                      class="app-input w-full font-mono"
+                      class="app-input w-full font-mono resize-y min-h-[200px] text-sm leading-relaxed"
+                      style="resize: vertical; min-height: 200px;"
                     ></textarea>
                   </div>
 
@@ -358,6 +362,8 @@ export class EmailSettingsPageComponent implements OnInit {
   readonly autoSendOnConvert = signal(false);
   readonly rules = signal<EmailRule[]>([]);
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
+  readonly conditionalSyntax = '{{#if variable}}...{{/if}}';
+  readonly conditionalExample = '{{#if agent}}Agent: ${agent}{{/if}}';
   readonly templateVariables = signal<TemplateVariable[]>([]);
   readonly savingTemplate = signal<DocumentType | null>(null);
   readonly savedTemplate = signal<DocumentType | null>(null);

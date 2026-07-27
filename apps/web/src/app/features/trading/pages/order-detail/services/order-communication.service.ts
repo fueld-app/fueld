@@ -48,7 +48,7 @@ export class OrderCommunicationService {
 
     this.http
       .post<ApiResponse<{
-        recipientEmail: string;
+        recipientEmails: string[];
         recipientName: string;
         ccEmails: string[];
         bccEmails: string[];
@@ -73,7 +73,7 @@ export class OrderCommunicationService {
           );
 
           emailModal?.showWith({
-            recipientEmail: d.recipientEmail,
+            recipientEmails: d.recipientEmails,
             ccEmails: d.ccEmails,
             bccEmails: d.bccEmails ?? [],
             defaultCcEmails: d.defaultCcEmails ?? [],
@@ -111,7 +111,7 @@ export class OrderCommunicationService {
           }
           const d = res.data;
           emailModal?.showWith({
-            recipientEmail: d.to.join(', '),
+            recipientEmails: d.to,
             ccEmails: d.cc,
             bccEmails: [],
             defaultCcEmails: [],
@@ -137,12 +137,12 @@ export class OrderCommunicationService {
     if (!orderId) return;
 
     this.http
-      .post<ApiResponse<{ success: boolean; message: string; channel: string; pdfFileName: string }>>(
+      .post<ApiResponse<{ success: boolean; message: string; channel: string; pdfFileName: string; tokenExpiredWarning?: string }>>(
         `${API_URL}/orders/${orderId}/send-email`,
         {
           documentType: payload.documentType,
           orderSupplierId: payload.orderSupplierId ?? null,
-          recipientEmail: payload.recipientEmail,
+          recipientEmails: payload.recipientEmails,
           ccEmails: payload.ccEmails,
           bccEmails: payload.bccEmails,
           subject: payload.subject,
@@ -154,12 +154,15 @@ export class OrderCommunicationService {
         next: (res) => {
           emailModal?.done();
           const channel = res.data?.channel === 'GRAPH' ? 'via Outlook' : 'via email';
-          showToast('success', `${payload.documentType} sent to ${payload.recipientEmail} ${channel}`);
+          showToast('success', `${payload.documentType} sent to ${payload.recipientEmails.join(', ')} ${channel}`);
+          if (res.data?.tokenExpiredWarning) {
+            showToast('error', res.data.tokenExpiredWarning);
+          }
           onSuccess?.();
         },
         error: () => {
           emailModal?.done();
-          showToast('error', 'Failed to send email. Please check that SMTP is configured in Admin → Settings → Integrations.');
+          showToast('error', 'Failed to send email. Check SMTP settings in Admin → Settings → Integrations, or re-link your Microsoft 365 account if it has expired.');
         },
       });
   }
@@ -182,6 +185,7 @@ export class OrderCommunicationService {
       INVOICE: 'invoice',
       PORT_DOCUMENTATION: 'invoice',
       BUNKER_BOOKING: 'invoice',
+      BROKER_CONFIRMATION: 'broker-confirmation',
     };
     const docLabels: Record<DocumentEmailType, string> = {
       OFFER: 'Offer',
@@ -191,6 +195,7 @@ export class OrderCommunicationService {
       INVOICE: 'Invoice',
       PORT_DOCUMENTATION: 'Port Documentation',
       BUNKER_BOOKING: 'Bunker Booking',
+      BROKER_CONFIRMATION: 'Broker Confirmation',
     };
 
     try {

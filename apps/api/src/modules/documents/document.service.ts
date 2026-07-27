@@ -1,7 +1,7 @@
 import pdfmake from 'pdfmake';
 import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
@@ -47,7 +47,7 @@ interface BankDetails {
   intermediaryBank: string | null;
 }
 
-type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
+type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER' | 'BROKER_CONFIRMATION';
 // Bump this whenever document output changes so cached revisions regenerate.
 const DOCUMENT_TEMPLATE_VERSION = '2026-04-10a';
 
@@ -476,7 +476,9 @@ export async function fetchOrderForInvoice(orderId: string) {
             contact: true,
           },
         },
-        items: true,
+        items: {
+          orderBy: [asc(orderItems.sortOrder), asc(orderItems.createdAt)],
+        },
         invoices: true,
       },
     });
@@ -572,21 +574,43 @@ function formatPrice(val: string | null | undefined, precision?: number | null):
 }
 
 /** Determine the fixed decimal places needed for the price column so all items align.
- *  If any item has a sub-cent price (< $0.01), use 4 decimals for all. Otherwise use 2. */
-function computePriceColumnDecimals(items: Array<{ salesPrice: string | null }>): number {
+ *  Uses the admin-configured costSalesDecimalPrecision as the baseline (default 5).
+ *  If any item has a sub-cent price (< $0.01), use at least 4 decimals. */
+function computePriceColumnDecimals(items: Array<{ salesPrice: string | null }>, configuredPrecision?: number | null): number {
+  const minDecimals = configuredPrecision ?? 5;
   for (const item of items) {
     const n = parseFloat(item.salesPrice ?? '0');
-    if (!isNaN(n) && n !== 0 && Math.abs(n) < 0.01) return 4;
+    if (!isNaN(n) && n !== 0 && Math.abs(n) < 0.01) return Math.max(4, minDecimals);
   }
-  return 2;
+  return minDecimals;
 }
 
-/** Format a price with a FIXED number of decimals (both min and max) for column alignment. */
+/** Format a price with at least 2 decimals, up to the configured precision.
+ *  Strips unnecessary trailing zeros while preserving full precision (no rounding). */
 function formatPriceFixed(val: string | null | undefined, decimals: number): string {
   if (!val) return '—';
   const n = parseFloat(val);
   if (isNaN(n)) return '—';
-  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return n.toLocaleString('en-US', { minimumFractionDigits: Math.min(2, decimals), maximumFractionDigits: decimals });
+}
+
+/**
+ * Compute the maximum number of decimal places across all line items for a given field.
+ * Returns at least 2 (minimum display precision).
+ * e.g. if items have quantities [100, 123.456, 50.5], returns 3.
+ */
+function computeMaxDecimalPlaces(items: Array<Record<string, unknown>>, field: string): number {
+  let maxDp = 2;
+  for (const item of items) {
+    const val = item[field];
+    if (!val) continue;
+    const s = String(val);
+    const dot = s.indexOf('.');
+    if (dot === -1) continue;
+    const dp = s.length - dot - 1;
+    if (dp > maxDp) maxDp = dp;
+  }
+  return maxDp;
 }
 
 /** Format a number, stripping trailing zeros (e.g. 100.000 → "100", 100.500 → "100.5"). */
@@ -955,8 +979,9 @@ function buildInvoiceDocument(data: {
     { text: 'Total (USD)', style: 'tableHeader', alignment: 'right' },
   ];
 
-  // Compute fixed decimal places for price column so all items align
-  const priceColDecimals = computePriceColumnDecimals(data.items);
+  // Compute fixed decimal places so all items align — min 2, max = highest dp in data
+  const qtyDecimals = computeMaxDecimalPlaces(data.items, 'quantity');
+  const priceDecimals = computeMaxDecimalPlaces(data.items, 'salesPrice');
 
   const tableRows: TableCell[][] = data.items.map((item, idx) => {
     const qty = parseFloat(item.quantity) || 0;
@@ -965,10 +990,10 @@ function buildInvoiceDocument(data: {
     return [
       { text: String(idx + 1), alignment: 'center' },
       { text: formatProductTypeLabel(item.productType) },
-      { text: formatNumberCompact(item.quantity, 3), alignment: 'right' },
+      { text: formatNumber(item.quantity, qtyDecimals), alignment: 'right' },
       { text: item.unit },
-      { text: formatPriceFixed(item.salesPrice, priceColDecimals), alignment: 'right' },
-      { text: formatNumber(String(lineTotal), 2), alignment: 'right' },
+      { text: formatNumber(item.salesPrice, priceDecimals), alignment: 'right' },
+      { text: formatNumber(String(lineTotal), priceDecimals), alignment: 'right' },
     ];
   });
 
@@ -1082,7 +1107,7 @@ function buildInvoiceDocument(data: {
       {
         columns: [
           { width: '*', text: totalAmountDueLabel, bold: true },
-          { width: 'auto', text: `${formatNumber(String(grandTotal), 2)} USD`, bold: true, alignment: 'right' },
+          { width: 'auto', text: `${formatNumber(String(grandTotal), priceDecimals)} USD`, bold: true, alignment: 'right' },
         ],
         margin: [0, 6, 0, 0],
       } as Content,
@@ -1096,73 +1121,163 @@ function buildInvoiceDocument(data: {
       } as Content,
       { text: '', margin: [0, 6, 0, 0] } as Content,
 
-      // ── Bank Details ──
-      { text: 'REMITTANCE INSTRUCTIONS', style: 'sectionLabel' } as Content,
-      { text: 'Payment to be effected, free of all charges to us, by telegraphic transfer to:', fontSize: 9, margin: [0, 2, 0, 6] } as Content,
-      { text: `Please include Order Ref ${data.orderNumber ?? data.invoiceNumber} in the transfer message/note.`, fontSize: 9, margin: [0, 0, 0, 6] } as Content,
-      {
+      // ── Remittance Instructions + QR code (true 2-column layout) ──
+      ...(data.verifyUrl ? [{
         columns: [
-          { width: '25%', text: 'Bank:', bold: true },
-          { width: '75%', text: data.bank.bankName },
+          // Left: full remittance instructions
+          {
+            width: '*',
+            stack: [
+              { text: 'REMITTANCE INSTRUCTIONS', style: 'sectionLabel' } as Content,
+              { text: 'Payment to be effected, free of all charges to us, by telegraphic transfer to:', fontSize: 9, margin: [0, 2, 0, 6] } as Content,
+              { text: `Please include Order Ref ${data.orderNumber ?? data.invoiceNumber} in the transfer message/note.`, fontSize: 9, margin: [0, 0, 0, 6] } as Content,
+              {
+                columns: [
+                  { width: '30%', text: 'Bank:', bold: true },
+                  { width: '70%', text: data.bank.bankName },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content,
+              ...(data.bank.branchAddress ? [{
+                columns: [
+                  { width: '30%', text: '' },
+                  { width: '70%', text: data.bank.branchAddress, color: '#374151' },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+              ...(data.bank.accountName ? [{
+                columns: [
+                  { width: '30%', text: 'In favour of:', bold: true },
+                  { width: '70%', text: data.bank.accountName },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+              ...(data.bank.iban ? [{
+                columns: [
+                  { width: '30%', text: 'IBAN No:', bold: true },
+                  { width: '70%', text: data.bank.iban, font: 'Roboto' },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+              ...(data.bank.accountNumber ? [{
+                columns: [
+                  { width: '30%', text: 'Account No:', bold: true },
+                  { width: '70%', text: data.bank.accountNumber, font: 'Roboto' },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+              ...(data.bank.swift ? [{
+                columns: [
+                  { width: '30%', text: 'SWIFT:', bold: true },
+                  { width: '70%', text: data.bank.swift },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+              ...(data.bank.sortCode ? [{
+                columns: [
+                  { width: '30%', text: 'Sort Code:', bold: true },
+                  { width: '70%', text: data.bank.sortCode },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+              ...(data.bank.routingNumber ? [{
+                columns: [
+                  { width: '30%', text: 'Routing No:', bold: true },
+                  { width: '70%', text: data.bank.routingNumber },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+              ...(data.bank.intermediaryBank ? [{
+                columns: [
+                  { width: '30%', text: 'Intermediary bank:', bold: true },
+                  { width: '70%', text: data.bank.intermediaryBank },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+            ],
+          },
+          // Right: QR code (fixed width, centered, non-wrapping text)
+          {
+            width: 110,
+            stack: [
+              { image: data.verifyUrl, fit: [80, 80], alignment: 'center', link: data.verifyLink ?? undefined } as Content,
+              { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
+              ...(data.verifyLink ? [
+                { text: `Verify: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
+              ] : []),
+            ],
+          },
         ],
-        margin: [0, 2, 0, 0],
-      } as Content,
-      ...(data.bank.branchAddress ? [{
-        columns: [
-          { width: '25%', text: '' },
-          { width: '75%', text: data.bank.branchAddress, color: '#374151' },
-        ],
-        margin: [0, 2, 0, 0],
-      } as Content] : []),
-      ...(data.bank.accountName ? [{
-        columns: [
-          { width: '25%', text: 'In favour of:', bold: true },
-          { width: '75%', text: data.bank.accountName },
-        ],
-        margin: [0, 2, 0, 0],
-      } as Content] : []),
-      ...(data.bank.iban ? [{
-        columns: [
-          { width: '25%', text: 'IBAN No:', bold: true },
-          { width: '75%', text: data.bank.iban, font: 'Roboto' },
-        ],
-        margin: [0, 2, 0, 0],
-      } as Content] : []),
-      ...(data.bank.accountNumber ? [{
-        columns: [
-          { width: '25%', text: 'Account No:', bold: true },
-          { width: '75%', text: data.bank.accountNumber, font: 'Roboto' },
-        ],
-        margin: [0, 2, 0, 0],
-      } as Content] : []),
-      ...(data.bank.swift ? [{
-        columns: [
-          { width: '25%', text: 'SWIFT:', bold: true },
-          { width: '75%', text: data.bank.swift },
-        ],
-        margin: [0, 2, 0, 0],
-      } as Content] : []),
-      ...(data.bank.sortCode ? [{
-        columns: [
-          { width: '25%', text: 'Sort Code:', bold: true },
-          { width: '75%', text: data.bank.sortCode },
-        ],
-        margin: [0, 2, 0, 0],
-      } as Content] : []),
-      ...(data.bank.routingNumber ? [{
-        columns: [
-          { width: '25%', text: 'Routing No:', bold: true },
-          { width: '75%', text: data.bank.routingNumber },
-        ],
-        margin: [0, 2, 0, 0],
-      } as Content] : []),
-      ...(data.bank.intermediaryBank ? [{
-        columns: [
-          { width: '25%', text: 'Intermediary bank:', bold: true },
-          { width: '75%', text: data.bank.intermediaryBank },
-        ],
-        margin: [0, 2, 0, 0],
-      } as Content] : []),
+        margin: [0, 6, 0, 0],
+      } as Content] : [
+        // No QR code — render remittance instructions full-width
+        { text: 'REMITTANCE INSTRUCTIONS', style: 'sectionLabel' } as Content,
+        { text: 'Payment to be effected, free of all charges to us, by telegraphic transfer to:', fontSize: 9, margin: [0, 2, 0, 6] } as Content,
+        { text: `Please include Order Ref ${data.orderNumber ?? data.invoiceNumber} in the transfer message/note.`, fontSize: 9, margin: [0, 0, 0, 6] } as Content,
+        {
+          columns: [
+            { width: '30%', text: 'Bank:', bold: true },
+            { width: '70%', text: data.bank.bankName },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content,
+        ...(data.bank.branchAddress ? [{
+          columns: [
+            { width: '30%', text: '' },
+            { width: '70%', text: data.bank.branchAddress, color: '#374151' },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.accountName ? [{
+          columns: [
+            { width: '30%', text: 'In favour of:', bold: true },
+            { width: '70%', text: data.bank.accountName },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.iban ? [{
+          columns: [
+            { width: '30%', text: 'IBAN No:', bold: true },
+            { width: '70%', text: data.bank.iban, font: 'Roboto' },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.accountNumber ? [{
+          columns: [
+            { width: '30%', text: 'Account No:', bold: true },
+            { width: '70%', text: data.bank.accountNumber, font: 'Roboto' },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.swift ? [{
+          columns: [
+            { width: '30%', text: 'SWIFT:', bold: true },
+            { width: '70%', text: data.bank.swift },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.sortCode ? [{
+          columns: [
+            { width: '30%', text: 'Sort Code:', bold: true },
+            { width: '70%', text: data.bank.sortCode },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.routingNumber ? [{
+          columns: [
+            { width: '30%', text: 'Routing No:', bold: true },
+            { width: '70%', text: data.bank.routingNumber },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.intermediaryBank ? [{
+          columns: [
+            { width: '30%', text: 'Intermediary bank:', bold: true },
+            { width: '70%', text: data.bank.intermediaryBank },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+      ]),
 
       // ── VAT Number ──
       ...(data.vatNumber ? [{
@@ -1179,35 +1294,7 @@ function buildInvoiceDocument(data: {
         margin: [0, 10, 0, 0],
       } as Content] : []),
 
-      // ── Fraud Prevention + QR (2-column) ──
-      ...((data.fraudPreventionText || data.verifyUrl) ? [
-        { text: '', margin: [0, 10, 0, 0] } as Content,
-        {
-          columns: [
-            {
-              width: '*',
-              stack: [
-                ...(data.fraudPreventionText ? [
-                  { text: 'FRAUD PREVENTION', fontSize: 9, bold: true, margin: [0, 0, 0, 4] } as Content,
-                  { text: data.fraudPreventionText, fontSize: 8, color: '#374151', margin: [0, 0, 10, 0] } as Content,
-                ] : []),
-              ],
-            },
-            {
-              width: 'auto',
-              stack: [
-                ...(data.verifyUrl ? [
-                  { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
-                  { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
-                  ...(data.verifyLink ? [
-                    { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
-                  ] : []),
-                ] : []),
-              ],
-            },
-          ],
-        } as Content,
-      ] : []),
+      // ── Fraud Prevention (removed — was showing above/below remittance, not needed) ──
     ],
 
     // ── Footer ──
@@ -1363,12 +1450,12 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items
-      .filter((item) => item.customerNote)
+      .filter((item) => item.customerNote && !item.hideOnDocuments)
       .map((item) => ({
         label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
-    items: order.items.map((item) => ({
+    items: order.items.filter(item => !item.hideOnDocuments).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.deliveredQuantity ?? item.quantity,
@@ -1382,6 +1469,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
       salesBargingUnit: item.salesBargingUnit,
       salesCreditDays: item.salesCreditDays,
       salesPriceFinalized: item.salesPriceFinalized,
+      salesCurrency: item.salesCurrency,
     })),
     createdAt: invoice.createdAt,
     verifyUrl,
@@ -1514,12 +1602,12 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items
-      .filter((item) => item.customerNote)
+      .filter((item) => item.customerNote && !item.hideOnDocuments)
       .map((item) => ({
         label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
-    items: order.items.map((item) => ({
+    items: order.items.filter(item => !item.hideOnDocuments).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.deliveredQuantity ?? item.quantity,
@@ -1533,6 +1621,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
       salesBargingUnit: item.salesBargingUnit,
       salesCreditDays: item.salesCreditDays,
       salesPriceFinalized: item.salesPriceFinalized,
+      salesCurrency: item.salesCurrency,
     })),
     createdAt: invoice?.createdAt ?? order.createdAt,
     verifyUrl,
@@ -1652,6 +1741,7 @@ export function buildOfferDocument(data: {
     salesBargingUnit?: string | null;
     salesCreditDays?: number | null;
     salesPriceFinalized?: boolean | null;
+    salesCurrency?: string | null;
   }>;
   createdAt: Date;
   docTitle?: string;
@@ -1748,13 +1838,14 @@ export function buildOfferDocument(data: {
         { text: 'Price', style: 'tableHeader', alignment: 'right' },
       ];
 
-  // Compute fixed decimal places for price column so all items align
-  const priceColDecimals = computePriceColumnDecimals(data.items);
+  // Compute fixed decimal places so all items align — min 2, max = highest dp in data
+  const qtyDecimals = computeMaxDecimalPlaces(data.items, 'quantity');
+  const priceDecimals = computeMaxDecimalPlaces(data.items, 'salesPrice');
 
   const tableRows: TableCell[][] = data.items.map((item) => {
     const qty = item.quantityMin && item.quantityMax
-      ? `${formatNumberCompact(item.quantityMin, 0)} - ${formatNumberCompact(item.quantityMax, 0)}`
-      : formatNumberCompact(item.quantity, 3);
+      ? `${formatNumber(item.quantityMin, qtyDecimals)} - ${formatNumber(item.quantityMax, qtyDecimals)}`
+      : formatNumber(item.quantity, qtyDecimals);
     const desc = item.description?.trim();
     const productCell: Content = item.productType === 'ITEM' && desc
       ? { text: desc }
@@ -1776,11 +1867,11 @@ export function buildOfferDocument(data: {
         if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
         if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
         if (item.salesPriceFinalized) {
-          parts.push({ text: `\n→ ${formatPriceFixed(item.salesPrice, priceColDecimals)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
+          parts.push({ text: `\n→ ${formatNumber(item.salesPrice, priceDecimals)} ${item.salesCurrency || data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
         }
         priceCell = { text: parts, alignment: 'right' };
       } else {
-        priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPriceFixed(item.salesPrice, priceColDecimals)}`, alignment: 'right' };
+        priceCell = { text: `${item.salesCurrency || data.currency}/${item.priceUnit ?? item.unit}  ${formatNumber(item.salesPrice, priceDecimals)}`, alignment: 'right' };
       }
       baseRow.push(priceCell as TableCell);
     }
@@ -2072,18 +2163,24 @@ export function buildOfferDocument(data: {
 /**
  * Generate an Offer PDF buffer for a given order ID.
  */
-export async function generateOfferPdfBuffer(orderId: string): Promise<{
+export async function generateOfferPdfBuffer(orderId: string, options?: {
+  includeHiddenItems?: boolean;
+  documentTitleOverride?: string;
+  documentTypeOverride?: DocumentType;
+  baseFileNameOverride?: string;
+}): Promise<{
   buffer: Buffer;
   fileName: string;
   revision: DocumentRevisionInfo;
 }> {
+  const includeHidden = options?.includeHiddenItems ?? false;
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings();
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const isInquiryContext = order.status === 'INQUIRY' || order.status === 'OFFER';
-  const documentTitle = isInquiryContext ? 'OFFER' : 'CONFIRMATION';
-  const documentName = isInquiryContext ? 'Offer' : 'Confirmation';
-  const baseFileName = isInquiryContext ? 'Offer' : 'Confirmation';
+  const documentTitle = options?.documentTitleOverride ?? (isInquiryContext ? 'OFFER' : 'CONFIRMATION');
+  const documentName = options?.documentTitleOverride ?? (isInquiryContext ? 'Offer' : 'Confirmation');
+  const baseFileName = options?.baseFileNameOverride ?? (isInquiryContext ? 'Offer' : 'Confirmation');
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'OFFER',
     orderId: order.id,
@@ -2166,13 +2263,13 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items
-      .filter((item) => item.customerNote)
+      .filter((item) => item.customerNote && !item.hideOnDocuments)
       .map((item) => ({
         label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
     currency: order.currency ?? 'USD',
-    items: order.items.map((item) => ({
+    items: (includeHidden ? order.items : order.items.filter(item => !item.hideOnDocuments)).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.quantity,
@@ -2188,6 +2285,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
       salesBargingUnit: item.salesBargingUnit,
       salesCreditDays: item.salesCreditDays,
       salesPriceFinalized: item.salesPriceFinalized,
+      salesCurrency: item.salesCurrency,
     })),
     createdAt: order.createdAt,
     docTitle: documentTitle,
@@ -2202,7 +2300,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
   const revision = await persistDocumentRevision({
     tenantId: order.tenantId,
     orderId: order.id,
-    documentType: 'OFFER',
+    documentType: options?.documentTypeOverride ?? 'OFFER',
     fileName,
     buffer,
   });
@@ -2224,6 +2322,24 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
   const canonicalBuffer = loadDocumentRevisionBuffer(revision);
 
   return { buffer: canonicalBuffer, fileName, revision };
+}
+
+/**
+ * Generate a broker confirmation PDF — includes ALL line items (including
+ * those marked hideOnDocuments=true, e.g. broker commission line items).
+ * Sent to the broker contact, not the customer.
+ */
+export async function generateBrokerConfirmationPdfBuffer(orderId: string): Promise<{
+  buffer: Buffer;
+  fileName: string;
+}> {
+  const { buffer, fileName } = await generateOfferPdfBuffer(orderId, {
+    includeHiddenItems: true,
+    documentTitleOverride: 'BROKER CONFIRMATION',
+    documentTypeOverride: 'BROKER_CONFIRMATION',
+    baseFileNameOverride: 'BrokerConfirmation',
+  });
+  return { buffer, fileName };
 }
 
 /**
@@ -2385,7 +2501,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     companyLogoDataUrl,
     itemNotes: [],
     currency: order.currency ?? 'USD',
-    items: nominationContext.items.map((item) => ({
+    items: nominationContext.items.filter(item => !item.hideOnDocuments).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.quantity,
@@ -2401,6 +2517,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
       salesBargingUnit: item.costBargingUnit,
       salesCreditDays: item.costCreditDays,
       salesPriceFinalized: item.costPriceFinalized,
+      salesCurrency: item.costCurrency,
     })),
     createdAt: order.createdAt,
     docTitle: 'NOMINATION',
@@ -2494,6 +2611,7 @@ function buildProformaDocument(data: {
     salesBargingUnit?: string | null;
     salesCreditDays?: number | null;
     salesPriceFinalized?: boolean | null;
+    salesCurrency?: string | null;
   }>;
   createdAt: Date;
   verifyUrl?: string | null;
@@ -2547,8 +2665,9 @@ function buildProformaDocument(data: {
     { text: 'Total amount', style: 'tableHeader', alignment: 'right' },
   ];
 
-  // Compute fixed decimal places for price column so all items align
-  const priceColDecimals = computePriceColumnDecimals(data.items);
+  // Compute fixed decimal places so all items align — min 2, max = highest dp in data
+  const qtyDecimals = computeMaxDecimalPlaces(data.items, 'quantity');
+  const priceDecimals = computeMaxDecimalPlaces(data.items, 'salesPrice');
 
   const tableRows: TableCell[][] = data.items.map((item) => {
     const qty = parseFloat(item.quantity) || 0;
@@ -2569,20 +2688,20 @@ function buildProformaDocument(data: {
       if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
       if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
       if (item.salesPriceFinalized) {
-        parts.push({ text: `\n\u2192 ${formatPriceFixed(item.salesPrice, priceColDecimals)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
-        totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
+        parts.push({ text: `\n\u2192 ${formatNumber(item.salesPrice, priceDecimals)} ${item.salesCurrency || data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
+        totalCell = { text: `${formatNumber(String(lineTotal), priceDecimals)} ${item.salesCurrency || data.currency}`, alignment: 'right' };
       } else {
         totalCell = { text: 'TBD', alignment: 'right', italics: true, color: '#d97706' };
       }
       priceCell = { text: parts, alignment: 'right' };
     } else {
-      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPriceFixed(item.salesPrice, priceColDecimals)}`, alignment: 'right' };
-      totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
+      priceCell = { text: `${item.salesCurrency || data.currency}/${item.priceUnit ?? item.unit}  ${formatNumber(item.salesPrice, priceDecimals)}`, alignment: 'right' };
+      totalCell = { text: `${formatNumber(String(lineTotal), priceDecimals)} ${item.salesCurrency || data.currency}`, alignment: 'right' };
     }
 
     return [
       productCell as TableCell,
-      { text: formatNumberCompact(item.quantity, 3), alignment: 'right' },
+      { text: formatNumber(item.quantity, qtyDecimals), alignment: 'right' },
       { text: item.unit },
       priceCell as TableCell,
       totalCell as TableCell,
@@ -2593,6 +2712,7 @@ function buildProformaDocument(data: {
     const price = parseFloat(item.salesPrice ?? '0') || 0;
     return sum + qty * price;
   }, 0);
+  const grandTotalCurrency = data.items[0]?.salesCurrency || data.currency;
   const totalAmountDueLabel = `Total amount due to ${data.companyName?.trim() || 'Company'}`;
 
   // Delivery date string — use the actual marked delivery date (deliveredAt), not ETA/ETD range
@@ -2752,7 +2872,7 @@ function buildProformaDocument(data: {
       {
         columns: [
           { width: '*', text: totalAmountDueLabel, bold: true },
-          { width: 'auto', text: `${formatNumber(String(grandTotal), 2)} ${data.currency}`, bold: true, alignment: 'right' },
+          { width: 'auto', text: `${formatNumber(String(grandTotal), priceDecimals)} ${grandTotalCurrency}`, bold: true, alignment: 'right' },
         ],
         margin: [0, 6, 0, 0],
       } as Content,
@@ -2986,12 +3106,12 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items
-      .filter((item) => item.customerNote)
+      .filter((item) => item.customerNote && !item.hideOnDocuments)
       .map((item) => ({
         label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
-    items: order.items.map((item) => ({
+    items: order.items.filter(item => !item.hideOnDocuments).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.quantity,
@@ -3005,6 +3125,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
       salesBargingUnit: item.salesBargingUnit,
       salesCreditDays: item.salesCreditDays,
       salesPriceFinalized: item.salesPriceFinalized,
+      salesCurrency: item.salesCurrency,
     })),
     createdAt: order.createdAt,
     verifyUrl: null as string | null,

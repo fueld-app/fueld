@@ -28,8 +28,10 @@ import {
   getOrderActivity,
   resolveOrderId,
   listOrderAttachments,
+  listOrderPhotos,
   createOrderAttachment,
   updateOrderAttachmentType,
+  updateOrderAttachmentCategory,
   deleteOrderAttachment,
   listOrderPayments,
   createOrderPayment,
@@ -677,7 +679,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
                     sentByUserId: auth.sub,
                     senderEmail: auth.email,
                     senderName: (await db.select({ name: users.name }).from(users).where(eq(users.id, auth.sub)).limit(1))[0]?.name ?? 'Fueld',
-                    recipientEmail: to.join(', '),
+                    recipientEmails: to,
                     ccEmails: cc,
                     bccEmails: [],
                     subject,
@@ -961,6 +963,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           filePath: `/uploads/attachments/${filename}`,
           mimeType: file.type,
           fileSize: file.size,
+          category: body.category ? String(body.category).trim().toUpperCase() : null,
           uploadedBy: auth.sub,
         });
 
@@ -979,6 +982,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       body: t.Object({
         file: t.File(),
         type: t.String(),
+        category: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Orders'],
@@ -1027,7 +1031,18 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           return { success: false, data: null, message: 'Attachment not found' };
         }
 
-        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+        // If a category was provided, update it as well
+        let finalRecord = updated;
+        if (body.category !== undefined) {
+          const catResult = await updateOrderAttachmentCategory(
+            params.attachmentId,
+            orderId,
+            body.category ? String(body.category).trim().toUpperCase() : null,
+          );
+          if (catResult) finalRecord = catResult;
+        }
+
+        return { success: true, data: finalRecord } satisfies ApiResponse<typeof finalRecord>;
       } catch (err) {
         console.error('[Orders] Update attachment type failed:', err);
         return { success: false, data: null, message: 'Failed to update attachment type' };
@@ -1037,10 +1052,34 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       params: t.Object({ id: t.String(), attachmentId: t.String() }),
       body: t.Object({
         type: t.String(),
+        category: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Orders'],
-        summary: 'Update the type of an order attachment',
+        summary: 'Update the type (and optionally category) of an order attachment',
+      },
+    },
+  )
+
+  .get(
+    '/:id/photos',
+    async ({ params, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+
+        const photos = await listOrderPhotos(orderId);
+        return { success: true, data: photos } satisfies ApiResponse<typeof photos>;
+      } catch (err) {
+        console.error('[Orders] List order photos failed:', err);
+        return { success: false, data: null, message: 'Failed to list photos' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'List all photo (image) attachments for an order',
       },
     },
   )

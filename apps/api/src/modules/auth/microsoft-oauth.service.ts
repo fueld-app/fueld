@@ -177,7 +177,7 @@ export async function refreshMicrosoftToken(
   if (!res.ok) {
     const errorText = await res.text();
     console.error(`[MicrosoftOAuth] Token refresh failed (${res.status}):`, errorText);
-    throw new Error(`Microsoft token refresh failed: ${res.status}`);
+    throw new Error(`Microsoft token refresh failed: ${res.status} — ${errorText}`);
   }
 
   return (await res.json()) as MicrosoftTokenResponse;
@@ -375,17 +375,26 @@ export function validateReturnUrl(returnUrl: string): boolean {
 
 // ─── Acquire Graph Token for a User ─────────────────────────────────
 
+/** Result of attempting to acquire a Graph access token for a user. */
+export interface GraphTokenResult {
+  /** A valid Graph access token, or null if unavailable. */
+  token: string | null;
+  /** True if the user HAD a refresh token but it expired (needs re-link). */
+  tokenExpired: boolean;
+}
+
 /**
  * Look up and refresh a user's Microsoft token for Graph API access.
  * Returns an access token suitable for `Authorization: Bearer ...`
  * against `https://graph.microsoft.com`, or `null` if unavailable.
  *
- * This is the function that mail.service.ts should call instead of
- * receiving a token from the frontend.
+ * If the user's refresh token has expired (AADSTS700082 / invalid_grant),
+ * the stored token is cleared from the database and `tokenExpired` is set
+ * to `true` so the caller can notify the user to re-link their account.
  */
 export async function acquireGraphTokenForUser(
   userId: string,
-): Promise<string | null> {
+): Promise<GraphTokenResult> {
   // Lazy import to avoid circular deps
   const { db } = await import('../../db');
   const { users } = await import('../../db/schema');
@@ -407,12 +416,12 @@ export async function acquireGraphTokenForUser(
     !user?.microsoftRefreshTokenIv ||
     !user?.microsoftRefreshTokenAuthTag
   ) {
-    return null; // No Microsoft account linked with refresh token
+    return { token: null, tokenExpired: false }; // No Microsoft account linked
   }
 
   // 2. Get Microsoft config from integration_credentials (encrypted)
   const config = await loadMicrosoftConfig();
-  if (!config) return null;
+  if (!config) return { token: null, tokenExpired: false };
 
   // 3. Decrypt refresh token
   const refreshToken = decryptRefreshToken(
@@ -439,9 +448,28 @@ export async function acquireGraphTokenForUser(
         .where(eq(users.id, userId));
     }
 
-    return tokens.access_token;
-  } catch (err) {
+    return { token: tokens.access_token, tokenExpired: false };
+  } catch (err: any) {
+    const errMsg = String(err?.message ?? err);
+    const isExpiredToken = /invalid_grant|AADSTS700082|expired/i.test(errMsg);
+
+    if (isExpiredToken) {
+      // Clear the expired refresh token so the system stops retrying a dead token
+      // and the user shows as 'not linked' in the admin integrations page.
+      console.warn(`[MicrosoftOAuth] Refresh token expired for user ${userId}, clearing stored token.`);
+      await db
+        .update(users)
+        .set({
+          microsoftRefreshToken: null,
+          microsoftRefreshTokenIv: null,
+          microsoftRefreshTokenAuthTag: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+      return { token: null, tokenExpired: true };
+    }
+
     console.error(`[MicrosoftOAuth] Failed to refresh token for user ${userId}:`, err);
-    return null; // Caller should fall back to SMTP
+    return { token: null, tokenExpired: false }; // Other error — fall back to SMTP
   }
 }

@@ -125,7 +125,9 @@ export class LliIntegrationCardComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toastService = inject(IntegrationsToastService);
 
-  readonly integration = input.required<IntegrationStatusDto | undefined>();
+  /** Optional input — used when rendered directly. When rendered via router-outlet,
+   *  status comes from the shared toast service. */
+  readonly integration = input<IntegrationStatusDto | undefined>(undefined);
 
   readonly formUsername = signal('');
   readonly formPassword = signal('');
@@ -134,7 +136,7 @@ export class LliIntegrationCardComponent implements OnInit {
   readonly errorMessage = signal('');
 
   status(): IntegrationStatusDto | null {
-    return this.integration() ?? null;
+    return this.toastService.getProvider('LLI') ?? this.integration() ?? null;
   }
 
   ngOnInit(): void {
@@ -162,6 +164,7 @@ export class LliIntegrationCardComponent implements OnInit {
         this.successMessage.set('Credentials verified and saved successfully.');
         this.formPassword.set('');
         this.toastService.show('success', 'LLI credentials saved successfully.');
+        await this.toastService.loadIntegrations();
       }
     } catch (err: any) {
       const msg = err?.error?.error ?? 'Failed to verify credentials. Please check and try again.';

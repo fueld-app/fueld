@@ -4,9 +4,21 @@ import type { SendDocumentEmailOptions } from '../src/modules/documents/mail.ser
 // ── Mock the microsoft-oauth module before importing mail.service ──
 // This lets us control whether a Graph token is available.
 let mockGraphToken: string | null = null;
+let mockTokenExpired = false;
+let mockSmtpSuccess = false;
 
 mock.module('../src/modules/auth/microsoft-oauth.service', () => ({
-  acquireGraphTokenForUser: async () => mockGraphToken,
+  acquireGraphTokenForUser: async () => ({ token: mockGraphToken, tokenExpired: mockTokenExpired }),
+}));
+
+// ── Mock the email (SMTP) module so we can test the SMTP fallback path ──
+mock.module('../src/lib/email', () => ({
+  getSmtpConfig: async () => mockSmtpSuccess
+    ? { host: 'smtp.test.com', port: 587, user: 'test', pass: 'test', from: 'test@fueld.app', secure: false }
+    : null,
+  getTransporter: async () => mockSmtpSuccess
+    ? { sendMail: async () => ({ messageId: 'test-message-id' }) }
+    : null,
 }));
 
 const { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml } =
@@ -23,6 +35,8 @@ describe('documents mail service', () => {
     capturedUrl = null;
     capturedInit = null;
     mockGraphToken = null; // Default: no Graph token (SMTP path)
+    mockTokenExpired = false;
+    mockSmtpSuccess = false;
   });
 
   afterEach(() => {
@@ -37,7 +51,7 @@ describe('documents mail service', () => {
     sentByUserId: '00000000-0000-0000-0000-000000000003',
     senderEmail: 'sender@example.com',
     senderName: 'Test Sender',
-    recipientEmail: 'customer@example.com',
+    recipientEmails: ['customer@example.com'],
     ccEmails: [],
     bccEmails: [],
     subject: 'Test Subject',
@@ -140,6 +154,35 @@ describe('documents mail service', () => {
     ).rejects.toThrow(/SMTP/);
 
     expect(graphCalled).toBe(false);
+  });
+
+  test('sendDocumentEmail returns tokenExpiredWarning when token expired and SMTP succeeds', async () => {
+    mockGraphToken = null; // No token available
+    mockTokenExpired = true; // Token was expired
+    mockSmtpSuccess = true; // SMTP will succeed
+
+    // Suppress console.error from logEmail
+    console.error = (() => {}) as typeof console.error;
+
+    const result = await sendDocumentEmail(baseOptions);
+
+    expect(result.channel).toBe('SMTP');
+    expect(result.tokenExpiredWarning).toBeDefined();
+    expect(result.tokenExpiredWarning).toContain('Microsoft 365 connection has expired');
+    expect(result.tokenExpiredWarning).toContain('re-link');
+  });
+
+  test('sendDocumentEmail does not return tokenExpiredWarning when token simply not linked', async () => {
+    mockGraphToken = null; // No token
+    mockTokenExpired = false; // Not expired — just never linked
+    mockSmtpSuccess = true; // SMTP will succeed
+
+    console.error = (() => {}) as typeof console.error;
+
+    const result = await sendDocumentEmail(baseOptions);
+
+    expect(result.channel).toBe('SMTP');
+    expect(result.tokenExpiredWarning).toBeUndefined();
   });
 
   // ─── Subject builder tests ────────────────────────────────────────

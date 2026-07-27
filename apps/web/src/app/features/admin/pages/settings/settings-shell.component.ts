@@ -64,6 +64,7 @@ export class SettingsShellComponent {
     { path: 'companies', label: 'Companies' },
     { path: 'documents', label: 'Documents & Workflow' },
     { path: 'broker-deals', label: 'Broker Deals' },
+    { path: 'features', label: 'Features' },
   ] as const;
 
 }

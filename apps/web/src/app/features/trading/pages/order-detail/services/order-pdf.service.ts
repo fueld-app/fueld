@@ -163,4 +163,44 @@ export class OrderPdfService {
     const token = res.headers.get('X-Document-Verify-Token')?.trim();
     return token ? toAbsoluteUrl(`${API_URL}/verify/token/${token}`) : null;
   }
+
+  async viewBrokerConfirmationPdf(
+    orderId: string,
+    pdfModal: PdfModal | null,
+    hasLineItems: boolean,
+    hasBroker: boolean,
+    showToast: ShowToast,
+    orderNumber: string | null | undefined,
+  ): Promise<void> {
+    if (!orderId) return;
+    if (!hasLineItems) {
+      showToast('error', 'Add at least one line item before generating Broker Confirmation PDF.');
+      return;
+    }
+    if (!hasBroker) {
+      showToast('error', 'Select a broker before generating Broker Confirmation PDF.');
+      return;
+    }
+    if (!pdfModal) return;
+
+    pdfModal.showLoading('Broker Confirmation');
+    try {
+      const res = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${orderId}/broker-confirmation/pdf`, {
+          responseType: 'blob',
+          observe: 'response',
+        }),
+      );
+      const blob = res.body;
+      if (!blob) throw new Error('Missing PDF body');
+      pdfModal.setBlob(
+        blob,
+        `BrokerConfirmation_${orderNumber ?? orderId}.pdf`,
+        this.buildVerifyUrlFromResponse(res),
+      );
+    } catch {
+      pdfModal.showError();
+      showToast('error', 'Failed to generate broker confirmation PDF.');
+    }
+  }
 }

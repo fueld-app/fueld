@@ -1,4 +1,5 @@
 import { and, asc, eq, gte, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import type {
   CommercialSummaryReportDto,
   ConversionMetricsDto,
@@ -34,6 +35,8 @@ import type {
   BrokerCommissionReportDto,
   BrokerCommissionReportByCustomerDto,
   BrokerCommissionReportOrderDto,
+  ThroughputReportDto,
+  ThroughputReportRowDto,
 } from '@fueld/types';
 import { Role } from '@fueld/types';
 import * as XLSX from 'xlsx';
@@ -2049,7 +2052,9 @@ function buildScheduledAttachments(schedule: ReportScheduleDto, report: ReleaseT
     ? 'exceptions'
     : schedule.reportType === 'MARGIN_ANALYSIS'
       ? 'margin-analysis'
-      : 'summary';
+      : schedule.reportType === 'THROUGHPUT'
+        ? 'throughput'
+        : 'summary';
   const exceptionRows = schedule.exceptionTypes.length > 0
     ? report.exceptions.rows.filter((row) => schedule.exceptionTypes.includes(row.type))
     : report.exceptions.rows;
@@ -2170,6 +2175,20 @@ function buildExceptionsEmailHtml(tenantName: string, rows: ReportExceptionRowDt
   `;
 }
 
+function buildThroughputEmailHtml(tenantName: string, report: ThroughputReportDto): string {
+  const tableRows = report.rows
+    .map((row) => `<tr><td style="padding:6px 0;">${escHtml(row.productType)}</td><td style="padding:6px 0; text-align:right;">${row.totalQuantity}</td><td style="padding:6px 0;">${escHtml(row.unit)}</td><td style="padding:6px 0; text-align:right;">${row.orderCount}</td></tr>`)
+    .join('');
+
+  return `
+    <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;">
+      <h2 style="margin:0 0 12px;">${escHtml(tenantName)} throughput report</h2>
+      <p style="margin:0 0 18px; color:#6b7280;">${report.rows.length} product${report.rows.length === 1 ? '' : 's'} | ${report.totalOrderCount} order${report.totalOrderCount === 1 ? '' : 's'}${report.from ? ` | From: ${report.from}` : ''}${report.to ? ` | To: ${report.to}` : ''}</p>
+      <table style="width:100%; border-collapse:collapse;"><thead><tr><th style="padding:6px 0; text-align:left; border-bottom:1px solid #e5e7eb;">Product / Service</th><th style="padding:6px 0; text-align:right; border-bottom:1px solid #e5e7eb;">Total Quantity</th><th style="padding:6px 0; text-align:left; border-bottom:1px solid #e5e7eb;">Unit</th><th style="padding:6px 0; text-align:right; border-bottom:1px solid #e5e7eb;">Orders</th></tr></thead><tbody>${tableRows || '<tr><td colspan="4">No data for this period</td></tr>'}</tbody></table>
+    </div>
+  `;
+}
+
 async function runScheduleForTenant(tenantId: string, tenantName: string, schedule: ReportScheduleDto): Promise<boolean> {
   const userRows = await db
     .select({ email: users.email })
@@ -2182,6 +2201,50 @@ async function runScheduleForTenant(tenantId: string, tenantName: string, schedu
   ].map((value) => value.trim()).filter(Boolean)));
 
   if (recipients.length === 0) return false;
+
+  // THROUGHPUT report has its own data source — doesn't need the full ReleaseTwo payload
+  if (schedule.reportType === 'THROUGHPUT') {
+    const filters = schedule.filters ?? {};
+    const throughput = await buildThroughputReport(tenantId, filters.from ?? undefined, filters.to ?? undefined);
+    if (schedule.sendOnlyWhenNonEmpty && throughput.rows.length === 0) return false;
+
+    const html = buildThroughputEmailHtml(tenantName, throughput);
+    const effectiveBodyMode = resolveScheduleBodyMode(schedule.deliveryMode, schedule.bodyMode);
+    const htmlBody = effectiveBodyMode === 'ATTACHMENT_ONLY'
+      ? '<div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;"><p>Your scheduled throughput report is attached.</p></div>'
+      : html;
+    const textBody = effectiveBodyMode === 'ATTACHMENT_ONLY'
+      ? 'Your scheduled throughput report is attached.'
+      : undefined;
+
+    const attachments: Array<{ filename: string; content: string | Buffer; contentType: string }> = [];
+    const wantsCsv = schedule.deliveryMode === 'CSV' || schedule.deliveryMode === 'CSV_XLSX';
+    const wantsXlsx = schedule.deliveryMode === 'XLSX' || schedule.deliveryMode === 'CSV_XLSX';
+    const suffix = `${throughput.from ?? 'all'}_to_${throughput.to ?? 'now'}`;
+    if (wantsCsv) {
+      attachments.push({
+        filename: `throughput_${suffix}.csv`,
+        content: buildCsv([
+          ['Product / Service', 'Total Quantity', 'Unit', 'Order Count'],
+          ...throughput.rows.map((r) => [r.productType, r.totalQuantity, r.unit, r.orderCount]),
+        ]),
+        contentType: 'text/csv; charset=utf-8',
+      });
+    }
+    if (wantsXlsx) {
+      const { content, fileName } = await exportThroughputXlsx(tenantId, filters.from ?? undefined, filters.to ?? undefined);
+      attachments.push({
+        filename: fileName,
+        content,
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+    }
+
+    return sendNotificationEmail(recipients, `Fueld report: ${schedule.name}`, htmlBody, {
+      textContent: textBody,
+      attachments,
+    });
+  }
 
   const report = await getReleaseTwoReports(tenantId, userRows.length > 0 ? (await db.query.users.findFirst({ where: and(eq(users.tenantId, tenantId), eq(users.role, Role.Admin)), columns: { id: true } }))?.id ?? '' : '', schedule.filters ?? {});
   if (!report) return false;
@@ -2522,4 +2585,179 @@ export async function createCommissionOrdersFromReport(
   }
 
   return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  THROUGHPUT / SALES REPORT (Feature 1: Sales Reporting by Product)
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Known unit-to-gallons conversion factors. */
+const UNIT_TO_GALLONS: Record<string, number> = {
+  gallon: 1, gallons: 1, gal: 1,
+  drum: 55, drums: 55,
+  pail: 5, pails: 5,
+  barrel: 42, barrels: 42, bbl: 42,
+  mt: 318.988, 'metric ton': 318.988, 'metric tons': 318.988,
+};
+
+/** Determine the display unit for a product type based on its name. */
+function determineDisplayUnit(productType: string): string {
+  const pt = productType.toLowerCase();
+  if (pt.includes('fuel') || pt.includes('slop') || pt.includes('lube') || pt.includes('oil') && !pt.includes('filter')) return 'Gallons';
+  if (pt.includes('labor') || pt.includes('hour') || pt.includes('hr')) return 'Hours';
+  if (pt.includes('trash') || pt.includes('bag')) return 'Bags';
+  if (pt.includes('filter')) return 'Count';
+  return '';
+}
+
+/** Convert a quantity from its original unit to the target unit.
+ *  Checks tenant-configured unitConversions first, then falls back to hardcoded factors. */
+function convertQuantity(
+  quantity: number,
+  fromUnit: string,
+  toUnit: string,
+  productType?: string,
+  tenantConversions?: { productType?: string; fromUnit: string; toUnit: string; factor: number }[],
+): number {
+  const from = fromUnit.toLowerCase().trim();
+  const to = toUnit.toLowerCase().trim();
+  if (from === to) return quantity;
+
+  // 1. Check tenant-configured conversions first (most specific match wins)
+  if (tenantConversions) {
+    const ptLower = productType?.toLowerCase();
+    // Try product-specific conversion first
+    const specificMatch = tenantConversions.find(
+      (c) => c.productType?.toLowerCase() === ptLower
+        && c.fromUnit.toLowerCase().trim() === from
+        && c.toUnit.toLowerCase().trim() === to,
+    );
+    if (specificMatch) return quantity * specificMatch.factor;
+
+    // Try generic conversion (no productType specified)
+    const genericMatch = tenantConversions.find(
+      (c) => !c.productType
+        && c.fromUnit.toLowerCase().trim() === from
+        && c.toUnit.toLowerCase().trim() === to,
+    );
+    if (genericMatch) return quantity * genericMatch.factor;
+  }
+
+  // 2. Fall back to hardcoded unit-to-gallons factors
+  const fromFactor = UNIT_TO_GALLONS[from];
+  const toFactor = UNIT_TO_GALLONS[to];
+  if (fromFactor && toFactor) {
+    return (quantity * fromFactor) / toFactor;
+  }
+
+  // If the target is gallons and we know the source factor
+  if (to === 'gallons' || to === 'gallon' || to === 'gal') {
+    if (fromFactor) return quantity * fromFactor;
+  }
+
+  // If the source is gallons and we know the target factor
+  if (from === 'gallons' || from === 'gallon' || from === 'gal') {
+    if (toFactor) return quantity / toFactor;
+  }
+
+  // Can't convert — return original quantity (different unit types, e.g. Hours vs Gallons)
+  return quantity;
+}
+
+export async function buildThroughputReport(
+  tenantId: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<ThroughputReportDto> {
+  const conditions: SQL[] = [eq(orders.tenantId, tenantId)];
+
+  // Filter by COALESCE(deliveredAt, createdAt) for the date range
+  if (fromDate) {
+    conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.createdAt}) >= ${fromDate}T00:00:00`);
+  }
+  if (toDate) {
+    conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.createdAt}) <= ${toDate}T23:59:59`);
+  }
+
+  // Load tenant-configured unit conversions for product-specific conversion factors
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+    columns: { settings: true },
+  });
+  const tenantSettings = (tenant?.settings ?? {}) as TenantSettings;
+  const tenantConversions = tenantSettings.unitConversions ?? [];
+
+  const rows = await db
+    .select({
+      productType: orderItems.productType,
+      quantity: orderItems.quantity,
+      unit: orderItems.unit,
+      orderId: orderItems.orderId,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .where(and(...conditions));
+
+  // Group by productType and aggregate
+  const grouped = new Map<string, { totalQuantity: number; unit: string; orderIds: Set<string> }>();
+  for (const row of rows) {
+    const key = row.productType;
+    const displayUnit = determineDisplayUnit(key);
+    const convertedQty = displayUnit
+      ? convertQuantity(parseFloat(row.quantity), row.unit, displayUnit, key, tenantConversions)
+      : parseFloat(row.quantity);
+    const finalUnit = displayUnit || row.unit;
+
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.totalQuantity += convertedQty;
+      existing.orderIds.add(row.orderId);
+    } else {
+      grouped.set(key, {
+        totalQuantity: convertedQty,
+        unit: finalUnit,
+        orderIds: new Set([row.orderId]),
+      });
+    }
+  }
+
+  const reportRows: ThroughputReportRowDto[] = Array.from(grouped.entries())
+    .map(([productType, data]) => ({
+      productType,
+      totalQuantity: Math.round(data.totalQuantity * 1000) / 1000,
+      unit: data.unit,
+      orderCount: data.orderIds.size,
+    }))
+    .sort((a, b) => a.productType.localeCompare(b.productType));
+
+  const uniqueOrders = new Set(rows.map((r) => r.orderId));
+
+  return {
+    from: fromDate ?? null,
+    to: toDate ?? null,
+    rows: reportRows,
+    totalOrderCount: uniqueOrders.size,
+  };
+}
+
+export async function exportThroughputXlsx(
+  tenantId: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<{ fileName: string; content: Buffer }> {
+  const report = await buildThroughputReport(tenantId, fromDate, toDate);
+  const workbook = XLSX.utils.book_new();
+  const sheetData = report.rows.map((row) => ({
+    'Product / Service': row.productType,
+    'Total Quantity': row.totalQuantity,
+    'Unit': row.unit,
+    'Order Count': row.orderCount,
+  }));
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sheetData), 'Throughput');
+
+  const suffix = `${report.from ?? 'all'}_to_${report.to ?? 'now'}`;
+  return {
+    fileName: `throughput_${suffix}.xlsx`,
+    content: XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+  };
 }

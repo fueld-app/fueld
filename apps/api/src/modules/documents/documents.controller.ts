@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
-import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
+import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, generateBrokerConfirmationPdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById, updateOrderStatus } from '../orders/orders.service';
 import { getPortSuppliers } from '../lloyds/lli.service';
@@ -299,6 +299,35 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
   )
 
+  // ── GET /orders/:id/broker-confirmation/pdf ────────────────────────
+  .get(
+    '/:id/broker-confirmation/pdf',
+    async ({ params, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+      const order = await getOrderById(orderId);
+      if (!order?.items?.length) {
+        set.status = 400;
+        return { success: false, message: 'Add at least one line item before generating documents' };
+      }
+      const { buffer, fileName } = await generateBrokerConfirmationPdfBuffer(orderId);
+
+      set.headers['Content-Type'] = 'application/pdf';
+      set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
+      set.headers['Content-Length'] = String(buffer.length);
+
+      return buffer;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Generate broker confirmation PDF (includes all line items, even hidden ones)',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
   // ── GET /orders/:id/nomination/pdf ────────────────────────────────
   .get(
     '/:id/nomination/pdf',
@@ -546,7 +575,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           orderSupplierId: nominationSupplierId,
           supplierId: nominationSupplier.supplier.companyId,
           contactId: nominationSupplier.supplier.contactId ?? null,
-          email: body.recipientEmail,
+          email: body.recipientEmails[0],
           subject: body.subject,
           sentByUserId: auth.userId,
         });
@@ -582,6 +611,12 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         case 'INVOICE': {
           if (!order.bankAccountId) { set.status = 400; return { success: false, message: 'Select a bank account first' }; }
           const result = await generateOrderInvoicePdfBuffer(orderId);
+          pdfBuffer = result.buffer;
+          pdfFileName = result.fileName;
+          break;
+        }
+        case 'BROKER_CONFIRMATION': {
+          const result = await generateBrokerConfirmationPdfBuffer(orderId);
           pdfBuffer = result.buffer;
           pdfFileName = result.fileName;
           break;
@@ -625,14 +660,14 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         : body.htmlBody;
 
       // Send the email
-      const { channel } = await sendDocumentEmail({
+      const { channel, tokenExpiredWarning } = await sendDocumentEmail({
         documentType: docType,
         orderId,
         tenantId: auth.tenantId,
         sentByUserId: auth.userId,
         senderEmail,
         senderName,
-        recipientEmail: body.recipientEmail,
+        recipientEmails: body.recipientEmails,
         ccEmails: body.ccEmails ?? [],
         bccEmails: body.bccEmails ?? [],
         subject: body.subject,
@@ -651,7 +686,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         entityId: orderId,
         metadata: {
           documentType: docType,
-          recipientEmail: body.recipientEmail,
+          recipientEmail: body.recipientEmails.join(', '),
           channel,
           subject: body.subject,
         },
@@ -670,9 +705,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       return {
         success: true,
-        message: `${docType} sent to ${body.recipientEmail} via ${channel}`,
+        message: `${docType} sent to ${body.recipientEmails.join(', ')} via ${channel}`,
         channel,
         pdfFileName,
+        ...(tokenExpiredWarning ? { tokenExpiredWarning } : {}),
       };
     },
     {
@@ -684,9 +720,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           t.Literal('NOMINATION'),
           t.Literal('PROFORMA'),
           t.Literal('INVOICE'),
+          t.Literal('BROKER_CONFIRMATION'),
           t.Literal('PORT_DOCUMENTATION'),
         ], { description: 'Type of document to send' }),
-        recipientEmail: t.String({ format: 'email', description: 'Primary recipient email address' }),
+        recipientEmails: t.Array(t.String({ format: 'email' }), { description: 'Recipient email addresses' }),
         ccEmails: t.Optional(t.Array(t.String({ format: 'email' }), { description: 'CC email addresses' })),
         bccEmails: t.Optional(t.Array(t.String({ format: 'email' }), { description: 'BCC email addresses' })),
         subject: t.String({ description: 'Email subject line' }),
@@ -735,12 +772,16 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         PORT_DOCUMENTATION: 'Port Documentation',
         INQUIRY: 'Inquiry',
         BUNKER_BOOKING: 'Bunker Booking',
+        BROKER_CONFIRMATION: 'Broker Confirmation',
       };
 
       // Determine recipient based on document type
       let recipientEmail = '';
       let recipientName = '';
-      if (docType === 'NOMINATION') {
+      if (docType === 'BROKER_CONFIRMATION') {
+        recipientEmail = order.brokerContact?.email ?? '';
+        recipientName = order.brokerContact?.name ?? order.broker?.name ?? '';
+      } else if (docType === 'NOMINATION') {
         const nominationSupplier = resolveNominationOrderSupplier(order, body.orderSupplierId ?? null);
         if (nominationSupplier.message || !nominationSupplier.supplier) {
           set.status = 400;
@@ -759,6 +800,57 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       } else {
         recipientEmail = order.customerContact?.email ?? '';
         recipientName = order.customerContact?.name ?? order.client?.name ?? '';
+      }
+
+      // Build recipient emails list: contact person + company primary/general email.
+      // Split semicolon-separated emails (some contacts store multiple addresses in one field).
+      const recipientEmails: string[] = [];
+      if (recipientEmail) {
+        for (const email of recipientEmail.split(/[;,]/)) {
+          const trimmed = email.trim();
+          if (trimmed && !recipientEmails.includes(trimmed)) {
+            recipientEmails.push(trimmed);
+          }
+        }
+      }
+
+      // Also include the relevant company's primary/general email
+      let companyEmailCounterpartyId: string | null | undefined = null;
+
+      if (docType === 'NOMINATION') {
+        // For nominations, look up the supplier's company email
+        const nominationSupplier = resolveNominationOrderSupplier(order, body.orderSupplierId ?? null);
+        if (nominationSupplier.supplier?.companyId) {
+          companyEmailCounterpartyId = nominationSupplier.supplier.companyId;
+        }
+      } else if (docType === 'BROKER_CONFIRMATION') {
+        // For broker confirmations, look up the broker's company email
+        companyEmailCounterpartyId = order.brokerId;
+      } else {
+        // For customer-facing documents, look up the customer's company email
+        companyEmailCounterpartyId = order.clientId;
+      }
+
+      if (companyEmailCounterpartyId) {
+        try {
+          const [companyEmail] = await db
+            .select({ email: companyEmails.email })
+            .from(companyEmails)
+            .where(
+              and(
+                eq(companyEmails.counterpartyId, companyEmailCounterpartyId),
+                eq(companyEmails.emailType, 'general'),
+                eq(companyEmails.isPrimary, true),
+              ),
+            )
+            .limit(1);
+
+          if (companyEmail?.email && !recipientEmails.includes(companyEmail.email)) {
+            recipientEmails.push(companyEmail.email);
+          }
+        } catch (err) {
+          console.error('[Documents] Failed to look up company email:', err);
+        }
       }
 
       // Build default CC list: sender's own email (so they get a copy)
@@ -919,7 +1011,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       return {
         success: true,
         data: {
-          recipientEmail,
+          recipientEmails,
           recipientName,
           ccEmails,
           bccEmails,
@@ -942,6 +1034,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           t.Literal('PROFORMA'),
           t.Literal('INVOICE'),
           t.Literal('PORT_DOCUMENTATION'),
+          t.Literal('BROKER_CONFIRMATION'),
         ]),
         orderSupplierId: t.Optional(t.Nullable(t.String())),
       }),
@@ -1653,7 +1746,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             sentByUserId: auth.userId,
             senderEmail,
             senderName,
-            recipientEmail: target.email,
+            recipientEmails: [target.email],
             ccEmails: targetCcEmails,
             bccEmails,
             subject: renderedSubject,

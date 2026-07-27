@@ -32,6 +32,7 @@
       [hasSupplier]="hasSupplier()"
       [hasBankAccount]="hasBankAccount()"
       [hasLineItems]="hasLineItems()"
+      [hasBroker]="!!order()?.brokerId"
       [hasEnoughPayments]="hasEnoughPaymentsForMarkPaid()"
       [hasPortDocumentationDocuments]="(portDocSvc.portDocumentationContext()?.documents?.length ?? 0) > 0"
       [portDocumentationEnabled]="portDocSvc.portDocumentationContext()?.enabled ?? false"
@@ -246,7 +247,7 @@
   [canSeePrices]="auth.canSeePrices()"
   [isBrokerDeal]="isBrokerDeal()"
   [supplierOptionsInput]="itemSupplierOptions()"
-  [financingRateAnnual]="financingRateAnnual()"
+  [financingRateAnnual]="isBrokerDeal() ? 0 : financingRateAnnual()"
   [financingDays]="financingDays()"
   [financingDayCountConvention]="financingDayCountConvention()"
   [productOptionsInput]="refData.configuredProducts()"
@@ -279,9 +280,9 @@
 } @placeholder { <div></div> }
 
 
-<!--  Financing Summary (always visible when user can see prices) -->
+<!--  Financing Summary (hidden for broker deals — no financing cost on broker deals) -->
 @defer (on idle) {
-@if (auth.canSeePrices()) {
+@if (auth.canSeePrices() && !isBrokerDeal()) {
   <div class="mt-4">
     <app-order-financing-summary
       [baseCurrency]="itemDisplayCurrency()"
@@ -373,6 +374,23 @@
       (fileSelected)="onAttachmentSelected($event)"
     />
 } @placeholder { <div></div> }
+
+@if (photoGalleryEnabled()) {
+  @defer (on idle) {
+      <app-order-photo-gallery
+        [photos]="orderPhotos()"
+        [photoCategories]="refData.photoGallerySettings().photoCategories"
+        [uploading]="uploadingPhoto()"
+        [uploadProgress]="photoUploadProgress()"
+        [hasFile]="selectedPhotos.length > 0"
+        [(uploadCategory)]="photoUploadCategory"
+        (upload)="uploadPhoto()"
+        (delete)="deletePhoto($event)"
+        (categoryChange)="updatePhotoCategory($event)"
+        (fileSelected)="onPhotoSelected($event)"
+      />
+  } @placeholder { <div></div> }
+}
 
   </div>
 }

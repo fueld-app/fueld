@@ -89,17 +89,23 @@ import type {
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Gross ({{ baseCurrency() }})</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Financing</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Net</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]">Tax</th>
+                @if (taxRatesInput().length > 0) {
+                  <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]">Tax</th>
+                }
               }
             }
             @if (!readonly()) {
-              <th class="w-12 p-0"></th>
+              <th class="w-10 p-0"></th>
             }
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-line">
           @for (row of rows(); track row.id; let i = $index) {
-            <tr class="group relative transition-colors hover:bg-gray-50/50 align-top dark:hover:bg-surface-tint">
+            <tr class="group relative transition-colors hover:bg-gray-50/50 align-top dark:hover:bg-surface-tint"
+                [class.bg-amber-50]="row.hideOnDocuments"
+                [class.dark:bg-amber-500/5]="row.hideOnDocuments"
+                [class.text-gray-400]="row.hideOnDocuments"
+                [class.dark:text-muted]="row.hideOnDocuments">
               <!-- Product -->
               <td class="px-4 py-2">
                 @if (readonly()) {
@@ -335,6 +341,7 @@ import type {
                 }
               </td>
 
+              @if (taxRatesInput().length > 0) {
               <!-- Tax -->
               <td class="px-4 py-3 pt-4 text-right tabular-nums"
                 [class.text-green-600]="!isFormulaUnfinalized(row) && row.taxAmount != null && row.taxAmount > 0"
@@ -367,44 +374,80 @@ import type {
               </td>
               }
               }
+              }
 
-              <!-- Reorder + Delete -->
+              <!-- Actions -->
               @if (!readonly()) {
-                <td class="relative w-12 p-0">
-                  <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
-                    <button
-                      type="button"
-                      (click)="moveRow(i, -1)"
-                      [disabled]="i === 0"
-                      class="rounded-md p-1 text-gray-300 dark:text-muted transition-all hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600 disabled:opacity-20 disabled:hover:bg-transparent"
-                      aria-label="Move up"
-                      title="Move up"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      (click)="moveRow(i, 1)"
-                      [disabled]="i === rows().length - 1"
-                      class="rounded-md p-1 text-gray-300 dark:text-muted transition-all hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600 disabled:opacity-20 disabled:hover:bg-transparent"
-                      aria-label="Move down"
-                      title="Move down"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                      </svg>
-                    </button>
-                    <button
-                      (click)="removeRow(i)"
-                      class="rounded-md p-1 text-gray-300 dark:text-muted transition-all hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-500"
-                      aria-label="Remove item"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022 1.005 11.36A2.75 2.75 0 0 0 7.763 20h4.474a2.75 2.75 0 0 0 2.744-2.689l1.005-11.36.149.022a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" />
-                      </svg>
-                    </button>
+                <td class="w-10 p-0 align-middle">
+                  <div class="flex items-center justify-center py-2 opacity-0 transition-opacity group-hover:opacity-100" data-item-menu>
+                    <!-- Kebab menu -->
+                    <div class="relative shrink-0">
+                      <button
+                        type="button"
+                        (click)="toggleItemMenu(i)"
+                        class="rounded-md p-1 text-gray-300 dark:text-muted transition-all hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600"
+                        aria-label="Item actions"
+                        title="Item actions"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                        </svg>
+                      </button>
+                    @if (openItemMenu() === i) {
+                      <div class="absolute right-0 top-full z-[60] mt-1 w-48 rounded-lg border border-gray-200 dark:border-line-strong bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 py-1">
+                        <button
+                          type="button"
+                          (click)="updateField(i, 'hideOnDocuments', !row.hideOnDocuments); toggleItemMenu(-1)"
+                          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
+                        >
+                          @if (row.hideOnDocuments) {
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 text-amber-500 shrink-0">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                            </svg>
+                          } @else {
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          }
+                          {{ row.hideOnDocuments ? 'Show on documents' : 'Hide on documents' }}
+                        </button>
+                        <button
+                          type="button"
+                          (click)="moveRow(i, -1); toggleItemMenu(-1)"
+                          [disabled]="i === 0"
+                          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
+                          </svg>
+                          Move up
+                        </button>
+                        <button
+                          type="button"
+                          (click)="moveRow(i, 1); toggleItemMenu(-1)"
+                          [disabled]="i === rows().length - 1"
+                          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                          </svg>
+                          Move down
+                        </button>
+                        <div class="my-1 border-t border-gray-100 dark:border-line"></div>
+                        <button
+                          type="button"
+                          (click)="removeRow(i); toggleItemMenu(-1)"
+                          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/15"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022 1.005 11.36A2.75 2.75 0 0 0 7.763 20h4.474a2.75 2.75 0 0 0 2.744-2.689l1.005-11.36.149.022a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" />
+                          </svg>
+                          Delete
+                        </button>
+                      </div>
+                    }
+                  </div>
                   </div>
                 </td>
               }
@@ -966,9 +1009,21 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   /** Track which row IDs have the min-qty spread enabled */
   readonly spreadEnabled = signal<Set<string>>(new Set());
+  readonly openItemMenu = signal<number>(-1);
+
+  toggleItemMenu(index: number): void {
+    this.openItemMenu.update((v) => (v === index ? -1 : index));
+  }
   private spreadInitialized = false;
 
+  private itemMenuClickOutside = (e: MouseEvent) => {
+    if (!(e.target as HTMLElement)?.closest('[data-item-menu]')) {
+      this.openItemMenu.set(-1);
+    }
+  };
+
   ngOnInit(): void {
+    document.addEventListener('click', this.itemMenuClickOutside);
     this.fxSub = this.wsService.onRaw('prices').subscribe((msg) => {
       const data = msg.data as { fxRates?: { base?: string; rates?: Record<string, number> } } | undefined;
       const rates = data?.fxRates?.rates;
@@ -979,6 +1034,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    document.removeEventListener('click', this.itemMenuClickOutside);
     this.fxSub?.unsubscribe();
   }
 

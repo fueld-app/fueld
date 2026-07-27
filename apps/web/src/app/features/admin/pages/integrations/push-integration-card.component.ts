@@ -133,7 +133,9 @@ export class PushIntegrationCardComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly toastService = inject(IntegrationsToastService);
 
-  readonly integration = input.required<IntegrationStatusDto | undefined>();
+  /** Optional input — used when rendered directly. When rendered via router-outlet,
+   *  status comes from the shared toast service. */
+  readonly integration = input<IntegrationStatusDto | undefined>(undefined);
 
   readonly pushPublicKey = signal('');
   readonly pushPrivateKey = signal('');
@@ -143,7 +145,7 @@ export class PushIntegrationCardComponent implements OnInit {
   readonly pushSaveError = signal('');
 
   status(): IntegrationStatusDto | null {
-    return this.integration() ?? null;
+    return this.toastService.getProvider('PUSH') ?? this.integration() ?? null;
   }
 
   ngOnInit(): void {
@@ -178,6 +180,7 @@ export class PushIntegrationCardComponent implements OnInit {
         this.pushSaveSuccess.set('Push notification keys saved successfully.');
         this.pushPrivateKey.set('');
         this.toastService.show('success', 'Push notification keys saved successfully.');
+        await this.toastService.loadIntegrations();
       } else {
         this.pushSaveError.set(res.message ?? 'Failed to save push credentials.');
       }

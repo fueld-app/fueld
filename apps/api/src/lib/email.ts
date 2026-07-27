@@ -108,6 +108,8 @@ export async function getTransporter() {
       user: cfg.user,
       pass: cfg.pass,
     },
+    family: 4, // Force IPv4 — some VPS environments lack IPv6 connectivity,
+               // causing ECONNREFUSED when DNS resolves to an AAAA record.
   });
 }
 

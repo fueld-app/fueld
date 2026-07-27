@@ -420,7 +420,7 @@ export async function processPendingInquiryReminders(): Promise<number> {
         sentByUserId: candidate.sentByUserId,
         senderEmail: candidate.senderEmail,
         senderName: candidate.senderName ?? 'Fueld User',
-        recipientEmail: candidate.email,
+        recipientEmails: [candidate.email],
         ccEmails: [],
         bccEmails: [],
         subject: `Reminder: ${candidate.subject}`,
