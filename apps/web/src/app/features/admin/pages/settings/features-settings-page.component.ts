@@ -406,7 +406,7 @@ export class FeaturesSettingsPageComponent implements OnInit {
         firstValueFrom(this.http.get<ApiResponse<{
           enabled: boolean; placeId: string | null; placeName: string | null; hourUtc: number; recipientContactIds: string[]; extraEmails: string[]; lookbackHours: number; emailSubject: string;
         }>>(`${API}/admin/settings/my-daily-pricing-settings`)),
-        firstValueFrom(this.http.get<ApiResponse<Array<{ id: string; name: string; email: string | null; companyName: string }>>(`${API}/admin/settings/daily-pricing-contacts`)),
+        firstValueFrom(this.http.get<ApiResponse<{ id: string; name: string; email: string | null; companyName: string }[]>>(`${API}/admin/settings/daily-pricing-contacts`)),
       ]);
 
       if (photoRes.success && photoRes.data) {
