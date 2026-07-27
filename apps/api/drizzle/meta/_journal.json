@@ -750,6 +750,13 @@
       "when": 1784139000000,
       "tag": "0106_channeltx_comments_digest_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1784139100000,
+      "tag": "0107_channeltx_daily_pricing_email_settings",
+      "breakpoints": true
     }
   ]
 }

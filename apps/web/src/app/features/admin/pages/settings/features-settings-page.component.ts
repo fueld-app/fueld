@@ -198,6 +198,133 @@ import { ThroughputReportService } from '@app/core/services/throughput-report.se
             }
           </div>
 
+          <!-- Daily Pricing Email -->
+          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">⛽ Daily Pricing Email</h3>
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
+                  Daily email with posted fuel prices ($/Gallon) sent to external client contacts.
+                </p>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer ml-4">
+                <input
+                  type="checkbox"
+                  [ngModel]="pricingEnabled()"
+                  (ngModelChange)="pricingEnabled.set($event)"
+                  class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span class="text-sm font-medium text-gray-700 dark:text-ink-dim">
+                  {{ pricingEnabled() ? 'Enabled' : 'Disabled' }}
+                </span>
+              </label>
+            </div>
+
+            @if (pricingEnabled()) {
+              <div class="mt-4 space-y-4 border-t border-gray-100 dark:border-line pt-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Dock / Location</label>
+                  <input
+                    type="text"
+                    [ngModel]="pricingPlaceName()"
+                    (ngModelChange)="pricingPlaceName.set($event)"
+                    placeholder="e.g. CMF Fuel Dock"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                  />
+                  <p class="mt-1 text-xs text-gray-400 dark:text-muted">Enter the place name — must match a place in the system</p>
+                </div>
+
+                <div class="flex items-center gap-4">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Send Time (UTC hour)</label>
+                    <input
+                      type="number"
+                      [ngModel]="pricingHourUtc()"
+                      (ngModelChange)="pricingHourUtc.set(+$event)"
+                      min="0"
+                      max="23"
+                      class="w-20 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                    />
+                    <span class="ml-2 text-xs text-gray-400 dark:text-muted">{{ pricingHourUtc() }}:00 UTC</span>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Lookback (hours)</label>
+                    <input
+                      type="number"
+                      [ngModel]="pricingLookbackHours()"
+                      (ngModelChange)="pricingLookbackHours.set(+$event)"
+                      min="1"
+                      max="168"
+                      class="w-20 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Email Subject</label>
+                  <input
+                    type="text"
+                    [ngModel]="pricingEmailSubject()"
+                    (ngModelChange)="pricingEmailSubject.set($event)"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Recipient Contacts (from system)</label>
+                  @if (customerContacts().length === 0) {
+                    <p class="text-xs text-gray-400 dark:text-muted italic">No customer contacts with email addresses found.</p>
+                  } @else {
+                    <div class="max-h-40 overflow-y-auto rounded-lg border border-gray-200 dark:border-line p-2 space-y-1">
+                      @for (contact of customerContacts(); track contact.id) {
+                        <label class="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            [checked]="pricingRecipientContactIds().includes(contact.id)"
+                            (change)="togglePricingContact(contact.id)"
+                            class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                          />
+                          <span class="text-sm text-gray-700 dark:text-ink-dim">
+                            {{ contact.name }} — {{ contact.companyName }}
+                            <span class="text-xs text-gray-400 dark:text-muted">({{ contact.email }})</span>
+                          </span>
+                        </label>
+                      }
+                    </div>
+                  }
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Extra Emails (comma-separated)</label>
+                  <input
+                    type="text"
+                    [ngModel]="pricingExtraEmails()"
+                    (ngModelChange)="pricingExtraEmails.set($event)"
+                    placeholder="extra@example.com, another@example.com"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  (click)="previewPricing()"
+                  [disabled]="pricingPreviewing()"
+                  class="text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 transition-colors inline-flex items-center gap-1.5"
+                >
+                  @if (pricingPreviewing()) {
+                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Loading preview…
+                  } @else {
+                    Preview Pricing Email
+                  }
+                </button>
+              </div>
+            }
+          </div>
+
           <!-- Save button -->
           <div class="flex justify-end">
             <button
@@ -247,6 +374,18 @@ export class FeaturesSettingsPageComponent implements OnInit {
   readonly digestPreviewing = signal(false);
   readonly digestPreviewHtml = signal('');
 
+  // Daily Pricing Email settings
+  readonly pricingEnabled = signal(false);
+  readonly pricingPlaceId = signal<string | null>(null);
+  readonly pricingPlaceName = signal<string | null>(null);
+  readonly pricingHourUtc = signal(13);
+  readonly pricingRecipientContactIds = signal<string[]>([]);
+  readonly pricingExtraEmails = signal('');
+  readonly pricingLookbackHours = signal(24);
+  readonly pricingEmailSubject = signal('CMF Fuel Dock — Posted Prices');
+  readonly pricingPreviewing = signal(false);
+  readonly customerContacts = signal<Array<{ id: string; name: string; email: string | null; companyName: string }>>([]);
+
   ngOnInit(): void {
     this.load();
   }
@@ -254,7 +393,7 @@ export class FeaturesSettingsPageComponent implements OnInit {
   async load(): Promise<void> {
     this.loading.set(true);
     try {
-      const [photoRes, throughputRes, digestRes] = await Promise.all([
+      const [photoRes, throughputRes, digestRes, pricingRes, contactsRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<{
           enabled: boolean; photoCategories: string[]; maxFileSizeMb: number;
         }>>(`${API}/admin/settings/my-photo-gallery-settings`)),
@@ -264,6 +403,10 @@ export class FeaturesSettingsPageComponent implements OnInit {
         firstValueFrom(this.http.get<ApiResponse<{
           enabled: boolean; hourUtc: number; includeActivityLog: boolean; recipientRoles: string[]; extraEmails: string[]; entityTypes: string[];
         }>>(`${API}/admin/settings/my-comments-digest-settings`)),
+        firstValueFrom(this.http.get<ApiResponse<{
+          enabled: boolean; placeId: string | null; placeName: string | null; hourUtc: number; recipientContactIds: string[]; extraEmails: string[]; lookbackHours: number; emailSubject: string;
+        }>>(`${API}/admin/settings/my-daily-pricing-settings`)),
+        firstValueFrom(this.http.get<ApiResponse<Array<{ id: string; name: string; email: string | null; companyName: string }>>(`${API}/admin/settings/daily-pricing-contacts`)),
       ]);
 
       if (photoRes.success && photoRes.data) {
@@ -281,6 +424,19 @@ export class FeaturesSettingsPageComponent implements OnInit {
         this.digestHourUtc.set(digestRes.data.hourUtc);
         this.digestIncludeActivityLog.set(digestRes.data.includeActivityLog);
       }
+      if (pricingRes.success && pricingRes.data) {
+        this.pricingEnabled.set(pricingRes.data.enabled);
+        this.pricingPlaceId.set(pricingRes.data.placeId);
+        this.pricingPlaceName.set(pricingRes.data.placeName);
+        this.pricingHourUtc.set(pricingRes.data.hourUtc);
+        this.pricingRecipientContactIds.set(pricingRes.data.recipientContactIds);
+        this.pricingExtraEmails.set((pricingRes.data.extraEmails ?? []).join(', '));
+        this.pricingLookbackHours.set(pricingRes.data.lookbackHours);
+        this.pricingEmailSubject.set(pricingRes.data.emailSubject);
+      }
+      if (contactsRes.success && contactsRes.data) {
+        this.customerContacts.set(contactsRes.data);
+      }
     } catch {
       this.toastSvc.show('error', 'Failed to load feature settings.');
     } finally {
@@ -296,7 +452,7 @@ export class FeaturesSettingsPageComponent implements OnInit {
         .map((c) => c.trim().toUpperCase())
         .filter((c) => c.length > 0);
 
-      const [photoRes, throughputRes, digestRes] = await Promise.all([
+      const [photoRes, throughputRes, digestRes, pricingRes] = await Promise.all([
         firstValueFrom(this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/photo-gallery`, {
           enabled: this.photoGalleryEnabled(),
           photoCategories: photoCategories.length ? photoCategories : ['BEFORE', 'AFTER', 'TANK_SEAL', 'OTHER'],
@@ -315,9 +471,18 @@ export class FeaturesSettingsPageComponent implements OnInit {
           includeActivityLog: this.digestIncludeActivityLog(),
           entityTypes: [],
         })),
+        firstValueFrom(this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/daily-pricing`, {
+          enabled: this.pricingEnabled(),
+          placeId: this.pricingPlaceId(),
+          hourUtc: this.pricingHourUtc(),
+          recipientContactIds: this.pricingRecipientContactIds(),
+          extraEmails: this.pricingExtraEmails().split(',').map((e) => e.trim()).filter(Boolean),
+          lookbackHours: this.pricingLookbackHours(),
+          emailSubject: this.pricingEmailSubject(),
+        })),
       ]);
 
-      if (photoRes.success && throughputRes.success && digestRes.success) {
+      if (photoRes.success && throughputRes.success && digestRes.success && pricingRes.success) {
         this.toastSvc.show('success', 'Feature settings saved.');
         // Invalidate cached services so nav menu updates
         this.brokerDealSvc.invalidateCache();
@@ -356,6 +521,39 @@ export class FeaturesSettingsPageComponent implements OnInit {
       this.toastSvc.show('error', 'Failed to generate preview.');
     } finally {
       this.digestPreviewing.set(false);
+    }
+  }
+
+  togglePricingContact(contactId: string): void {
+    this.pricingRecipientContactIds.update((ids) => {
+      if (ids.includes(contactId)) {
+        return ids.filter((id) => id !== contactId);
+      }
+      return [...ids, contactId];
+    });
+  }
+
+  async previewPricing(): Promise<void> {
+    this.pricingPreviewing.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ html: string; priceCount: number; recipientCount: number }>>(`${API}/reports/daily-pricing/preview`),
+      );
+      if (res.success && res.data) {
+        const w = window.open('', '_blank', 'width=700,height=800');
+        if (w) {
+          w.document.write(res.data.html);
+          w.document.close();
+        } else {
+          this.toastSvc.show('error', 'Popup blocked. Allow popups to preview the pricing email.');
+        }
+      } else {
+        this.toastSvc.show('error', 'Failed to generate preview.');
+      }
+    } catch {
+      this.toastSvc.show('error', 'Failed to generate preview.');
+    } finally {
+      this.pricingPreviewing.set(false);
     }
   }
 }

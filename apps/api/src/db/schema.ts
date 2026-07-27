@@ -299,6 +299,16 @@ export interface TenantSettings {
     includeActivityLog?: boolean; // include status changes + updates (default true)
     entityTypes?: string[];       // e.g. ['order', 'vessel'] — null/empty = all
   };
+  // Daily Pricing Email feature settings (Feature 7: Daily Pricing Email for Fuel Dock)
+  dailyPricingEmail?: {
+    enabled?: boolean;
+    placeId?: string;             // which dock/location (CMF Fuel Dock)
+    hourUtc?: number;             // when to send (e.g. 13 = 8am CST)
+    recipientContactIds?: string[]; // company_contacts IDs — emails resolved at send time for sync
+    extraEmails?: string[];       // additional manual email addresses
+    lookbackHours?: number;       // look back this many hours for delivered prices (default 24)
+    emailSubject?: string;        // custom subject line
+  };
   // Microsoft email sending
   approvedEmailDomains?: string[];            // Restrict Microsoft connect to these domains (empty/null = any)
   microsoftConnectForceUserEmail?: boolean;    // Force Microsoft connect to match the user's Fueld email

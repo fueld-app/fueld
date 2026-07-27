@@ -15,6 +15,7 @@ import { dashboardController } from './modules/dashboard/dashboard.controller';
 import { reportsController } from './modules/reports/reports.controller';
 import { startReportsScheduleJob } from './modules/reports/reports.service';
 import { runDueCommentsDigests } from './modules/comments/comments-digest.service';
+import { runDueDailyPricingEmails } from './modules/reports/daily-pricing.service';
 import { lloydsController } from './modules/lloyds';
 import { companiesController } from './modules/companies/companies.controller';
 import { vesselsController } from './modules/vessels/vessels.controller';
@@ -765,9 +766,10 @@ export async function createApp(options: CreateAppOptions = {}) {
     startPricePolling();
     startInquiryReminderJob();
     startReportsScheduleJob();
-    // Comments digest runs on the same hourly interval
+    // Comments digest + daily pricing run on the same hourly interval
     setInterval(async () => {
       try { await runDueCommentsDigests(); } catch (e) { console.error('[CommentsDigest] Scheduled run failed:', e); }
+      try { await runDueDailyPricingEmails(); } catch (e) { console.error('[DailyPricing] Scheduled run failed:', e); }
     }, 60 * 60 * 1000);
     registerAutoSyncHooks();
     reconnectWhatsAppSessions();

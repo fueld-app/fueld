@@ -39,6 +39,7 @@ import {
 } from './reports.service';
 import { getThroughputReportSettings } from '../admin/settings.service';
 import { previewCommentsDigest, getCommentsDigestSettings } from '../comments/comments-digest.service';
+import { previewDailyPricingEmail } from './daily-pricing.service';
 
 const reportFiltersSchema = t.Object({
   from: t.Optional(t.String()),
@@ -472,4 +473,16 @@ export const reportsController = new Elysia({ prefix: '/reports' })
     }
   }, {
     detail: { tags: ['Reports'], summary: 'Preview comments digest email content', security: [{ bearerAuth: [] }] },
+  })
+
+  .get('/daily-pricing/preview', async ({ auth }) => {
+    try {
+      const result = await previewDailyPricingEmail(auth.tenantId);
+      return { success: true, data: result } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Reports'], summary: 'Preview daily pricing email content', security: [{ bearerAuth: [] }] },
   });
