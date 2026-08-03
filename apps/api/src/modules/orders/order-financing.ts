@@ -20,6 +20,8 @@ export interface FinancingItemInput {
   salesPrice?: string | number | null;
   salesCurrency?: string | null;
   unitConversionFactor?: string | number | null;
+  // Broker deal — per-line commission rate (falls back to the order-level rate).
+  commissionPerUnit?: string | number | null;
 }
 
 export interface LineEconomics {
@@ -110,10 +112,31 @@ export function calculateLineEconomics(
   item: FinancingItemInput,
   financingRateAnnual: number,
   financingDays: number,
+  isBrokerDeal = false,
+  orderCommissionPerMt: number | null = null,
 ): LineEconomics {
   const quantity = getEffectiveQuantity(item);
   const costBase = calculateCostBase(item);
   const revenueBase = calculateRevenueBase(item);
+
+  // Broker deals earn commission, not a sales−cost margin. Profit = commission
+  // (per-line commissionPerUnit, falling back to the order-level commissionPerMt),
+  // and broker deals carry no financing cost. costBase/revenueBase are still
+  // computed so the "Value" column can show the pass-through deal value.
+  if (isBrokerDeal) {
+    const rate = parseNumber(item.commissionPerUnit) || orderCommissionPerMt || 0;
+    const currency = normalizedCurrency(item.salesCurrency ?? item.costCurrency);
+    const commissionBase = quantity * rate * getFxRate(currency);
+    return {
+      quantity,
+      costBase,
+      revenueBase,
+      grossProfit: commissionBase,
+      financingCost: 0,
+      netProfit: commissionBase,
+    };
+  }
+
   const grossProfit = revenueBase - costBase;
   const financingCost = costBase * financingRateAnnual * financingDays / DEFAULT_FINANCING_DAY_COUNT;
 
@@ -131,9 +154,12 @@ export function calculateOrderEconomics(
   terms: FinancingTermsInput,
   items: FinancingItemInput[],
   financingRateAnnual: number,
+  isBrokerDeal = false,
+  commissionPerMt: number | string | null = null,
 ): OrderEconomics {
   const financingDays = getFinancingDays(terms);
-  const lineEconomics = items.map((item) => calculateLineEconomics(item, financingRateAnnual, financingDays));
+  const orderCommissionPerMt = parseNumber(commissionPerMt) || 0;
+  const lineEconomics = items.map((item) => calculateLineEconomics(item, financingRateAnnual, financingDays, isBrokerDeal, orderCommissionPerMt));
 
   const totals = lineEconomics.reduce(
     (sum, line) => ({
@@ -165,7 +191,9 @@ export function calculateOrderEconomics(
     totalFinancingCost: totals.totalFinancingCost,
     financingCostPerMt: totals.totalQuantity > 0 ? totals.totalFinancingCost / totals.totalQuantity : null,
     totalNetProfit: totals.totalNetProfit,
-    netMarginPct: totals.totalRevenueBase > 0 ? (totals.totalNetProfit / totals.totalRevenueBase) * 100 : null,
+    // Margin % is meaningless for broker deals (profit is commission, not a
+    // spread over pass-through revenue).
+    netMarginPct: isBrokerDeal ? null : (totals.totalRevenueBase > 0 ? (totals.totalNetProfit / totals.totalRevenueBase) * 100 : null),
     lineEconomics,
   };
 }

@@ -715,6 +715,32 @@ describe('dashboard.service', () => {
       expect(net).toBeCloseTo(gross - financing, 2);
     });
 
+    it('broker deal contributes commission (not negative margin) to dashboard KPIs', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder, saveOrderItems } = await loadOrdersService();
+      const { getTeamStats } = await loadDashboardService();
+
+      // Broker deal: pass-through prices where sales < cost would normally show
+      // a loss ((100-115)x100 = -1500). With the fix, Gross/Net = commission.
+      const order = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+        isBrokerDeal: true,
+        commissionPerMt: '3.00',
+      });
+      await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, order.id));
+      await saveOrderItems(order.id, [
+        { productType: 'VLSFO', quantity: '100', unit: 'MT', costPrice: '115', salesPrice: '100', commissionPerUnit: '3' },
+      ]);
+
+      const stats = await getTeamStats(tenant.id, user.id);
+      const s = stats[0]!;
+      // Gross = Net = commission (3 x 100 = 300); no financing on broker deals.
+      expect(Number(s.totalProfit)).toBeCloseTo(300, 2);
+      expect(Number(s.totalFinancingCost)).toBe(0);
+      expect(Number(s.totalNetProfit)).toBeCloseTo(300, 2);
+    });
+
     it('applies density conversion factors in dashboard gross and net profit totals', async () => {
       const { tenant, client, vessel, place, user } = await seedBasics();
       const db = await getDb();

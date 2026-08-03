@@ -148,6 +148,8 @@ export async function getTeamStats(
       customerCreditDays: orders.customerCreditDays,
       supplierPaymentTermType: orders.supplierPaymentTermType,
       supplierCreditDays: orders.supplierCreditDays,
+      isBrokerDeal: orders.isBrokerDeal,
+      commissionPerMt: orders.commissionPerMt,
     })
     .from(orders)
     .innerJoin(users, eq(orders.salesRepId, users.id))
@@ -169,6 +171,7 @@ export async function getTeamStats(
         salesPrice: orderItems.salesPrice,
         salesCurrency: orderItems.salesCurrency,
         unitConversionFactor: orderItems.unitConversionFactor,
+        commissionPerUnit: orderItems.commissionPerUnit,
       })
       .from(orderItems)
       .where(inArray(orderItems.orderId, orderRows.map((row) => row.orderId))),
@@ -209,6 +212,8 @@ export async function getTeamStats(
       },
       itemsByOrder.get(row.orderId) ?? [],
       financingRateAnnual,
+      row.isBrokerDeal ?? false,
+      row.commissionPerMt,
     );
 
     const current = stats.get(row.traderId!) ?? {

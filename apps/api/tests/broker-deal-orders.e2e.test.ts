@@ -168,4 +168,55 @@ describe('broker-deal orders e2e', () => {
     // H1 FIXED: isBrokerDeal is now forced to false when feature is disabled
     expect(created.data?.data?.isBrokerDeal).toBe(false);
   });
+
+  it('lists broker deals with commission-based profit (Gross=Net=commission, Financing=0) instead of sales−cost margin', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    // Broker deal: pass-through prices where sales < cost would normally show a
+    // loss ((100−115)×100 = −1500). With the fix, Gross/Net = commission.
+    const brokerCreated = await requestJson('/orders', {
+      method: 'POST',
+      token,
+      body: { clientId: seeded.client.id, vesselId: seeded.vessel.id, placeId: seeded.place.id, isBrokerDeal: true, commissionPerMt: '3.00' },
+    });
+    const brokerId = brokerCreated.data?.data?.id as string;
+    await requestJson(`/orders/${brokerId}/items`, {
+      method: 'PUT',
+      token,
+      body: { items: [{ productType: 'VLSFO', quantity: '100', unit: 'MT', costPrice: '115', costCurrency: 'USD', salesPrice: '100', salesCurrency: 'USD', commissionPerUnit: '3' }] },
+    });
+    await requestJson(`/orders/${brokerId}/status`, { method: 'PUT', token, body: { status: 'CONFIRMED' } });
+
+    // Regular order: same prices reversed → normal trade margin (115−100)×100 = +1500.
+    const regularCreated = await requestJson('/orders', {
+      method: 'POST',
+      token,
+      body: { clientId: seeded.client.id, vesselId: seeded.vessel.id, placeId: seeded.place.id },
+    });
+    const regularId = regularCreated.data?.data?.id as string;
+    await requestJson(`/orders/${regularId}/items`, {
+      method: 'PUT',
+      token,
+      body: { items: [{ productType: 'VLSFO', quantity: '100', unit: 'MT', costPrice: '100', costCurrency: 'USD', salesPrice: '115', salesCurrency: 'USD' }] },
+    });
+    await requestJson(`/orders/${regularId}/status`, { method: 'PUT', token, body: { status: 'CONFIRMED' } });
+
+    const list = await requestJson('/orders?statuses=CONFIRMED', { token });
+    const rows = list.data?.data?.items as Array<Record<string, unknown>>;
+    const brokerRow = rows.find((r) => r.id === brokerId)!;
+    const regularRow = rows.find((r) => r.id === regularId)!;
+
+    // Broker deal: profit is commission (3 × 100 = 300), no financing, no margin %.
+    expect(parseFloat(String(brokerRow.totalProfit))).toBeCloseTo(300, 2);
+    expect(parseFloat(String(brokerRow.totalFinancingCost))).toBe(0);
+    expect(parseFloat(String(brokerRow.totalNetProfit))).toBeCloseTo(300, 2);
+    expect(brokerRow.netMarginPct).toBeNull();
+
+    // Regular order: unchanged — standard gross margin (115−100)×100 = 1500.
+    expect(parseFloat(String(regularRow.totalProfit))).toBeCloseTo(1500, 2);
+    expect(parseFloat(String(regularRow.totalNetProfit))).toBeCloseTo(1500, 2);
+  });
 });

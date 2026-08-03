@@ -1035,6 +1035,7 @@ export async function listOrders(query?: ListOrdersQuery) {
           salesPrice: orderItems.salesPrice,
           salesCurrency: orderItems.salesCurrency,
           unitConversionFactor: orderItems.unitConversionFactor,
+          commissionPerUnit: orderItems.commissionPerUnit,
         })
         .from(orderItems)
         .where(inArray(orderItems.orderId, orderIds)),
@@ -1059,6 +1060,8 @@ export async function listOrders(query?: ListOrdersQuery) {
         },
         orderItemList,
         financingRateByTenant.get(row.tenantId) ?? getFinancingRateAnnual(),
+        row.isBrokerDeal ?? false,
+        row.commissionPerMt,
       );
 
       // Determine display currency: uniform across all items → that currency, else USD
@@ -1231,6 +1234,8 @@ export async function getOrderById(idOrNumber: string) {
     },
     items,
     financingRateAnnual,
+    row.isBrokerDeal ?? false,
+    row.commissionPerMt,
   );
 
   // Resolve price reference names for formula-priced items
