@@ -822,6 +822,61 @@ describe('OrderDetailPageComponent', () => {
     expect(itemsCall?.body.items).toBeDefined();
   });
 
+  it('persists isBrokerDeal and commissionPerMt through the autosave path', async () => {
+    // Regression: the order-detail page has no manual Save button
+    // ([showSave]="false"), so autosave is the only persistence path. The
+    // autosave PUT must include the broker-deal fields, otherwise toggling
+    // "Broker Deal" updates the local signal but never reaches the server and
+    // the deal "resets" to standard deal on the next load.
+    const putCalls: Array<{ url: string; body: any }> = [];
+    const { component } = await createComponent({
+      onPut: (url, body) => {
+        putCalls.push({ url, body });
+        return { success: true, data: {} };
+      },
+    });
+
+    component.order.set({
+      id: 'order-1',
+      clientId: 'client-1',
+      vesselId: 'vessel-1',
+      placeId: 'place-1',
+      salesRepId: 'user-1',
+      invoicingCompanyId: 'company-1',
+      bankAccountId: 'bank-1',
+      currency: 'USD',
+      status: 'CONFIRMED',
+      eta: '2026-04-15T12:00:00.000Z',
+      etd: null,
+      customerPaymentTermType: null,
+      customerCreditDays: null,
+      customerNote: null,
+      customerContactId: null,
+      supplierId: null,
+      supplierPaymentTermType: null,
+      supplierCreditDays: null,
+      supplierNote: null,
+      supplierContactId: null,
+      brokerId: null,
+      brokerContactId: null,
+      brokerGetsAll: false,
+      agentId: null,
+      agentContactId: null,
+      termsAndConditions: null,
+      deliveredAt: null,
+      isBrokerDeal: true,
+      commissionPerMt: '3.00',
+    } as any);
+    component.itemRows.set([] as any);
+
+    await (component as any).performAutoSave();
+
+    const orderCall = putCalls.find((call) => /^.*\/orders\/order-1$/.test(call.url) || call.url.endsWith('/orders/order-1'));
+    expect(orderCall).toBeDefined();
+    expect(orderCall?.body.isBrokerDeal).toBe(true);
+    expect(orderCall?.body.commissionPerMt).toBe('3.00');
+  });
+
   it('rebinds temporary supplier ids on item rows after supplier sync', async () => {
     const { component } = await createComponent();
 

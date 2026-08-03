@@ -143,6 +143,12 @@ export class OrderSaveService {
           deliveredAt: o.deliveredAt ?? null,
           deliveryMethod: (o as any).deliveryMethod ?? null,
           responseDeadlineAt: (o as any).responseDeadlineAt ?? null,
+          // Broker deal fields — must be persisted by autosave too, otherwise
+          // toggling "Broker Deal" in the order-detail settings dropdown updates
+          // the local signal but never reaches the server (the only save path is
+          // autosave; the manual Save button is hidden via [showSave]="false").
+          isBrokerDeal: (o as any).isBrokerDeal ?? false,
+          commissionPerMt: (o as any).commissionPerMt ?? null,
         }),
       );
       if (!orderRes.success) { onError?.('Failed to save order.'); return false; }
