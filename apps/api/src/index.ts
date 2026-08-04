@@ -773,6 +773,15 @@ export async function createApp(options: CreateAppOptions = {}) {
     }, 60 * 60 * 1000);
     registerAutoSyncHooks();
     reconnectWhatsAppSessions();
+    // Periodically re-attempt reconnecting stored WhatsApp sessions so a
+    // transient disconnect self-heals without requiring a server restart.
+    // The per-connection auto-reconnect gives up after 5 attempts; without this
+    // heartbeat a dropped admin session stays "stored"/disconnected until the
+    // next deploy, silently failing ALL group notifications (credit apps,
+    // inquiries, orders) for days.
+    setInterval(async () => {
+      try { await reconnectWhatsAppSessions(); } catch (e) { console.error('[WhatsApp] Periodic reconnect failed:', e); }
+    }, 5 * 60 * 1000);
     resumePendingPlattsParseJobs();
     startRiskMonitoringJob();
     startVesselSanctionJob();
