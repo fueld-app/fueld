@@ -6,11 +6,13 @@ import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { users } from '../src/db/schema';
 
 const notificationCalls: Array<{ userIds: string[]; notification: { title: string; body: string; url?: string } }> = [];
+const whatsappCalls: Array<{ tenantId: string; eventType: string; context: Record<string, unknown>; userId?: string }> = [];
 let shouldThrowPush = false;
 
 beforeEach(async () => {
   await truncateAll();
   notificationCalls.length = 0;
+  whatsappCalls.length = 0;
   shouldThrowPush = false;
 });
 
@@ -23,6 +25,9 @@ function createTestApp() {
       notificationCalls.push({ userIds, notification });
       if (shouldThrowPush) throw new Error('push failed');
       return userIds.length;
+    },
+    notifyCreditApplicationWhatsApp: async (tenantId, eventType, context, userId) => {
+      whatsappCalls.push({ tenantId, eventType, context, userId });
     },
   }));
 }
@@ -197,5 +202,38 @@ describe('credit applications notification branches', () => {
     expect(res.data.success).toBe(true);
     expect(res.data.data.id).toBeTruthy();
     expect(notificationCalls).toHaveLength(1);
+  });
+
+  it('dispatches a WhatsApp group notification when notifyWhatsApp is enabled', async () => {
+    const seeded = await seedAuthBasics();
+    const app = createTestApp();
+    const admin = await seedAdminUser(seeded.tenant.id);
+    const adminLogin = await login(app, admin.email, 'Passw0rd!');
+
+    // Enable WhatsApp notifications for credit applications
+    const patchRes = await requestJson(app, '/credit/applications/settings', {
+      method: 'PATCH',
+      token: adminLogin.accessToken,
+      body: { notifyWhatsApp: true },
+    });
+    expect(patchRes.status).toBe(200);
+
+    const traderLogin = await login(app, seeded.user.email, seeded.password);
+    const res = await requestJson(app, '/credit/applications', {
+      method: 'POST',
+      token: traderLogin.accessToken,
+      body: {
+        type: 'CUSTOMER',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '5000.00',
+        requestedCurrency: 'USD',
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.data.success).toBe(true);
+    expect(whatsappCalls).toHaveLength(1);
+    expect(whatsappCalls[0]!.eventType).toBe('credit_application_submitted');
+    expect(whatsappCalls[0]!.context.companyName).toBe(seeded.client.name);
   });
 });
