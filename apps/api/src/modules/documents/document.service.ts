@@ -1843,9 +1843,18 @@ export function buildOfferDocument(data: {
   const priceDecimals = computeMaxDecimalPlaces(data.items, 'salesPrice');
 
   const tableRows: TableCell[][] = data.items.map((item) => {
-    const qty = item.quantityMin && item.quantityMax
-      ? `${formatNumber(item.quantityMin, qtyDecimals)} - ${formatNumber(item.quantityMax, qtyDecimals)}`
-      : formatNumber(item.quantity, qtyDecimals);
+    // Render the quantity range (min - max) when a min is set and differs from
+    // the max. The max normally lives in `quantity` (quantityMax is unused /
+    // always null in stored data), but honour quantityMax when present. Matches
+    // the inquiry/email PDF range rendering.
+    const maxQty = formatNumber(
+      item.quantityMax != null && String(item.quantityMax).trim() !== '' ? item.quantityMax : item.quantity,
+      qtyDecimals,
+    );
+    const minQty = item.quantityMin != null && String(item.quantityMin).trim() !== ''
+      ? formatNumber(item.quantityMin, qtyDecimals)
+      : '';
+    const qty = minQty && minQty !== maxQty ? `${minQty} - ${maxQty}` : maxQty;
     const desc = item.description?.trim();
     const productCell: Content = item.productType === 'ITEM' && desc
       ? { text: desc }

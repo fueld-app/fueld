@@ -326,6 +326,39 @@ describe('document.service formatting helpers', () => {
     expect(text).toContain('USD/MT  612.50');
   });
 
+  it('renders quantity range from quantityMin + quantity when quantityMax is null (real stored data)', () => {
+    // Real stored data: `quantity` holds the max, `quantityMin` the min, and
+    // `quantityMax` is always null. The confirmation/nomination PDFs must still
+    // show the full range (regression for Matt's Riviera deal 20260807-000410).
+    const doc = __documentTestUtils.buildOfferDocument({
+      ...commonOfferInput,
+      docTitle: 'CONFIRMATION',
+      items: [
+        { productType: 'VLSFO', description: null, quantity: '650', quantityMin: '350', quantityMax: null, unit: 'MT', salesPrice: '612.5' },
+      ],
+    });
+
+    const text = collectTextValues(doc).join(' | ');
+    expect(text).toContain('350.00 - 650.00');
+  });
+
+  it('renders a single quantity when quantityMin is null or equals the max', () => {
+    const doc = __documentTestUtils.buildOfferDocument({
+      ...commonOfferInput,
+      docTitle: 'CONFIRMATION',
+      items: [
+        { productType: 'VLSFO', description: null, quantity: '100', quantityMin: null, quantityMax: null, unit: 'MT', salesPrice: '500' },
+        { productType: 'LSMGO', description: null, quantity: '200', quantityMin: '200', quantityMax: null, unit: 'MT', salesPrice: '600' },
+      ],
+    });
+
+    const text = collectTextValues(doc).join(' | ');
+    expect(text).toContain('100.00');
+    expect(text).toContain('200.00');
+    expect(text).not.toContain('100.00 - ');
+    expect(text).not.toContain('200.00 - ');
+  });
+
   it('builds offer document nomination branch with verification block', () => {
     const doc = __documentTestUtils.buildOfferDocument({
       ...commonOfferInput,
