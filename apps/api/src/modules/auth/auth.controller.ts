@@ -53,6 +53,20 @@ import type { TenantSettings } from '../../db/schema';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
+/**
+ * Safely extract returnUrl from an OAuth state parameter.
+ * Returns the default settings page if the state is missing or invalid.
+ */
+function safeReturnUrlFromState(state: string | undefined): string {
+  if (!state) return '/admin/settings/integrations';
+  try {
+    const decoded = verifyAndDecodeState(state);
+    return decoded.returnUrl || '/admin/settings/integrations';
+  } catch {
+    return '/admin/settings/integrations';
+  }
+}
+
 /** Strip sensitive fields before returning a user in an API response. */
 function sanitiseUser(user: {
   id: string;
@@ -730,6 +744,36 @@ export const authController = new Elysia({ prefix: '/auth' })
   .get(
     '/microsoft/callback',
     async ({ query, set, jwtAccess, jwtRefresh, request }) => {
+      // ── Handle admin consent flow ───────────────────────────────────
+      // When an admin grants tenant-wide consent via the /adminconsent URL,
+      // Microsoft redirects back with admin_consent=true but no code/state.
+      // Redirect to the frontend settings page with a success message.
+      if (query.admin_consent === 'true') {
+        const returnUrl = query.state ? safeReturnUrlFromState(query.state) : '/admin/settings/integrations';
+        const separator = returnUrl.includes('?') ? '&' : '?';
+        set.status = 302;
+        set.headers['location'] = `${returnUrl}${separator}microsoft_admin_consent=true`;
+        return;
+      }
+
+      // ── Handle OAuth error redirect ───────────────────────────────────
+      // Microsoft may redirect back with an error parameter instead of code.
+      if (query.error) {
+        const errorDesc = query.error_description || query.error;
+        const returnUrl = query.state ? safeReturnUrlFromState(query.state) : '/admin/settings/integrations';
+        const separator = returnUrl.includes('?') ? '&' : '?';
+        set.status = 302;
+        set.headers['location'] = `${returnUrl}${separator}microsoft_error=${encodeURIComponent(errorDesc)}`;
+        return;
+      }
+
+      // ── Handle missing code/state (empty callback) ────────────────────
+      if (!query.code || !query.state) {
+        set.status = 302;
+        set.headers['location'] = `/admin/settings/integrations?microsoft_error=${encodeURIComponent('Microsoft did not return an authorization code. Please try connecting again.')}`;
+        return;
+      }
+
       try {
         // 1. Verify state (anti-CSRF + returnUrl)
         const state = verifyAndDecodeState(query.state);
@@ -848,9 +892,13 @@ export const authController = new Elysia({ prefix: '/auth' })
     },
     {
       query: t.Object({
-        code: t.String(),
-        state: t.String(),
+        code: t.Optional(t.String()),
+        state: t.Optional(t.String()),
         session_state: t.Optional(t.String()),
+        admin_consent: t.Optional(t.String()),
+        tenant: t.Optional(t.String()),
+        error: t.Optional(t.String()),
+        error_description: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Auth'],

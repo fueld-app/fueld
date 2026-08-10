@@ -266,6 +266,12 @@ export async function startWhatsAppSession(userId: string, tenantId?: string): P
       const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
 
+      // Log the actual disconnect reason for diagnostics
+      const errorMsg = lastDisconnect?.error instanceof Error
+        ? lastDisconnect.error.message
+        : String(lastDisconnect?.error ?? 'unknown');
+      console.warn(`[whatsapp] ${userId} disconnected: statusCode=${statusCode}, loggedOut=${loggedOut}, error=${errorMsg}`);
+
       conn.status = 'closed';
       connections.delete(userId);
 
@@ -688,6 +694,13 @@ export async function sendWhatsAppMessage(
 
 // ─── Reconnect stored sessions on server start ───────────────────────
 
+// Retry abandoned sessions every 10 minutes
+const RETRY_INTERVAL_MS = 10 * 60 * 1000;
+
+setInterval(() => {
+  reconnectStoredSessions().catch(() => {});
+}, RETRY_INTERVAL_MS);
+
 export async function reconnectStoredSessions(): Promise<void> {
   try {
     const waSettings = await getWhatsAppSettings();
@@ -698,6 +711,13 @@ export async function reconnectStoredSessions(): Promise<void> {
       .from(whatsappSessions);
 
     for (const session of sessions) {
+      // Skip sessions that are already connected or connecting
+      const existing = connections.get(session.userId);
+      if (existing && (existing.status === 'connected' || existing.status === 'connecting' || existing.status === 'qr')) {
+        continue;
+      }
+      // Reset reconnect attempts for retry
+      reconnectAttempts.delete(session.userId);
       // Reconnect in background, don't block startup
       startWhatsAppSession(session.userId).catch(() => {});
     }

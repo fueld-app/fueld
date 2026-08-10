@@ -118,11 +118,38 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
           </svg>
         </div>
       } @else {
+        <!-- Batch complete bar (invoiced orders only) -->
+        @if (isBatchMode() && selectedCount() > 0) {
+          <div class="mb-3 flex items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 dark:border-brand-800 dark:bg-brand-900/20">
+            <span class="text-sm font-medium text-brand-700 dark:text-brand-300">
+              {{ selectedCount() }} order(s) selected
+            </span>
+            <button (click)="batchComplete()" [disabled]="batchLoading()"
+              class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 inline-flex items-center gap-1.5">
+              @if (batchLoading()) {
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                Completing…
+              } @else {
+                Batch Complete (Mark as Paid)
+              }
+            </button>
+            <button (click)="clearSelection()"
+              class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
+              Clear Selection
+            </button>
+          </div>
+        }
         <!-- Desktop table -->
         <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
+                @if (isBatchMode()) {
+                  <th class="px-4 py-3 w-10">
+                    <input type="checkbox" [checked]="allOnPageSelected()" (change)="toggleSelectAll($event)"
+                      class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-600" />
+                  </th>
+                }
                 @for (col of visibleColumns(); track col.field) {
                   @if (col.sortable) {
                     <th app-sort-header [field]="col.field" [sortFields]="activeSortFields()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">{{ col.label }}</th>
@@ -138,6 +165,13 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                 <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint"
                   (click)="onRowClick($event, inq.orderNumber || inq.id)"
                   (auxclick)="onRowAuxClick($event, inq.orderNumber || inq.id)">
+                  @if (isBatchMode()) {
+                    <td class="px-4 py-3" (click)="$event.stopPropagation()">
+                      <input type="checkbox" [checked]="selectedOrderIds().has(inq.id)"
+                        (change)="toggleOrderSelection($event, inq.id)"
+                        class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-600" />
+                    </td>
+                  }
                   @for (col of visibleColumns(); track col.field) {
                     @switch (col.field) {
                       @case ('orderNumber') {
@@ -235,7 +269,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                 </tr>
               } @empty {
                 <tr>
-                  <td [attr.colspan]="visibleColumns().length + 1" class="px-4 py-12 text-center">
+                  <td [attr.colspan]="visibleColumns().length + 1 + (isBatchMode() ? 1 : 0)" class="px-4 py-12 text-center">
                     <p class="text-sm text-gray-400 dark:text-muted">{{ isOrders() ? 'No orders found.' : 'No inquiries found.' }}</p>
                     @if (!isOrders()) {
         <button
@@ -448,6 +482,17 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly activeSortBy = computed(() => this.activeSortFields()[0]?.field ?? this.defaultSortBy());
   readonly activeSortDir = computed<'asc' | 'desc'>(() => this.activeSortFields()[0]?.dir ?? this.defaultSortDir());
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // ─── Batch selection (invoiced orders only) ────────────────────────
+  readonly selectedOrderIds = signal<Set<string>>(new Set());
+  readonly isBatchMode = computed(() => this.isInvoicedOrders());
+  readonly selectedCount = computed(() => this.selectedOrderIds().size);
+  readonly allOnPageSelected = computed(() => {
+    const ids = this.selectedOrderIds();
+    const rows = this.inquiries();
+    return rows.length > 0 && rows.every(r => ids.has(r.id));
+  });
+  readonly batchLoading = signal(false);
 
   // ─── Column configuration ─────────────────────────────────────────
   private readonly userPrefs = inject(UserPreferencesService);
@@ -927,5 +972,64 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private showToast(type: 'success' | 'error', message: string): void {
     this.toast.set({ type, message });
     setTimeout(() => this.toast.set(null), 4000);
+  }
+
+  // ─── Batch selection ─────────────────────────────────────────────────
+
+  toggleOrderSelection(event: Event, orderId: string): void {
+    event.stopPropagation();
+    const checkbox = event.target as HTMLInputElement;
+    this.selectedOrderIds.update(ids => {
+      const next = new Set(ids);
+      if (checkbox.checked) next.add(orderId); else next.delete(orderId);
+      return next;
+    });
+  }
+
+  toggleSelectAll(event: Event): void {
+    const checkbox = event.target as HTMLInputElement;
+    if (checkbox.checked) {
+      this.selectedOrderIds.update(ids => {
+        const next = new Set(ids);
+        for (const inq of this.inquiries()) next.add(inq.id);
+        return next;
+      });
+    } else {
+      this.selectedOrderIds.update(ids => {
+        const next = new Set(ids);
+        for (const inq of this.inquiries()) next.delete(inq.id);
+        return next;
+      });
+    }
+  }
+
+  clearSelection(): void {
+    this.selectedOrderIds.set(new Set());
+  }
+
+  async batchComplete(): Promise<void> {
+    const ids = Array.from(this.selectedOrderIds());
+    if (!ids.length) return;
+    if (ids.length > 20) {
+      this.showToast('error', 'You can complete at most 20 orders at once.');
+      return;
+    }
+    this.batchLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ succeeded: number; failed: number }>>(`${API}/orders/batch/status`, { orderIds: ids, status: 'PAID' }),
+      );
+      if (res.success) {
+        this.showToast('success', res.message || `${ids.length} order(s) marked as paid`);
+        this.clearSelection();
+        await this.loadInquiries();
+      } else {
+        this.showToast('error', res.message || 'Batch update failed');
+      }
+    } catch {
+      this.showToast('error', 'Failed to batch complete orders');
+    } finally {
+      this.batchLoading.set(false);
+    }
   }
 }

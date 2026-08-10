@@ -19,6 +19,12 @@ type DateMode = 'daily' | 'weekly' | 'monthly' | 'custom';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule],
   template: `
+    @if (toast(); as t) {
+      <div class="fixed bottom-4 right-4 z-50 rounded-lg px-4 py-3 text-sm shadow-lg"
+        [class]="t.type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'">
+        {{ t.message }}
+      </div>
+    }
     @if (!throughputEnabled() && !throughputChecked()) {
       <div class="flex items-center justify-center py-20">
         <svg class="h-5 w-5 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
@@ -172,6 +178,7 @@ export class ThroughputReportPageComponent implements OnInit {
   readonly report = signal<ThroughputReportDto | null>(null);
   readonly throughputEnabled = signal(false);
   readonly throughputChecked = signal(false);
+  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
   ngOnInit(): void {
     // Check if throughput report is enabled for this tenant
@@ -239,7 +246,9 @@ export class ThroughputReportPageComponent implements OnInit {
         this.report.set(res.data);
       }
     } catch {
-      // ignore
+      this.report.set(null);
+      this.toast.set({ type: 'error', message: 'Failed to generate report. Please try again or contact support.' });
+      setTimeout(() => this.toast.set(null), 5000);
     } finally {
       this.loading.set(false);
     }

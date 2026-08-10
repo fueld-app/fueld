@@ -2671,12 +2671,18 @@ export async function buildThroughputReport(
 ): Promise<ThroughputReportDto> {
   const conditions: SQL[] = [eq(orders.tenantId, tenantId)];
 
-  // Filter by COALESCE(deliveredAt, createdAt) for the date range
+  // Filter by COALESCE(deliveredAt, createdAt) for the date range.
+  // NOTE: The datetime string must be concatenated BEFORE passing to the
+  // sql template — putting ${fromDate}T00:00:00 in the template causes
+  // Drizzle to emit `>= $1T00:00:00` which is invalid SQL (the literal
+  // text T00:00:00 fuses with the parameter placeholder).
   if (fromDate) {
-    conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.createdAt}) >= ${fromDate}T00:00:00`);
+    const fromDateTime = `${fromDate}T00:00:00`;
+    conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.createdAt}) >= ${fromDateTime}`);
   }
   if (toDate) {
-    conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.createdAt}) <= ${toDate}T23:59:59`);
+    const toDateTime = `${toDate}T23:59:59`;
+    conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.createdAt}) <= ${toDateTime}`);
   }
 
   // Load tenant-configured unit conversions for product-specific conversion factors

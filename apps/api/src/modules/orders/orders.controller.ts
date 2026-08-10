@@ -712,6 +712,51 @@ export const ordersController = new Elysia({ prefix: '/orders' })
     },
   )
 
+  // ─── Batch status update (batch complete invoiced orders) ─────────
+  .put(
+    '/batch/status',
+    async ({ body, auth }) => {
+      try {
+        const { orderIds, status } = body;
+        if (!orderIds.length || orderIds.length > 20) {
+          return { success: false, data: null, message: 'Select between 1 and 20 orders' };
+        }
+        const results: { id: string; success: boolean; message?: string }[] = [];
+        for (const orderId of orderIds) {
+          try {
+            const updated = await updateOrderStatus(orderId, status, auth.sub);
+            if (updated) {
+              results.push({ id: orderId, success: true });
+            } else {
+              results.push({ id: orderId, success: false, message: 'Order not found' });
+            }
+          } catch (err: any) {
+            results.push({ id: orderId, success: false, message: err?.message ?? 'Failed' });
+          }
+        }
+        const succeeded = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success);
+        const message = failed.length
+          ? `${succeeded} order(s) updated, ${failed.length} failed`
+          : `${succeeded} order(s) marked as ${status.toLowerCase()}`;
+        return { success: failed.length === 0, data: { results, succeeded, failed: failed.length }, message } satisfies ApiResponse<unknown>;
+      } catch (err) {
+        console.error('[Orders] Batch status update failed:', err);
+        return { success: false, data: null, message: 'Failed to batch update orders' };
+      }
+    },
+    {
+      body: t.Object({
+        orderIds: t.Array(t.String(), { maxItems: 20 }),
+        status: t.String(),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Batch update order status (max 20 orders at once)',
+      },
+    },
+  )
+
   // ─── Save Order Items ─────────────────────────────────────────────
   .put(
     '/:id/items',

@@ -438,7 +438,10 @@ export class OrderActionService {
   private async markPaid(ctx: OrderActionContext): Promise<void> {
     if (ctx.order()?.status === 'PAID') { ctx.showToast('error', 'Order is already marked as paid.'); return; }
     if (!ctx.hasEnoughPaymentsForMarkPaid()) { ctx.showToast('error', 'Add payments equal to the total due before marking as paid.'); ctx.openPaymentModal(); return; }
-    ctx.openPaymentModal();
+    // Payments are sufficient — mark the order as PAID so it moves to
+    // the completed orders section and customer credit is released.
+    await this.setOrderStatus(ctx, 'PAID');
+    ctx.showToast('success', 'Order marked as paid and moved to completed.');
   }
 
   private async syncToQuickBooks(ctx: OrderActionContext): Promise<void> {

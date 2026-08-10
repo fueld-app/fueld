@@ -2819,7 +2819,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.openPaymentModal();
       return;
     }
-    this.openPaymentModal();
+    // Payments are sufficient — mark the order as PAID so it moves to
+    // the completed orders section and customer credit is released.
+    this.setOrderStatus(OrderStatus.Paid);
+    this.showToast('success', 'Order marked as paid and moved to completed.');
   }
 
   // ─── Credit Application ──────────────────────────────────────────
