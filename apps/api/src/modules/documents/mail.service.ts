@@ -385,7 +385,6 @@ function buildPortDocumentationEmailHtml(params: {
             <td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Agent:</td>
             <td style="padding: 4px 0; font-weight: 600;">${agentName}</td>
           </tr>
-          ${params.paymentTerms ? `<tr><td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Payment terms:</td><td style="padding: 4px 0; font-weight: 600;">${params.paymentTerms}</td></tr>` : ''}
           ${quantityLabel ? `<tr><td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Quantity:</td><td style="padding: 4px 0; font-weight: 600;">${quantityLabel}</td></tr>` : ''}
           ${productLabel ? `<tr><td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Product:</td><td style="padding: 4px 0; font-weight: 600;">${productLabel}</td></tr>` : ''}
         </table>
