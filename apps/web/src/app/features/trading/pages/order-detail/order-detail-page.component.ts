@@ -730,6 +730,38 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return new Date(deadline).getTime() < Date.now();
   });
 
+  // ── Response deadline inline edit ──
+  readonly editingResponseDeadline = signal(false);
+  private _responseDeadlineBackup: string | null = null;
+  readonly responseDeadlineInputValue = computed(() =>
+    formatDateTimeInput(this.order()?.responseDeadlineAt ?? null),
+  );
+
+  toggleResponseDeadlineEdit(): void {
+    if (this.editingResponseDeadline()) {
+      this.cancelResponseDeadlineEdit();
+      return;
+    }
+    this._responseDeadlineBackup = this.order()?.responseDeadlineAt ?? null;
+    this.editingResponseDeadline.set(true);
+  }
+
+  onResponseDeadlineChange(value: string): void {
+    const iso = value ? toIsoFromDateTimeInput(value) : null;
+    this.order.update((o) => (o ? { ...o, responseDeadlineAt: iso } : o));
+  }
+
+  saveResponseDeadlineEdit(): void {
+    this.editingResponseDeadline.set(false);
+    this._responseDeadlineBackup = null;
+  }
+
+  cancelResponseDeadlineEdit(): void {
+    this.order.update((o) => (o ? { ...o, responseDeadlineAt: this._responseDeadlineBackup } : o));
+    this.editingResponseDeadline.set(false);
+    this._responseDeadlineBackup = null;
+  }
+
   readonly etaMinDateTime = computed(() => {
     const eta = this.order()?.eta;
     if (!eta) return '';

@@ -315,18 +315,60 @@
       />
     }
 } @placeholder { <div></div> }
-@if (responseDeadlineLabel()) {
+@if (responseDeadlineLabel() || editingResponseDeadline()) {
   <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm h-fit">
-    <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim uppercase tracking-wider">Response Deadline</h3>
-    <div class="mt-3 flex items-center gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" [class.text-red-500]="isDeadlineOverdue()" [class.text-gray-400]="!isDeadlineOverdue()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <span class="text-sm font-medium" [class.text-red-600]="isDeadlineOverdue()" [class.text-gray-900]="!isDeadlineOverdue()" [class.dark:text-red-400]="isDeadlineOverdue()" [class.dark:text-ink]="!isDeadlineOverdue()">{{ responseDeadlineLabel() }}</span>
-      @if (isDeadlineOverdue()) {
-        <span class="text-xs font-medium text-red-600 dark:text-red-400">Overdue</span>
+    <div class="flex items-center justify-between">
+      <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim uppercase tracking-wider">Response Deadline</h3>
+      @if (!editingResponseDeadline()) {
+        <button
+          type="button"
+          (click)="toggleResponseDeadlineEdit()"
+          class="rounded-md p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600 dark:hover:text-ink"
+          aria-label="Edit response deadline"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.86 4.486l1.657-1.657a1 1 0 011.414 0l1.414 1.414a1 1 0 010 1.414L18.293 7.207M16.86 4.486L7.5 13.828a4 4 0 00-1.113 1.93l-.566 2.274a.5.5 0 00.62.62l2.274-.566a4 4 0 001.93-1.113l9.342-9.342M16.86 4.486L18.293 7.207" />
+          </svg>
+        </button>
       }
     </div>
+
+    @if (editingResponseDeadline()) {
+      <div class="mt-3 space-y-2">
+        <input
+          type="datetime-local"
+          [ngModel]="responseDeadlineInputValue()"
+          (ngModelChange)="onResponseDeadlineChange($event)"
+          class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+        />
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="saveResponseDeadlineEdit()"
+            class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            (click)="cancelResponseDeadlineEdit()"
+            class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    } @else {
+      <div class="mt-3 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" [class.text-red-500]="isDeadlineOverdue()" [class.text-gray-400]="!isDeadlineOverdue()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span class="text-sm font-medium" [class.text-red-600]="isDeadlineOverdue()" [class.text-gray-900]="!isDeadlineOverdue()" [class.dark:text-red-400]="isDeadlineOverdue()" [class.dark:text-ink]="!isDeadlineOverdue()">{{ responseDeadlineLabel() }}</span>
+        @if (isDeadlineOverdue()) {
+          <span class="text-xs font-medium text-red-600 dark:text-red-400">Overdue</span>
+        }
+      </div>
+    }
   </div>
 }
 @defer (on idle) {
