@@ -655,6 +655,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           actualStatus,
           auth.sub,
           body.lossReason?.trim(),
+          body.skipDeliveryDocumentation,
         );
         if (!updated) {
           return { success: false, data: null, message: 'Order not found' };
@@ -704,6 +705,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       body: t.Object({
         status: t.String(),
         lossReason: t.Optional(t.String()),
+        skipDeliveryDocumentation: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Orders'],

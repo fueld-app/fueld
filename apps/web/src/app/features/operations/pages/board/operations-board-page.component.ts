@@ -176,28 +176,42 @@ export class OperationsBoardPageComponent implements OnInit {
     return result;
   });
 
+  /** Sort orders by due date (responseDeadlineAt) ascending.
+   *  Orders with no due date are pushed to the end. */
+  private sortByDueDate(orders: OrderListRowDto[]): OrderListRowDto[] {
+    return [...orders].sort((a, b) => {
+      const aDate = a.responseDeadlineAt ? new Date(a.responseDeadlineAt).getTime() : null;
+      const bDate = b.responseDeadlineAt ? new Date(b.responseDeadlineAt).getTime() : null;
+      // No due date → sort last
+      if (aDate === null && bDate === null) return 0;
+      if (aDate === null) return 1;
+      if (bDate === null) return -1;
+      return aDate - bDate;
+    });
+  }
+
   readonly columns = computed(() => {
     const all = this.filteredOrders();
     return [
       {
         status: OrderStatus.Inquiry,
         label: 'Open Inquiries',
-        orders: all.filter((o) => o.status === OrderStatus.Inquiry || o.status === OrderStatus.Offer),
+        orders: this.sortByDueDate(all.filter((o) => o.status === OrderStatus.Inquiry || o.status === OrderStatus.Offer)),
       },
       {
         status: OrderStatus.Confirmed,
         label: 'Confirmed',
-        orders: all.filter((o) => o.status === OrderStatus.Confirmed),
+        orders: this.sortByDueDate(all.filter((o) => o.status === OrderStatus.Confirmed)),
       },
       {
         status: OrderStatus.Delivered,
         label: 'Delivered',
-        orders: all.filter((o) => o.status === OrderStatus.Delivered),
+        orders: this.sortByDueDate(all.filter((o) => o.status === OrderStatus.Delivered)),
       },
       {
         status: OrderStatus.Invoiced,
         label: 'Invoiced',
-        orders: all.filter((o) => o.status === OrderStatus.Invoiced),
+        orders: this.sortByDueDate(all.filter((o) => o.status === OrderStatus.Invoiced)),
       },
     ];
   });

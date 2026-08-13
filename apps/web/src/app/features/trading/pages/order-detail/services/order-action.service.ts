@@ -258,8 +258,13 @@ export class OrderActionService {
     if (!ctx.order()?.deliveredAt) { ctx.showToast('error', 'Enter delivered date before marking delivered.'); return; }
     if (!ctx.deliveredQtyComplete()) { ctx.showToast('error', 'Enter delivered quantity for every line item before marking delivered.'); return; }
     const docSettings = ctx.deliveryDocumentationSettings();
+    let skipDeliveryDocumentation = false;
     if (docSettings.requireDeliveryDocumentation && !ctx.hasDeliveryDocumentation()) {
-      ctx.showToast('error', 'Upload required delivery documentation before marking delivered.'); return;
+      const confirmed = window.confirm(
+        'No delivery documentation has been uploaded.\n\nDo you want to mark this order as delivered without documentation?',
+      );
+      if (!confirmed) return;
+      skipDeliveryDocumentation = true;
     }
 
     const normalizedRows = ctx.itemRows().map((row) => ({ ...row, deliveredQuantity: ctx.getEffectiveDeliveredQuantity(row) }));
@@ -273,7 +278,7 @@ export class OrderActionService {
       ctx.showToast('error', 'Failed to save delivered quantities.');
       return;
     }
-    await this.setOrderStatus(ctx, 'DELIVERED');
+    await this.setOrderStatus(ctx, 'DELIVERED', undefined, skipDeliveryDocumentation);
   }
 
   private async reopenOrder(ctx: OrderActionContext): Promise<void> {
@@ -290,11 +295,11 @@ export class OrderActionService {
     ctx.showToast('success', 'Order marked as invoiced.');
   }
 
-  private async setOrderStatus(ctx: OrderActionContext, status: string): Promise<void> {
+  private async setOrderStatus(ctx: OrderActionContext, status: string, lossReason?: string, skipDeliveryDocumentation?: boolean): Promise<void> {
     const id = ctx.orderId();
     if (!id) return;
     try {
-      await firstValueFrom(this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, { status }));
+      await firstValueFrom(this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, { status, lossReason, skipDeliveryDocumentation }));
       ctx.updateOrder((o) => ({ ...o, status: status as OrderStatus }));
     } catch {
       ctx.showToast('error', 'Failed to update order status.');

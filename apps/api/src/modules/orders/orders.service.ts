@@ -2111,6 +2111,7 @@ export async function updateOrderStatus(
   newStatus: string,
   userId?: string,
   lossReason?: string,
+  skipDeliveryDocumentation?: boolean,
 ) {
   const setData: Record<string, unknown> = {
     status: newStatus,
@@ -2133,7 +2134,9 @@ export async function updateOrderStatus(
   // Validate delivery documentation requirements before marking delivered.
   // Internal transfers (stock moves between own warehouses) are not customer
   // deliveries, so a BDR/delivery doc is not required for them.
-  if (newStatus === 'DELIVERED' && previous?.orderKind !== 'INTERNAL_TRANSFER') {
+  // skipDeliveryDocumentation allows closing non-delivery orders (e.g. cancellation fees)
+  // without uploading a placeholder document.
+  if (newStatus === 'DELIVERED' && previous?.orderKind !== 'INTERNAL_TRANSFER' && !skipDeliveryDocumentation) {
     const { getDeliveryDocumentationSettings } = await import('../admin/settings.service');
     const docSettings = await getDeliveryDocumentationSettings();
     if (docSettings.requireDeliveryDocumentation) {
