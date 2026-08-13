@@ -1012,6 +1012,7 @@ export const authController = new Elysia({ prefix: '/auth' })
           success: true,
           data: {
             requiresMfaSetup,
+            user: sanitiseUser(user),
             ...apiTokenFields(headers as Record<string, string | undefined>, newAccessToken, newRefreshToken),
           },
         } satisfies ApiResponse<unknown>;

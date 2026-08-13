@@ -1529,6 +1529,9 @@ export interface AuthTokensDto {
   accessToken?: string;
   refreshToken?: string;
   requiresMfaSetup?: boolean;
+  /** Updated user object — included in refresh responses so the frontend
+   *  can pick up role changes without requiring a re-login. */
+  user?: UserDto;
 }
 
 /** Full login response (when 2FA is NOT required).

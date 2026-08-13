@@ -279,6 +279,12 @@ export class AuthService {
       }
 
       this.afterAuthSuccess(res.data.requiresMfaSetup);
+      // Update user data if the server included an updated user object.
+      // This ensures role changes (e.g. admin downgrading to LIGHT) propagate
+      // without requiring the user to log out and back in.
+      if (res.data.user) {
+        this.setUser(res.data.user);
+      }
       return true;
     } catch (err: any) {
       // Only logout on 401/403 (invalid token). Network errors (0, 502, etc.)

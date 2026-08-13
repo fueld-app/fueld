@@ -6,6 +6,11 @@ import { getCollections, getTeamStats, getPipelineSummary, getLossAnalysis, getC
 //  Dashboard Controller
 // ═══════════════════════════════════════════════════════════════════════
 
+/** Returns true if the authenticated user is a LIGHT user (no price visibility). */
+function isLightUser(role: string): boolean {
+  return role === 'LIGHT';
+}
+
 export const dashboardController = new Elysia({ prefix: '/dashboard' })
   // ── Require authentication for all routes ──
   .use(authGuard)
@@ -14,6 +19,10 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   .get(
     '/collections',
     async ({ auth, query }) => {
+      // LIGHT users must not see collections (financial data)
+      if (isLightUser(auth.role)) {
+        return { items: [], count: 0 };
+      }
       const params = query as { from?: string; to?: string };
       const items = await getCollections(auth.tenantId, params.from, params.to);
       return { items, count: items.length };
@@ -38,6 +47,10 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   .get(
     '/team-stats',
     async ({ auth, query }) => {
+      // LIGHT users must not see financial stats (revenue, profit, cost)
+      if (isLightUser(auth.role)) {
+        return { traders: [] };
+      }
       const params = query as { from?: string; to?: string };
       const stats = await getTeamStats(auth.tenantId, auth.userId, params.from, params.to);
       return { traders: stats };
@@ -64,6 +77,10 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
     async ({ auth, query }) => {
       const params = query as { from?: string; to?: string; userId?: string };
       const pipeline = await getPipelineSummary(auth.tenantId, params.from, params.to, params.userId);
+      // LIGHT users see pipeline counts but NOT dollar values
+      if (isLightUser(auth.role)) {
+        return { stages: pipeline.map((s) => ({ ...s, totalValue: '0' })) };
+      }
       return { stages: pipeline };
     },
     {
