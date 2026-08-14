@@ -324,8 +324,12 @@ export function buildConnectAuthorizationUrl(
     state,
     // Pre-fill the email so users connect the correct account
     login_hint: userEmail,
-    // If forced, don't let them switch accounts
-    ...(forceUserEmail ? { prompt: 'consent' } : { prompt: 'select_account' }),
+    // If forced, re-authenticate so they can't switch accounts (prompt=login)
+    // but DON'T use prompt=consent — that forces the consent screen which
+    // shows "Need admin approval" for unverified apps even when admin
+    // consent has already been granted. The callback handler validates
+    // the email match regardless.
+    ...(forceUserEmail ? { prompt: 'login' } : { prompt: 'select_account' }),
   });
 
   return `${base}?${params.toString()}`;
