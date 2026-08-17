@@ -318,6 +318,8 @@ export interface TenantSettings {
   // Microsoft email sending
   approvedEmailDomains?: string[];            // Restrict Microsoft connect to these domains (empty/null = any)
   microsoftConnectForceUserEmail?: boolean;    // Force Microsoft connect to match the user's Fueld email
+  microsoftSharedSender?: boolean;              // Use a shared Microsoft account for all email sending (instead of per-user)
+  microsoftSharedSenderEmail?: string;          // Email of the shared sender account (e.g. happier@company.com)
   // WhatsApp integration
   whatsappEnabled?: boolean;
   whatsappDefaultGroupJid?: string | null;

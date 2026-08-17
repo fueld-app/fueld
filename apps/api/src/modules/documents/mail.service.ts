@@ -11,10 +11,11 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { db } from '../../db';
-import { emailLog } from '../../db/schema';
+import { emailLog, tenants, users } from '../../db/schema';
 import { getSmtpConfig, getTransporter } from '../../lib/email';
 import { acquireGraphTokenForUser } from '../auth/microsoft-oauth.service';
 import { splitAddressLines } from './document.service';
+import { eq, and, isNotNull } from 'drizzle-orm';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -216,8 +217,36 @@ export async function sendDocumentEmail(options: SendDocumentEmailOptions): Prom
   let tokenExpiredWarning: string | undefined;
 
   try {
-    // Try to acquire a Graph token from the user's stored Microsoft refresh token
-    const graphResult = await acquireGraphTokenForUser(options.sentByUserId);
+    // Determine which user's Microsoft token to use for sending.
+    // If the tenant has "shared sender" enabled, find a user in the tenant
+    // with a Microsoft refresh token (the shared account) and use theirs.
+    // Otherwise, use the current user's token.
+    let tokenUserId = options.sentByUserId;
+    try {
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, options.tenantId)).limit(1);
+      const tenantSettings = (tenant?.settings ?? {}) as any;
+      if (tenantSettings?.microsoftSharedSender) {
+        // If a specific shared sender email is configured, find THAT user.
+        // Otherwise fall back to any user with a token (ordered by most recently updated).
+        if (tenantSettings.microsoftSharedSenderEmail) {
+          const [sharedUser] = await db.select({ id: users.id }).from(users).where(and(
+            eq(users.tenantId, options.tenantId),
+            eq(users.email, tenantSettings.microsoftSharedSenderEmail),
+            isNotNull(users.microsoftRefreshToken),
+          )).limit(1);
+          if (sharedUser) tokenUserId = sharedUser.id;
+        } else {
+          const [sharedUser] = await db.select({ id: users.id }).from(users).where(and(
+            eq(users.tenantId, options.tenantId),
+            isNotNull(users.microsoftRefreshToken),
+          )).limit(1);
+          if (sharedUser) tokenUserId = sharedUser.id;
+        }
+      }
+    } catch { /* ignore — fall back to per-user token */ }
+
+    // Try to acquire a Graph token
+    const graphResult = await acquireGraphTokenForUser(tokenUserId);
     if (graphResult.token) {
       channel = 'GRAPH';
       await sendViaGraph(options, graphResult.token);

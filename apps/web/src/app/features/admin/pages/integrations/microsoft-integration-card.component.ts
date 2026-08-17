@@ -110,6 +110,17 @@ import { IntegrationsToastService } from './integrations-toast.service';
             }
           </button>
           <span class="text-xs text-gray-400 dark:text-muted">Credentials are stored encrypted. Enable SSO in Security settings.</span>
+
+        @if (status()?.configured) {
+          <div class="mt-5 flex items-start gap-3 border-t border-gray-200 dark:border-line pt-4">
+            <input type="checkbox" [checked]="msSharedSender()" (change)="toggleSharedSender()" [disabled]="msSharedSenderSaving()"
+              class="mt-0.5 h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-600" />
+            <div>
+              <label class="text-sm font-medium text-gray-700 dark:text-ink-dim">Use shared sender account</label>
+              <p class="text-xs text-gray-500 dark:text-muted mt-0.5">All emails will be sent from the shared Microsoft account instead of each user's individual account. Connect the shared account first (e.g. happier@company.com) via Settings xe2x86x92 Connect Microsoft.</p>
+            </div>
+          </div>
+        }
         </div>
       </div>
     </div>
@@ -129,6 +140,9 @@ export class MicrosoftIntegrationCardComponent implements OnInit {
   readonly msSaving = signal(false);
   readonly msSaveSuccess = signal('');
   readonly msSaveError = signal('');
+  readonly msSharedSender = signal(false);
+  readonly msSharedSenderEmail = signal('');
+  readonly msSharedSenderSaving = signal(false);
 
   status(): IntegrationStatusDto | null {
     // Prefer the shared service (populated by the shell), fall back to input binding
@@ -139,6 +153,8 @@ export class MicrosoftIntegrationCardComponent implements OnInit {
     const s = this.status();
     if (s?.msClientId) this.msClientId.set(s.msClientId);
     if (s?.msTenantId) this.msTenantId.set(s.msTenantId);
+    // Load shared sender setting
+    this.loadSharedSenderSetting();
   }
 
   async saveMicrosoftCredentials(): Promise<void> {
@@ -177,6 +193,40 @@ export class MicrosoftIntegrationCardComponent implements OnInit {
       this.msSaveError.set(msg);
     } finally {
       this.msSaving.set(false);
+    }
+  }
+
+
+  async loadSharedSenderSetting(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ microsoftSharedSender?: boolean; microsoftSharedSenderEmail?: string }>>(`${API}/admin/settings/integrations/microsoft/shared-sender`),
+      );
+      if (res.success && res.data) {
+        this.msSharedSender.set(res.data.microsoftSharedSender ?? false);
+        this.msSharedSenderEmail.set(res.data.microsoftSharedSenderEmail ?? '');
+      }
+    } catch {}
+  }
+
+  async toggleSharedSender(): Promise<void> {
+    this.msSharedSenderSaving.set(true);
+    const newValue = !this.msSharedSender();
+    const email = this.msSharedSenderEmail().trim();
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ enabled: boolean }>>(`${API}/admin/settings/integrations/microsoft/shared-sender`, { enabled: newValue, email: email || undefined }),
+      );
+      if (res.success) {
+        this.msSharedSender.set(newValue);
+        this.toastService.show('success', newValue ? 'Shared sender enabled — all emails will be sent from the shared Microsoft account.' : 'Shared sender disabled.');
+      } else {
+        this.toastService.show('error', res.message ?? 'Failed to toggle shared sender.');
+      }
+    } catch {
+      this.toastService.show('error', 'Failed to toggle shared sender.');
+    } finally {
+      this.msSharedSenderSaving.set(false);
     }
   }
 }

@@ -1043,6 +1043,48 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     detail: { tags: ['Admin Settings'], summary: 'Set Microsoft 365 / Entra ID OAuth credentials' },
   })
 
+  // ── GET /integrations/microsoft/shared-sender ─────────────────────
+  .get(
+    '/integrations/microsoft/shared-sender',
+    async ({ auth }) => {
+      try {
+        requireAdmin(auth);
+        const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+        const settings = (tenant?.settings ?? {}) as any;
+        return { success: true, data: { microsoftSharedSender: settings.microsoftSharedSender ?? false, microsoftSharedSenderEmail: settings.microsoftSharedSenderEmail ?? null } } satisfies ApiResponse<unknown>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      detail: { tags: ['Admin Settings'], summary: 'Get shared Microsoft sender status', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ── PUT /integrations/microsoft/shared-sender ────────────────────
+  .put(
+    '/integrations/microsoft/shared-sender',
+    async ({ auth, body }) => {
+      try {
+        requireAdmin(auth);
+        const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+        const settings = { ...(tenant?.settings ?? {}) } as any;
+        settings.microsoftSharedSender = body.enabled;
+        settings.microsoftSharedSenderEmail = body.email ?? null;
+        await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenant!.id));
+        return { success: true, data: { enabled: body.enabled, email: body.email ?? null } } satisfies ApiResponse<unknown>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({ enabled: t.Boolean(), email: t.Optional(t.String()) }),
+      detail: { tags: ['Admin Settings'], summary: 'Toggle shared Microsoft sender account for all email sending', security: [{ bearerAuth: [] }] },
+    },
+  )
+
   // ═══════════════════════════════════════════════════════════════════
   //  QUICKBOOKS INTEGRATION
   // ═══════════════════════════════════════════════════════════════════
