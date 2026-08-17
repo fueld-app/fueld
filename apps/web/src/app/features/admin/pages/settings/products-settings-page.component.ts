@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   signal,
+  computed,
   inject,
   OnInit,
 } from '@angular/core';
@@ -37,20 +38,34 @@ import { SettingsToastService } from './settings-toast.service';
         </div>
 
         <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
-          @for (item of catalogItems(); track $index; let i = $index) {
+          @if (catalogItems().length > 4) {
+            <div class="relative">
+              <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-muted pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+              </svg>
+              <input
+                type="text"
+                [value]="productSearch()"
+                (input)="productSearch.set($any($event.target).value)"
+                placeholder="Search products…"
+                class="app-input w-full pl-8"
+              />
+            </div>
+          }
+          @for (entry of filteredCatalogItems(); track entry.originalIndex) {
             <div class="space-y-2 rounded-lg border border-gray-200 dark:border-line p-3">
               <div class="flex items-center gap-2">
                 <input
                   type="text"
-                  [value]="item.name"
-                  (input)="updateCatalogItem(i, 'name', $any($event.target).value)"
+                  [value]="entry.item.name"
+                  (input)="updateCatalogItem(entry.originalIndex, 'name', $any($event.target).value)"
                   placeholder="Product name"
                   class="app-input flex-1"
                 />
                 <div class="flex items-center gap-0.5 shrink-0">
                   <button
-                    (click)="moveCatalogItem(i, -1)"
-                    [disabled]="i === 0"
+                    (click)="moveCatalogItem(entry.originalIndex, -1)"
+                    [disabled]="entry.originalIndex === 0 || isSearching()"
                     class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-gray-700 dark:hover:text-ink hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                     title="Move up"
                   >
@@ -59,8 +74,8 @@ import { SettingsToastService } from './settings-toast.service';
                     </svg>
                   </button>
                   <button
-                    (click)="moveCatalogItem(i, 1)"
-                    [disabled]="i === catalogItems().length - 1"
+                    (click)="moveCatalogItem(entry.originalIndex, 1)"
+                    [disabled]="entry.originalIndex === catalogItems().length - 1 || isSearching()"
                     class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-gray-700 dark:hover:text-ink hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                     title="Move down"
                   >
@@ -69,7 +84,7 @@ import { SettingsToastService } from './settings-toast.service';
                     </svg>
                   </button>
                   <button
-                    (click)="removeCatalogItem(i)"
+                    (click)="removeCatalogItem(entry.originalIndex)"
                     class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors shrink-0"
                     title="Remove item"
                   >
@@ -81,35 +96,39 @@ import { SettingsToastService } from './settings-toast.service';
               </div>
               <input
                 type="text"
-                [value]="item.description"
-                (input)="updateCatalogItem(i, 'description', $any($event.target).value)"
+                [value]="entry.item.description"
+                (input)="updateCatalogItem(entry.originalIndex, 'description', $any($event.target).value)"
                 placeholder="Default description"
                 class="app-input w-full"
               />
               <div class="grid grid-cols-3 gap-2">
                 <input
                   type="text"
-                  [value]="item.defaultUnit"
-                  (input)="updateCatalogItem(i, 'defaultUnit', $any($event.target).value)"
+                  [value]="entry.item.defaultUnit"
+                  (input)="updateCatalogItem(entry.originalIndex, 'defaultUnit', $any($event.target).value)"
                   placeholder="Unit"
                   class="app-input"
                 />
                 <input
                   type="number"
-                  [value]="item.defaultCostPrice"
-                  (input)="updateCatalogItem(i, 'defaultCostPrice', $any($event.target).value)"
+                  [value]="entry.item.defaultCostPrice"
+                  (input)="updateCatalogItem(entry.originalIndex, 'defaultCostPrice', $any($event.target).value)"
                   placeholder="Cost price"
                   class="app-input"
                 />
                 <input
                   type="number"
-                  [value]="item.defaultSalesPrice"
-                  (input)="updateCatalogItem(i, 'defaultSalesPrice', $any($event.target).value)"
+                  [value]="entry.item.defaultSalesPrice"
+                  (input)="updateCatalogItem(entry.originalIndex, 'defaultSalesPrice', $any($event.target).value)"
                   placeholder="Sales price"
                   class="app-input"
                 />
               </div>
             </div>
+          } @empty {
+            @if (isSearching()) {
+              <p class="text-sm text-gray-400 dark:text-muted py-4 text-center">No products match "{{ productSearch() }}".</p>
+            }
           }
           <button
             (click)="addCatalogItem()"
@@ -318,6 +337,16 @@ export class ProductsSettingsPageComponent implements OnInit {
   readonly catalogItems = signal<{ id: string; name: string; description: string; defaultUnit: string; defaultCostPrice: string; defaultSalesPrice: string; defaultTaxRateId: string; categoryKey: string }[]>([]);
   readonly catalogSaving = signal(false);
   readonly catalogSaved = signal(false);
+  readonly productSearch = signal('');
+  readonly filteredCatalogItems = computed(() => {
+    const items = this.catalogItems();
+    const q = this.productSearch().toLowerCase().trim();
+    if (!q || items.length <= 4) return items.map((item, i) => ({ item, originalIndex: i }));
+    return items
+      .map((item, i) => ({ item, originalIndex: i }))
+      .filter(({ item }) => item.name.toLowerCase().includes(q) || item.description.toLowerCase().includes(q));
+  });
+  readonly isSearching = computed(() => this.productSearch().toLowerCase().trim().length > 0 && this.catalogItems().length > 4);
 
   // Order categories
   readonly orderCategories = signal<{ key: string; label: string; description: string; defaultUnit: string }[]>([]);
