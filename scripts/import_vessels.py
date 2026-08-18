@@ -61,9 +61,13 @@ for row in rows:
     vid = str(uuid.uuid4())
     vessel_ids[vessel_name] = vid
     
+    # NOTE: Do NOT set vessel phone from the CSV's "Business Phone" — that is a
+    # company-level field, not per-vessel.  Vessels get phone = NULL and must be
+    # set individually via the UI.  (Previous version leaked the `phone` variable
+    # from the companies loop above, giving every vessel the same number.)
     sql_lines.append(
         f"INSERT INTO vessels (id, name, flag, type, phone, created_at, updated_at) "
-        f"VALUES ('{vid}', '{vessel_name.replace(chr(39), chr(39)+chr(39))}', '{flag}', '{vtype}', '{phone}', NOW(), NOW());"
+        f"VALUES ('{vid}', '{vessel_name.replace(chr(39), chr(39)+chr(39))}', '{flag}', '{vtype}', NULL, NOW(), NOW());"
     )
 
 sql_lines.append("")

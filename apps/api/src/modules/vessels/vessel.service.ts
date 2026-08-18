@@ -287,6 +287,23 @@ export async function updateVessel(
     ignoreForCreditEnforcement: boolean;
   }>,
 ) {
+  // Bulk-corruption safeguard: if a phone is being set, check how many other
+  // vessels already have that exact number.  5+ is a red flag (the import_vessels.py
+  // bug assigned one company's number to all 353 vessels).
+  if (data.phone !== undefined && data.phone !== null && data.phone.trim()) {
+    const normalized = data.phone.trim();
+    const [{ count }] = await db
+      .select({ count: sql`COUNT(*)::int` })
+      .from(vessels)
+      .where(and(eq(vessels.phone, normalized), sql`${vessels.id} != ${id}`));
+    if (count >= 5) {
+      console.warn(
+        `[Vessels] WARNING: Phone "${normalized}" is already assigned to ${count} other vessels. ` +
+        `This may indicate bulk data corruption. Vessel ID: ${id}`,
+      );
+    }
+  }
+
   const [updated] = await db
     .update(vessels)
     .set({ ...data, updatedAt: new Date() })
