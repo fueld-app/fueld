@@ -1068,7 +1068,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     async ({ auth, body }) => {
       try {
         requireAdmin(auth);
-        const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+        const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
         const settings = { ...(tenant?.settings ?? {}) } as any;
         settings.microsoftSharedSender = body.enabled;
         settings.microsoftSharedSenderEmail = body.email ?? null;
