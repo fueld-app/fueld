@@ -46,8 +46,24 @@ interface UserConnection {
 
 const connections = new Map<string, UserConnection>();
 const reconnectAttempts = new Map<string, number>();
+const reconnectCooldownUntil = new Map<string, number>(); // userId → timestamp (ms) when retry is allowed again
 const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown after exhausting retries
+const MAX_CONCURRENT_RECONNECTS = 3; // circuit breaker: limit simultaneous reconnections
 const QR_STALE_MS = 15_000; // QR codes expire after ~20s; treat as stale after 15s
+
+/**
+ * Properly tear down a Baileys socket — remove all event listeners and
+ * close the underlying WebSocket.  Failing to do this leaks memory because
+ * the old WASocket object and its internal timers/promises are kept alive
+ * by the event-emitter references.
+ */
+function destroySocket(sock: WASocket | null | undefined): void {
+  if (!sock) return;
+  try { (sock.ev as any).removeAllListeners(); } catch {}
+  try { sock.end(undefined); } catch {}
+  try { (sock as any).ws?.close(); } catch {}
+}
 
 // ─── Buffer Revival (JSONB round-trip loses Buffer types) ────────────
 
@@ -193,8 +209,8 @@ export async function startWhatsAppSession(userId: string, tenantId?: string): P
       if (qrAge < QR_STALE_MS) {
         return { status: 'qr', qr: existing.qr };
       }
-      // QR is stale — destroy old socket and fall through to create a new session
-      try { existing.socket?.end(undefined); } catch {}
+      // QR is stale — properly destroy old socket and fall through to create a new session
+      destroySocket(existing.socket);
       connections.delete(userId);
     }
     if (existing.status === 'connecting') {
@@ -242,6 +258,7 @@ export async function startWhatsAppSession(userId: string, tenantId?: string): P
       conn.status = 'connected';
       conn.qr = undefined;
       reconnectAttempts.delete(userId);
+      reconnectCooldownUntil.delete(userId);
 
       // Extract phone number from socket user
       const jid = sock.user?.id;
@@ -273,11 +290,14 @@ export async function startWhatsAppSession(userId: string, tenantId?: string): P
       console.warn(`[whatsapp] ${userId} disconnected: statusCode=${statusCode}, loggedOut=${loggedOut}, error=${errorMsg}`);
 
       conn.status = 'closed';
+      // Properly destroy the socket to prevent memory leaks (event listeners, internal timers)
+      destroySocket(conn.socket);
       connections.delete(userId);
 
       if (loggedOut) {
         // User logged out from phone — clean up DB
         reconnectAttempts.delete(userId);
+        reconnectCooldownUntil.delete(userId);
         cleanupSession(userId);
         sendToUserSockets(userId, { type: 'whatsapp:disconnected', data: { reason: 'logged_out' } }, 'whatsapp');
       } else {
@@ -291,8 +311,12 @@ export async function startWhatsAppSession(userId: string, tenantId?: string): P
             startWhatsAppSession(userId).catch(() => {});
           }, delay);
         } else {
-          console.warn(`[whatsapp] Giving up reconnecting ${userId} after ${MAX_RECONNECT_ATTEMPTS} attempts`);
+          // Exhausted retries — set a cooldown instead of permanently giving up.
+          // reconnectStoredSessions() will respect this cooldown and skip the session.
+          const cooldownUntil = Date.now() + RECONNECT_COOLDOWN_MS;
+          reconnectCooldownUntil.set(userId, cooldownUntil);
           reconnectAttempts.delete(userId);
+          console.warn(`[whatsapp] Giving up reconnecting ${userId} after ${MAX_RECONNECT_ATTEMPTS} attempts — cooldown until ${new Date(cooldownUntil).toISOString()}`);
           sendToUserSockets(userId, { type: 'whatsapp:disconnected', data: { reason: 'max_retries' } }, 'whatsapp');
         }
       }
@@ -405,9 +429,11 @@ export async function disconnectWhatsApp(userId: string): Promise<void> {
     } catch {
       // already disconnected
     }
-    conn.socket.end(undefined);
+    destroySocket(conn.socket);
   }
   connections.delete(userId);
+  reconnectAttempts.delete(userId);
+  reconnectCooldownUntil.delete(userId);
   await cleanupSession(userId);
 }
 
@@ -694,21 +720,26 @@ export async function sendWhatsAppMessage(
 
 // ─── Reconnect stored sessions on server start ───────────────────────
 
-// Retry abandoned sessions every 10 minutes
-const RETRY_INTERVAL_MS = 10 * 60 * 1000;
-
-setInterval(() => {
-  reconnectStoredSessions().catch(() => {});
-}, RETRY_INTERVAL_MS);
+// NOTE: reconnectStoredSessions() is called at startup and every 5 minutes
+// from src/index.ts. The safeguards below (skip unpaired, respect cooldown,
+// circuit breaker) prevent the reconnection storms that previously caused
+// memory exhaustion and server freezes.
 
 export async function reconnectStoredSessions(): Promise<void> {
   try {
     const waSettings = await getWhatsAppSettings();
     if (!waSettings.enabled) return;
 
+    // Only retry sessions that were previously PAIRED (have a phone number).
+    // Unpaired sessions (users who started QR pairing but never scanned it)
+    // should NOT be auto-reconnected — they create an infinite loop of
+    // failed connections that eventually exhausts memory and freezes the server.
     const sessions = await db
-      .select({ userId: whatsappSessions.userId })
+      .select({ userId: whatsappSessions.userId, phoneNumber: whatsappSessions.phoneNumber })
       .from(whatsappSessions);
+
+    const now = Date.now();
+    let reconnectCount = 0;
 
     for (const session of sessions) {
       // Skip sessions that are already connected or connecting
@@ -716,8 +747,31 @@ export async function reconnectStoredSessions(): Promise<void> {
       if (existing && (existing.status === 'connected' || existing.status === 'connecting' || existing.status === 'qr')) {
         continue;
       }
-      // Reset reconnect attempts for retry
+
+      // Skip sessions that were never paired — they have no valid credentials
+      // and will only generate QR codes that expire (statusCode=408).
+      // These sessions must be re-initiated by the user from the UI.
+      if (!session.phoneNumber) {
+        continue;
+      }
+
+      // Respect the cooldown — don't retry sessions that recently exhausted attempts.
+      const cooldownUntil = reconnectCooldownUntil.get(session.userId);
+      if (cooldownUntil && now < cooldownUntil) {
+        continue;
+      }
+
+      // Circuit breaker: limit concurrent reconnections to avoid thundering herd.
+      if (reconnectCount >= MAX_CONCURRENT_RECONNECTS) {
+        console.log(`[whatsapp] reconnectStoredSessions: reached max concurrent reconnects (${MAX_CONCURRENT_RECONNECTS}), deferring remaining sessions`);
+        break;
+      }
+
+      // Clear cooldown and attempts for a fresh retry cycle
+      reconnectCooldownUntil.delete(session.userId);
       reconnectAttempts.delete(session.userId);
+      reconnectCount++;
+
       // Reconnect in background, don't block startup
       startWhatsAppSession(session.userId).catch(() => {});
     }

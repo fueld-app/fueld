@@ -26,10 +26,9 @@ describe('booking-email.service (pure rendering)', () => {
     expect(subject).toContain('M/V Ocean7 Ruby');
     expect(subject).toContain('Panama');
 
-    expect(body).toContain('Dear Captain Sergiy');
+    expect(body).toContain('Dear Captain of M/V Ocean7 Ruby');
     expect(body).toContain('M/V Ocean7 Ruby');
     expect(body).toContain('Place: Panama');
-    expect(body).toContain('Agent: Altarmar');
     expect(body).toContain('Physical: Trafigura');
     expect(body).toContain('Method: Via Barge');
     expect(body).toContain('Product: VLSFO 0.5%');
@@ -41,8 +40,8 @@ describe('booking-email.service (pure rendering)', () => {
 
   test('captain falls back to "Captain" when name empty', () => {
     const { body } = renderBookingEmail(baseOrder, '');
-    // Empty captainName → "Dear Captain " (the template hardcodes 'Captain {captainName}')
-    expect(body).toContain('Dear Captain');
+    // Template now uses 'Dear Captain of {vesselName}' — captain name is not in the body anymore
+    expect(body).toContain('Dear Captain of M/V Ocean7 Ruby');
   });
 
   test('formatDates: range, single, none', () => {

@@ -908,7 +908,7 @@ import type {
             </span>
           </div>
           <div class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-muted">
-            <span>Financing / MT</span>
+            <span>Financing / {{ effectiveUnit() }}</span>
             <span class="tabular-nums">{{ (financingCostPerMt() ?? 0) | number:'1.2-2' }} {{ baseCurrency() }}</span>
           </div>
           <div class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-muted">
@@ -916,14 +916,14 @@ import type {
             <span class="tabular-nums">{{ (netMarginPct() ?? 0) | number:'1.2-2' }}%</span>
           </div>
           <div class="mt-1 flex items-center justify-between text-xs text-gray-400 dark:text-muted">
-            <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} MT</span>
+            <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} {{ effectiveUnit() }}</span>
             <span>Rev {{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency() }}</span>
           </div>
         </div>
       } @else if (rows().length > 0) {
         <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
           <div class="flex items-center justify-between text-xs text-gray-400 dark:text-muted">
-            <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} MT</span>
+            <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} {{ effectiveUnit() }}</span>
             <span class="text-sm font-medium text-gray-500 dark:text-muted">Quantities only</span>
           </div>
         </div>
@@ -956,6 +956,9 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly inventorySkuOptionsInput = input<DropdownOption[]>([]);
   readonly catalogItemsInput = input<{ name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number; defaultTaxRateId?: string }[]>([]);
   readonly defaultUnitInput = input<string>('MT');
+
+  /** The tenant-configured default unit, used everywhere a unit label is shown. */
+  readonly effectiveUnit = computed(() => this.defaultUnitInput() || 'MT');
   readonly taxRatesInput = input<{ id: string; name: string; rate: number }[]>([]);
   readonly decimalPrecisionInput = input<number>(5);
   /** Map of order-item row id → availability check result (controlled by parent). */
@@ -1243,7 +1246,8 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
         const match = catalog.find((c) => c.name === (value as string));
         if (match) {
           if (!row.description) row.description = match.description ?? '';
-          if (row.unit === 'MT' || !row.unit) row.unit = match.defaultUnit ?? this.defaultUnitInput() ?? 'MT';
+          // Auto-apply unit from catalog default when unit is the tenant default or empty
+          if (row.unit === this.defaultUnitInput() || !row.unit) row.unit = match.defaultUnit ?? this.defaultUnitInput() ?? 'MT';
           if (row.costUnit === 'MT' || !row.costUnit) row.costUnit = match.defaultUnit ?? this.defaultUnitInput() ?? 'MT';
           if (row.salesUnit === 'MT' || !row.salesUnit) row.salesUnit = match.defaultUnit ?? this.defaultUnitInput() ?? 'MT';
           if (row.costPrice === 0) row.costPrice = match.defaultCostPrice ?? 0;

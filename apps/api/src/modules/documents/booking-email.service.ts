@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { vesselPersons, companyContacts } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate } from '../admin/email-settings.service';
-import { getTimezoneSettings } from '../admin/settings.service';
+import { getTimezoneSettings, getBookingEmailSettings } from '../admin/settings.service';
 
 /** Order shape we need (a subset of getOrderById output). */
 interface BookingItem {
@@ -35,18 +35,24 @@ interface BookingOrder {
   supplier?: { name?: string | null } | null;
   deliveryMethod?: string | null;
   items?: BookingItem[];
+  isBrokerDeal?: boolean | null;
+  orderSuppliers?: Array<{ isPrimary: boolean; company?: { name?: string | null } | null }> | null;
 }
 
-const DEFAULT_SUBJECT = 'Bunkers booked for ${vesselName} at ${place}';
-const DEFAULT_BODY = `Dear Captain \${captainName}
-Please note that we have booked bunkers for your good lady \${vesselName}.
+const DEFAULT_SUBJECT = '${vesselName} @ ${place}';
+const DEFAULT_BODY = `Dear Captain of \${vesselName}
+
+Please note that we have booked bunkers for your good lady.
+
 Place: \${place}
-Dates: \${dates}
-Agent: \${agent}
+Date: \${dates}
+
 Physical: \${physicalSupplier}
 Method: \${deliveryMethod}
+
 \${products}
-Agents; kindly assist us with the coordination of this supply and do the needful to secure a smooth operation without any delays.`;
+
+Agents: kindly assist us with the coordination of this supply and do the needful to secure a smooth operation without any delays.`;
 
 /** Ordinal day + month name, e.g. "3rd of July". */
 function formatDayMonth(iso: string, timezone?: string | null): string {
@@ -97,6 +103,17 @@ function stripNum(v: string): string {
   return Number.isFinite(n) ? String(n) : v;
 }
 
+/** Resolve the physical supplier name from the primary order supplier leg, falling back to the order's supplier field. */
+function resolvePhysicalSupplier(order: BookingOrder): string {
+  // Prefer the primary order supplier leg's company name
+  if (order.orderSuppliers && order.orderSuppliers.length > 0) {
+    const primary = order.orderSuppliers.find((s) => s.isPrimary) ?? order.orderSuppliers[0];
+    if (primary?.company?.name) return primary.company.name;
+  }
+  // Fall back to the order's legacy supplier field
+  return order.supplier?.name ?? '';
+}
+
 /** Find the captain's name from the vessel's persons (title 'Captain'). */
 async function resolveCaptainName(vesselId: string): Promise<string> {
   const persons = await db
@@ -132,6 +149,13 @@ export async function resolveBookingRecipients(order: BookingOrder): Promise<{ t
   const rules = await getApplicableEmailRules(order.tenantId, null, 'BUNKER_BOOKING');
   const cc = rules.filter((r) => r.ruleType === 'CC').map((r) => r.email).filter(Boolean);
 
+  // On broker deals, always CC the configured broker deal email + agent email
+  if (order.isBrokerDeal) {
+    const { brokerDealCcEmail } = await getBookingEmailSettings();
+    if (brokerDealCcEmail) cc.push(brokerDealCcEmail);
+    if (agentEmail?.trim()) cc.push(agentEmail.trim());
+  }
+
   return { to: Array.from(to), cc };
 }
 
@@ -141,7 +165,7 @@ export function renderBookingEmail(order: BookingOrder, captainName: string, tim
   const place = order.place?.name ?? '';
   const dates = formatDates(order.eta ?? null, order.etd ?? null, timezone);
   const agent = order.agent?.name ?? '';
-  const physicalSupplier = order.supplier?.name ?? '';
+  const physicalSupplier = resolvePhysicalSupplier(order);
   const deliveryMethod = order.deliveryMethod ?? '';
 
   const products = (order.items ?? [])
@@ -180,7 +204,7 @@ export async function composeBookingEmail(order: BookingOrder): Promise<{ subjec
     place: order.place?.name ?? '',
     dates: formatDates(order.eta ?? null, order.etd ?? null, defaultTimezone),
     agent: order.agent?.name ?? '',
-    physicalSupplier: order.supplier?.name ?? '',
+    physicalSupplier: resolvePhysicalSupplier(order),
     deliveryMethod: order.deliveryMethod ?? '',
     products: (order.items ?? []).map((item) => {
       const desc = item.description ? ` - ${item.description}` : '';

@@ -2071,7 +2071,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .put('/booking-email', async ({ auth, body }) => {
     try {
       requireAdmin(auth);
-      const data = await updateBookingEmailSettings({ autoSendOnConvert: body.autoSendOnConvert });
+      const data = await updateBookingEmailSettings({ autoSendOnConvert: body.autoSendOnConvert, brokerDealCcEmail: body.brokerDealCcEmail });
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -2080,6 +2080,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     body: t.Object({
       autoSendOnConvert: t.Boolean(),
+      brokerDealCcEmail: t.Optional(t.Nullable(t.String({ format: 'email' }))),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update Bunker Booking email settings' },
   })

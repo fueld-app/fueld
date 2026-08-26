@@ -15,6 +15,7 @@ export enum OrderStatus {
 /** Product types available for order items. */
 export enum ProductType {
   VLSFO = 'VLSFO',
+  ULSFO = 'ULSFO',
   LSMGO = 'LSMGO',
   MGO = 'MGO',
   LUBE = 'LUBE',

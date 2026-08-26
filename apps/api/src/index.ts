@@ -66,6 +66,9 @@ import { inventoryController } from './modules/inventory/inventory.controller';
 import { transfersController } from './modules/inventory/transfers.controller';
 import { reconnectStoredSessions as reconnectWhatsAppSessions } from './modules/whatsapp/whatsapp.service';
 import { plattsController } from './modules/platts/platts.controller';
+import { bankingController } from './modules/banking/banking.controller';
+import { bankingCallbackController } from './modules/banking/banking.controller';
+import { syncAllConnections as syncAllBankConnections } from './modules/banking/banking.service';
 import { resumePendingPlattsParseJobs } from './modules/platts/platts.service';
 import { getBuildInfo } from './lib/build-info';
 import { assertCredentialsEncryptionConfig } from './lib/crypto';
@@ -494,6 +497,8 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(vesselSanctionsController)
     .use(inventoryController)
     .use(transfersController)
+    .use(bankingController)
+    .use(bankingCallbackController)
     .get('/uploads/avatars/:filename', serveUpload('avatars'))
     .get('/uploads/logos/:filename', serveUpload('logos'))
     .get('/uploads/attachments/:filename', serveUpload('attachments'))
@@ -785,6 +790,22 @@ export async function createApp(options: CreateAppOptions = {}) {
     resumePendingPlattsParseJobs();
     startRiskMonitoringJob();
     startVesselSanctionJob();
+
+    // Banking sync — every 2 hours
+    setInterval(async () => {
+      try {
+        // Sync all tenants that have Enable Banking configured
+        const { sql } = await import('drizzle-orm');
+        const tenants = await db.execute(sql`SELECT id FROM tenants`);
+        for (const t of tenants.rows) {
+          try {
+            const result = await syncAllBankConnections((t as any).id);
+            if (result.synced > 0) console.log(`[Banking] Synced ${result.synced} connections for tenant ${(t as any).id}`);
+          } catch (e) { /* tenant may not have banking configured — skip silently */ }
+        }
+      } catch (e) { console.error('[Banking] Periodic sync failed:', e); }
+    }, 2 * 60 * 60 * 1000);
+    console.log('[Banking] Background sync job started (interval: 2h)');
   }
 
   return app;

@@ -9,7 +9,7 @@ import { AuthService } from '@app/core/auth';
 import { IntegrationsToastService } from './integrations-toast.service';
 
 interface ApiResponse<T> { success: boolean; data: T; message?: string; }
-interface BankConnection { id: string; aspsp_name: string; aspsp_country: string; status: string; last_synced_at: string | null; }
+interface BankConnection { id: string; aspsp_name: string; aspsp_country: string; status: string; last_synced_at: string | null; created_at: string | null; user_id: string | null; user_name: string | null; user_email: string | null; auth_expires_at: string | null; }
 interface ASPSP { name: string; country: string; bic?: string; }
 
 // European countries supported by Enable Banking (PSD2/EEA)
@@ -95,6 +95,19 @@ const BANKING_COUNTRIES = [
                     } @else if (conn.last_synced_at) {
                       <span class="ml-2 text-xs text-gray-400">synced {{ conn.last_synced_at | date:'short' }}</span>
                     }
+                    @if (conn.user_name || conn.user_email) {
+                      <span class="ml-2 text-xs text-gray-400">added by {{ conn.user_name || conn.user_email }}</span>
+                    } @else {
+                      <span class="ml-2 text-xs text-gray-400">added by (tenant setup)</span>
+                    }
+                    @if (conn.created_at) {
+                      <span class="ml-2 text-xs text-gray-400">on {{ conn.created_at | date:'mediumDate' }}</span>
+                    }
+                    @if (conn.auth_expires_at) {
+                      <span class="ml-2 text-xs" [class.text-amber-600]="isExpiringSoon(conn.auth_expires_at)" [class.text-red-600]="isExpired(conn.auth_expires_at)">
+                        auth expires {{ conn.auth_expires_at | date:'mediumDate' }}
+                      </span>
+                    }
                   </div>
                   @if (auth.isAdmin() || auth.isFinance()) {
                     <button type="button" (click)="removeConnection(conn.id)"
@@ -111,25 +124,21 @@ const BANKING_COUNTRIES = [
                 Add Bank Connection
               </button>
             }
-            @if (auth.isAdmin() || auth.isFinance()) {
-              <button type="button" (click)="showSetup.set(true)"
-                class="inline-flex items-center rounded-lg border border-gray-300 dark:border-line px-3 py-2 text-sm font-semibold text-gray-700 dark:text-ink hover:bg-gray-50 dark:hover:bg-surface-dim">
-                {{ configured() ? 'Edit Credentials' : 'Set Up' }}
-              </button>
-            }
             @if (configured()) {
               <a routerLink="/cash" class="inline-flex items-center rounded-lg border border-gray-300 dark:border-line px-3 py-2 text-sm font-semibold text-gray-700 dark:text-ink hover:bg-gray-50 dark:hover:bg-surface-dim">
                 View Cash Dashboard →
               </a>
             }
           </div>
-          @if (auth.isAdmin() || auth.isFinance()) {
-            <p class="mt-3 text-xs text-gray-400">
-              Don't have an Enable Banking account?
-              <button type="button" (click)="openSelfService()" class="text-blue-500 hover:underline">
-                Set up automatically →
+          @if (!configured() && (auth.isAdmin() || auth.isFinance())) {
+            <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 text-sm text-blue-700 dark:text-blue-300 space-y-2">
+              <p class="font-semibold">Get started with Enable Banking</p>
+              <p>Connect your European bank accounts for live cash balances and transactions. Set up your Enable Banking account automatically — no manual configuration needed.</p>
+              <button type="button" (click)="openSelfService()"
+                class="inline-flex items-center rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800">
+                Set Up Enable Banking →
               </button>
-            </p>
+            </div>
           }
         }
 
@@ -260,60 +269,6 @@ const BANKING_COUNTRIES = [
           </div>
         }
 
-        @if (showSetup()) {
-          <div class="space-y-3">
-            @if (configured()) {
-              <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 text-sm text-blue-700 dark:text-blue-300">
-                <strong>Credentials are already configured.</strong> Enter new values below to replace them. (For security, current values are not shown.)
-              </div>
-            } @else {
-              <p class="text-sm text-gray-500 dark:text-muted">
-                Enter your Enable Banking credentials. Get these from
-                <a href="https://enablebanking.com/cp/applications" target="_blank" rel="noopener" class="text-blue-500 hover:underline">enablebanking.com → Applications</a>
-              </p>
-            }
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">App ID</label>
-              <input type="text" [ngModel]="appId()" (ngModelChange)="appId.set($event)"
-                class="w-full rounded-lg border border-gray-300 dark:border-line px-3 py-2 text-sm dark:bg-surface"
-                placeholder="e.g. ae51f60d-a5ec-4ecc-..." />
-            </div>
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Private Key (PEM)</label>
-              <textarea [ngModel]="privateKey()" (ngModelChange)="privateKey.set($event)"
-                rows="6"
-                class="w-full rounded-lg border border-gray-300 dark:border-line px-3 py-2 text-sm font-mono dark:bg-surface"
-                placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Environment</label>
-                <select [ngModel]="environment()" (ngModelChange)="environment.set($event)"
-                  class="w-full rounded-lg border border-gray-300 dark:border-line px-3 py-2 text-sm dark:bg-surface">
-                  <option value="production">Production</option>
-                  <option value="sandbox">Sandbox</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Redirect URL</label>
-                <input type="text" [ngModel]="redirectUrl()" (ngModelChange)="redirectUrl.set($event)"
-                  class="w-full rounded-lg border border-gray-300 dark:border-line px-3 py-2 text-sm dark:bg-surface"
-                  placeholder="https://your-domain.fueld.app/api/banking/callback" />
-              </div>
-            </div>
-            <div class="flex gap-2 pt-2">
-              <button type="button" (click)="saveCredentials()"
-                class="inline-flex items-center rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800">
-                Save Credentials
-              </button>
-              <button type="button" (click)="showSetup.set(false)"
-                class="inline-flex items-center rounded-lg border border-gray-300 dark:border-line px-4 py-2 text-sm font-semibold text-gray-700 dark:text-ink hover:bg-gray-50">
-                Cancel
-              </button>
-            </div>
-          </div>
-        }
-
         @if (showConnect()) {
           <div class="space-y-4">
             <!-- Country selector (always visible) -->
@@ -336,7 +291,35 @@ const BANKING_COUNTRIES = [
             @if (loadingBanks()) {
               <p class="text-sm text-gray-400">Loading available banks…</p>
             } @else if (availableBanks().length === 0) {
-              <p class="text-sm text-gray-400">No banks found for {{ country() }}. Try a different country.</p>
+              <div class="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-xs text-amber-700 dark:text-amber-300 space-y-2">
+                <p class="font-semibold">⚠️ Your Enable Banking app needs to be activated</p>
+                <p>Your app has been created but is not yet active. To activate it:</p>
+                <ol class="list-decimal list-inside space-y-1">
+                  <li>Click <strong>"Send login email"</strong> below — you'll receive an email from Enable Banking</li>
+                  <li>Click the link in the email to log in to the Enable Banking Control Panel</li>
+                  <li>Find your app and click <strong>"Link accounts"</strong></li>
+                  <li>Follow the bank consent flow to link your bank accounts</li>
+                  <li>The app will be <strong>activated automatically</strong> after linking</li>
+                </ol>
+                <p class="pt-1">Once activated, come back here and click "Retry" to load available banks.</p>
+                <div class="flex gap-2 pt-1">
+                  <button type="button" (click)="sendEbLoginEmail()" [disabled]="sendingLoginEmail()"
+                    class="inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50">
+                    @if (sendingLoginEmail()) {
+                      Sending…
+                    } @else {
+                      Send login email
+                    }
+                  </button>
+                  <button type="button" (click)="loadBanks()"
+                    class="inline-flex items-center rounded-lg border border-amber-300 dark:border-amber-700 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30">
+                    Retry loading banks
+                  </button>
+                </div>
+                @if (loginEmailSent()) {
+                  <p class="text-green-600 dark:text-green-400">✓ Login email sent! Check your inbox and click the link.</p>
+                }
+              </div>
             } @else {
               <div>
                 <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Select Bank</label>
@@ -383,6 +366,8 @@ export class EnableBankingIntegrationCardComponent implements OnInit, OnDestroy 
   private ssOobCode: string | null = null;
   private ssOobEmail: string | null = null;
   readonly ssOobCodeInput = signal('');
+  readonly sendingLoginEmail = signal(false);
+  readonly loginEmailSent = signal(false);
 
   // Setup form
   readonly appId = signal('');
@@ -536,6 +521,21 @@ export class EnableBankingIntegrationCardComponent implements OnInit, OnDestroy 
 
   // ─── Self-Service Setup Wizard ──────────────────────────────────
 
+  isPositive(value: string | number): boolean {
+    return Number(value) >= 0;
+  }
+
+  isExpiringSoon(dateStr: string | null): boolean {
+    if (!dateStr) return false;
+    const days = (new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    return days >= 0 && days <= 14;
+  }
+
+  isExpired(dateStr: string | null): boolean {
+    if (!dateStr) return false;
+    return new Date(dateStr).getTime() < Date.now();
+  }
+
   openSelfService(): void {
     this.showSelfService.set(true);
     this.ssStep.set('idle');
@@ -622,10 +622,50 @@ export class EnableBankingIntegrationCardComponent implements OnInit, OnDestroy 
   }
 
   async completeWithOobCode(): Promise<void> {
-    const oobCode = this.ssOobCodeInput().trim();
+    let oobCode = this.ssOobCodeInput().trim();
     if (!oobCode) return;
+
+    // If user pasted the full URL, extract oobCode from it
+    if (oobCode.includes('://') || oobCode.includes('oobCode=')) {
+      try {
+        const url = new URL(oobCode);
+        const extracted = url.searchParams.get('oobCode');
+        if (extracted) {
+          oobCode = extracted;
+          this.ssOobCodeInput.set(oobCode); // Update the field so user sees it
+        }
+      } catch {
+        // Not a valid URL — try to extract oobCode= from the string
+        const match = oobCode.match(/oobCode=([^&]+)/);
+        if (match) {
+          oobCode = match[1];
+          this.ssOobCodeInput.set(oobCode);
+        }
+      }
+    }
+
     this.stopPolling();
     await this.completeSelfServiceSetup(oobCode, this.ssEmail());
+  }
+
+  async sendEbLoginEmail(): Promise<void> {
+    this.sendingLoginEmail.set(true);
+    this.loginEmailSent.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/banking/enablebanking/send-login-email`, { email: this.ssEmail() || this.auth.userEmail() }),
+      );
+      if (res.success) {
+        this.loginEmailSent.set(true);
+        this.toast.show('success', 'Login email sent. Check your inbox.');
+      } else {
+        this.toast.show('error', res.message ?? 'Failed to send email');
+      }
+    } catch (e: any) {
+      this.toast.show('error', e?.message ?? 'Failed to send email');
+    } finally {
+      this.sendingLoginEmail.set(false);
+    }
   }
 
   closeSelfService(): void {

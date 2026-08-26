@@ -156,10 +156,14 @@ export async function handleOAuthCallback(
 
 export async function listBankConnections(tenantId: string) {
   const result = await db.execute(sql`
-    SELECT id, aspsp_name, aspsp_country, session_id, status, last_synced_at, created_at
-    FROM bank_connections
-    WHERE tenant_id = ${tenantId}
-    ORDER BY aspsp_name
+    SELECT bc.id, bc.aspsp_name, bc.aspsp_country, bc.session_id, bc.status,
+           bc.last_synced_at, bc.created_at, bc.user_id,
+           u.name as user_name, u.email as user_email,
+           bc.created_at + interval '90 days' as auth_expires_at
+    FROM bank_connections bc
+    LEFT JOIN users u ON u.id = bc.user_id
+    WHERE bc.tenant_id = ${tenantId}
+    ORDER BY bc.aspsp_name
   `);
   return result as any[];
 }
@@ -596,7 +600,17 @@ export async function completeEnableBankingSetup(
   email: string,
   oobCode: string | null,
   redirectUrl: string,
-): Promise<{ appId: string }> {
+): Promise<{ appId: string; isNew: boolean }> {
+  // Check if user already has credentials — don't create duplicate apps
+  const existing = await isUserEnableBankingConfigured(userId);
+  if (existing) {
+    // Return the existing app ID
+    const creds = await getUserEnableBankingCredentials(userId, tenantId);
+    if (creds) {
+      return { appId: creds.appId, isNew: false };
+    }
+  }
+
   try {
     let cpTokens: { idToken: string; refreshToken: string; localId: string; email: string } | null = null;
 
@@ -647,7 +661,7 @@ export async function completeEnableBankingSetup(
       WHERE user_id = ${userId} AND status = 'pending'
     `);
 
-    return { appId };
+    return { appId, isNew: true };
   } catch (e: any) {
     // Update pending status to error so user can retry
     await db.execute(sql`
@@ -657,6 +671,12 @@ export async function completeEnableBankingSetup(
     `);
     throw e;
   }
+}
+
+/** Send EB Control Panel login email (for activating apps, linking accounts). */
+export async function sendEbLoginEmail(email: string): Promise<void> {
+  const continueUrl = 'https://enablebanking.com/cp/applications';
+  await cpClient.getOobConfirmationCode(email, continueUrl);
 }
 
 /** Quick setup: register app for user using existing CP tokens (no email needed). */

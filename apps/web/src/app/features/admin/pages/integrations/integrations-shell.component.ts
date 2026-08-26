@@ -70,6 +70,7 @@ export class IntegrationsShellComponent implements OnInit, OnDestroy {
     { path: 'push', label: 'Web Push' },
     { path: 'quickbooks', label: 'QuickBooks' },
     { path: 'whatsapp', label: 'WhatsApp' },
+    { path: 'enable-banking', label: 'Enable Banking' },
   ] as const;
 
   ngOnInit(): void {

@@ -13,9 +13,9 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { Elysia, t } from 'elysia';
-import { eq } from 'drizzle-orm';
+import { eq, isNull, and } from 'drizzle-orm';
 import { db } from '../../db';
-import { users } from '../../db/schema';
+import { users, companyEmails, companyContacts, counterparties } from '../../db/schema';
 import { authGuard } from '../auth/auth.guard';
 import { buildStructuredActivityDiff } from '../activity/activity-diff';
 import { logActivity } from '../activity/activity.service';
@@ -71,6 +71,8 @@ import {
   updateCompanyPlaceSupplyRule,
   deleteCompanyPlaceSupplyRule,
   reapplyCompanyPlaceSupplyRule,
+  getCustomerPaymentLedger,
+  getSupplierPaymentLedger,
 } from './company.service';
 import { getSupplyPortsForCompany } from '../lloyds/lli.service';
 import { getUserCompanyAccess } from '../admin/settings.service';
@@ -152,6 +154,51 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         tags: ['Companies'],
         summary: 'Get a single company by local ID',
       },
+    },
+  )
+
+  //  GET  /companies/local/:id/inquiry-data
+  //  Returns a company's emails + contacts for direct inquiry sending
+  //  (without needing to register as a port supplier first).
+  .get(
+    '/local/:id/inquiry-data',
+    async ({ params }) => {
+      const [company] = await db
+        .select({ id: counterparties.id, name: counterparties.name })
+        .from(counterparties)
+        .where(eq(counterparties.id, params.id))
+        .limit(1);
+      if (!company) return { success: false, data: null, message: 'Company not found' };
+
+      const [emails, contacts] = await Promise.all([
+        db
+          .select({
+            email: companyEmails.email,
+            emailType: companyEmails.emailType,
+            isPrimary: companyEmails.isPrimary,
+          })
+          .from(companyEmails)
+          .where(eq(companyEmails.counterpartyId, params.id)),
+        db
+          .select({
+            id: companyContacts.id,
+            name: companyContacts.name,
+            role: companyContacts.role,
+            email: companyContacts.email,
+            phone: companyContacts.phone,
+          })
+          .from(companyContacts)
+          .where(and(eq(companyContacts.counterpartyId, params.id), isNull(companyContacts.deletedAt))),
+      ]);
+
+      return {
+        success: true,
+        data: { supplierId: company.id, supplierName: company.name, emails, contacts },
+      } satisfies ApiResponse<unknown>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Get company emails + contacts for direct inquiry sending' },
     },
   )
 
@@ -1522,6 +1569,66 @@ export const companiesController = new Elysia({ prefix: '/companies' })
       detail: { tags: ['Companies'], summary: 'Remove the parent link from a child company (unlink)' },
     },
   )
+
+  // ─── Payment Ledgers ──────────────────────────────────────────
+  .get(
+    '/local/:id/ledger/customer',
+    async ({ params, query }) => {
+      try {
+        const ledger = await getCustomerPaymentLedger(params.id, {
+          limit: query?.limit ? Number(query.limit) : undefined,
+          offset: query?.offset ? Number(query.offset) : undefined,
+          sort: query?.sort as 'date' | 'amount' | undefined,
+          dateFrom: query?.dateFrom,
+          dateTo: query?.dateTo,
+        });
+        return { success: true, data: ledger } satisfies ApiResponse<typeof ledger>;
+      } catch (err: any) {
+        console.error('[Companies] Customer ledger failed:', err);
+        return { success: false, data: null, message: err.message ?? 'Failed to load customer ledger' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      query: t.Optional(t.Object({
+        limit: t.Optional(t.String()),
+        offset: t.Optional(t.String()),
+        sort: t.Optional(t.String()),
+        dateFrom: t.Optional(t.String()),
+        dateTo: t.Optional(t.String()),
+      })),
+      detail: { tags: ['Companies'], summary: 'Customer payment ledger for a counterparty (all received payments across orders, per-currency totals + outstanding)' },
+    },
+  )
+  .get(
+    '/local/:id/ledger/supplier',
+    async ({ params, query }) => {
+      try {
+        const ledger = await getSupplierPaymentLedger(params.id, {
+          limit: query?.limit ? Number(query.limit) : undefined,
+          offset: query?.offset ? Number(query.offset) : undefined,
+          sort: query?.sort as 'date' | 'amount' | undefined,
+          dateFrom: query?.dateFrom,
+          dateTo: query?.dateTo,
+        });
+        return { success: true, data: ledger } satisfies ApiResponse<typeof ledger>;
+      } catch (err: any) {
+        console.error('[Companies] Supplier ledger failed:', err);
+        return { success: false, data: null, message: err.message ?? 'Failed to load supplier ledger' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      query: t.Optional(t.Object({
+        limit: t.Optional(t.String()),
+        offset: t.Optional(t.String()),
+        sort: t.Optional(t.String()),
+        dateFrom: t.Optional(t.String()),
+        dateTo: t.Optional(t.String()),
+      })),
+      detail: { tags: ['Companies'], summary: 'Supplier payment ledger for a counterparty (all paid payments across order legs, per-currency totals + outstanding)' },
+    },
+    )
 
   // ─── Top credit groups (dashboard widget) ─────────────────────────
   .get(

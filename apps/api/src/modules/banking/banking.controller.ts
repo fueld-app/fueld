@@ -25,6 +25,7 @@ import {
   initiateEnableBankingSetup,
   completeEnableBankingSetup,
   quickSetupEnableBanking,
+  sendEbLoginEmail,
   getEnableBankingSetupStatus,
   isControlPanelConfigured,
   listAvailableBanksForUser,
@@ -377,6 +378,25 @@ export const bankingController = new Elysia({ prefix: '/banking' })
   }, {
     body: t.Object({ email: t.String() }),
     detail: { tags: ['Banking'], summary: 'Quick setup — register app using existing Control Panel tokens (Admin, Finance)' },
+  })
+
+  // ─── Send EB Control Panel login email (ADMIN, FINANCE) ──
+  // Sends a sign-in email so the user can log in to the EB Control Panel
+  // to activate their app and link bank accounts.
+  .post('/enablebanking/send-login-email', async ({ auth, body }) => {
+    const denied = requireFinanceOrAdmin(auth);
+    if (denied) return denied satisfies ApiResponse<null>;
+    try {
+      await sendEbLoginEmail(body.email);
+      console.log(`[Banking] EB login email sent: user=${auth!.userId}, email=${body.email}`);
+      return { success: true, data: { sent: true } } satisfies ApiResponse<any>;
+    } catch (e: any) {
+      console.error(`[Banking] EB login email failed: ${e.message}`);
+      return { success: false, data: null, message: e.message };
+    }
+  }, {
+    body: t.Object({ email: t.String() }),
+    detail: { tags: ['Banking'], summary: 'Send Enable Banking Control Panel login email (Admin, Finance)' },
   })
 
   // ─── Self-Service Onboarding: Check if CP tokens exist (ADMIN, FINANCE) ──

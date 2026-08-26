@@ -140,7 +140,7 @@ export interface SendInquiryWhatsAppPayload {
                 Send Inquiry to Suppliers
               </h2>
               <p class="text-sm text-gray-500 dark:text-muted mt-0.5">
-                Select suppliers at {{ portName() }} to send RFQ emails or WhatsApp messages
+                Select suppliers to send RFQ emails or WhatsApp messages. Use "Add supplier" to search any company — no port registration required.
               </p>
             </div>
             <button
@@ -254,9 +254,7 @@ export interface SendInquiryWhatsAppPayload {
                 </div>
               } @else if (suppliers().length === 0) {
                 <div class="text-center py-8 text-gray-400 dark:text-muted text-sm">
-                  No suppliers registered for this port.
-                  <br/>
-                  Add port suppliers via the Places section.
+                  No suppliers found for this port. Use "Add supplier" to search any company and send an inquiry directly.
                 </div>
               } @else if (filteredSuppliers().length === 0) {
                 <div class="rounded-lg border border-dashed border-gray-200 dark:border-line px-4 py-6 text-center text-sm text-gray-400 dark:text-muted">
@@ -1534,18 +1532,66 @@ export class SendInquiryModalComponent implements OnDestroy {
   }
 
   addCompanyAsSupplier(companyId: string, companyName: string): void {
-    const pId = this.placeId();
-    if (!pId) return;
-    this.http.post<any>(`${API_URL}/lloyds/places/local/${pId}/suppliers`, { companyId })
+    // Fetch the company's emails + contacts and add directly to the suppliers list
+    // (no longer requires registering as a port supplier first)
+    this.http.get<any>(`${API_URL}/companies/local/${companyId}/inquiry-data`)
       .subscribe({
-        next: () => {
+        next: (res) => {
+          if (!res.success || !res.data) return;
+          const data = res.data;
+          const emails = data.emails ?? [];
+          const contacts = data.contacts ?? [];
+          // Find preferred email: 'inquiry' type first, then primary, then first
+          const preferredEmail =
+            emails.find((e: any) => e.emailType === 'inquiry')?.email ??
+            emails.find((e: any) => e.isPrimary)?.email ??
+            emails[0]?.email ?? null;
+          const preferredContact = contacts.find((c: any) => c.email) ?? null;
+
+          const newRow: SupplierRow = {
+            portSupplierId: `direct:${companyId}`,
+            supplierId: companyId,
+            supplierName: data.supplierName ?? companyName,
+            contactId: preferredContact?.id ?? null,
+            contactName: preferredContact?.name ?? null,
+            phone: preferredContact?.phone ?? null,
+            waContactId: null,
+            waContactName: null,
+            products: [],
+            note: null,
+            email: preferredContact?.email ?? preferredEmail,
+            inquiryStatus: null,
+            inquirySentAt: null,
+            performance: {
+              deliveredCountOverall: 0,
+              deliveredCountAtPlace: 0,
+              lastDeliveredAtOverall: null,
+              lastDeliveredAtPlace: null,
+              sentCount: 0,
+              quotedCount: 0,
+              declinedCount: 0,
+              noReplyCount: 0,
+              respondedCount: 0,
+              deliverableCount: 0,
+              nonDeliverableCount: 0,
+              averageResponseHours: null,
+            },
+            companyEmails: emails,
+            contacts: contacts,
+            selected: true,
+            emailOverride: '',
+            phoneOverride: '',
+            expanded: emails.length + contacts.length > 0,
+            ccCompanyEmail: false,
+            personalNote: '',
+          };
+          this.suppliers.update(list => [...list, newRow]);
           this.showAddSupplier.set(false);
           this.addSupplierQuery.set('');
           this.addSupplierResults.set([]);
-          this.loadSuppliers();
         },
         error: (err) => {
-          console.error('Failed to add supplier:', err);
+          console.error('Failed to load company inquiry data:', err);
         },
       });
   }

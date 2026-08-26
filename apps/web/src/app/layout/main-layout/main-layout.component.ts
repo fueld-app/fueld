@@ -264,6 +264,15 @@ const NAVIGATION: NavItem[] = [
     route: '/vessels',
   },
   {
+    label: 'Banking',
+    icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3.75h6a4.5 4.5 0 004.5-4.5V5.25A2.25 2.25 0 0015 3H6a2.25 2.25 0 00-2.25 2.25v11.25A4.5 4.5 0 004.5 21h6z',
+    children: [
+      { label: 'Cash Dashboard', route: '/cash' },
+      { label: 'Banking Setup', route: '/banking-setup' },
+    ],
+    allowedRoles: ['FINANCE'],
+  },
+  {
     label: 'Resources',
     icon: 'M4 6.75A2.75 2.75 0 016.75 4h10.5A2.75 2.75 0 0120 6.75v10.5A2.75 2.75 0 0117.25 20H6.75A2.75 2.75 0 014 17.25V6.75zm3 1.5a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5H7zm0 4a.75.75 0 000 1.5h10a.75.75 0 000-1.5H7zm0 4a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5H7z',
     children: [

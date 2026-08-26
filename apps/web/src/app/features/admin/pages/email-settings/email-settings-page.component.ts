@@ -83,6 +83,17 @@ const DOC_LABELS: Record<DocumentType, string> = {
               <span class="text-sm text-gray-700 dark:text-ink-dim">Auto-send on convert</span>
             </label>
           </div>
+          <div class="border-t border-gray-200 dark:border-line px-5 py-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Broker deal CC email</label>
+            <input type="email" [ngModel]="brokerDealCcEmail()" (ngModelChange)="brokerDealCcEmail.set($event)"
+              class="mt-1 w-full max-w-md rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+              placeholder="e.g. operations@ocean7projects.com" />
+            <p class="mt-1 text-xs text-gray-500 dark:text-muted">This email is always CC'd on bunker booking emails for broker deals, along with the agent email.</p>
+            <button (click)="saveBrokerDealCc()" [disabled]="brokerDealCcSaving()"
+              class="mt-2 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+              Save
+            </button>
+          </div>
         </div>
 
         <!-- ═══════════════ Email Templates ═══════════════ -->
@@ -360,6 +371,8 @@ export class EmailSettingsPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly templates = signal<EmailTemplate[]>([]);
   readonly autoSendOnConvert = signal(false);
+  readonly brokerDealCcEmail = signal('');
+  readonly brokerDealCcSaving = signal(false);
   readonly rules = signal<EmailRule[]>([]);
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
   readonly conditionalSyntax = '{{#if variable}}...{{/if}}';
@@ -406,7 +419,7 @@ export class EmailSettingsPageComponent implements OnInit {
         firstValueFrom(this.http.get<ApiResponse<EmailRule[]>>(`${API}/admin/settings/email-rules`)),
         firstValueFrom(this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API}/companies/own`)),
         firstValueFrom(this.http.get<ApiResponse<TemplateVariable[]>>(`${API}/admin/settings/email-templates/variables`)),
-        firstValueFrom(this.http.get<ApiResponse<{ autoSendOnConvert: boolean }>>(`${API}/admin/settings/booking-email`)),
+        firstValueFrom(this.http.get<ApiResponse<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null }>>(`${API}/admin/settings/booking-email`)),
       ]);
 
       if (templatesRes.success) {
@@ -419,7 +432,10 @@ export class EmailSettingsPageComponent implements OnInit {
       if (rulesRes.success) this.rules.set(rulesRes.data ?? []);
       if (companiesRes.success) this.ownCompanies.set(companiesRes.data ?? []);
       if (varsRes.success) this.templateVariables.set(varsRes.data ?? []);
-      if (bookingRes.success) this.autoSendOnConvert.set(bookingRes.data.autoSendOnConvert ?? false);
+      if (bookingRes.success) {
+        this.autoSendOnConvert.set(bookingRes.data.autoSendOnConvert ?? false);
+        this.brokerDealCcEmail.set(bookingRes.data.brokerDealCcEmail ?? '');
+      }
     } catch {
       // silent
     } finally {
@@ -480,10 +496,27 @@ export class EmailSettingsPageComponent implements OnInit {
       await firstValueFrom(
         this.http.put<ApiResponse<{ autoSendOnConvert: boolean }>>(`${API}/admin/settings/booking-email`, {
           autoSendOnConvert: this.autoSendOnConvert(),
+          brokerDealCcEmail: this.brokerDealCcEmail().trim() || null,
         }),
       );
     } catch {
       // silent
+    }
+  }
+
+  async saveBrokerDealCc(): Promise<void> {
+    this.brokerDealCcSaving.set(true);
+    try {
+      await firstValueFrom(
+        this.http.put<ApiResponse<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null }>>(`${API}/admin/settings/booking-email`, {
+          autoSendOnConvert: this.autoSendOnConvert(),
+          brokerDealCcEmail: this.brokerDealCcEmail().trim() || null,
+        }),
+      );
+    } catch {
+      // silent
+    } finally {
+      this.brokerDealCcSaving.set(false);
     }
   }
 

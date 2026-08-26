@@ -54,6 +54,7 @@ export const orderStatusEnum = pgEnum('order_status', [
 
 export const productTypeEnum = pgEnum('product_type', [
   'VLSFO',
+  'ULSFO',
   'LSMGO',
   'MGO',
   'LUBE',
@@ -256,6 +257,7 @@ export interface TenantSettings {
   // Bunker Booking email behaviour
   bookingEmail?: {
     autoSendOnConvert?: boolean;
+    brokerDealCcEmail?: string | null;  // CC email always included on broker deal booking emails (e.g. operations@ocean7projects.com)
   };
   // Configurable reasons required when cancelling inquiries
   inquiryCancelReasons?: string[];

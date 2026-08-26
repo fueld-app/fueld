@@ -5,7 +5,7 @@
 import { eq, ilike, or, and, sql, asc, desc, inArray, isNull, ne } from 'drizzle-orm';
 import { db } from '../../db';
 import { escapeLikePattern } from '../../utils/like';
-import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, creditApplications, portSuppliers, companyPlaceSupplyRules, creditLines, creditLineCounterparties } from '../../db/schema';
+import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderItems, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, supplierPayments, invoices, creditApplications, portSuppliers, companyPlaceSupplyRules, creditLines, creditLineCounterparties } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import { matchLocalVessels } from '../vessels/vessel.service';
 import {
@@ -2372,4 +2372,220 @@ export async function applyMatchingCompanyPlaceSupplyRulesForPlace(placeId: stri
   }
 
   return { created, updated, skipped, matchedRuleCount };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PAYMENT LEDGERS — per-counterparty aggregated payment views
+//  Computes totals and outstanding per currency directly from payment
+//  records (not from stored aggregate fields, which can drift).
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Customer payment ledger: all payments received from a counterparty
+ * (as customer) across all their orders, plus per-currency totals and
+ * outstanding balances. Outstanding = invoiced − received, per currency.
+ */
+export async function getCustomerPaymentLedger(
+  companyId: string,
+  opts: { limit?: number; offset?: number; sort?: 'date' | 'amount'; dateFrom?: string; dateTo?: string } = {},
+) {
+  const limit = Math.min(opts.limit ?? 50, 200);
+  const offset = opts.offset ?? 0;
+  const sortCol = opts.sort === 'amount' ? customerPayments.amount : customerPayments.receivedAt;
+
+  // Build date filter conditions
+  const conditions = [eq(customerPayments.customerId, companyId)];
+  if (opts.dateFrom) conditions.push(sql`${customerPayments.receivedAt} >= ${opts.dateFrom}`);
+  if (opts.dateTo) conditions.push(sql`${customerPayments.receivedAt} <= ${opts.dateTo}`);
+
+  // Fetch payment rows with order number
+  const rows = await db
+    .select({
+      id: customerPayments.id,
+      orderId: customerPayments.orderId,
+      orderNumber: orders.orderNumber,
+      invoiceId: customerPayments.invoiceId,
+      invoiceNumber: invoices.invoiceNumber,
+      amount: customerPayments.amount,
+      currency: customerPayments.currency,
+      receivedAt: customerPayments.receivedAt,
+      method: customerPayments.method,
+      note: customerPayments.note,
+      createdAt: customerPayments.createdAt,
+    })
+    .from(customerPayments)
+    .leftJoin(orders, eq(orders.id, customerPayments.orderId))
+    .leftJoin(invoices, eq(invoices.id, customerPayments.invoiceId))
+    .where(and(...conditions))
+    .orderBy(desc(sortCol))
+    .limit(limit)
+    .offset(offset);
+
+  // Totals per currency (all rows, not just the page)
+  const totalsRows = await db
+    .select({
+      currency: customerPayments.currency,
+      totalReceived: sql<string>`COALESCE(SUM(${customerPayments.amount}), 0)::numeric(14,2)`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(customerPayments)
+    .where(and(...conditions))
+    .groupBy(customerPayments.currency);
+
+  // Outstanding per currency: sum(invoices.amount) - sum(payments.amount), grouped by order currency
+  // (invoices table has no currency column, so we join orders for currency)
+  const outstandingByCurrency = await db
+    .select({
+      currency: orders.currency,
+      totalInvoiced: sql<string>`COALESCE(SUM(${invoices.amount}), 0)::numeric(14,2)`,
+    })
+    .from(invoices)
+    .innerJoin(orders, eq(orders.id, invoices.orderId))
+    .where(eq(orders.clientId, companyId))
+    .groupBy(orders.currency);
+
+  // Build per-currency totals map
+  const totalsByCurrency = new Map<string, { totalReceived: number; count: number; totalInvoiced: number; outstanding: number }>();
+  for (const t of totalsRows) {
+    totalsByCurrency.set(t.currency, { totalReceived: Number(t.totalReceived), count: t.count, totalInvoiced: 0, outstanding: 0 });
+  }
+  for (const o of outstandingByCurrency) {
+    const entry = totalsByCurrency.get(o.currency) ?? { totalReceived: 0, count: 0, totalInvoiced: 0, outstanding: 0 };
+    entry.totalInvoiced = Number(o.totalInvoiced);
+    entry.outstanding = entry.totalInvoiced - entry.totalReceived;
+    totalsByCurrency.set(o.currency, entry);
+  }
+  // Ensure currencies with payments but no invoices still show
+  for (const [cur, entry] of totalsByCurrency) {
+    if (entry.totalInvoiced === 0 && entry.totalReceived > 0) {
+      entry.outstanding = -entry.totalReceived; // overpaid / no invoice yet
+    }
+  }
+
+  const totals = Array.from(totalsByCurrency.entries()).map(([currency, t]) => ({
+    currency,
+    totalReceived: t.totalReceived.toFixed(2),
+    totalInvoiced: t.totalInvoiced.toFixed(2),
+    outstanding: t.outstanding.toFixed(2),
+    count: t.count,
+  }));
+
+  return {
+    payments: rows.map((r) => ({
+      id: r.id,
+      orderId: r.orderId,
+      orderNumber: r.orderNumber,
+      invoiceNumber: r.invoiceNumber,
+      amount: String(r.amount),
+      currency: r.currency,
+      receivedAt: r.receivedAt?.toISOString() ?? null,
+      method: r.method,
+      note: r.note,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    totals,
+    pagination: { limit, offset, hasMore: rows.length === limit },
+  };
+}
+
+/**
+ * Supplier payment ledger: all payments paid to a counterparty
+ * (as supplier) across all their order legs, plus per-currency totals
+ * and outstanding balances. Outstanding = cost − paid, per currency.
+ */
+export async function getSupplierPaymentLedger(
+  companyId: string,
+  opts: { limit?: number; offset?: number; sort?: 'date' | 'amount'; dateFrom?: string; dateTo?: string } = {},
+) {
+  const limit = Math.min(opts.limit ?? 50, 200);
+  const offset = opts.offset ?? 0;
+  const sortCol = opts.sort === 'amount' ? supplierPayments.amount : supplierPayments.paidAt;
+
+  const conditions = [eq(supplierPayments.supplierId, companyId)];
+  if (opts.dateFrom) conditions.push(sql`${supplierPayments.paidAt} >= ${opts.dateFrom}`);
+  if (opts.dateTo) conditions.push(sql`${supplierPayments.paidAt} <= ${opts.dateTo}`);
+
+  const rows = await db
+    .select({
+      id: supplierPayments.id,
+      orderId: supplierPayments.orderId,
+      orderNumber: orders.orderNumber,
+      orderSupplierId: supplierPayments.orderSupplierId,
+      amount: supplierPayments.amount,
+      currency: supplierPayments.currency,
+      paidAt: supplierPayments.paidAt,
+      method: supplierPayments.method,
+      note: supplierPayments.note,
+      createdAt: supplierPayments.createdAt,
+    })
+    .from(supplierPayments)
+    .leftJoin(orders, eq(orders.id, supplierPayments.orderId))
+    .where(and(...conditions))
+    .orderBy(desc(sortCol))
+    .limit(limit)
+    .offset(offset);
+
+  // Totals per currency
+  const totalsRows = await db
+    .select({
+      currency: supplierPayments.currency,
+      totalPaid: sql<string>`COALESCE(SUM(${supplierPayments.amount}), 0)::numeric(14,2)`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(supplierPayments)
+    .where(and(...conditions))
+    .groupBy(supplierPayments.currency);
+
+  // Outstanding per currency: sum(cost) - sum(paid)
+  // Cost = sum(order_items.cost_price * quantity) for orders where supplier = companyId
+  // Simplified: use order_suppliers to find legs for this supplier, then sum order_items cost
+  const outstandingByCurrency = await db
+    .select({
+      currency: orders.currency,
+      totalCost: sql<string>`COALESCE(SUM(${orderItems.costPrice} * ${orderItems.quantity}), 0)::numeric(14,2)`,
+    })
+    .from(orderSuppliers)
+    .innerJoin(orders, eq(orders.id, orderSuppliers.orderId))
+    .innerJoin(orderItems, eq(orderItems.orderSupplierId, orderSuppliers.id))
+    .where(eq(orderSuppliers.companyId, companyId))
+    .groupBy(orders.currency);
+
+  const totalsByCurrency = new Map<string, { totalPaid: number; count: number; totalCost: number; outstanding: number }>();
+  for (const t of totalsRows) {
+    totalsByCurrency.set(t.currency, { totalPaid: Number(t.totalPaid), count: t.count, totalCost: 0, outstanding: 0 });
+  }
+  for (const o of outstandingByCurrency) {
+    const entry = totalsByCurrency.get(o.currency) ?? { totalPaid: 0, count: 0, totalCost: 0, outstanding: 0 };
+    entry.totalCost = Number(o.totalCost);
+    entry.outstanding = entry.totalCost - entry.totalPaid;
+    totalsByCurrency.set(o.currency, entry);
+  }
+  for (const [cur, entry] of totalsByCurrency) {
+    if (entry.totalCost === 0 && entry.totalPaid > 0) entry.outstanding = -entry.totalPaid;
+  }
+
+  const totals = Array.from(totalsByCurrency.entries()).map(([currency, t]) => ({
+    currency,
+    totalPaid: t.totalPaid.toFixed(2),
+    totalCost: t.totalCost.toFixed(2),
+    outstanding: t.outstanding.toFixed(2),
+    count: t.count,
+  }));
+
+  return {
+    payments: rows.map((r) => ({
+      id: r.id,
+      orderId: r.orderId,
+      orderNumber: r.orderNumber,
+      orderSupplierId: r.orderSupplierId,
+      amount: String(r.amount),
+      currency: r.currency,
+      paidAt: r.paidAt.toISOString(),
+      method: r.method,
+      note: r.note,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    totals,
+    pagination: { limit, offset, hasMore: rows.length === limit },
+  };
 }

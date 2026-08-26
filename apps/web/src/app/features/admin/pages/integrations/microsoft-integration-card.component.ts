@@ -115,11 +115,24 @@ import { IntegrationsToastService } from './integrations-toast.service';
           <div class="mt-5 flex items-start gap-3 border-t border-gray-200 dark:border-line pt-4">
             <input type="checkbox" [checked]="msSharedSender()" (change)="toggleSharedSender()" [disabled]="msSharedSenderSaving()"
               class="mt-0.5 h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-600" />
-            <div>
+            <div class="flex-1">
               <label class="text-sm font-medium text-gray-700 dark:text-ink-dim">Use shared sender account</label>
               <p class="text-xs text-gray-500 dark:text-muted mt-0.5">All emails will be sent from the shared Microsoft account instead of each user's individual account. Connect the shared account first (e.g. happier@company.com) via Settings xe2x86x92 Connect Microsoft.</p>
             </div>
           </div>
+          @if (msSharedSender()) {
+            <div class="mt-3 ml-7">
+              <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Shared sender email (Fueld login of the user who connected the shared account)</label>
+              <input type="email" [ngModel]="msSharedSenderEmail()" (ngModelChange)="msSharedSenderEmail.set($event)"
+                class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                placeholder="e.g. daniel@company.com" />
+              <p class="mt-1 text-xs text-gray-500 dark:text-muted">Enter the Fueld login email of the user who connected the shared Microsoft account. The system will use their token to send emails from the shared account.</p>
+              <button (click)="saveSharedSenderEmail()" [disabled]="msSharedSenderSaving()"
+                class="mt-2 inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50 transition-colors">
+                Save email
+              </button>
+            </div>
+          }
         }
         </div>
       </div>
@@ -225,6 +238,30 @@ export class MicrosoftIntegrationCardComponent implements OnInit {
       }
     } catch {
       this.toastService.show('error', 'Failed to toggle shared sender.');
+    } finally {
+      this.msSharedSenderSaving.set(false);
+    }
+  }
+
+  async saveSharedSenderEmail(): Promise<void> {
+    const email = this.msSharedSenderEmail().trim();
+    if (!email) {
+      this.toastService.show('error', 'Please enter an email address.');
+      return;
+    }
+    this.msSharedSenderSaving.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ enabled: boolean }>>(`${API}/admin/settings/integrations/microsoft/shared-sender`, { enabled: this.msSharedSender(), email }),
+      );
+      if (res.success) {
+        this.msSharedSenderEmail.set(email);
+        this.toastService.show('success', 'Shared sender email saved.');
+      } else {
+        this.toastService.show('error', res.message ?? 'Failed to save shared sender email.');
+      }
+    } catch {
+      this.toastService.show('error', 'Failed to save shared sender email.');
     } finally {
       this.msSharedSenderSaving.set(false);
     }

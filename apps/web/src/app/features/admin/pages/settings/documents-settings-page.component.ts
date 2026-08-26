@@ -516,7 +516,7 @@ export class DocumentsSettingsPageComponent implements OnInit {
   readonly inquiryResponseUrlEnabled = signal(true);
   readonly inquiryAutoNoReplyEnabled = signal(true);
   readonly inquiryAutoNoReplyHours = signal('168');
-  readonly inquiryDeadlineHours = signal('48');
+  readonly inquiryDeadlineHours = signal('');
   readonly inquiryQuoteAlertEmailEnabled = signal(false);
   readonly inquiryQuoteAlertPushEnabled = signal(false);
   readonly inquiryQuoteAlertWhatsAppEnabled = signal(false);

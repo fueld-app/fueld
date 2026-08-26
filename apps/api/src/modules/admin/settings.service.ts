@@ -902,7 +902,7 @@ export async function updateVesselCompanyRoleSettings(
 // ═══════════════════════════════════════════════════════════════════════
 
 const DEFAULT_PRODUCTS = [
-  'VLSFO', 'LSMGO', 'IFO380CST', 'IFO180CST', 'IFO120CST', 'IFO30CST',
+  'VLSFO', 'ULSFO', 'LSMGO', 'IFO380CST', 'IFO180CST', 'IFO120CST', 'IFO30CST',
   'IFO', 'MGO', 'MDO', 'LSIFO', 'LUBE',
   'ITEM', 'COMMISSION', 'HIRE', 'PAYMENT', 'CREDIT_NOTE',
   'CUTTERSTOCK', 'PYGAS', 'BARGING_FEE',
@@ -1286,22 +1286,30 @@ export async function updateDeliveryMethodSettings(input: {
 //  BUNKER BOOKING EMAIL
 // ═══════════════════════════════════════════════════════════════════
 
-export async function getBookingEmailSettings(): Promise<{ autoSendOnConvert: boolean }> {
+export async function getBookingEmailSettings(): Promise<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
 
   const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
-  return { autoSendOnConvert: settings.bookingEmail?.autoSendOnConvert ?? false };
+  return {
+    autoSendOnConvert: settings.bookingEmail?.autoSendOnConvert ?? false,
+    brokerDealCcEmail: settings.bookingEmail?.brokerDealCcEmail ?? null,
+  };
 }
 
 export async function updateBookingEmailSettings(input: {
   autoSendOnConvert: boolean;
-}): Promise<{ autoSendOnConvert: boolean }> {
+  brokerDealCcEmail?: string | null;
+}): Promise<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
 
   const settings = { ...(tenant.settings as any) };
-  settings.bookingEmail = { ...(settings.bookingEmail ?? {}), autoSendOnConvert: !!input.autoSendOnConvert };
+  settings.bookingEmail = {
+    ...(settings.bookingEmail ?? {}),
+    autoSendOnConvert: !!input.autoSendOnConvert,
+    brokerDealCcEmail: input.brokerDealCcEmail?.trim() || null,
+  };
 
   await db
     .update(tenants)
@@ -1577,7 +1585,7 @@ export async function getInquirySettings(): Promise<InquirySettings> {
         ? null
         : typeof inquirySettings.defaultResponseDeadlineHours === 'number' && inquirySettings.defaultResponseDeadlineHours > 0
         ? inquirySettings.defaultResponseDeadlineHours
-        : DEFAULT_RESPONSE_DEADLINE_HOURS,
+        : null,
     notifyQuoteSubmitEmail: inquirySettings.notifyQuoteSubmitEmail ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_EMAIL,
     notifyQuoteSubmitPush: inquirySettings.notifyQuoteSubmitPush ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_PUSH,
     notifyQuoteSubmitWhatsApp: inquirySettings.notifyQuoteSubmitWhatsApp ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_WHATSAPP,

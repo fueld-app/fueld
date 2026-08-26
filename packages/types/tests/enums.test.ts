@@ -43,6 +43,7 @@ describe('enums', () => {
   test('ProductType has expected product constants', () => {
     verifyStringEnum(ProductType, {
       VLSFO: 'VLSFO',
+      ULSFO: 'ULSFO',
       LSMGO: 'LSMGO',
       MGO: 'MGO',
       LUBE: 'LUBE',
