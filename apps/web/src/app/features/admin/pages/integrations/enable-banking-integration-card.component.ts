@@ -96,7 +96,7 @@ const BANKING_COUNTRIES = [
                       <span class="ml-2 text-xs text-gray-400">synced {{ conn.last_synced_at | date:'short' }}</span>
                     }
                   </div>
-                  @if (auth.isAdmin()) {
+                  @if (auth.isAdmin() || auth.isFinance()) {
                     <button type="button" (click)="removeConnection(conn.id)"
                       class="text-xs text-red-500 hover:text-red-700">Remove</button>
                   }
@@ -105,13 +105,13 @@ const BANKING_COUNTRIES = [
             </div>
           }
           <div class="flex gap-2">
-            @if (configured() && auth.isAdmin()) {
+            @if (configured() && (auth.isAdmin() || auth.isFinance())) {
               <button type="button" (click)="openConnectPanel()"
                 class="inline-flex items-center rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-800">
                 Add Bank Connection
               </button>
             }
-            @if (auth.isAdmin()) {
+            @if (auth.isAdmin() || auth.isFinance()) {
               <button type="button" (click)="showSetup.set(true)"
                 class="inline-flex items-center rounded-lg border border-gray-300 dark:border-line px-3 py-2 text-sm font-semibold text-gray-700 dark:text-ink hover:bg-gray-50 dark:hover:bg-surface-dim">
                 {{ configured() ? 'Edit Credentials' : 'Set Up' }}
@@ -123,7 +123,7 @@ const BANKING_COUNTRIES = [
               </a>
             }
           </div>
-          @if (auth.isAdmin()) {
+          @if (auth.isAdmin() || auth.isFinance()) {
             <p class="mt-3 text-xs text-gray-400">
               Don't have an Enable Banking account?
               <button type="button" (click)="openSelfService()" class="text-blue-500 hover:underline">

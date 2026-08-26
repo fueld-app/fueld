@@ -160,8 +160,8 @@ export class EnableBankingClient {
       body: JSON.stringify(payload),
     });
     if (!resp.ok) throw new Error(`startAuthorization failed: ${resp.status} ${await resp.text()}`);
-    const data = await resp.json() as { authorization_url?: string };
-    return { authorizationUrl: data.authorization_url ?? '' };
+    const data = await resp.json() as { authorization_url?: string; url?: string };
+    return { authorizationUrl: data.authorization_url ?? data.url ?? '' };
   }
 
   async createSession(code: string): Promise<{ sessionId: string; accounts: BankAccount[] }> {

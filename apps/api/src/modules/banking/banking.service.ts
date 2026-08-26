@@ -698,12 +698,28 @@ export async function getEnableBankingSetupStatus(userId: string): Promise<{
 export async function listAvailableBanksForUser(userId: string, tenantId: string, country: string): Promise<ASPSP[]> {
   const creds = await getUserEnableBankingCredentials(userId, tenantId);
   if (!creds) throw new Error('Enable Banking not configured. Please set up your account first.');
-  const client = new EnableBankingClient({
-    appId: creds.appId,
-    privateKeyPem: creds.privateKeyPem,
-    redirectUrl: creds.redirectUrl,
-  });
-  return client.listAspsps(country);
+  try {
+    const client = new EnableBankingClient({
+      appId: creds.appId,
+      privateKeyPem: creds.privateKeyPem,
+      redirectUrl: creds.redirectUrl,
+    });
+    return await client.listAspsps(country);
+  } catch (e: any) {
+    // If per-user app is not active, fall back to tenant credentials
+    if (String(e?.message ?? '').includes('403') || String(e?.message ?? '').includes('not active')) {
+      const tenantCreds = await getEnableBankingCredentials(tenantId);
+      if (tenantCreds) {
+        const client = new EnableBankingClient({
+          appId: tenantCreds.appId,
+          privateKeyPem: tenantCreds.privateKeyPem,
+          redirectUrl: tenantCreds.redirectUrl,
+        });
+        return client.listAspsps(country);
+      }
+    }
+    throw e;
+  }
 }
 
 /** Start bank connection using the user's credentials. */
@@ -715,12 +731,28 @@ export async function startBankConnectionForUser(
 ): Promise<{ authorizationUrl: string }> {
   const creds = await getUserEnableBankingCredentials(userId, tenantId);
   if (!creds) throw new Error('Enable Banking not configured. Please set up your account first.');
-  const client = new EnableBankingClient({
-    appId: creds.appId,
-    privateKeyPem: creds.privateKeyPem,
-    redirectUrl: creds.redirectUrl,
-  });
-  return client.startAuthorization(aspspName, country, creds.redirectUrl);
+  try {
+    const client = new EnableBankingClient({
+      appId: creds.appId,
+      privateKeyPem: creds.privateKeyPem,
+      redirectUrl: creds.redirectUrl,
+    });
+    return client.startAuthorization(aspspName, country, creds.redirectUrl);
+  } catch (e: any) {
+    // If per-user app is not active, fall back to tenant credentials
+    if (String(e?.message ?? '').includes('403') || String(e?.message ?? '').includes('not active')) {
+      const tenantCreds = await getEnableBankingCredentials(tenantId);
+      if (tenantCreds) {
+        const client = new EnableBankingClient({
+          appId: tenantCreds.appId,
+          privateKeyPem: tenantCreds.privateKeyPem,
+          redirectUrl: tenantCreds.redirectUrl,
+        });
+        return client.startAuthorization(aspspName, country, tenantCreds.redirectUrl);
+      }
+    }
+    throw e;
+  }
 }
 
 /** Handle OAuth callback using the user's credentials. Stores user_id on the connection. */
