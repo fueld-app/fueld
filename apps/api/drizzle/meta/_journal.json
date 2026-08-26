@@ -764,6 +764,41 @@
       "when": 1784139200000,
       "tag": "0108_channeltx_quickbooks_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1756000000000,
+      "tag": "0109_payment_ledger_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1756100000000,
+      "tag": "0110_enable_banking",
+      "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1787677000000,
+      "tag": "0111_add_transaction_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1787680000000,
+      "tag": "0112_add_ulsfo_product_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1787730000000,
+      "tag": "0113_enable_banking_user_credentials",
+      "breakpoints": true
     }
   ]
 }

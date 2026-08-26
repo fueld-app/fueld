@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { adminGuard } from './core/auth/admin.guard';
+import { financeGuard } from './core/auth/finance.guard';
 import { creditGuard } from './core/auth/credit.guard';
 import { lightGuard } from './core/auth/light.guard';
 
@@ -78,6 +79,42 @@ export const routes: Routes = [
             (m) => m.AnalyticsPageComponent,
           ),
         title: 'Analytics',
+      },
+      {
+        path: 'cash',
+        canActivate: [financeGuard],
+        loadComponent: () =>
+          import('./features/banking/pages/cash-page/cash-page.component').then(
+            (m) => m.CashPageComponent,
+          ),
+        title: 'Cash & Banking',
+      },
+      {
+        path: 'cash/:accountId',
+        canActivate: [financeGuard],
+        loadComponent: () =>
+          import('./features/banking/pages/account-detail/account-detail-page.component').then(
+            (m) => m.AccountDetailPageComponent,
+          ),
+        title: 'Account Detail',
+      },
+      {
+        path: 'cash/:accountId/:txnId',
+        canActivate: [financeGuard],
+        loadComponent: () =>
+          import('./features/banking/pages/transaction-detail/transaction-detail-page.component').then(
+            (m) => m.TransactionDetailPageComponent,
+          ),
+        title: 'Transaction Detail',
+      },
+      {
+        path: 'banking-setup',
+        canActivate: [financeGuard],
+        loadComponent: () =>
+          import('./features/admin/pages/integrations/enable-banking-integration-card.component').then(
+            (m) => m.EnableBankingIntegrationCardComponent,
+          ),
+        title: 'Banking Setup',
       },
       {
         path: 'reports',
@@ -422,6 +459,14 @@ export const routes: Routes = [
               ),
             title: 'Companies > Activity',
           },
+          {
+            path: 'payments',
+            loadComponent: () =>
+              import('./features/companies/pages/company-detail/tabs/payments-tab/payments-tab.component').then(
+                (m) => m.PaymentsTabComponent,
+              ),
+            title: 'Companies > Payments',
+          },
         ],
       },
       // ── Places ──
@@ -631,6 +676,14 @@ export const routes: Routes = [
                     (m) => m.WhatsAppIntegrationCardComponent,
                   ),
                 title: 'Admin > Integrations > WhatsApp',
+              },
+              {
+                path: 'enable-banking',
+                loadComponent: () =>
+                  import('./features/admin/pages/integrations/enable-banking-integration-card.component').then(
+                    (m) => m.EnableBankingIntegrationCardComponent,
+                  ),
+                title: 'Admin > Integrations > Enable Banking',
               },
             ],
           },
