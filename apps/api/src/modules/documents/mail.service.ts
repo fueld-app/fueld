@@ -227,7 +227,8 @@ export async function sendDocumentEmail(options: SendDocumentEmailOptions): Prom
       const tenantSettings = (tenant?.settings ?? {}) as any;
       if (tenantSettings?.microsoftSharedSender) {
         // If a specific shared sender email is configured, find THAT user.
-        // Otherwise fall back to any user with a token (ordered by most recently updated).
+        // If no specific email is set, fall back to the current user's token
+        // (do NOT pick a random user — emails must come from the sender's own mailbox).
         if (tenantSettings.microsoftSharedSenderEmail) {
           const [sharedUser] = await db.select({ id: users.id }).from(users).where(and(
             eq(users.tenantId, options.tenantId),
@@ -235,13 +236,8 @@ export async function sendDocumentEmail(options: SendDocumentEmailOptions): Prom
             isNotNull(users.microsoftRefreshToken),
           )).limit(1);
           if (sharedUser) tokenUserId = sharedUser.id;
-        } else {
-          const [sharedUser] = await db.select({ id: users.id }).from(users).where(and(
-            eq(users.tenantId, options.tenantId),
-            isNotNull(users.microsoftRefreshToken),
-          )).limit(1);
-          if (sharedUser) tokenUserId = sharedUser.id;
         }
+        // else: no shared sender email configured — use the current user's token (tokenUserId stays as options.sentByUserId)
       }
     } catch { /* ignore — fall back to per-user token */ }
 
