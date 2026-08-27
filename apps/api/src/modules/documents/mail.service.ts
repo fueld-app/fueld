@@ -218,9 +218,8 @@ export async function sendDocumentEmail(options: SendDocumentEmailOptions): Prom
 
   try {
     // Determine which user's Microsoft token to use for sending.
-    // If the tenant has "shared sender" enabled, find a user in the tenant
-    // with a Microsoft refresh token (the shared account) and use theirs.
-    // Otherwise, use the current user's token.
+    // If the tenant has "shared sender" enabled AND a specific email is configured,
+    // use that shared account's token. Otherwise, use the current user's token.
     let tokenUserId = options.sentByUserId;
     try {
       const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, options.tenantId)).limit(1);
