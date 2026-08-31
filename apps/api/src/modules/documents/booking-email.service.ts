@@ -40,19 +40,75 @@ interface BookingOrder {
 }
 
 const DEFAULT_SUBJECT = '${vesselName} @ ${place}';
-const DEFAULT_BODY = `Dear Captain of \${vesselName}
 
-Please note that we have booked bunkers for your good lady.
+//  Structured HTML layout (matches the Confirmation/Nomination email style):
+//  greeting, an order-details table, a products table and a closing note.
+//  Previously this was plain text with \n line breaks which collapsed into a
+//  single run-on blob in HTML email clients.
+const DEFAULT_BODY = `<div style="font-family: 'Segoe UI', Arial, sans-serif; color: #111827;">
+<p>Dear Captain of <strong>\${vesselName}</strong>,</p>
 
-Place: \${place}
-Date: \${dates}
+<p>Please note that we have booked bunkers for your good lady as follows:</p>
 
-Physical: \${physicalSupplier}
-Method: \${deliveryMethod}
+<table style="border-collapse: collapse; margin: 0 0 16px; width: 100%; max-width: 560px;">
+  <tr>
+    <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px; width: 150px;">Vessel:</td>
+    <td style="padding: 4px 0; font-weight: 600;">\${vesselName}</td>
+  </tr>
+  <tr>
+    <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Place:</td>
+    <td style="padding: 4px 0; font-weight: 600;">\${place}</td>
+  </tr>
+  <tr>
+    <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Dates:</td>
+    <td style="padding: 4px 0; font-weight: 600;">\${dates}</td>
+  </tr>
+  <tr>
+    <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Physical Supplier:</td>
+    <td style="padding: 4px 0; font-weight: 600;">\${physicalSupplier}</td>
+  </tr>
+  <tr>
+    <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Delivery Method:</td>
+    <td style="padding: 4px 0; font-weight: 600;">\${deliveryMethod}</td>
+  </tr>
+</table>
 
 \${products}
 
-Agents: kindly assist us with the coordination of this supply and do the needful to secure a smooth operation without any delays.`;
+<p style="margin-top: 16px;">Agents: kindly assist us with the coordination of this supply and do the needful to secure a smooth operation without any delays.</p>
+
+{{#if senderName}}<p>Best regards,<br/>\${senderName}</p>{{/if}}
+</div>`;
+
+/** Build the products table HTML for the booking email body. */
+function buildBookingProductsHtml(items: BookingItem[]): string {
+  if (!items.length) return '';
+  const rows = items
+    .map((item) => {
+      const desc = item.description ? ` - ${escapeHtml(item.description)}` : '';
+      return `<tr>
+    <td style="padding: 6px 16px; border: 1px solid #e5e7eb;">${escapeHtml(item.productType)}${desc}</td>
+    <td style="padding: 6px 16px; border: 1px solid #e5e7eb; text-align: right; white-space: nowrap;">${escapeHtml(formatQty(item))}</td>
+  </tr>`;
+    })
+    .join('\n');
+  return `<table style="border-collapse: collapse; margin: 0 0 8px; width: 100%; max-width: 560px;">
+  <tr>
+    <th style="padding: 6px 16px; border: 1px solid #e5e7eb; background: #f9fafb; text-align: left; font-size: 13px; color: #374151;">Product</th>
+    <th style="padding: 6px 16px; border: 1px solid #e5e7eb; background: #f9fafb; text-align: right; font-size: 13px; color: #374151;">Quantity</th>
+  </tr>
+${rows}
+</table>`;
+}
+
+/** Escape text for safe inclusion in HTML email bodies. */
+function escapeHtml(v: string): string {
+  return v
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 /** Ordinal day + month name, e.g. "3rd of July". */
 function formatDayMonth(iso: string, timezone?: string | null): string {
@@ -159,62 +215,68 @@ export async function resolveBookingRecipients(order: BookingOrder): Promise<{ t
   return { to: Array.from(to), cc };
 }
 
-/** Pure renderer (no DB) — used by composeBookingEmail and unit tests. */
-export function renderBookingEmail(order: BookingOrder, captainName: string, timezone?: string | null): { subject: string; body: string } {
-  const vesselName = order.vessel?.name ?? '';
-  const place = order.place?.name ?? '';
-  const dates = formatDates(order.eta ?? null, order.etd ?? null, timezone);
-  const agent = order.agent?.name ?? '';
-  const physicalSupplier = resolvePhysicalSupplier(order);
-  const deliveryMethod = order.deliveryMethod ?? '';
-
-  const products = (order.items ?? [])
-    .map((item) => {
-      const desc = item.description ? ` - ${item.description}` : '';
-      return `Product: ${item.productType}${desc}\nQnty: ${formatQty(item)}`;
-    })
-    .join('\n');
-
-  const vars: Record<string, string> = {
+/**
+ * Build the template variables for the booking email.
+ * `plain` values are for the subject line (no escaping); `html` values are
+ * HTML-escaped for safe inclusion in the HTML body. `products` is already
+ * valid HTML (built with escaping in buildBookingProductsHtml).
+ */
+function buildBookingVars(order: BookingOrder, captainName: string, dates: string, senderName: string) {
+  const plain: Record<string, string> = {
     captainName,
-    vesselName,
-    place,
+    vesselName: order.vessel?.name ?? '',
+    place: order.place?.name ?? '',
     dates,
-    agent,
-    physicalSupplier,
-    deliveryMethod,
-    products,
+    agent: order.agent?.name ?? '',
+    physicalSupplier: resolvePhysicalSupplier(order),
+    deliveryMethod: order.deliveryMethod ?? '',
+    products: buildBookingProductsHtml(order.items ?? []),
     orderNumber: order.orderNumber ?? '',
+    senderName,
   };
+  const html: Record<string, string> = {
+    ...plain,
+    captainName: escapeHtml(plain.captainName),
+    vesselName: escapeHtml(plain.vesselName),
+    place: escapeHtml(plain.place),
+    dates: escapeHtml(plain.dates),
+    agent: escapeHtml(plain.agent),
+    physicalSupplier: escapeHtml(plain.physicalSupplier),
+    deliveryMethod: escapeHtml(plain.deliveryMethod),
+    orderNumber: escapeHtml(plain.orderNumber),
+    senderName: escapeHtml(plain.senderName),
+  };
+  return { plain, html };
+}
 
-  const subject = renderTemplate(DEFAULT_SUBJECT, vars as any);
-  const body = renderTemplate(DEFAULT_BODY, vars as any);
+/** Pure renderer (no DB) — used by composeBookingEmail and unit tests. */
+export function renderBookingEmail(
+  order: BookingOrder,
+  captainName: string,
+  timezone?: string | null,
+  senderName?: string,
+): { subject: string; body: string } {
+  const dates = formatDates(order.eta ?? null, order.etd ?? null, timezone);
+  const { plain, html } = buildBookingVars(order, captainName, dates, senderName ?? '');
+
+  const subject = renderTemplate(DEFAULT_SUBJECT, plain as any);
+  const body = renderTemplate(DEFAULT_BODY, html as any);
   return { subject, body };
 }
 
 /** Compose subject + html body from the order + the BUNKER_BOOKING template. */
-export async function composeBookingEmail(order: BookingOrder): Promise<{ subject: string; body: string }> {
+export async function composeBookingEmail(
+  order: BookingOrder,
+  senderName?: string,
+): Promise<{ subject: string; body: string }> {
   const tpl = await getEmailTemplate(order.tenantId, 'BUNKER_BOOKING');
   const { defaultTimezone } = await getTimezoneSettings();
   const captainName = await resolveCaptainName(order.vesselId);
+  const dates = formatDates(order.eta ?? null, order.etd ?? null, defaultTimezone);
+  const { plain, html } = buildBookingVars(order, captainName, dates, senderName ?? '');
 
-  const vars: Record<string, string> = {
-    captainName,
-    vesselName: order.vessel?.name ?? '',
-    place: order.place?.name ?? '',
-    dates: formatDates(order.eta ?? null, order.etd ?? null, defaultTimezone),
-    agent: order.agent?.name ?? '',
-    physicalSupplier: resolvePhysicalSupplier(order),
-    deliveryMethod: order.deliveryMethod ?? '',
-    products: (order.items ?? []).map((item) => {
-      const desc = item.description ? ` - ${item.description}` : '';
-      return `Product: ${item.productType}${desc}\nQnty: ${formatQty(item)}`;
-    }).join('\n'),
-    orderNumber: order.orderNumber ?? '',
-  };
-
-  const subject = renderTemplate(tpl?.subjectTemplate ?? DEFAULT_SUBJECT, vars as any);
-  const body = renderTemplate(tpl?.bodyTemplate ?? DEFAULT_BODY, vars as any);
+  const subject = renderTemplate(tpl?.subjectTemplate ?? DEFAULT_SUBJECT, plain as any);
+  const body = renderTemplate(tpl?.bodyTemplate ?? DEFAULT_BODY, html as any);
   return { subject, body };
 }
 

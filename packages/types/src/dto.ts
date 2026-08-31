@@ -776,8 +776,20 @@ export interface OrderListRowDto {
   /** Display currency for totals — matches item currencies when uniform, otherwise USD. */
   displayCurrency?: string;
   responseDeadlineAt?: string | null;
+  /** Bunker Booking sent indicator — set when a booking email was sent (or manually toggled). */
+  bunkerBookingSentAt?: string | null;
+  /** Tenant-configurable custom column values keyed by column key. */
+  customFields?: Record<string, string | number | null>;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Tenant-configurable custom column definition (admins define these per entity). */
+export interface CustomColumnDef {
+  entity: 'order';
+  key: string;
+  label: string;
+  type: 'text' | 'number';
 }
 
 /** Per-user UI preferences persisted cross-device via backend JSONB. */

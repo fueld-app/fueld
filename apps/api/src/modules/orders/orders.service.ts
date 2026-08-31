@@ -94,6 +94,7 @@ interface CreateOrderInput {
   responseDeadlineAt?: string | null;
   isBrokerDeal?: boolean;
   commissionPerMt?: string | null;
+  customFields?: Record<string, string | number | null>;
 }
 
 interface UpdateOrderInput {
@@ -131,6 +132,7 @@ interface UpdateOrderInput {
   responseDeadlineAt?: string | null;
   isBrokerDeal?: boolean;
   commissionPerMt?: string | null;
+  customFields?: Record<string, string | number | null>;
 }
 
 interface SaveItemInput {
@@ -993,10 +995,12 @@ export async function listOrders(query?: ListOrdersQuery) {
         eta: orders.eta,
         dueDate: orders.dueDate,
         responseDeadlineAt: orders.responseDeadlineAt,
+        bunkerBookingSentAt: orders.bunkerBookingSentAt,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
         isBrokerDeal: orders.isBrokerDeal,
         commissionPerMt: orders.commissionPerMt,
+        customFields: orders.customFields,
       })
       .from(orders)
       .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
@@ -1106,12 +1110,14 @@ export async function listOrders(query?: ListOrdersQuery) {
     eta: r.eta?.toISOString() ?? null,
     dueDate: r.dueDate ?? r.eta?.toISOString() ?? null,
     responseDeadlineAt: r.responseDeadlineAt?.toISOString() ?? null,
+    bunkerBookingSentAt: r.bunkerBookingSentAt?.toISOString() ?? null,
     totalValue: itemAggs[r.id]?.totalValue ?? 0,
     totalProfit: itemAggs[r.id]?.totalProfit ?? 0,
     totalFinancingCost: itemAggs[r.id]?.totalFinancingCost ?? 0,
     totalNetProfit: itemAggs[r.id]?.totalNetProfit ?? 0,
     netMarginPct: itemAggs[r.id]?.netMarginPct ?? null,
     displayCurrency: itemAggs[r.id]?.displayCurrency ?? 'USD',
+    customFields: r.customFields ?? {},
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   }));
@@ -1120,6 +1126,23 @@ export async function listOrders(query?: ListOrdersQuery) {
 }
 
 // ─── Resolve order ID (UUID or order number → UUID) ────────────────
+
+/**
+ * Mark (or unmark) an order's Bunker Booking as sent.
+ * Called automatically when a BUNKER_BOOKING email is sent from an
+ * order, and by the manual toggle endpoint for bookings sent outside Fueld.
+ * Tenant-scoped: returns null when the order does not exist in the tenant
+ * (or does not exist at all).
+ */
+export async function setOrderBunkerBookingSent(orderId: string, sent: boolean, tenantId: string): Promise<{ found: boolean; sentAt: Date | null }> {
+  const value = sent ? new Date() : null;
+  const [updated] = await db
+    .update(orders)
+    .set({ bunkerBookingSentAt: value })
+    .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenantId)))
+    .returning({ bunkerBookingSentAt: orders.bunkerBookingSentAt });
+  return { found: updated !== undefined, sentAt: updated?.bunkerBookingSentAt ?? null };
+}
 
 export async function resolveOrderId(idOrNumber: string): Promise<string | null> {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrNumber);
@@ -1441,6 +1464,7 @@ export async function createOrder(input: CreateOrderInput) {
     responseDeadlineAt: input.responseDeadlineAt ? new Date(input.responseDeadlineAt) : null,
     isBrokerDeal: input.isBrokerDeal ?? false,
     commissionPerMt: input.commissionPerMt ?? null,
+    customFields: input.customFields ?? {},
   };
 
   const [created] = await db
@@ -1525,6 +1549,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
   if (input.responseDeadlineAt !== undefined) setData.responseDeadlineAt = input.responseDeadlineAt ? new Date(input.responseDeadlineAt) : null;
   if (input.isBrokerDeal !== undefined) setData.isBrokerDeal = input.isBrokerDeal;
   if (input.commissionPerMt !== undefined) setData.commissionPerMt = input.commissionPerMt;
+  if (input.customFields !== undefined) setData.customFields = input.customFields;
 
   // Auto-set closedAt when status moves to CANCELLED, LOST, or PAID
   if (input.status === 'CANCELLED' || input.status === 'LOST' || input.status === 'PAID') {

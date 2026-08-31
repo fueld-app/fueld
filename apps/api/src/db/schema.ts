@@ -269,6 +269,8 @@ export interface TenantSettings {
     notifyQuoteSubmitPush?: boolean;
     notifyQuoteSubmitWhatsApp?: boolean;
   };
+  // Tenant-configurable custom columns per entity (orders/inquiries first)
+  customColumns?: { entity: 'order'; key: string; label: string; type: 'text' | 'number' }[];
   // Configurable attachment types for order/inquiry attachments
   attachmentTypes?: string[];
   // Delivery documentation settings — which attachment types satisfy delivery closeout rules
@@ -1044,6 +1046,14 @@ export const orders = pgTable('orders', {
 
   // Inquiry response deadline — when the supplier should reply by
   responseDeadlineAt: timestamp('response_deadline_at', { withTimezone: true }),
+
+  // Bunker Booking sent indicator (Moxie request): NULL = not sent (red),
+  // set = sent (green). Auto-set when a BUNKER_BOOKING email is sent from
+  // the order, or toggled manually via the API.
+  bunkerBookingSentAt: timestamp('bunker_booking_sent_at', { withTimezone: true }),
+
+  // Tenant-configurable custom column values keyed by column key (e.g. { comment: "...", voyage: "..." })
+  customFields: jsonb('custom_fields').$type<Record<string, string | number | null>>().default({}),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

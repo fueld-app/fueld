@@ -18,10 +18,10 @@ import { type DropdownOption } from '../../../../shared/components/searchable-dr
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import { ColumnPickerComponent, type ColumnOption } from '../../../../shared/components/column-picker/column-picker.component';
 import type { SortChangeEvent, SortField } from '../../../../shared/components';
-import type { ApiResponse, OrderListRowDto, UserUiPreferences } from '@fueld/types';
+import type { ApiResponse, OrderListRowDto, UserUiPreferences, CustomColumnDef } from '@fueld/types';
 import { InquiriesListNewInquiryModalComponent } from './inquiries-list-new-inquiry-modal.component';
 import type { TeamUserOption } from './inquiries-list.types';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, DatePipe } from '@angular/common';
 import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import { DateFormatService } from '@app/core/services/date-format.service';
 import { firstValueFrom } from 'rxjs';
@@ -41,7 +41,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
 @Component({
   selector: 'app-inquiries-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DateLabelPipe, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent, FilterOverlayComponent],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, DateLabelPipe, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent, FilterOverlayComponent],
   template: `
     <div>
       <!-- Header -->
@@ -163,6 +163,8 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (inq of inquiries(); track inq.id) {
                 <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint"
+                  [class.bg-red-50\/60]="isEtaSoon(inq.eta, inq.status)"
+                  [class.dark\:bg-red-500\/10]="isEtaSoon(inq.eta, inq.status)"
                   (click)="onRowClick($event, inq.orderNumber || inq.id)"
                   (auxclick)="onRowAuxClick($event, inq.orderNumber || inq.id)">
                   @if (isBatchMode()) {
@@ -201,6 +203,24 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                           <app-status-badge [status]="inq.status" />
                         </td>
                       }
+                      @case ('booking') {
+                        <td class="px-4 py-3" (click)="$event.stopPropagation()">
+                          <button type="button"
+                            class="inline-flex h-5 w-5 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                            [class.bg-green-500]="!!inq.bunkerBookingSentAt"
+                            [class.bg-red-500]="!inq.bunkerBookingSentAt"
+                            [title]="inq.bunkerBookingSentAt ? ('Bunker Booking sent ' + (inq.bunkerBookingSentAt | date: 'dd MMM yyyy HH:mm')) : 'Bunker Booking not sent — click to mark as sent'"
+                            (click)="toggleBunkerBooking($event, inq)">
+                            @if (inq.bunkerBookingSentAt) {
+                              <svg class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                              </svg>
+                            } @else {
+                              <span class="block h-1.5 w-1.5 rounded-full bg-white"></span>
+                            }
+                          </button>
+                        </td>
+                      }
                       @case ('responsible') {
                         <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ inq.salesRepName || '—' }}</td>
                       }
@@ -208,7 +228,17 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                         <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ inq.invoicingCompanyName || '—' }}</td>
                       }
                       @case ('eta') {
-                        <td class="px-4 py-3 text-gray-500 dark:text-muted">{{ inq.eta ? (inq.eta | dateLabel) : '—' }}</td>
+                        <td class="px-4 py-3">
+                          @if (inq.eta) {
+                            @if (isEtaSoon(inq.eta, inq.status)) {
+                              <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-500\/15 dark:text-red-400">{{ inq.eta | dateLabel }}</span>
+                            } @else {
+                              <span class="text-gray-500 dark:text-muted">{{ inq.eta | dateLabel }}</span>
+                            }
+                          } @else {
+                            <span class="text-gray-500 dark:text-muted">—</span>
+                          }
+                        </td>
                       }
                       @case ('dueDate') {
                         <td class="px-4 py-3 text-gray-500 dark:text-muted">{{ inq.dueDate ? (inq.dueDate | dateLabel) : '—' }}</td>
@@ -251,6 +281,32 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                       }
                       @case ('createdAt') {
                         <td class="px-4 py-3 text-gray-500 dark:text-muted">{{ inq.createdAt | dateLabel }}</td>
+                      }
+                      @default {
+                        @if (customColumnForField(col.field); as cc) {
+                          @if (isEditingCustomCell(inq.id, cc.key)) {
+                            <td class="px-4 py-3" (click)="$event.stopPropagation()" (auxclick)="$event.stopPropagation()">
+                              <input
+                                type="text"
+                                [attr.data-edit]="inq.id + '-' + cc.key"
+                                class="w-full rounded border border-brand-300 px-1.5 py-1 text-sm text-gray-900 dark:border-brand-500 dark:bg-surface-2 dark:text-ink focus:border-brand-500 focus:outline-none"
+                                [value]="editingCustomValue()"
+                                (input)="editingCustomValue.set($any($event.target).value)"
+                                (keydown.enter)="saveCustomField(inq, cc.key, $event)"
+                                (keydown.escape)="cancelEditCustomCell($event)"
+                                (blur)="saveCustomField(inq, cc.key, $event)"
+                              />
+                            </td>
+                          } @else {
+                            <td class="px-4 py-3 text-gray-600 dark:text-ink-dim"
+                                (click)="startEditCustomCell(inq, cc.key, $event)"
+                                title="Click to edit">
+                              <span class="cursor-text hover:text-brand-700 dark:hover:text-brand-400">{{ inq.customFields?.[cc.key] || '—' }}</span>
+                            </td>
+                          }
+                        } @else {
+                          <td class="px-4 py-3"></td>
+                        }
                       }
                     }
                   }
@@ -303,7 +359,25 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
             >
               <div class="flex items-center justify-between mb-2">
                 <span class="min-w-0 font-semibold text-gray-900 dark:text-ink">{{ inq.clientName }}</span>
-                <app-status-badge [status]="inq.status" />
+                <span class="flex items-center gap-1.5">
+                  @if (isOrders()) {
+                    <button type="button"
+                      class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full"
+                      [class.bg-green-500]="!!inq.bunkerBookingSentAt"
+                      [class.bg-red-500]="!inq.bunkerBookingSentAt"
+                      [title]="inq.bunkerBookingSentAt ? 'Bunker Booking sent' : 'Bunker Booking not sent — tap to mark as sent'"
+                      (click)="$event.stopPropagation(); toggleBunkerBooking($event, inq)">
+                      @if (inq.bunkerBookingSentAt) {
+                        <svg class="h-2 w-2 text-white" fill="none" viewBox="0 0 24 24" stroke-width="4" stroke="currentColor" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      } @else {
+                        <span class="block h-1 w-1 rounded-full bg-white"></span>
+                      }
+                    </button>
+                  }
+                  <app-status-badge [status]="inq.status" />
+                </span>
               </div>
               @if (inq.orderNumber) {
                 <p class="text-xs font-mono text-gray-400 dark:text-muted mb-1">{{ inq.orderNumber }}</p>
@@ -311,7 +385,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
               <div class="grid grid-cols-2 gap-1 text-xs text-gray-500 dark:text-muted">
                 <span>{{ inq.vesselName }}</span>
                 <span>{{ inq.placeName }}</span>
-                <span>ETA {{ inq.eta ? (inq.eta | dateLabel) : '—' }}</span>
+                <span [class.text-red-600]="isEtaSoon(inq.eta, inq.status)" [class.dark\:text-red-400]="isEtaSoon(inq.eta, inq.status)" [class.font-semibold]="isEtaSoon(inq.eta, inq.status)">ETA {{ inq.eta ? (inq.eta | dateLabel) : '—' }}</span>
                 <span>Resp {{ inq.salesRepName || '—' }}</span>
                 <span>{{ inq.createdAt | dateLabel }}</span>
               </div>
@@ -464,6 +538,11 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   // ─── State ───────────────────────────────────────────────────────
 
   readonly inquiries = signal<OrderListRowDto[]>([]);
+  /** Tenant-configurable custom columns (loaded from admin settings). */
+  readonly customColumns = signal<CustomColumnDef[]>([]);
+  /** Inline-editing state for a custom column cell. */
+  readonly editingCustomCell = signal<{ orderId: string; key: string } | null>(null);
+  readonly editingCustomValue = signal<string>('');
   readonly loading = signal(false);
   readonly totalItems = signal(0);
   readonly currentPage = signal(1);
@@ -511,6 +590,10 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       { field: 'dueDate', label: 'Due Date', sortable: true },
       { field: 'createdAt', label: 'Created', sortable: true },
     ];
+    // "Sendt Bunker Booking" red/green indicator — orders only (Moxie request).
+    if (this.isOrders()) {
+      base.splice(base.findIndex((c) => c.field === 'status') + 1, 0, { field: 'booking', label: 'Booking', sortable: false });
+    }
     if (this.auth.canSeePrices()) {
       base.push({ field: 'value', label: 'Value' });
     }
@@ -521,11 +604,18 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
         { field: 'net', label: 'Net' },
       );
     }
+    // Append tenant-configurable custom columns (prefixed so they never collide with built-in fields)
+    for (const cc of this.customColumns()) {
+      base.push({ field: `custom_${cc.key}`, label: cc.label, sortable: false });
+    }
     return base;
   });
 
   readonly defaultVisibleColumns = computed<string[]>(() => {
     const base = ['orderNumber', 'client', 'vessel', 'port', 'status', 'responsible', 'eta', 'createdAt'];
+    if (this.isOrders()) {
+      base.splice(base.indexOf('status') + 1, 0, 'booking');
+    }
     if (this.isDeliveredOrders() || this.isInvoicedOrders() || this.isCompletedOrders()) {
       base.splice(base.indexOf('eta') + 1, 0, 'dueDate');
     }
@@ -534,6 +624,10 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     }
     if (this.isOrders() && this.auth.canSeePrices()) {
       base.push('gross', 'financing', 'net');
+    }
+    // Tenant-configurable custom columns are visible by default.
+    for (const cc of this.customColumns()) {
+      base.push(`custom_${cc.key}`);
     }
     return base;
   });
@@ -549,9 +643,28 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     return (prefs[key] as { visible?: string[]; order?: string[] } | undefined) ?? {};
   });
 
-  readonly visibleColumnFields = computed(() =>
-    this.columnConfig().visible ?? this.defaultVisibleColumns(),
-  );
+  readonly visibleColumnFields = computed(() => {
+    const cfg = this.columnConfig();
+    const saved = cfg.visible;
+    if (!saved) return this.defaultVisibleColumns();
+    // The "Booking" indicator column is new — users with saved column prefs
+    // would never see it. Inject it once (after Status); a marker in the
+    // prefs prevents re-injecting after the user deliberately hides it.
+    if (this.isOrders() && !saved.includes('booking') && !(cfg as any).bookingInjected) {
+      const withBooking = [...saved];
+      const statusIdx = withBooking.indexOf('status');
+      withBooking.splice(statusIdx >= 0 ? statusIdx + 1 : 0, 0, 'booking');
+      queueMicrotask(() => this.userPrefs.patch({
+        [`orderList_${this.resolvedMode()}`]: {
+          visible: withBooking,
+          order: this.columnOrder(),
+          bookingInjected: true,
+        },
+      } as Partial<UserUiPreferences>));
+      return withBooking;
+    }
+    return saved;
+  });
 
   readonly columnOrder = computed(() =>
     this.columnConfig().order ?? this.defaultColumnOrder(),
@@ -699,6 +812,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     this.loadInquiries();
     void this.loadResponsibleUsers();
     void this.loadProducts();
+    void this.loadCustomColumns();
     void this.userPrefs.load();
     void this.dateFormatSvc.load();
     if (!this.isOrders()) {
@@ -774,6 +888,81 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       this.loading.set(false);
       this.applyingFilters.set(false);
     }
+  }
+
+  /** Load tenant-configurable custom columns from admin settings. */
+  private async loadCustomColumns(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<CustomColumnDef[]>>(`${API}/admin/settings/my-custom-columns`),
+      );
+      if (res.success && Array.isArray(res.data)) {
+        this.customColumns.set(res.data);
+      }
+    } catch {
+      // Custom columns are optional — fail silently.
+    }
+  }
+
+  /** Resolve the custom column definition for a table column field (custom_<key>). */
+  customColumnForField(field: string): CustomColumnDef | undefined {
+    if (!field.startsWith('custom_')) return undefined;
+    const key = field.slice('custom_'.length);
+    return this.customColumns().find((c) => c.key === key);
+  }
+
+  /** Begin inline-editing a custom column cell. */
+  startEditCustomCell(order: OrderListRowDto, key: string, event: MouseEvent): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.editingCustomCell.set({ orderId: order.id, key });
+    const existing = order.customFields?.[key];
+    this.editingCustomValue.set(existing != null ? String(existing) : '');
+    // Focus the rendered input on the next tick.
+    setTimeout(() => {
+      const sel = `input[data-edit="${order.id}-${key}"]`;
+      const el = document.querySelector<HTMLInputElement>(sel);
+      el?.focus();
+      el?.select();
+    });
+  }
+
+  /** Persist the edited custom column value. */
+  async saveCustomField(order: OrderListRowDto, key: string, event: Event | null = null): Promise<void> {
+    if (event) { event.stopPropagation(); event.preventDefault(); }
+    const editing = this.editingCustomCell();
+    if (!editing || editing.orderId !== order.id || editing.key !== key) return;
+    const value = this.editingCustomValue().trim();
+    const col = this.customColumns().find((c) => c.key === key);
+    const typedValue: string | number | null = col?.type === 'number'
+      ? (value === '' ? null : Number(value))
+      : (value === '' ? null : value);
+    this.editingCustomCell.set(null);
+    // Optimistic local update
+    this.inquiries.update((rows) =>
+      rows.map((r) => r.id === order.id
+        ? { ...r, customFields: { ...(r.customFields ?? {}), [key]: typedValue } }
+        : r,
+      ),
+    );
+    try {
+      await firstValueFrom(
+        this.http.put<ApiResponse<unknown>>(`${API}/orders/${order.orderNumber ?? order.id}`, { customFields: { ...(order.customFields ?? {}), [key]: typedValue } }),
+      );
+    } catch {
+      this.showToast('error', 'Failed to save custom field.');
+      await this.loadInquiries();
+    }
+  }
+
+  cancelEditCustomCell(event: Event | null = null): void {
+    if (event) event.stopPropagation();
+    this.editingCustomCell.set(null);
+  }
+
+  isEditingCustomCell(orderId: string, key: string): boolean {
+    const e = this.editingCustomCell();
+    return !!e && e.orderId === orderId && e.key === key;
   }
 
   private async loadResponsibleUsers(): Promise<void> {
@@ -938,6 +1127,54 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     }
     this.currentPage.set(1);
     this.loadInquiries();
+  }
+
+  /**
+   * True when the row's ETA is within the next 7 days (or already overdue) —
+   * used to highlight urgent rows in red on the list. Terminal statuses
+   * (DELIVERED / INVOICED / PAID / CANCELLED / LOST) are excluded: a past
+   * ETA is normal for them, not urgent.
+   */
+  isEtaSoon(eta: string | null | undefined, status?: string | null): boolean {
+    if (!eta) return false;
+    if (status && ['DELIVERED', 'INVOICED', 'PAID', 'CANCELLED', 'LOST'].includes(status)) return false;
+    const d = new Date(eta);
+    if (isNaN(d.getTime())) return false;
+    return d.getTime() - Date.now() <= 7 * 24 * 60 * 60 * 1000;
+  }
+
+  /**
+   * Toggle the "Sendt Bunker Booking" indicator (red/green) for an order.
+   * Optimistic update + rollback on failure.
+   */
+  toggleBunkerBooking(event: Event, inq: OrderListRowDto): void {
+    event.stopPropagation();
+    const newSent = !inq.bunkerBookingSentAt;
+    const prev = inq.bunkerBookingSentAt;
+    // Optimistic update
+    this.inquiries.update(rows =>
+      rows.map(r => r.id === inq.id ? { ...r, bunkerBookingSentAt: newSent ? new Date().toISOString() : null } : r),
+    );
+    this.http
+      .put<ApiResponse<{ bunkerBookingSentAt: string | null }>>(
+        `${API}/orders/${inq.orderNumber || inq.id}/bunker-booking-sent`,
+        { sent: newSent },
+      )
+      .subscribe({
+        next: (res) => {
+          if (res.success && res.data) {
+            this.inquiries.update(rows =>
+              rows.map(r => r.id === inq.id ? { ...r, bunkerBookingSentAt: res.data!.bunkerBookingSentAt } : r),
+            );
+          } else {
+            // Roll back
+            this.inquiries.update(rows => rows.map(r => r.id === inq.id ? { ...r, bunkerBookingSentAt: prev } : r));
+          }
+        },
+        error: () => {
+          this.inquiries.update(rows => rows.map(r => r.id === inq.id ? { ...r, bunkerBookingSentAt: prev } : r));
+        },
+      });
   }
 
   goToDetail(id: string): void {

@@ -12,6 +12,7 @@ import { users, counterparties, invoices as invoicesTable, companyContacts, comp
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 import { getInquirySettings, getDeliveryDocumentationSettings } from '../admin/settings.service';
 import { composeBookingEmail, resolveBookingRecipients } from './booking-email.service';
+import { setOrderBunkerBookingSent } from '../orders/orders.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
 import { createSupplierNominationLink, getSupplierNominationFormUrl, getSupplierNominationSummary } from './supplier-nomination.service';
 import {
@@ -517,7 +518,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         const order = await getOrderById(orderId);
         if (!order) { return { success: false, data: null, message: 'Order not found' }; }
 
-        const { subject, body } = await composeBookingEmail(order);
+        // Sender's display name for the email signature.
+        const [sender] = await db.select({ name: users.name }).from(users).where(eq(users.id, auth.userId)).limit(1);
+        const { subject, body } = await composeBookingEmail(order, sender?.name ?? 'Fueld');
         const { to, cc } = await resolveBookingRecipients(order);
 
         return { success: true, data: { to, cc, subject, body } };
@@ -676,6 +679,16 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         pdfFileName,
         attachments,
       });
+
+      // A successfully sent Bunker Booking email flips the order's
+      // "Sendt Bunker Booking" indicator to green.
+      if (docType === 'BUNKER_BOOKING') {
+        try {
+          await setOrderBunkerBookingSent(orderId, true, auth.tenantId);
+        } catch (err) {
+          console.error('[Documents] Failed to set bunker booking sent flag:', err);
+        }
+      }
 
       // Log to activity timeline
       logActivity({

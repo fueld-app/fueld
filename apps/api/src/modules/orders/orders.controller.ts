@@ -40,11 +40,12 @@ import {
   updateSupplierPayment,
   deleteSupplierPayment,
   finalizeItemPrice,
+  setOrderBunkerBookingSent,
 } from './orders.service';
 import { logActivity } from '../activity/activity.service';
 import type { ApiResponse } from '@fueld/types';
 import { db } from '../../db';
-import { users, tenants } from '../../db/schema';
+import { users, tenants, orders } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
 /** Check if broker deals are enabled for the tenant. If not, strip broker deal fields from request body. */
@@ -358,6 +359,40 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       detail: { tags: ['Orders'], summary: 'Create a supplier payment for a leg' },
     },
   )
+  // ── PUT /orders/:id/bunker-booking-sent ────────────────────────────
+  //  Manual toggle for the "Sendt Bunker Booking" (red/green) indicator.
+  //  Used when a booking was sent outside Fueld (manual email) — flips the
+  //  indicator red→green or green→red.
+  .put(
+    '/:id/bunker-booking-sent',
+    async ({ params, body, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const result = await setOrderBunkerBookingSent(orderId, body.sent, auth.tenantId);
+        if (!result.found) return { success: false, data: null, message: 'Order not found' };
+        const sentAt = result.sentAt;
+        await logActivity({
+          userId: auth.sub,
+          tenantId: auth.tenantId,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: { bunkerBookingSent: body.sent },
+        }).catch(() => {});
+        return { success: true, data: { bunkerBookingSentAt: sentAt } } satisfies ApiResponse<{ bunkerBookingSentAt: Date | null }>;
+      } catch (err) {
+        console.error('[Orders] Toggle bunker booking sent failed:', err);
+        return { success: false, data: null, message: 'Failed to update bunker booking indicator' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({ sent: t.Boolean() }),
+      detail: { tags: ['Orders'], summary: 'Toggle the Sendt Bunker Booking indicator (red/green)' },
+    },
+  )
+
   .patch(
     '/supplier-payments/:paymentId',
     async ({ params, body }) => {
@@ -487,6 +522,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           etd: body.etd,
           isBrokerDeal: body.isBrokerDeal ?? false,
           commissionPerMt: body.commissionPerMt ?? null,
+          customFields: body.customFields,
         });
 
         // Log activity
@@ -536,6 +572,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         etd: t.Optional(t.String()),
         isBrokerDeal: t.Optional(t.Boolean()),
         commissionPerMt: t.Optional(t.String()),
+        customFields: t.Optional(t.Record(t.String(), t.Union([t.String(), t.Number(), t.Null()]))),
       }),
       detail: {
         tags: ['Orders'],
@@ -600,6 +637,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         lossReason: t.Optional(t.Nullable(t.String())),
         isBrokerDeal: t.Optional(t.Boolean()),
         commissionPerMt: t.Optional(t.Nullable(t.String())),
+        customFields: t.Optional(t.Record(t.String(), t.Union([t.String(), t.Number(), t.Null()]))),
       }),
       detail: {
         tags: ['Orders'],
@@ -670,7 +708,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             if (autoSendOnConvert) {
               const fullOrder = await getOrderById(orderId);
               if (fullOrder) {
-                const { subject, body: htmlBody } = await composeBookingEmail(fullOrder);
+                const senderName = (await db.select({ name: users.name }).from(users).where(eq(users.id, auth.sub)).limit(1))[0]?.name ?? 'Fueld';
+                const { subject, body: htmlBody } = await composeBookingEmail(fullOrder, senderName);
                 const { to, cc } = await resolveBookingRecipients(fullOrder);
                 if (to.length) {
                   await sendDocumentEmail({
@@ -679,13 +718,15 @@ export const ordersController = new Elysia({ prefix: '/orders' })
                     tenantId: auth.tenantId,
                     sentByUserId: auth.sub,
                     senderEmail: auth.email,
-                    senderName: (await db.select({ name: users.name }).from(users).where(eq(users.id, auth.sub)).limit(1))[0]?.name ?? 'Fueld',
+                    senderName,
                     recipientEmails: to,
                     ccEmails: cc,
                     bccEmails: [],
                     subject,
                     htmlBody,
                   });
+                  // Flip the "Sendt Bunker Booking" indicator to green.
+                  await setOrderBunkerBookingSent(orderId, true, auth.tenantId);
                 }
               }
             }
@@ -1136,8 +1177,21 @@ export const ordersController = new Elysia({ prefix: '/orders' })
     '/:id',
     async ({ params, auth }) => {
       try {
+        // Only admins may hard-delete an order (e.g. a delivered inquiry that must be removed).
+        if (auth.role !== 'ADMIN') {
+          return { success: false, data: null, message: 'Admin access required to delete an order' };
+        }
         const orderId = await resolveOrderId(params.id);
         if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        // Ensure the order belongs to the caller's tenant before deleting.
+        const [orderRow] = await db
+          .select({ tenantId: orders.tenantId })
+          .from(orders)
+          .where(eq(orders.id, orderId))
+          .limit(1);
+        if (!orderRow || orderRow.tenantId !== auth.tenantId) {
+          return { success: false, data: null, message: 'Order not found' };
+        }
         const deleted = await deleteOrder(orderId);
         if (!deleted) {
           return { success: false, data: null, message: 'Order not found' };
