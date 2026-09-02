@@ -40,7 +40,8 @@ export type HeaderAction =
   | 'mark-invoiced'
   | 'mark-paid'
   | 'sync-quickbooks'
-  | 'reopen-order';
+  | 'reopen-order'
+  | 'delete-order';
 
 interface ActionItem {
   key: HeaderAction;
@@ -184,6 +185,13 @@ const ACTIONS: ActionItem[] = [
     color: 'text-amber-600',
     dividerBefore: true,
   },
+  {
+    key: 'delete-order',
+    label: 'Delete (Permanent)',
+    icon: 'M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.082.589.128 1.18.128 1.78M19.21 5.79 18.5 19.5A2.25 2.25 0 0 1 16.27 21.75H7.73A2.25 2.25 0 0 1 5.5 19.5L4.79 5.79M12 9v6m-3-3h6m6 0V6.42A2.41 2.41 0 0 0 15.58 4H8.42A2.41 2.41 0 0 0 6 6.42V9m12 0H6',
+    color: 'text-red-600',
+    dividerBefore: true,
+  },
 ];
 
 @Component({
@@ -246,6 +254,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
   readonly hasPortDocumentationDocuments = input<boolean>(false);
   readonly portDocumentationEnabled = input<boolean>(false);
   readonly isAdmin = input<boolean>(false);
+  readonly isCreditManager = input<boolean>(false);
   readonly isLight = input<boolean>(false);
   readonly actionTriggered = output<HeaderAction>();
 
@@ -300,7 +309,10 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
     const hasBroker = this.hasBroker();
     const portDocumentationEnabled = this.portDocumentationEnabled();
     const isAdmin = this.isAdmin();
-    const canReopen = isAdmin && (status === OrderStatus.Delivered || status === OrderStatus.Invoiced);
+    // Credit managers can also reopen delivered/invoiced orders
+    // (suppliers are often slow with BDN + invoice, so prices need
+    // correcting after delivery).
+    const canReopen = (isAdmin || this.isCreditManager()) && (status === OrderStatus.Delivered || status === OrderStatus.Invoiced);
     const isInquiry = normalizedStatus === 'INQUIRY' || normalizedStatus === 'OFFER';
     const showInvoiceAsFinal =
       status === OrderStatus.Delivered
@@ -327,7 +339,8 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
               || action.key === 'send-offer'
               || action.key === 'send-proforma'
               || action.key === 'send-broker-confirmation'
-              || action.key === 'send-inquiry',
+              || action.key === 'send-inquiry'
+              || (action.key === 'delete-order' && isAdmin),
             )
             .map((action) =>
               action.key === 'view-offer'
@@ -362,6 +375,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
           .filter((action) =>
             action.key !== 'convert-to-order'
             && action.key !== 'cancel-inquiry'
+            && (action.key !== 'delete-order' || isAdmin)
             && (action.key !== 'cancel-order' || canCancelOrder)
             && action.key !== 'send-offer'
             && action.key !== 'send-proforma'

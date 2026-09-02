@@ -37,6 +37,7 @@
       [hasPortDocumentationDocuments]="(portDocSvc.portDocumentationContext()?.documents?.length ?? 0) > 0"
       [portDocumentationEnabled]="portDocSvc.portDocumentationContext()?.enabled ?? false"
       [isAdmin]="auth.isAdmin()"
+      [isCreditManager]="auth.isCreditManager()"
       [isLight]="auth.isLight()"
       (actionTriggered)="onAction($event)"
     />
@@ -414,6 +415,7 @@
       (delete)="deleteAttachment($event)"
       (typeChange)="updateAttachmentType($event)"
       (fileSelected)="onAttachmentSelected($event)"
+      (filesDropped)="onAttachmentsDropped($event)"
     />
 } @placeholder { <div></div> }
 
@@ -639,4 +641,40 @@
     (closed)="showCreditApplicationModal.set(false)"
     (submitted)="onCreditApplicationSubmitted()"
   />
+}
+
+<!-- Admin: permanent delete confirmation -->
+@if (confirmDeleteOpen()) {
+  <div class="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="cancelDeleteOrder()">
+    <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl dark:bg-surface mx-4" (click)="$event.stopPropagation()">
+      <div class="flex items-start gap-3">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.008v.008H12v-.008Z" /></svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Delete this order permanently?</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
+            This action cannot be undone. Order <span class="font-mono font-semibold">{{ order()?.orderNumber ?? orderId() }}</span>
+            and all its line items, attachments, and supplier legs will be permanently removed.
+            This works even for delivered/invoiced orders.
+          </p>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end gap-3">
+        <button type="button" (click)="cancelDeleteOrder()" [disabled]="deleting()"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50">
+          Cancel
+        </button>
+        <button type="button" (click)="confirmDeleteOrder()" [disabled]="deleting()"
+          class="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
+          @if (deleting()) {
+            <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            Deleting…
+          } @else {
+            Delete permanently
+          }
+        </button>
+      </div>
+    </div>
+  </div>
 }

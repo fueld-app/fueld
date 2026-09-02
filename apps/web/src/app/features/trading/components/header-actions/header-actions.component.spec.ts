@@ -8,6 +8,8 @@ describe('HeaderActionsComponent', () => {
     hasPortDocumentationDocuments?: boolean;
     portDocumentationEnabled?: boolean;
     isLight?: boolean;
+    isAdmin?: boolean;
+    isCreditManager?: boolean;
   }) {
     await TestBed.configureTestingModule({
       imports: [HeaderActionsComponent],
@@ -19,6 +21,8 @@ describe('HeaderActionsComponent', () => {
     fixture.componentRef.setInput('hasPortDocumentationDocuments', options?.hasPortDocumentationDocuments ?? false);
     fixture.componentRef.setInput('portDocumentationEnabled', options?.portDocumentationEnabled ?? false);
     if (options?.isLight) fixture.componentRef.setInput('isLight', true);
+    if (options?.isAdmin) fixture.componentRef.setInput('isAdmin', true);
+    if (options?.isCreditManager) fixture.componentRef.setInput('isCreditManager', true);
     fixture.detectChanges();
 
     return fixture.componentInstance;
@@ -87,5 +91,49 @@ describe('HeaderActionsComponent', () => {
     expect(keys).toContain('cancel-inquiry');
     expect(keys).not.toContain('cancel-order');
     expect(keys).not.toContain('mark-delivered');
+  });
+
+  // ── Reopen Order gating (ADMIN + CREDIT_MANAGER can reopen delivered/invoiced) ──
+
+  it('shows reopen-order for ADMIN on a delivered order', async () => {
+    const component = await createComponent({ status: OrderStatus.Delivered, isAdmin: true });
+    const keys = component.displayActions().map((a) => a.key);
+
+    expect(keys).toContain('reopen-order');
+  });
+
+  it('shows reopen-order for ADMIN on an invoiced order', async () => {
+    const component = await createComponent({ status: OrderStatus.Invoiced, isAdmin: true });
+    const keys = component.displayActions().map((a) => a.key);
+
+    expect(keys).toContain('reopen-order');
+  });
+
+  it('shows reopen-order for CREDIT_MANAGER on a delivered order', async () => {
+    const component = await createComponent({ status: OrderStatus.Delivered, isCreditManager: true });
+    const keys = component.displayActions().map((a) => a.key);
+
+    expect(keys).toContain('reopen-order');
+  });
+
+  it('shows reopen-order for CREDIT_MANAGER on an invoiced order', async () => {
+    const component = await createComponent({ status: OrderStatus.Invoiced, isCreditManager: true });
+    const keys = component.displayActions().map((a) => a.key);
+
+    expect(keys).toContain('reopen-order');
+  });
+
+  it('does not show reopen-order for a plain trader on a delivered order', async () => {
+    const component = await createComponent({ status: OrderStatus.Delivered });
+    const keys = component.displayActions().map((a) => a.key);
+
+    expect(keys).not.toContain('reopen-order');
+  });
+
+  it('does not show reopen-order for CREDIT_MANAGER on a confirmed order', async () => {
+    const component = await createComponent({ status: OrderStatus.Confirmed, isCreditManager: true });
+    const keys = component.displayActions().map((a) => a.key);
+
+    expect(keys).not.toContain('reopen-order');
   });
 });
