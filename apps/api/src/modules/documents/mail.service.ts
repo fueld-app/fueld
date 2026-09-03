@@ -344,7 +344,7 @@ function buildPortDocumentationEmailHtml(params: {
   const headerTextColor = isLightBg ? '#111827' : '#ffffff';
   const accentColor = (headerBg.toLowerCase() === '#ffffff' || headerBg.toLowerCase() === '#fff') ? '#1e3a5f' : headerBg;
   const logoHtml = params.companyLogoUrl
-    ? `<img src="${params.companyLogoUrl}" alt="${companyName}" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+    ? `<img src="${params.companyLogoUrl}" alt="${companyName}" height="40" style="height: 40px; width: auto; max-width: 180px; margin-bottom: 4px; display: block;" />`
     : `<h1 style="color: ${headerTextColor}; margin: 0; font-size: 24px;">${companyName}</h1>`;
   const addressHtml = params.companyAddress?.trim()
     ? `<div style="color: ${headerTextColor}; font-size: 12px; margin-top: 6px; line-height: 1.5; opacity: 0.85;">${splitAddressLines(params.companyAddress).join('<br/>')}</div>`
@@ -522,7 +522,7 @@ export function buildDocumentEmailHtml(params: {
   // Always show a colored accent bar at the top; use brand color unless it's white/unset
   const accentColor = (headerBg.toLowerCase() === '#ffffff' || headerBg.toLowerCase() === '#fff') ? '#1e3a5f' : headerBg;
   const logoHtml = params.companyLogoUrl
-    ? `<img src="${params.companyLogoUrl}" alt="${companyName}" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+    ? `<img src="${params.companyLogoUrl}" alt="${companyName}" height="40" style="height: 40px; width: auto; max-width: 180px; margin-bottom: 4px; display: block;" />`
     : `<h1 style="color: ${headerTextColor}; margin: 0; font-size: 24px;">${companyName}</h1>`;
 
   const addressHtml = params.companyAddress?.trim()
@@ -612,7 +612,7 @@ export function buildInquiryEmailHtml(params: {
   const headerTextColor = isLightBg ? '#111827' : '#ffffff';
   const accentColor = (headerBg.toLowerCase() === '#ffffff' || headerBg.toLowerCase() === '#fff') ? '#1e3a5f' : headerBg;
   const logoHtml = params.companyLogoUrl
-    ? `<img src="${params.companyLogoUrl}" alt="${companyName}" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+    ? `<img src="${params.companyLogoUrl}" alt="${companyName}" height="40" style="height: 40px; width: auto; max-width: 180px; margin-bottom: 4px; display: block;" />`
     : `<h1 style="color: ${headerTextColor}; margin: 0; font-size: 24px;">${companyName}</h1>`;
 
   const vesselLabel = params.vesselImo

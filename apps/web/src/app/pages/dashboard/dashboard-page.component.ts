@@ -404,6 +404,8 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     { key: 'this_week', label: 'This Week' },
     { key: 'last_7_days', label: 'Last 7 Days' },
     { key: 'this_month', label: 'This Month' },
+    { key: 'previous_month', label: 'Previous Month' },
+    { key: 'next_month', label: 'Next Month' },
     { key: 'last_30_days', label: 'Last 30 Days' },
     { key: 'this_quarter', label: 'This Quarter' },
     { key: 'this_year', label: 'Year to Date' },
@@ -458,6 +460,16 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         from = new Date(now.getFullYear(), now.getMonth(), 1);
         to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
         break;
+      case 'previous_month': {
+        from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        break;
+      }
+      case 'next_month': {
+        from = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        to = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59);
+        break;
+      }
       case 'last_30_days':
         from = new Date(now);
         from.setDate(now.getDate() - 29);
@@ -479,6 +491,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         break;
       default:
         from = new Date(now.getFullYear(), now.getMonth(), 1);
+        to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     }
     return { from, to };
   });

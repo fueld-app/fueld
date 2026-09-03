@@ -89,6 +89,28 @@ describe('DashboardPageComponent — date basis', () => {
     expect(range.to.getHours()).toBe(23);
   });
 
+  it('previous_month spans the full previous month', async () => {
+    const component = await createComponent();
+    component.selectDatePreset('previous_month');
+    const range = (component as unknown as { dateRange: () => { from: Date; to: Date } }).dateRange();
+    expect(range.from.getDate()).toBe(1);
+    expect(range.from.getMonth()).toBe((new Date().getMonth() + 11) % 12);
+    const lastDayOfFromMonth = new Date(range.from.getFullYear(), range.from.getMonth() + 1, 0).getDate();
+    expect(range.to.getDate()).toBe(lastDayOfFromMonth);
+    expect(range.to.getMonth()).toBe(range.from.getMonth());
+  });
+
+  it('next_month spans the full next month', async () => {
+    const component = await createComponent();
+    component.selectDatePreset('next_month');
+    const range = (component as unknown as { dateRange: () => { from: Date; to: Date } }).dateRange();
+    expect(range.from.getDate()).toBe(1);
+    expect(range.from.getMonth()).toBe((new Date().getMonth() + 1) % 12);
+    const lastDayOfFromMonth = new Date(range.from.getFullYear(), range.from.getMonth() + 1, 0).getDate();
+    expect(range.to.getDate()).toBe(lastDayOfFromMonth);
+    expect(range.to.getMonth()).toBe(range.from.getMonth());
+  });
+
   it('this_quarter spans the full quarter', async () => {
     const component = await createComponent();
     component.selectDatePreset('this_quarter');
