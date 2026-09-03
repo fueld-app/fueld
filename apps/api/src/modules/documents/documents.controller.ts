@@ -527,9 +527,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         const { subject, body } = await composeBookingEmail(order, sender
           ? { name: sender.name || 'Fueld', email: sender.email, phone: sender.phone, skype: sender.skype, whatsapp: sender.whatsapp }
           : 'Fueld');
-        const { to, cc } = await resolveBookingRecipients(order);
+        const { to, cc, bcc } = await resolveBookingRecipients(order);
 
-        return { success: true, data: { to, cc, subject, body } };
+        return { success: true, data: { to, cc, bcc, subject, body } };
       } catch (err: any) {
         console.error('[Documents] Booking email compose failed:', err);
         return { success: false, data: null, message: err?.message ?? 'Failed to compose booking email' };

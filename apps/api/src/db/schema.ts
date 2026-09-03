@@ -261,6 +261,7 @@ export interface TenantSettings {
     signatureLogoUrl?: string | null;   // Logo image shown in the booking-email signature block (absolute URL, hosted on the tenant's app origin)
     signatureWebsite?: string | null;   // Website line in the booking-email signature (e.g. 'www.moxiebrokerage.com')
     signatureFromEmail?: string | null; // e: line override in the signature (e.g. shared 'happier@' mailbox); falls back to shared-sender email, then user email
+    bccEmail?: string | null;           // Always-BCC address on booking emails (e.g. shared 'happier@' mailbox)
   };
   // Configurable reasons required when cancelling inquiries
   inquiryCancelReasons?: string[];

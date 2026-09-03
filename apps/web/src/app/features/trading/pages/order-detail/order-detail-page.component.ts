@@ -318,6 +318,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly orderSuppliers = signal<OrderSupplierDto[]>([]);
   readonly activeOrderSupplierId = signal<string | null>(null);
   readonly uploadingAttachment = signal(false);
+  readonly confirmDeleteOpen = signal(false);
+  readonly deleting = signal(false);
   readonly attachmentType = linkedSignal({
     source: this.refData.deliveryDocumentationSettings,
     computation: (settings) => {
@@ -1659,6 +1661,33 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.selectedAttachment = file;
   }
 
+  /** Handle files dragged and dropped onto the attachments card — upload each with the selected type. */
+  async onAttachmentsDropped(files: File[]): Promise<void> {
+    if (!files.length) return;
+    const id = this.orderId();
+    if (!id) return;
+    this.uploadingAttachment.set(true);
+    try {
+      for (const file of files) {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('type', this.attachmentType());
+        try {
+          const res = await firstValueFrom(
+            this.http.post<ApiResponse<OrderAttachmentDto>>(`${API_URL}/orders/${id}/attachments`, form),
+          );
+          if (res.success && res.data) {
+            this.attachments.update((prev) => [res.data, ...prev]);
+          }
+        } catch {
+          this.showToast('error', `Failed to upload ${file.name}.`);
+        }
+      }
+    } finally {
+      this.uploadingAttachment.set(false);
+    }
+  }
+
   async uploadAttachment(): Promise<void> {
     const id = this.orderId();
     if (!id || !this.selectedAttachment) return;
@@ -1678,6 +1707,34 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'Failed to upload attachment.');
     } finally {
       this.uploadingAttachment.set(false);
+    }
+  }
+
+  cancelDeleteOrder(): void {
+    this.confirmDeleteOpen.set(false);
+  }
+
+  /** Admin-only permanent deletion of an order/inquiry (works for any status, incl. DELIVERED). */
+  async confirmDeleteOrder(): Promise<void> {
+    const id = this.orderId() ?? this.order()?.id;
+    if (!id) return;
+    this.deleting.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<{ id: string }>>(`${API_URL}/orders/${id}`),
+      );
+      if (res.success) {
+        this.showToast('success', 'Order deleted.');
+        this.confirmDeleteOpen.set(false);
+        // Navigate back to the relevant list.
+        this.router.navigate([this.isInquiryContext() ? '/trading/inquiries' : '/trading/orders']);
+      } else {
+        this.showToast('error', res.message ?? 'Failed to delete order.');
+      }
+    } catch (err: any) {
+      this.showToast('error', err?.error?.message ?? 'Failed to delete order.');
+    } finally {
+      this.deleting.set(false);
     }
   }
 
@@ -2671,6 +2728,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   // ─── Actions ─────────────────────────────────────────────────────
 
   async onAction(action: HeaderAction): Promise<void> {
+    // Admin-only permanent delete — needs a confirmation modal, handled here.
+    if (action === 'delete-order') {
+      if (!this.auth.isAdmin()) return;
+      this.confirmDeleteOpen.set(true);
+      return;
+    }
     await this.actionSvc.onAction(action, this.buildActionContext());
   }
 

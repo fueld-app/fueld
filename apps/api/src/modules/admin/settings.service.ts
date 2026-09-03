@@ -1292,6 +1292,7 @@ export async function getBookingEmailSettings(): Promise<{
   signatureLogoUrl: string | null;
   signatureWebsite: string | null;
   signatureFromEmail: string | null;
+  bccEmail: string | null;
 }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
@@ -1303,6 +1304,7 @@ export async function getBookingEmailSettings(): Promise<{
     signatureLogoUrl: settings.bookingEmail?.signatureLogoUrl ?? null,
     signatureWebsite: settings.bookingEmail?.signatureWebsite ?? null,
     signatureFromEmail: settings.bookingEmail?.signatureFromEmail ?? null,
+    bccEmail: settings.bookingEmail?.bccEmail ?? null,
   };
 }
 
@@ -1312,12 +1314,14 @@ export async function updateBookingEmailSettings(input: {
   signatureLogoUrl?: string | null;
   signatureWebsite?: string | null;
   signatureFromEmail?: string | null;
+  bccEmail?: string | null;
 }): Promise<{
   autoSendOnConvert: boolean;
   brokerDealCcEmail: string | null;
   signatureLogoUrl: string | null;
   signatureWebsite: string | null;
   signatureFromEmail: string | null;
+  bccEmail: string | null;
 }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
@@ -1330,6 +1334,7 @@ export async function updateBookingEmailSettings(input: {
     signatureLogoUrl: input.signatureLogoUrl?.trim() || null,
     signatureWebsite: input.signatureWebsite?.trim() || null,
     signatureFromEmail: input.signatureFromEmail?.trim() || null,
+    bccEmail: input.bccEmail?.trim() || null,
   };
 
   await db

@@ -4,6 +4,7 @@ import {
   input,
   output,
   model,
+  signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { OrderAttachmentDto } from '@fueld/types';
@@ -29,32 +30,48 @@ import type { OrderAttachmentDto } from '@fueld/types';
         </div>
       }
 
-      <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <select
-          [ngModel]="attachmentType()"
-          (ngModelChange)="attachmentType.set($event)"
-          class="fueld-select-no-chevron w-full sm:w-40 appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
-        >
-          @for (type of attachmentTypes(); track type) {
-            <option [value]="type">{{ type }}</option>
-          }
-        </select>
-        <input
-          #fileInput
-          type="file"
-          (change)="onFileSelected($event)"
-          accept="application/pdf,image/*"
-          class="w-full text-sm text-gray-600 dark:text-ink-dim file:mr-4 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
-        />
-        <button
-          type="button"
-          (click)="upload.emit()"
-          [disabled]="uploading() || !hasFile()"
-          class="inline-flex items-center justify-center rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold
-                 text-white shadow-sm transition-colors hover:bg-brand-800 disabled:opacity-50"
-        >
-          Upload
-        </button>
+      <div
+        class="mt-3 rounded-lg border border-dashed px-3 py-3 transition-colors"
+        [class.border-brand-400]="dragging()"
+        [class.bg-brand-50]="dragging()"
+        [class.dark:border-brand-500]="dragging()"
+        [class.dark:bg-brand-700]="dragging()"
+        [class.border-gray-300]="!dragging()"
+        [class.dark:border-line-strong]="!dragging()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+      >
+        <p class="mb-2 text-xs text-gray-400 dark:text-muted">
+          Drag and drop files here, or use the file picker below.
+        </p>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <select
+            [ngModel]="attachmentType()"
+            (ngModelChange)="attachmentType.set($event)"
+            class="fueld-select-no-chevron w-full sm:w-40 appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
+          >
+            @for (type of attachmentTypes(); track type) {
+              <option [value]="type">{{ type }}</option>
+            }
+          </select>
+          <input
+            #fileInput
+            type="file"
+            (change)="onFileSelected($event)"
+            accept="application/pdf,image/*"
+            class="w-full text-sm text-gray-600 dark:text-ink-dim file:mr-4 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
+          />
+          <button
+            type="button"
+            (click)="upload.emit()"
+            [disabled]="uploading() || !hasFile()"
+            class="inline-flex items-center justify-center rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold
+                   text-white shadow-sm transition-colors hover:bg-brand-800 disabled:opacity-50"
+          >
+            Upload
+          </button>
+        </div>
       </div>
       <div class="mt-4 flex-1 overflow-auto">
         @if (attachments().length === 0) {
@@ -119,6 +136,32 @@ export class OrderAttachmentsCardComponent {
   readonly delete = output<OrderAttachmentDto>();
   readonly typeChange = output<{ att: OrderAttachmentDto; type: string }>();
   readonly fileSelected = output<File>();
+  readonly filesDropped = output<File[]>();
+  readonly dragging = signal(false);
+
+  protected onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.dragging.set(true);
+  }
+
+  protected onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    // Only clear when the pointer truly leaves the dropzone (not when entering a child element).
+    if (event.currentTarget && event.relatedTarget && (event.currentTarget as HTMLElement).contains(event.relatedTarget as Node)) return;
+    this.dragging.set(false);
+  }
+
+  protected onDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.dragging.set(false);
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.filesDropped.emit(Array.from(files));
+    }
+  }
 
   protected onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;

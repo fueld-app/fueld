@@ -112,6 +112,13 @@ const DOC_LABELS: Record<DocumentType, string> = {
                   class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                   placeholder="Falls back to shared sender mailbox, then the user's own email" />
               </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Always BCC (booking emails)</label>
+                <input type="email" [ngModel]="signatureBccEmail()" (ngModelChange)="signatureBccEmail.set($event)"
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                  placeholder="e.g. happier@moxiebrokerage.com" />
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">Every booking email is BCC'd to this address (e.g. the shared mailbox archive).</p>
+              </div>
             </div>
             <button (click)="saveSignatureSettings()" [disabled]="signatureSaving()"
               class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
@@ -399,6 +406,7 @@ export class EmailSettingsPageComponent implements OnInit {
   readonly signatureLogoUrl = signal('');
   readonly signatureWebsite = signal('');
   readonly signatureFromEmail = signal('');
+  readonly signatureBccEmail = signal('');
   readonly signatureSaving = signal(false);
   readonly brokerDealCcSaving = signal(false);
   readonly rules = signal<EmailRule[]>([]);
@@ -447,7 +455,7 @@ export class EmailSettingsPageComponent implements OnInit {
         firstValueFrom(this.http.get<ApiResponse<EmailRule[]>>(`${API}/admin/settings/email-rules`)),
         firstValueFrom(this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API}/companies/own`)),
         firstValueFrom(this.http.get<ApiResponse<TemplateVariable[]>>(`${API}/admin/settings/email-templates/variables`)),
-        firstValueFrom(this.http.get<ApiResponse<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null; signatureLogoUrl: string | null; signatureWebsite: string | null; signatureFromEmail: string | null }>>(`${API}/admin/settings/booking-email`)),
+        firstValueFrom(this.http.get<ApiResponse<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null; signatureLogoUrl: string | null; signatureWebsite: string | null; signatureFromEmail: string | null; bccEmail: string | null }>>(`${API}/admin/settings/booking-email`)),
       ]);
 
       if (templatesRes.success) {
@@ -466,6 +474,7 @@ export class EmailSettingsPageComponent implements OnInit {
         this.signatureLogoUrl.set(bookingRes.data.signatureLogoUrl ?? '');
         this.signatureWebsite.set(bookingRes.data.signatureWebsite ?? '');
         this.signatureFromEmail.set(bookingRes.data.signatureFromEmail ?? '');
+        this.signatureBccEmail.set(bookingRes.data.bccEmail ?? '');
       }
     } catch {
       // silent
@@ -561,6 +570,7 @@ export class EmailSettingsPageComponent implements OnInit {
           signatureLogoUrl: this.signatureLogoUrl().trim() || null,
           signatureWebsite: this.signatureWebsite().trim() || null,
           signatureFromEmail: this.signatureFromEmail().trim() || null,
+          bccEmail: this.signatureBccEmail().trim() || null,
         }),
       );
     } catch {

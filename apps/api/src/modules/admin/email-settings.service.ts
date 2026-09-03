@@ -196,6 +196,7 @@ export const TEMPLATE_VARIABLES = [
   { key: 'physicalSupplier', label: 'Physical supplier company name', example: 'Trafigura' },
   { key: 'deliveryMethod', label: 'Delivery method', example: 'Via Barge' },
   { key: 'products', label: 'Product / Quantity lines block', example: 'Product: VLSFO 0.5%\nQnty: 350 - 400 MT' },
+  { key: 'productLines', label: 'Line-based product block (Product:/Qnty: paragraphs)', example: 'Product: VLSFO 0.5% - desc' },
   { key: 'Phone', label: 'Recipient phone number (WhatsApp)', example: '+4526131217' },
 ];
 

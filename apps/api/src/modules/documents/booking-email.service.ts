@@ -37,6 +37,8 @@ interface BookingOrder {
   items?: BookingItem[];
   isBrokerDeal?: boolean | null;
   orderSuppliers?: Array<{ isPrimary: boolean; company?: { name?: string | null } | null }> | null;
+  /** Order's responsible user (salesRep) — preferred for the signature block. */
+  salesRep?: { id: string; name: string; email: string | null; phone: string | null; skype: string | null; whatsapp: string | null } | null;
 }
 
 const DEFAULT_SUBJECT = '${vesselName} @ ${place}';
@@ -99,6 +101,23 @@ function buildBookingProductsHtml(items: BookingItem[]): string {
   </tr>
 ${rows}
 </table>`;
+}
+
+/**
+ * Build the line-based product block for the booking email body:
+ *   Product: <name> - <description>
+ *   Qnty: <range>
+ * Used by tenants whose custom template is line-based (e.g. Moxie) instead
+ * of the table layout. All values HTML-escaped.
+ */
+export function buildBookingProductLinesHtml(items: BookingItem[]): string {
+  if (!items.length) return '';
+  return items
+    .map((item) => {
+      const desc = item.description ? ` - ${escapeHtml(item.description)}` : '';
+      return `<p style="margin: 8px 0 0;">Product: ${escapeHtml(item.productType)}${desc}<br/>Qnty: ${escapeHtml(formatQty(item))}</p>`;
+    })
+    .join('\n');
 }
 
 /** Escape text for safe inclusion in HTML email bodies. */
@@ -182,8 +201,10 @@ async function resolveCaptainName(vesselId: string): Promise<string> {
   return captain?.name ?? 'Captain';
 }
 
-/** Resolve To (vessel captain email(s) + agent contact email) + CC (email rules). */
-export async function resolveBookingRecipients(order: BookingOrder): Promise<{ to: string[]; cc: string[] }> {
+/** Resolve To (vessel captain email(s) + agent contact email) + CC (email rules) + always-BCC. */
+export async function resolveBookingRecipients(
+  order: BookingOrder,
+): Promise<{ to: string[]; cc: string[]; bcc: string[] }> {
   const to = new Set<string>();
 
   // Captain person email(s)
@@ -203,18 +224,22 @@ export async function resolveBookingRecipients(order: BookingOrder): Promise<{ t
   }
   if (agentEmail?.trim()) to.add(agentEmail.trim());
 
+  const bookingSettings = await getBookingEmailSettings();
+
   // CC from email rules for BUNKER_BOOKING
   const rules = await getApplicableEmailRules(order.tenantId, null, 'BUNKER_BOOKING');
   const cc = rules.filter((r) => r.ruleType === 'CC').map((r) => r.email).filter(Boolean);
 
   // On broker deals, always CC the configured broker deal email + agent email
   if (order.isBrokerDeal) {
-    const { brokerDealCcEmail } = await getBookingEmailSettings();
-    if (brokerDealCcEmail) cc.push(brokerDealCcEmail);
+    if (bookingSettings.brokerDealCcEmail) cc.push(bookingSettings.brokerDealCcEmail);
     if (agentEmail?.trim()) cc.push(agentEmail.trim());
   }
 
-  return { to: Array.from(to), cc };
+  // Always-BCC (e.g. Moxie's shared happier@ mailbox) from tenant settings
+  const bcc = bookingSettings.bccEmail?.trim() ? [bookingSettings.bccEmail.trim()] : [];
+
+  return { to: Array.from(to), cc, bcc };
 }
 
 /**
@@ -232,6 +257,27 @@ export interface BookingSender {
 function toBookingSender(sender?: BookingSender | string): BookingSender | undefined {
   if (!sender) return undefined;
   return typeof sender === 'string' ? { name: sender } : sender;
+}
+
+/**
+ * The signature shows the ORDER'S RESPONSIBLE user (salesRep) when known,
+ * falling back to the sender (Moxie: "insert Frederik auto signature if
+ * responsible is Frederik").
+ */
+export function resolveSignatureUser(order: BookingOrder, sender?: BookingSender): BookingSender | undefined {
+  if (order.salesRep?.name?.trim()) {
+    const rep = order.salesRep;
+    // Per-field fallback to the sender's contact details when the responsible
+    // user hasn't populated theirs (e.g. rep set but phone/skype empty).
+    return {
+      name: rep.name,
+      email: rep.email ?? sender?.email ?? null,
+      phone: rep.phone ?? sender?.phone ?? null,
+      skype: rep.skype ?? sender?.skype ?? null,
+      whatsapp: rep.whatsapp ?? sender?.whatsapp ?? null,
+    };
+  }
+  return sender;
 }
 
 /**
@@ -276,14 +322,14 @@ export function buildBookingSignatureHtml(
     .join('<br/>');
 
   return `<p style="margin: 16px 0 0;">Best regards,</p>
-<table style="border-collapse: collapse; width: 300px; max-width: 300px; margin: 8px 0 0; font-family: Verdana, sans-serif;">
+<table style="border-collapse: collapse; width: 300px; max-width: 300px; margin: 8px 0 0;">
   <tr>
     <td style="border-bottom: 1.5pt solid #16348C; padding: 0 0 2px;">
       <span style="font-size: 9pt; font-weight: bold; color: #16348C;">${escapeHtml(name)}</span>
     </td>
   </tr>
   <tr>
-    <td style="padding: 4px 0 0; font-size: 9pt; color: #16348C; font-family: Verdana, sans-serif;">${contactHtml}</td>
+    <td style="padding: 4px 0 0; font-size: 9pt; color: #16348C;">${contactHtml}</td>
   </tr>
 </table>${
     logoUrl
@@ -312,6 +358,8 @@ function buildBookingVars(order: BookingOrder, captainName: string, dates: strin
     orderNumber: order.orderNumber ?? '',
     senderName,
   };
+  // Line-based product block (pre-built escaped HTML) — used by line-based custom templates
+  const productLines = buildBookingProductLinesHtml(order.items ?? []);
   const html: Record<string, string> = {
     ...plain,
     captainName: escapeHtml(plain.captainName),
@@ -323,8 +371,10 @@ function buildBookingVars(order: BookingOrder, captainName: string, dates: strin
     deliveryMethod: escapeHtml(plain.deliveryMethod),
     orderNumber: escapeHtml(plain.orderNumber),
     senderName: escapeHtml(plain.senderName),
-    // Pre-built escaped HTML (buildBookingSignatureHtml escapes all values)
+    // Pre-built escaped HTML (buildBookingProductsHtml / buildBookingProductLinesHtml /
+    // buildBookingSignatureHtml escape all values)
     signatureHtml,
+    productLines,
   };
   return { plain, html };
 }
@@ -382,16 +432,21 @@ export async function composeBookingEmail(
   const captainName = await resolveCaptainName(order.vesselId);
   const dates = formatDates(order.eta ?? null, order.etd ?? null, defaultTimezone);
 
+  // The signature shows the ORDER'S RESPONSIBLE user (salesRep) when known,
+  // falling back to the sender (Moxie: "insert Frederik auto signature if
+  // responsible is Frederik").
+  const signatureUser = resolveSignatureUser(order, senderInfo);
+
   let signatureHtml = '';
-  if (senderInfo?.name?.trim()) {
-    const fromEmail = await resolveSignatureFromEmail(order.tenantId, senderInfo);
-    signatureHtml = buildBookingSignatureHtml(senderInfo, {
+  if (signatureUser?.name?.trim()) {
+    const fromEmail = await resolveSignatureFromEmail(order.tenantId, signatureUser);
+    signatureHtml = buildBookingSignatureHtml(signatureUser, {
       fromEmail,
       logoUrl: bookingSettings.signatureLogoUrl,
       website: bookingSettings.signatureWebsite,
     });
   }
-  const { plain, html } = buildBookingVars(order, captainName, dates, senderInfo?.name ?? '', signatureHtml);
+  const { plain, html } = buildBookingVars(order, captainName, dates, signatureUser?.name ?? '', signatureHtml);
 
   const subject = renderTemplate(tpl?.subjectTemplate ?? DEFAULT_SUBJECT, plain as any);
   const body = renderTemplate(tpl?.bodyTemplate ?? DEFAULT_BODY, html as any);

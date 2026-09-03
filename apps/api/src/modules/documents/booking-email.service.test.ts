@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { renderBookingEmail, formatDates, formatQty, buildBookingSignatureHtml } from './booking-email.service';
+import { renderBookingEmail, formatDates, formatQty, buildBookingSignatureHtml, resolveSignatureUser, buildBookingProductLinesHtml } from './booking-email.service';
 
 const baseOrder = {
   id: 'order-1',
@@ -139,6 +139,44 @@ describe('booking-email.service (pure rendering)', () => {
     expect(body).toContain('m: +971 (0) 55 246 8292');
     expect(body).toContain('whatsapp: +45 60 48 26 16');
     expect(body).toContain('happier@moxiebrokerage.com');
+  });
+
+  test('productLines: line-based product block with fra-til ranges', () => {
+    const lines = buildBookingProductLinesHtml([
+      { productType: 'VLSFO 0.5%', quantity: '400', quantityMin: '350', quantityMax: '400', unit: 'MT', description: 'ISO 8217 RMK380' },
+      { productType: 'LSMGO', quantity: '130', quantityMin: '100', unit: 'MT' },
+    ]);
+    expect(lines).toContain('Product: VLSFO 0.5% - ISO 8217 RMK380');
+    expect(lines).toContain('Qnty: 350 - 400 MT');
+    expect(lines).toContain('Product: LSMGO<br/>Qnty: 100 - 130 MT');
+  });
+
+  test('resolveSignatureUser: prefers the order\'s responsible (salesRep) over the sender', () => {
+    const order = {
+      ...baseOrder,
+      salesRep: { id: 'u1', name: 'Frederik Nissen', email: 'frederik@moxiebrokerage.com', phone: '+971 (0) 55 246 8292', skype: null, whatsapp: '+45 60 48 26 16' },
+    } as any;
+    const sig = resolveSignatureUser(order, { name: 'Daniel Kvist' });
+    expect(sig?.name).toBe('Frederik Nissen');
+    expect(sig?.phone).toBe('+971 (0) 55 246 8292');
+  });
+
+  test('resolveSignatureUser: merges sender contact fields when salesRep lacks them', () => {
+    const order = {
+      ...baseOrder,
+      salesRep: { id: 'u1', name: 'Frederik Nissen', email: 'frederik@moxiebrokerage.com', phone: null, skype: null, whatsapp: null },
+    } as any;
+    const sig = resolveSignatureUser(order, { name: 'Daniel Kvist', phone: '+45 30 497 777', skype: 'dkvist77' });
+    expect(sig?.name).toBe('Frederik Nissen');
+    expect(sig?.phone).toBe('+45 30 497 777');
+    expect(sig?.skype).toBe('dkvist77');
+  });
+
+  test('resolveSignatureUser: falls back to sender when no salesRep', () => {
+    const sig = resolveSignatureUser(baseOrder as any, { name: 'Daniel Kvist' });
+    expect(sig?.name).toBe('Daniel Kvist');
+    const sig2 = resolveSignatureUser(baseOrder as any);
+    expect(sig2).toBeUndefined();
   });
 
   test('signature values are HTML-escaped', () => {

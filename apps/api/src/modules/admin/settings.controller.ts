@@ -2115,6 +2115,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
         signatureLogoUrl: body.signatureLogoUrl,
         signatureWebsite: body.signatureWebsite,
         signatureFromEmail: body.signatureFromEmail,
+        bccEmail: body.bccEmail,
       });
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
@@ -2128,6 +2129,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       signatureLogoUrl: t.Optional(t.Nullable(t.String())),
       signatureWebsite: t.Optional(t.Nullable(t.String())),
       signatureFromEmail: t.Optional(t.Nullable(t.String({ format: 'email' }))),
+      bccEmail: t.Optional(t.Nullable(t.String({ format: 'email' }))),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update Bunker Booking email settings' },
   })

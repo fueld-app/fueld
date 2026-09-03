@@ -1192,7 +1192,7 @@ export async function getOrderById(idOrNumber: string) {
         .then((r) => r[0] ?? null),
       row.salesRepId
         ? db
-            .select({ id: users.id, name: users.name, email: users.email })
+            .select({ id: users.id, name: users.name, email: users.email, phone: users.phone, skype: users.skype, whatsapp: users.whatsapp })
             .from(users)
             .where(eq(users.id, row.salesRepId))
             .limit(1)

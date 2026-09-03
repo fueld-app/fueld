@@ -717,7 +717,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
                 const { subject, body: htmlBody } = await composeBookingEmail(fullOrder, senderUser
                   ? { name: senderName, email: senderUser.email, phone: senderUser.phone, skype: senderUser.skype, whatsapp: senderUser.whatsapp }
                   : 'Fueld');
-                const { to, cc } = await resolveBookingRecipients(fullOrder);
+                const { to, cc, bcc } = await resolveBookingRecipients(fullOrder);
                 if (to.length) {
                   await sendDocumentEmail({
                     documentType: 'BUNKER_BOOKING',
@@ -728,7 +728,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
                     senderName,
                     recipientEmails: to,
                     ccEmails: cc,
-                    bccEmails: [],
+                    bccEmails: bcc,
                     subject,
                     htmlBody,
                   });

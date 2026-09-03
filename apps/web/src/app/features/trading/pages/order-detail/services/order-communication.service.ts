@@ -102,7 +102,7 @@ export class OrderCommunicationService {
     this.emailPdfFileName.set('');
 
     this.http
-      .get<ApiResponse<{ to: string[]; cc: string[]; subject: string; body: string }>>(`${API_URL}/orders/${orderId}/booking-email`)
+      .get<ApiResponse<{ to: string[]; cc: string[]; bcc: string[]; subject: string; body: string }>>(`${API_URL}/orders/${orderId}/booking-email`)
       .subscribe({
         next: (res) => {
           if (!res.success || !res.data) {
@@ -113,9 +113,9 @@ export class OrderCommunicationService {
           emailModal?.showWith({
             recipientEmails: d.to,
             ccEmails: d.cc,
-            bccEmails: [],
+            bccEmails: d.bcc ?? [],
             defaultCcEmails: [],
-            defaultBccEmails: [],
+            defaultBccEmails: (d.bcc ?? []).map((email) => ({ email, label: null })),
             subject: d.subject,
             htmlBody: d.body,
             defaultPhoneOverride,
