@@ -605,6 +605,89 @@ describe('dashboard.service', () => {
     expect(metrics.winRate).toBe(0);
   });
 
+  // ─── Date Basis (delivery vs created) ─────────────────────
+
+  describe('date basis', () => {
+    it('parseDateBasis maps values correctly (delivery default-safe)', async () => {
+      const { parseDateBasis } = await loadDashboardService();
+      expect(parseDateBasis('delivery')).toBe('delivery');
+      expect(parseDateBasis('created')).toBe('created');
+      expect(parseDateBasis(undefined)).toBe('created');
+      expect(parseDateBasis('garbage')).toBe('created');
+    });
+
+    it('delivery basis counts delivered orders by deliveredAt, not createdAt', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder } = await loadOrdersService();
+      const { getPipelineSummary } = await loadDashboardService();
+
+      // Created in January, delivered in March
+      const order = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await db.update(orders).set({
+        status: 'DELIVERED',
+        createdAt: new Date('2026-01-10T10:00:00Z'),
+        deliveredAt: new Date('2026-03-15T10:00:00Z'),
+        updatedAt: new Date(),
+      }).where(eq(orders.id, order.id));
+
+      // Created basis: order belongs to January
+      const createdMarch = await getPipelineSummary(tenant.id, '2026-03-01', '2026-03-31', undefined, 'created');
+      expect(createdMarch.find((s) => s.status === 'DELIVERED')?.count ?? 0).toBe(0);
+      const createdJan = await getPipelineSummary(tenant.id, '2026-01-01', '2026-01-31', undefined, 'created');
+      expect(createdJan.find((s) => s.status === 'DELIVERED')?.count).toBe(1);
+
+      // Delivery basis: order belongs to March
+      const deliveryMarch = await getPipelineSummary(tenant.id, '2026-03-01', '2026-03-31', undefined, 'delivery');
+      expect(deliveryMarch.find((s) => s.status === 'DELIVERED')?.count).toBe(1);
+      const deliveryJan = await getPipelineSummary(tenant.id, '2026-01-01', '2026-01-31', undefined, 'delivery');
+      expect(deliveryJan.find((s) => s.status === 'DELIVERED')?.count ?? 0).toBe(0);
+    });
+
+    it('delivery basis counts undelivered orders by ETA and excludes orders with no ETA/deliveredAt', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder } = await loadOrdersService();
+      const { getTeamStats } = await loadDashboardService();
+      await db.update(users).set({ role: 'ADMIN', updatedAt: new Date() }).where(eq(users.id, user.id));
+
+      // Undelivered order with ETA in March (created in January)
+      const withEta = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await db.update(orders).set({
+        status: 'CONFIRMED',
+        createdAt: new Date('2026-01-05T10:00:00Z'),
+        eta: new Date('2026-03-20T10:00:00Z'),
+        updatedAt: new Date(),
+      }).where(eq(orders.id, withEta.id));
+
+      // Undelivered order with NO ETA (created in January) — excluded in delivery mode
+      const noEta = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await db.update(orders).set({
+        status: 'CONFIRMED',
+        createdAt: new Date('2026-01-06T10:00:00Z'),
+        updatedAt: new Date(),
+      }).where(eq(orders.id, noEta.id));
+
+      // Created basis, March filter: neither order (both created Jan)
+      const createdMarch = await getTeamStats(tenant.id, user.id, '2026-03-01', '2026-03-31', 'created');
+      expect(createdMarch.reduce((s, t) => s + t.orderCount, 0)).toBe(0);
+
+      // Delivery basis, March filter: only the ETA order
+      const deliveryMarch = await getTeamStats(tenant.id, user.id, '2026-03-01', '2026-03-31', 'delivery');
+      expect(deliveryMarch.reduce((s, t) => s + t.orderCount, 0)).toBe(1);
+
+      // Delivery basis, January filter: no order has deliveredAt/eta in January → empty
+      const deliveryJan = await getTeamStats(tenant.id, user.id, '2026-01-01', '2026-01-31', 'delivery');
+      expect(deliveryJan.reduce((s, t) => s + t.orderCount, 0)).toBe(0);
+    });
+  });
+
   // ─── Dashboard KPI Consistency ───────────────────────────────────
   // These tests verify that the numbers shown on the dashboard (as in
   // the screenshot) are internally consistent and computed correctly.

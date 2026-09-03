@@ -1,4 +1,4 @@
-import { eq, and, lt, sql, inArray, ne, notInArray, isNotNull, gte, lte, or, asc } from 'drizzle-orm';
+import { eq, and, lt, sql, inArray, ne, notInArray, isNotNull, gte, lte, or, asc, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   invoices,
@@ -17,6 +17,42 @@ import { calculateOrderEconomics, calculateRevenueBase, getFinancingRateAnnual }
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Service — Smart Aggregations
 // ═══════════════════════════════════════════════════════════════════════
+
+// ─── Order date-basis filtering ──────────────────────────────
+
+/**
+ * Which order date determines period membership on the dashboard.
+ *  - 'created': order row creation date (legacy behaviour)
+ *  - 'delivery': delivered date for delivered orders, ETA for undelivered ones.
+ *    Orders with NEITHER deliveredAt NOR eta are excluded (strict delivery view).
+ */
+export type DashboardDateBasis = 'created' | 'delivery';
+
+/** Push from/to period conditions for the given basis onto `conditions`. */
+function applyOrderPeriodFilter(
+  conditions: SQL[],
+  basis: DashboardDateBasis,
+  fromDate: Date | null,
+  toDate: Date | null,
+): void {
+  if (basis === 'delivery') {
+    // Strict delivery view: an order must have deliveredAt or ETA to belong to a period.
+    conditions.push(sql`(${orders.deliveredAt} IS NOT NULL OR ${orders.eta} IS NOT NULL)`);
+    if (fromDate) {
+      conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.eta}) >= ${fromDate.toISOString()}::timestamptz`);
+    }
+    if (toDate) {
+      conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.eta}) <= ${toDate.toISOString()}::timestamptz`);
+    }
+    return;
+  }
+  if (fromDate) conditions.push(gte(orders.createdAt, fromDate));
+  if (toDate) conditions.push(lte(orders.createdAt, toDate));
+}
+
+export function parseDateBasis(value: string | undefined): DashboardDateBasis {
+  return value === 'delivery' ? 'delivery' : 'created';
+}
 
 // ─── Collections (overdue invoices) ──────────────────────────────────
 
@@ -117,6 +153,7 @@ export async function getTeamStats(
   requestingUserId: string,
   from?: string,
   to?: string,
+  dateBasis: DashboardDateBasis = 'created',
 ): Promise<TraderStat[]> {
   // 1. Find which trader IDs the requesting user can see
   const visibleTraderIds = await resolveVisibleTraderIds(tenantId, requestingUserId);
@@ -135,8 +172,7 @@ export async function getTeamStats(
     inArray(orders.salesRepId, visibleTraderIds),
     notInArray(orders.status, revenueExcludedStatuses),
   ];
-  if (fromDate) baseConditions.push(gte(orders.createdAt, fromDate));
-  if (toDate) baseConditions.push(lte(orders.createdAt, toDate));
+  applyOrderPeriodFilter(baseConditions, dateBasis, fromDate, toDate);
 
   const orderRows = await db
     .select({
@@ -272,10 +308,15 @@ export async function getPipelineSummary(
   from?: string,
   to?: string,
   userId?: string,
+  dateBasis: DashboardDateBasis = 'created',
 ): Promise<PipelineSummary[]> {
   const conditions = [eq(orders.tenantId, tenantId)];
-  if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
-  if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
+  applyOrderPeriodFilter(
+    conditions,
+    dateBasis,
+    from ? new Date(`${from}T00:00:00`) : null,
+    to ? new Date(`${to}T23:59:59`) : null,
+  );
   if (userId) conditions.push(eq(orders.salesRepId, userId));
 
   const orderRows = await db
@@ -336,14 +377,19 @@ export async function getLossAnalysis(
   from?: string,
   to?: string,
   userId?: string,
+  dateBasis: DashboardDateBasis = 'created',
 ): Promise<{ reasons: LossReason[]; totalCancelled: number }> {
   const conditions = [
     eq(orders.tenantId, tenantId),
     inArray(orders.status, ['CANCELLED', 'LOST']),
     isNotNull(orders.lossReason),
   ];
-  if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
-  if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
+  applyOrderPeriodFilter(
+    conditions,
+    dateBasis,
+    from ? new Date(`${from}T00:00:00`) : null,
+    to ? new Date(`${to}T23:59:59`) : null,
+  );
   if (userId) conditions.push(eq(orders.salesRepId, userId));
 
   const results = await db
@@ -389,10 +435,15 @@ export async function getConversionMetrics(
   from?: string,
   to?: string,
   userId?: string,
+  dateBasis: DashboardDateBasis = 'created',
 ): Promise<ConversionMetrics> {
   const conditions = [eq(orders.tenantId, tenantId)];
-  if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
-  if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
+  applyOrderPeriodFilter(
+    conditions,
+    dateBasis,
+    from ? new Date(`${from}T00:00:00`) : null,
+    to ? new Date(`${to}T23:59:59`) : null,
+  );
   if (userId) conditions.push(eq(orders.salesRepId, userId));
 
   const wonStatuses = ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'];

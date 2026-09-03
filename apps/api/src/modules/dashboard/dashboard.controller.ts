@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { getCollections, getTeamStats, getPipelineSummary, getLossAnalysis, getConversionMetrics, getFollowUps } from './dashboard.service';
+import { getCollections, getTeamStats, getPipelineSummary, getLossAnalysis, getConversionMetrics, getFollowUps, parseDateBasis } from './dashboard.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Controller
@@ -32,6 +32,7 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
         from: t.Optional(t.String()),
         to: t.Optional(t.String()),
         userId: t.Optional(t.String()),
+        dateBasis: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Dashboard'],
@@ -51,8 +52,8 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
       if (isLightUser(auth.role)) {
         return { traders: [] };
       }
-      const params = query as { from?: string; to?: string };
-      const stats = await getTeamStats(auth.tenantId, auth.userId, params.from, params.to);
+      const params = query as { from?: string; to?: string; dateBasis?: string };
+      const stats = await getTeamStats(auth.tenantId, auth.userId, params.from, params.to, parseDateBasis(params.dateBasis));
       return { traders: stats };
     },
     {
@@ -60,6 +61,7 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
         from: t.Optional(t.String()),
         to: t.Optional(t.String()),
         userId: t.Optional(t.String()),
+        dateBasis: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Dashboard'],
@@ -75,8 +77,8 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   .get(
     '/pipeline',
     async ({ auth, query }) => {
-      const params = query as { from?: string; to?: string; userId?: string };
-      const pipeline = await getPipelineSummary(auth.tenantId, params.from, params.to, params.userId);
+      const params = query as { from?: string; to?: string; userId?: string; dateBasis?: string };
+      const pipeline = await getPipelineSummary(auth.tenantId, params.from, params.to, params.userId, parseDateBasis(params.dateBasis));
       // LIGHT users see pipeline counts but NOT dollar values
       if (isLightUser(auth.role)) {
         return { stages: pipeline.map((s) => ({ ...s, totalValue: '0' })) };
@@ -88,6 +90,7 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
         from: t.Optional(t.String()),
         to: t.Optional(t.String()),
         userId: t.Optional(t.String()),
+        dateBasis: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Dashboard'],
@@ -102,14 +105,15 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   .get(
     '/loss-analysis',
     async ({ auth, query }) => {
-      const params = query as { from?: string; to?: string; userId?: string };
-      return getLossAnalysis(auth.tenantId, params.from, params.to, params.userId);
+      const params = query as { from?: string; to?: string; userId?: string; dateBasis?: string };
+      return getLossAnalysis(auth.tenantId, params.from, params.to, params.userId, parseDateBasis(params.dateBasis));
     },
     {
       query: t.Object({
         from: t.Optional(t.String()),
         to: t.Optional(t.String()),
         userId: t.Optional(t.String()),
+        dateBasis: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Dashboard'],
@@ -124,14 +128,15 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   .get(
     '/conversion',
     async ({ auth, query }) => {
-      const params = query as { from?: string; to?: string; userId?: string };
-      return getConversionMetrics(auth.tenantId, params.from, params.to, params.userId);
+      const params = query as { from?: string; to?: string; userId?: string; dateBasis?: string };
+      return getConversionMetrics(auth.tenantId, params.from, params.to, params.userId, parseDateBasis(params.dateBasis));
     },
     {
       query: t.Object({
         from: t.Optional(t.String()),
         to: t.Optional(t.String()),
         userId: t.Optional(t.String()),
+        dateBasis: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Dashboard'],
@@ -155,6 +160,7 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
         from: t.Optional(t.String()),
         to: t.Optional(t.String()),
         userId: t.Optional(t.String()),
+        dateBasis: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Dashboard'],

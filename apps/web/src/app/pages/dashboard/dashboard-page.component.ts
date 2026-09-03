@@ -83,6 +83,27 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
               <span class="text-sm font-medium text-gray-600 dark:text-ink-dim">Team View</span>
             </div>
           }
+          <!-- Date basis toggle: Delivery (delivered date / ETA) vs Created -->
+          <div class="flex items-center gap-2" title="Count orders by delivery date (or ETA) vs by the date they were created">
+            <span class="text-sm font-medium text-gray-600 dark:text-ink-dim" [class.opacity-40]="dateBasis() !== 'delivery'">Delivery</span>
+            <button
+              (click)="toggleDateBasis()"
+              [class.bg-brand-700]="dateBasis() === 'created'"
+              [class.bg-surface-3]="dateBasis() !== 'created'"
+              class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2"
+              role="switch"
+              [attr.aria-checked]="dateBasis() === 'created'"
+            >
+              <span class="sr-only">Toggle date basis</span>
+              <span
+                aria-hidden="true"
+                [class.translate-x-5]="dateBasis() === 'created'"
+                [class.translate-x-0]="dateBasis() !== 'created'"
+                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out"
+              ></span>
+            </button>
+            <span class="text-sm font-medium text-gray-600 dark:text-ink-dim" [class.opacity-40]="dateBasis() !== 'created'">Created</span>
+          </div>
           <div class="relative" #dateDropdown>
             <button
               (click)="dateDropdownOpen.set(!dateDropdownOpen())"
@@ -452,6 +473,16 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   // ─── State ───────────────────────────────────────────────────────
   readonly teamView = signal(false);
+
+  /**
+   * Which order date drives the timespan metrics.
+   *  - 'delivery' (default): delivered orders count by delivered date, undelivered by ETA
+   *  - 'created': legacy behaviour (order creation date)
+   * Persisted per-user in localStorage.
+   */
+  readonly dateBasis = signal<'delivery' | 'created'>(
+    localStorage.getItem('fueld.dashboard.dateBasis') === 'created' ? 'created' : 'delivery',
+  );
   readonly collections = signal<CollectionsResponseDto>({ items: [], count: 0 });
   readonly rawTraderStats = signal<TraderStatsDto[]>([]);
   readonly teamStats = signal<TeamStatsResponseDto>({
@@ -522,7 +553,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   readonly kpiCards = computed(() => {
     const cards = [
-      { label: 'Total Orders', value: this.teamStats().activeOrders.toString(), description: 'Count of all non-inquiry, non-cancelled orders in the selected period.' },
+      { label: 'Total Orders', value: this.teamStats().activeOrders.toString(), description: this.dateBasis() === 'delivery' ? 'Count of all non-inquiry, non-cancelled orders delivered (or due per ETA) in the selected period. Orders without a delivery date or ETA are excluded.' : 'Count of all non-inquiry, non-cancelled orders in the selected period.' },
     ];
     if (this.auth.canSeePrices()) {
       cards.push(
@@ -542,6 +573,17 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     this.teamView.update((current) => !current);
     void this.loadDashboardData();
     void this.loadFollowUps();
+  }
+
+  toggleDateBasis(): void {
+    const next = this.dateBasis() === 'delivery' ? 'created' : 'delivery';
+    this.dateBasis.set(next);
+    try {
+      localStorage.setItem('fueld.dashboard.dateBasis', next);
+    } catch {
+      // localStorage unavailable (private mode etc.) — toggle still works for this session
+    }
+    void this.loadDashboardData();
   }
 
   selectDatePreset(key: string): void {
@@ -591,6 +633,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       params.set('from', this.formatDateForQuery(range.from));
       params.set('to', this.formatDateForQuery(range.to));
     }
+    params.set('dateBasis', this.dateBasis());
     // "My Orders" mode: filter server-side by current user
     const isMyOrders = this.canUseTeamView() ? !this.teamView() : true;
     if (isMyOrders) {
