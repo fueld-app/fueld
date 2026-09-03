@@ -687,6 +687,19 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     detail: { tags: ['Admin Settings'], summary: 'Get tenant-configurable custom columns for current tenant' },
   })
 
+  .get('/my-booking-column', async ({ auth }) => {
+    try {
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      const enabled = !!(tenant?.settings as any)?.bookingEmail?.bookingColumnEnabled;
+      return { success: true, data: { enabled } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Whether the Sendt Bunker Booking indicator column is enabled for this tenant' },
+  })
+
   .put('/custom-columns', async ({ auth, body }) => {
     try {
       requireAdmin(auth);

@@ -262,6 +262,7 @@ export interface TenantSettings {
     signatureWebsite?: string | null;   // Website line in the booking-email signature (e.g. 'www.moxiebrokerage.com')
     signatureFromEmail?: string | null; // e: line override in the signature (e.g. shared 'happier@' mailbox); falls back to shared-sender email, then user email
     bccEmail?: string | null;           // Always-BCC address on booking emails (e.g. shared 'happier@' mailbox)
+    bookingColumnEnabled?: boolean;     // Show the Sendt Bunker Booking indicator column on order lists (Moxie only by default)
     fontFamily?: string | null;         // Font stack for booking emails (default "'Segoe UI', Arial, sans-serif"; Moxie uses Aptos)
   };
   // Configurable reasons required when cancelling inquiries

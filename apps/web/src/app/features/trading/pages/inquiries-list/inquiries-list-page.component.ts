@@ -360,7 +360,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
               <div class="flex items-center justify-between mb-2">
                 <span class="min-w-0 font-semibold text-gray-900 dark:text-ink">{{ inq.clientName }}</span>
                 <span class="flex items-center gap-1.5">
-                  @if (isOrders()) {
+                  @if (isOrders() && bookingColumnEnabled()) {
                     <button type="button"
                       class="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full"
                       [class.bg-green-500]="!!inq.bunkerBookingSentAt"
@@ -540,6 +540,10 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly inquiries = signal<OrderListRowDto[]>([]);
   /** Tenant-configurable custom columns (loaded from admin settings). */
   readonly customColumns = signal<CustomColumnDef[]>([]);
+  /** 'Sendt Bunker Booking' indicator column — tenant config (bookingEmail.bookingColumnEnabled, Moxie only). */
+  readonly bookingColumnEnabled = signal(false);
+  /** True once the tenant flag has been fetched — prefs cleanup must not run before that. */
+  readonly bookingColumnLoaded = signal(false);
   /** Inline-editing state for a custom column cell. */
   readonly editingCustomCell = signal<{ orderId: string; key: string } | null>(null);
   readonly editingCustomValue = signal<string>('');
@@ -590,8 +594,8 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       { field: 'dueDate', label: 'Due Date', sortable: true },
       { field: 'createdAt', label: 'Created', sortable: true },
     ];
-    // "Sendt Bunker Booking" red/green indicator — orders only (Moxie request).
-    if (this.isOrders()) {
+    // "Sendt Bunker Booking" red/green indicator — orders only, tenant-gated (Moxie request).
+    if (this.isOrders() && this.bookingColumnEnabled()) {
       base.splice(base.findIndex((c) => c.field === 'status') + 1, 0, { field: 'booking', label: 'Booking', sortable: false });
     }
     if (this.auth.canSeePrices()) {
@@ -613,7 +617,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   readonly defaultVisibleColumns = computed<string[]>(() => {
     const base = ['orderNumber', 'client', 'vessel', 'port', 'status', 'responsible', 'eta', 'createdAt'];
-    if (this.isOrders()) {
+    if (this.isOrders() && this.bookingColumnEnabled()) {
       base.splice(base.indexOf('status') + 1, 0, 'booking');
     }
     if (this.isDeliveredOrders() || this.isInvoicedOrders() || this.isCompletedOrders()) {
@@ -647,21 +651,19 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     const cfg = this.columnConfig();
     const saved = cfg.visible;
     if (!saved) return this.defaultVisibleColumns();
-    // The "Booking" indicator column is new — users with saved column prefs
-    // would never see it. Inject it once (after Status); a marker in the
-    // prefs prevents re-injecting after the user deliberately hides it.
-    if (this.isOrders() && !saved.includes('booking') && !(cfg as any).bookingInjected) {
-      const withBooking = [...saved];
-      const statusIdx = withBooking.indexOf('status');
-      withBooking.splice(statusIdx >= 0 ? statusIdx + 1 : 0, 0, 'booking');
-      queueMicrotask(() => this.userPrefs.patch({
-        [`orderList_${this.resolvedMode()}`]: {
-          visible: withBooking,
-          order: this.columnOrder(),
-          bookingInjected: true,
-        },
-      } as Partial<UserUiPreferences>));
-      return withBooking;
+    // Hide the Booking column for tenants without the feature even if it was
+    // injected into saved prefs earlier (it was briefly pushed to all tenants).
+    if (this.isOrders() && this.bookingColumnLoaded() && !this.bookingColumnEnabled()) {
+      const cleaned = saved.filter((f) => f !== 'booking');
+      if (cleaned.length !== saved.length) {
+        queueMicrotask(() => this.userPrefs.patch({
+          [`orderList_${this.resolvedMode()}`]: {
+            visible: cleaned,
+            order: this.columnOrder(),
+          },
+        } as Partial<UserUiPreferences>));
+        return cleaned;
+      }
     }
     return saved;
   });
@@ -901,6 +903,15 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       }
     } catch {
       // Custom columns are optional — fail silently.
+    }
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ enabled: boolean }>>(`${API}/admin/settings/my-booking-column`),
+      );
+      this.bookingColumnEnabled.set(!!res.data?.enabled);
+      this.bookingColumnLoaded.set(true);
+    } catch {
+      // Flag fetch failed — leave saved prefs untouched (no cleanup) this session.
     }
   }
 
