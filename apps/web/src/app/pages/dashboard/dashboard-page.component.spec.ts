@@ -57,6 +57,25 @@ describe('DashboardPageComponent — date basis', () => {
     localStorage.removeItem(LS_KEY);
   });
 
+  it('toggleTeamView persists teamView to localStorage (default false)', async () => {
+    const component = await createComponent();
+    expect(component.teamView()).toBe(false);
+    component.toggleTeamView();
+    expect(component.teamView()).toBe(true);
+    expect(localStorage.getItem('fueld.dashboard.teamView')).toBe('true');
+    component.toggleTeamView();
+    expect(component.teamView()).toBe(false);
+    expect(localStorage.getItem('fueld.dashboard.teamView')).toBe('false');
+    localStorage.removeItem('fueld.dashboard.teamView');
+  });
+
+  it('teamView restores from localStorage when saved true', async () => {
+    localStorage.setItem('fueld.dashboard.teamView', 'true');
+    const component = await createComponent();
+    expect(component.teamView()).toBe(true);
+    localStorage.removeItem('fueld.dashboard.teamView');
+  });
+
   it('buildDateQuery includes the current dateBasis param', async () => {
     const component = await createComponent();
     // component selectedDatePreset defaults to this_month

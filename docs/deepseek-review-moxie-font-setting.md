@@ -25,3 +25,12 @@ None.
 - P2-1 (CSS injection): tenant-admin-only setting; maxLength 200 added; noted.
 - P2-2 (helper text): fixed to match the default constant.
 - P2-3 (maxLength): added in controller schema.
+
+---
+
+## Follow-up: teamView localStorage persistence (2026-09-03)
+
+DeepSeek review of the teamView persistence diff: Approve, no P0/P1. P2-1 (unguarded
+localStorage read in signal initializer) — applied: shared tryLocalStorageGet() helper,
+used by BOTH teamView and dateBasis initializers. P2-2 (test cleanup) — beforeEach already
+clears keys.

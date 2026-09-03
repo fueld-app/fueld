@@ -43,6 +43,16 @@ type DashboardFollowUpItem = {
 
 const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
 
+/** localStorage.getItem that never throws (private mode / sandboxed iframe). */
+function tryLocalStorageGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Page — Manager view with collections and team stats
 // ═══════════════════════════════════════════════════════════════════════
@@ -472,7 +482,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   };
 
   // ─── State ───────────────────────────────────────────────────────
-  readonly teamView = signal(false);
+  readonly teamView = signal(tryLocalStorageGet('fueld.dashboard.teamView') === 'true');
 
   /**
    * Which order date drives the timespan metrics.
@@ -481,7 +491,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
    * Persisted per-user in localStorage.
    */
   readonly dateBasis = signal<'delivery' | 'created'>(
-    localStorage.getItem('fueld.dashboard.dateBasis') === 'created' ? 'created' : 'delivery',
+    tryLocalStorageGet('fueld.dashboard.dateBasis') === 'created' ? 'created' : 'delivery',
   );
   readonly collections = signal<CollectionsResponseDto>({ items: [], count: 0 });
   readonly rawTraderStats = signal<TraderStatsDto[]>([]);
@@ -570,7 +580,15 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   // ─── Actions ─────────────────────────────────────────────────────
 
   toggleTeamView(): void {
-    this.teamView.update((current) => !current);
+    this.teamView.update((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem('fueld.dashboard.teamView', String(next));
+      } catch {
+        // localStorage unavailable — toggle still works for this session
+      }
+      return next;
+    });
     void this.loadDashboardData();
     void this.loadFollowUps();
   }
