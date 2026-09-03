@@ -11,6 +11,8 @@ import {
   updateUserAllowedIps,
   adminReset2fa,
   updateUserPhone,
+  updateUserSkype,
+  updateUserWhatsapp,
   updateUserName,
 } from './admin.service';
 import { disconnectUserSessions } from '../activity/session-tracker';
@@ -339,6 +341,36 @@ export const adminController = new Elysia({ prefix: '/admin' })
     params: t.Object({ id: t.String() }),
     body: t.Object({ phone: t.Union([t.String(), t.Null()]) }),
     detail: { tags: ['Admin'], summary: 'Update user phone number', security: [{ bearerAuth: [] }] },
+  })
+
+  .patch('/users/:id/skype', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateUserSkype(params.id, body.skype);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update skype';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({ skype: t.Union([t.String(), t.Null()]) }),
+    detail: { tags: ['Admin'], summary: 'Update user skype handle (booking-email signature)', security: [{ bearerAuth: [] }] },
+  })
+
+  .patch('/users/:id/whatsapp', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateUserWhatsapp(params.id, body.whatsapp);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update whatsapp';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({ whatsapp: t.Union([t.String(), t.Null()]) }),
+    detail: { tags: ['Admin'], summary: 'Update user whatsapp number (booking-email signature)', security: [{ bearerAuth: [] }] },
   })
 
   // ── POST /admin/users/:id/reset-2fa ──────────────────────────────

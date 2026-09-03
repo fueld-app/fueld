@@ -30,6 +30,8 @@ export async function listUsers() {
       passkeyCount: sql<number>`count(${passkeys.id})`,
       isActive: users.isActive,
       phone: users.phone,
+      skype: users.skype,
+      whatsapp: users.whatsapp,
       allowedIps: users.allowedIps,
       createdAt: users.createdAt,
     })
@@ -509,6 +511,30 @@ export async function updateUserPhone(userId: string, phone: string | null) {
   if (!updated) throw new Error('User not found');
 
   return { id: updated.id, phone: updated.phone ?? null };
+}
+
+export async function updateUserSkype(userId: string, skype: string | null) {
+  const [updated] = await db
+    .update(users)
+    .set({ skype: skype?.trim() || null, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
+
+  if (!updated) throw new Error('User not found');
+
+  return { id: updated.id, skype: updated.skype ?? null };
+}
+
+export async function updateUserWhatsapp(userId: string, whatsapp: string | null) {
+  const [updated] = await db
+    .update(users)
+    .set({ whatsapp: whatsapp?.trim() || null, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
+
+  if (!updated) throw new Error('User not found');
+
+  return { id: updated.id, whatsapp: updated.whatsapp ?? null };
 }
 
 // ── Get User Allowed IPs (for auth check) ────────────────────────────

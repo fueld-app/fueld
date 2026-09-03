@@ -813,6 +813,13 @@
       "when": 1788160000000,
       "tag": "0115_bunker_booking_sent",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1788160001000,
+      "tag": "0116_user_signature_fields",
+      "breakpoints": true
     }
   ]
 }

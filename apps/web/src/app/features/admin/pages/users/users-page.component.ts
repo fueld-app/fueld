@@ -211,6 +211,8 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Email</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Phone</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim" title="Shown in the booking-email signature">Skype</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim" title="Shown in the booking-email signature">WhatsApp</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Role</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Team</th>
                 <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Auth</th>
@@ -276,6 +278,52 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                         title="Click to edit phone"
                       >
                         {{ user.phone || '—' }}
+                      </button>
+                    }
+                  </td>
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
+                    @if (editingSignatureField() === user.id + ':skype') {
+                      <form (ngSubmit)="saveSignatureEdit(user.id, 'skype')" class="flex items-center gap-1">
+                        <input
+                          type="text"
+                          [(ngModel)]="editingSignatureValue"
+                          name="skype"
+                          placeholder="skype handle"
+                          class="w-28 rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                          (blur)="saveSignatureEdit(user.id, 'skype')"
+                          (keydown.escape)="editingSignatureField.set(null)"
+                        />
+                      </form>
+                    } @else {
+                      <button
+                        (click)="startEditSignature(user, 'skype')"
+                        class="text-xs text-gray-500 dark:text-muted hover:text-brand-600 transition-colors cursor-pointer"
+                        title="Click to edit skype (booking-email signature)"
+                      >
+                        {{ user.skype || '—' }}
+                      </button>
+                    }
+                  </td>
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
+                    @if (editingSignatureField() === user.id + ':whatsapp') {
+                      <form (ngSubmit)="saveSignatureEdit(user.id, 'whatsapp')" class="flex items-center gap-1">
+                        <input
+                          type="tel"
+                          [(ngModel)]="editingSignatureValue"
+                          name="whatsapp"
+                          placeholder="+45 2613 1217"
+                          class="w-32 rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                          (blur)="saveSignatureEdit(user.id, 'whatsapp')"
+                          (keydown.escape)="editingSignatureField.set(null)"
+                        />
+                      </form>
+                    } @else {
+                      <button
+                        (click)="startEditSignature(user, 'whatsapp')"
+                        class="text-xs text-gray-500 dark:text-muted hover:text-brand-600 transition-colors cursor-pointer"
+                        title="Click to edit whatsapp (booking-email signature)"
+                      >
+                        {{ user.whatsapp || '—' }}
                       </button>
                     }
                   </td>
@@ -732,6 +780,10 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   readonly editingPhoneId = signal<string | null>(null);
   editingPhoneValue = '';
 
+  // Signature field editing (skype / whatsapp for the booking-email signature)
+  readonly editingSignatureField = signal<string | null>(null);
+  editingSignatureValue = '';
+
   // Name editing
   readonly editingNameId = signal<string | null>(null);
   editingNameValue = '';
@@ -991,6 +1043,43 @@ export class UsersPageComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       console.error('Failed to update phone:', err);
+    }
+  }
+
+  // ── Signature field editing (skype / whatsapp) ───────────────
+
+  private signatureEditOriginal = '';
+
+  startEditSignature(user: AdminUserDto, field: 'skype' | 'whatsapp') {
+    this.editingSignatureField.set(user.id + ':' + field);
+    this.editingSignatureValue = (field === 'skype' ? user.skype : user.whatsapp) ?? '';
+    this.signatureEditOriginal = this.editingSignatureValue;
+  }
+
+  async saveSignatureEdit(userId: string, field: 'skype' | 'whatsapp') {
+    const value = this.editingSignatureValue.trim() || null;
+    this.editingSignatureField.set(null);
+    if (this.editingSignatureValue === this.signatureEditOriginal) {
+      return; // unchanged — skip the request
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<{ id: string; skype: string | null; whatsapp: string | null }>>(
+          `${API}/admin/users/${userId}/${field}`,
+          { [field]: value },
+        ),
+      );
+
+      if (res.success && res.data) {
+        // Update only the edited field — the PATCH response contains just that field
+        const updated = field === 'skype' ? { skype: res.data.skype } : { whatsapp: res.data.whatsapp };
+        this.users.update((list) =>
+          list.map((u) => (u.id === userId ? { ...u, ...updated } : u)),
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update signature field:', err);
     }
   }
 

@@ -6,7 +6,7 @@
 
 import { eq } from 'drizzle-orm';
 import { db } from '../../db';
-import { vesselPersons, companyContacts } from '../../db/schema';
+import { vesselPersons, companyContacts, tenants } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate } from '../admin/email-settings.service';
 import { getTimezoneSettings, getBookingEmailSettings } from '../admin/settings.service';
 
@@ -77,7 +77,7 @@ const DEFAULT_BODY = `<div style="font-family: 'Segoe UI', Arial, sans-serif; co
 
 <p style="margin-top: 16px;">Agents: kindly assist us with the coordination of this supply and do the needful to secure a smooth operation without any delays.</p>
 
-{{#if senderName}}<p>Best regards,<br/>\${senderName}</p>{{/if}}
+{{#if signatureHtml}}\${signatureHtml}{{/if}}
 </div>`;
 
 /** Build the products table HTML for the booking email body. */
@@ -150,6 +150,8 @@ function formatQty(item: BookingItem): string {
   const max = item.quantityMax;
   const unit = item.unit ?? 'MT';
   if (min && max) return `${stripNum(min)} - ${stripNum(max)} ${unit}`;
+  // Stem range (fra-til): quantity_min is the minimum, quantity is the full/target
+  if (min && stripNum(min) !== stripNum(item.quantity)) return `${stripNum(min)} - ${stripNum(item.quantity)} ${unit}`;
   if (max) return `${stripNum(max)} ${unit}`;
   return `${stripNum(item.quantity)} ${unit}`;
 }
@@ -216,12 +218,88 @@ export async function resolveBookingRecipients(order: BookingOrder): Promise<{ t
 }
 
 /**
+ * Sender info for the booking-email closing block / signature.
+ * Accepts a plain string (display name only) for backward compatibility.
+ */
+export interface BookingSender {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  skype?: string | null;
+  whatsapp?: string | null;
+}
+
+function toBookingSender(sender?: BookingSender | string): BookingSender | undefined {
+  if (!sender) return undefined;
+  return typeof sender === 'string' ? { name: sender } : sender;
+}
+
+/**
+ * Build the closing block for the booking email: "Best regards," + a styled
+ * signature (name, contact lines, optional logo) when signature data exists,
+ * falling back to the legacy "Best regards,\u200bName" markup otherwise.
+ *
+ * All interpolated values are HTML-escaped.
+ */
+export function buildBookingSignatureHtml(
+  sender: BookingSender,
+  opts: { fromEmail?: string | null; logoUrl?: string | null; website?: string | null } = {},
+): string {
+  const name = sender.name?.trim();
+  if (!name) return '';
+
+  const email = opts.fromEmail?.trim() || sender.email?.trim() || '';
+  const website = opts.website?.trim() || '';
+  const logoUrl = opts.logoUrl?.trim() || '';
+
+  const hasContact = Boolean(sender.phone?.trim() || sender.skype?.trim() || sender.whatsapp?.trim() || email || website || logoUrl);
+
+  // Legacy fallback: plain "Best regards, Name" when there is no signature data.
+  if (!hasContact) {
+    return `<p>Best regards,<br/>${escapeHtml(name)}</p>`;
+  }
+
+  const contactLines: string[] = [];
+  const mLine = [sender.phone?.trim() ? escapeHtml(sender.phone.trim()) : '', sender.skype?.trim() ? `s: ${escapeHtml(sender.skype.trim())}` : '']
+    .filter(Boolean)
+    .join(' ◦ ');
+  if (mLine) contactLines.push(`m: ${mLine}`);
+  if (sender.whatsapp?.trim()) contactLines.push(`whatsapp: ${escapeHtml(sender.whatsapp.trim())}`);
+  if (email) contactLines.push(`e: <a href="mailto:${escapeHtml(email)}" style="color: #0563C1;">${escapeHtml(email)}</a>`);
+  if (website) {
+    const site = website.replace(/^https?:\/\//, '');
+    contactLines.push(`w: <a href="https://${escapeHtml(site)}" style="color: #0563C1;">${escapeHtml(site)}</a>`);
+  }
+
+  const contactHtml = contactLines
+    .map((line) => `<span style="display: inline-block; margin: 1px 0;">${line}</span>`)
+    .join('<br/>');
+
+  return `<p style="margin: 16px 0 0;">Best regards,</p>
+<table style="border-collapse: collapse; width: 300px; max-width: 300px; margin: 8px 0 0; font-family: Verdana, sans-serif;">
+  <tr>
+    <td style="border-bottom: 1.5pt solid #16348C; padding: 0 0 2px;">
+      <span style="font-size: 9pt; font-weight: bold; color: #16348C;">${escapeHtml(name)}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 4px 0 0; font-size: 9pt; color: #16348C; font-family: Verdana, sans-serif;">${contactHtml}</td>
+  </tr>
+</table>${
+    logoUrl
+      ? `<img src="${escapeHtml(logoUrl)}" width="220" style="margin-top: 8px; display: block;" alt="logo" />`
+      : ''
+  }`;
+}
+
+/**
  * Build the template variables for the booking email.
  * `plain` values are for the subject line (no escaping); `html` values are
- * HTML-escaped for safe inclusion in the HTML body. `products` is already
- * valid HTML (built with escaping in buildBookingProductsHtml).
+ * HTML-escaped for safe inclusion in the HTML body. `products` and
+ * `signatureHtml` are already valid HTML (built with escaping in
+ * buildBookingProductsHtml / buildBookingSignatureHtml).
  */
-function buildBookingVars(order: BookingOrder, captainName: string, dates: string, senderName: string) {
+function buildBookingVars(order: BookingOrder, captainName: string, dates: string, senderName: string, signatureHtml: string) {
   const plain: Record<string, string> = {
     captainName,
     vesselName: order.vessel?.name ?? '',
@@ -245,6 +323,8 @@ function buildBookingVars(order: BookingOrder, captainName: string, dates: strin
     deliveryMethod: escapeHtml(plain.deliveryMethod),
     orderNumber: escapeHtml(plain.orderNumber),
     senderName: escapeHtml(plain.senderName),
+    // Pre-built escaped HTML (buildBookingSignatureHtml escapes all values)
+    signatureHtml,
   };
   return { plain, html };
 }
@@ -254,26 +334,64 @@ export function renderBookingEmail(
   order: BookingOrder,
   captainName: string,
   timezone?: string | null,
-  senderName?: string,
+  sender?: BookingSender | string,
+  signatureHtml?: string,
 ): { subject: string; body: string } {
+  const senderInfo = toBookingSender(sender);
   const dates = formatDates(order.eta ?? null, order.etd ?? null, timezone);
-  const { plain, html } = buildBookingVars(order, captainName, dates, senderName ?? '');
+  const closing = signatureHtml ?? buildBookingSignatureHtml(senderInfo ?? { name: '' });
+  const { plain, html } = buildBookingVars(order, captainName, dates, senderInfo?.name ?? '', closing);
 
   const subject = renderTemplate(DEFAULT_SUBJECT, plain as any);
   const body = renderTemplate(DEFAULT_BODY, html as any);
   return { subject, body };
 }
 
+/**
+ * Resolve the signature "e:" line: explicit signatureFromEmail override,
+ * else the tenant's shared-sender mailbox, else the sender's own email.
+ */
+async function resolveSignatureFromEmail(tenantId: string, sender?: BookingSender): Promise<string | null> {
+  try {
+    const { signatureFromEmail } = await getBookingEmailSettings();
+    if (signatureFromEmail?.trim()) return signatureFromEmail.trim();
+    const [t] = await db
+      .select({ settings: tenants.settings })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    const shared = (t?.settings ?? {} as any).microsoftSharedSenderEmail;
+    if (shared) return String(shared).trim();
+  } catch {
+    // Settings unavailable — fall through to sender email
+  }
+  return sender?.email?.trim() || null;
+}
+
 /** Compose subject + html body from the order + the BUNKER_BOOKING template. */
 export async function composeBookingEmail(
   order: BookingOrder,
-  senderName?: string,
+  sender?: BookingSender | string,
 ): Promise<{ subject: string; body: string }> {
+  const senderInfo = toBookingSender(sender);
   const tpl = await getEmailTemplate(order.tenantId, 'BUNKER_BOOKING');
-  const { defaultTimezone } = await getTimezoneSettings();
+  const [{ defaultTimezone }, bookingSettings] = await Promise.all([
+    getTimezoneSettings(),
+    getBookingEmailSettings(),
+  ]);
   const captainName = await resolveCaptainName(order.vesselId);
   const dates = formatDates(order.eta ?? null, order.etd ?? null, defaultTimezone);
-  const { plain, html } = buildBookingVars(order, captainName, dates, senderName ?? '');
+
+  let signatureHtml = '';
+  if (senderInfo?.name?.trim()) {
+    const fromEmail = await resolveSignatureFromEmail(order.tenantId, senderInfo);
+    signatureHtml = buildBookingSignatureHtml(senderInfo, {
+      fromEmail,
+      logoUrl: bookingSettings.signatureLogoUrl,
+      website: bookingSettings.signatureWebsite,
+    });
+  }
+  const { plain, html } = buildBookingVars(order, captainName, dates, senderInfo?.name ?? '', signatureHtml);
 
   const subject = renderTemplate(tpl?.subjectTemplate ?? DEFAULT_SUBJECT, plain as any);
   const body = renderTemplate(tpl?.bodyTemplate ?? DEFAULT_BODY, html as any);

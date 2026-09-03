@@ -674,6 +674,44 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     detail: { tags: ['Admin Settings'], summary: 'Update throughput report settings (admin only)' },
   })
 
+  .get('/my-custom-columns', async ({ auth }) => {
+    try {
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      const cols = (tenant?.settings as any)?.customColumns ?? [];
+      return { success: true, data: cols } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get tenant-configurable custom columns for current tenant' },
+  })
+
+  .put('/custom-columns', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      if (!tenant) throw new Error('No tenant found');
+      const settings = { ...(tenant.settings as any) };
+      settings.customColumns = body.columns;
+      await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+      return { success: true, data: body.columns } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      columns: t.Array(t.Object({
+        entity: t.Literal('order'),
+        key: t.String(),
+        label: t.String(),
+        type: t.Union([t.Literal('text'), t.Literal('number')]),
+      })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update tenant-configurable custom columns (admin only)' },
+  })
+
   .get('/my-comments-digest-settings', async () => {
     try {
       const data = await getCommentsDigestSettings();
@@ -2071,7 +2109,13 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .put('/booking-email', async ({ auth, body }) => {
     try {
       requireAdmin(auth);
-      const data = await updateBookingEmailSettings({ autoSendOnConvert: body.autoSendOnConvert, brokerDealCcEmail: body.brokerDealCcEmail });
+      const data = await updateBookingEmailSettings({
+        autoSendOnConvert: body.autoSendOnConvert,
+        brokerDealCcEmail: body.brokerDealCcEmail,
+        signatureLogoUrl: body.signatureLogoUrl,
+        signatureWebsite: body.signatureWebsite,
+        signatureFromEmail: body.signatureFromEmail,
+      });
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -2081,6 +2125,9 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     body: t.Object({
       autoSendOnConvert: t.Boolean(),
       brokerDealCcEmail: t.Optional(t.Nullable(t.String({ format: 'email' }))),
+      signatureLogoUrl: t.Optional(t.Nullable(t.String())),
+      signatureWebsite: t.Optional(t.Nullable(t.String())),
+      signatureFromEmail: t.Optional(t.Nullable(t.String({ format: 'email' }))),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update Bunker Booking email settings' },
   })

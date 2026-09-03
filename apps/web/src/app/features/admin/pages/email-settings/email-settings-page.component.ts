@@ -89,8 +89,32 @@ const DOC_LABELS: Record<DocumentType, string> = {
               class="mt-1 w-full max-w-md rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
               placeholder="e.g. operations@ocean7projects.com" />
             <p class="mt-1 text-xs text-gray-500 dark:text-muted">This email is always CC'd on bunker booking emails for broker deals, along with the agent email.</p>
-            <button (click)="saveBrokerDealCc()" [disabled]="brokerDealCcSaving()"
-              class="mt-2 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+          </div>
+          <div class="border-t border-gray-200 dark:border-line px-5 py-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Email signature (Bunker Booking)</label>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-muted">Shown under “Best regards” in booking emails. Per-user contact details (phone, Skype, WhatsApp) are edited on the Admin → Users page.</p>
+            <div class="mt-3 grid gap-3 max-w-md">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Logo URL</label>
+                <input type="url" [ngModel]="signatureLogoUrl()" (ngModelChange)="signatureLogoUrl.set($event)"
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                  placeholder="https://…/logo.png" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Website</label>
+                <input type="text" [ngModel]="signatureWebsite()" (ngModelChange)="signatureWebsite.set($event)"
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                  placeholder="e.g. www.moxiebrokerage.com" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Signature email (e: line)</label>
+                <input type="email" [ngModel]="signatureFromEmail()" (ngModelChange)="signatureFromEmail.set($event)"
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                  placeholder="Falls back to shared sender mailbox, then the user's own email" />
+              </div>
+            </div>
+            <button (click)="saveSignatureSettings()" [disabled]="signatureSaving()"
+              class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
               Save
             </button>
           </div>
@@ -372,6 +396,10 @@ export class EmailSettingsPageComponent implements OnInit {
   readonly templates = signal<EmailTemplate[]>([]);
   readonly autoSendOnConvert = signal(false);
   readonly brokerDealCcEmail = signal('');
+  readonly signatureLogoUrl = signal('');
+  readonly signatureWebsite = signal('');
+  readonly signatureFromEmail = signal('');
+  readonly signatureSaving = signal(false);
   readonly brokerDealCcSaving = signal(false);
   readonly rules = signal<EmailRule[]>([]);
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
@@ -419,7 +447,7 @@ export class EmailSettingsPageComponent implements OnInit {
         firstValueFrom(this.http.get<ApiResponse<EmailRule[]>>(`${API}/admin/settings/email-rules`)),
         firstValueFrom(this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API}/companies/own`)),
         firstValueFrom(this.http.get<ApiResponse<TemplateVariable[]>>(`${API}/admin/settings/email-templates/variables`)),
-        firstValueFrom(this.http.get<ApiResponse<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null }>>(`${API}/admin/settings/booking-email`)),
+        firstValueFrom(this.http.get<ApiResponse<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null; signatureLogoUrl: string | null; signatureWebsite: string | null; signatureFromEmail: string | null }>>(`${API}/admin/settings/booking-email`)),
       ]);
 
       if (templatesRes.success) {
@@ -435,6 +463,9 @@ export class EmailSettingsPageComponent implements OnInit {
       if (bookingRes.success) {
         this.autoSendOnConvert.set(bookingRes.data.autoSendOnConvert ?? false);
         this.brokerDealCcEmail.set(bookingRes.data.brokerDealCcEmail ?? '');
+        this.signatureLogoUrl.set(bookingRes.data.signatureLogoUrl ?? '');
+        this.signatureWebsite.set(bookingRes.data.signatureWebsite ?? '');
+        this.signatureFromEmail.set(bookingRes.data.signatureFromEmail ?? '');
       }
     } catch {
       // silent
@@ -517,6 +548,25 @@ export class EmailSettingsPageComponent implements OnInit {
       // silent
     } finally {
       this.brokerDealCcSaving.set(false);
+    }
+  }
+
+  async saveSignatureSettings(): Promise<void> {
+    this.signatureSaving.set(true);
+    try {
+      await firstValueFrom(
+        this.http.put<ApiResponse<{ signatureLogoUrl: string | null; signatureWebsite: string | null; signatureFromEmail: string | null }>>(`${API}/admin/settings/booking-email`, {
+          autoSendOnConvert: this.autoSendOnConvert(),
+          brokerDealCcEmail: this.brokerDealCcEmail().trim() || null,
+          signatureLogoUrl: this.signatureLogoUrl().trim() || null,
+          signatureWebsite: this.signatureWebsite().trim() || null,
+          signatureFromEmail: this.signatureFromEmail().trim() || null,
+        }),
+      );
+    } catch {
+      // silent
+    } finally {
+      this.signatureSaving.set(false);
     }
   }
 

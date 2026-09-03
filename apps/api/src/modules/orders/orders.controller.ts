@@ -708,8 +708,15 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             if (autoSendOnConvert) {
               const fullOrder = await getOrderById(orderId);
               if (fullOrder) {
-                const senderName = (await db.select({ name: users.name }).from(users).where(eq(users.id, auth.sub)).limit(1))[0]?.name ?? 'Fueld';
-                const { subject, body: htmlBody } = await composeBookingEmail(fullOrder, senderName);
+                const [senderUser] = await db
+                  .select({ name: users.name, email: users.email, phone: users.phone, skype: users.skype, whatsapp: users.whatsapp })
+                  .from(users)
+                  .where(eq(users.id, auth.sub))
+                  .limit(1);
+                const senderName = senderUser?.name ?? 'Fueld';
+                const { subject, body: htmlBody } = await composeBookingEmail(fullOrder, senderUser
+                  ? { name: senderName, email: senderUser.email, phone: senderUser.phone, skype: senderUser.skype, whatsapp: senderUser.whatsapp }
+                  : 'Fueld');
                 const { to, cc } = await resolveBookingRecipients(fullOrder);
                 if (to.length) {
                   await sendDocumentEmail({

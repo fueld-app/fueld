@@ -155,6 +155,8 @@ export interface AdminUserDto {
   hasMicrosoftSso: boolean;
   isActive: boolean;
   phone?: string | null;
+  skype?: string | null;
+  whatsapp?: string | null;
   allowedIps: string[] | null;
   createdAt: string;
 }

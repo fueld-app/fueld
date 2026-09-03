@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { renderBookingEmail, formatDates, formatQty } from './booking-email.service';
+import { renderBookingEmail, formatDates, formatQty, buildBookingSignatureHtml } from './booking-email.service';
 
 const baseOrder = {
   id: 'order-1',
@@ -90,5 +90,65 @@ describe('booking-email.service (pure rendering)', () => {
   test('formatQty: min-max range and single', () => {
     expect(formatQty({ productType: 'VLSFO', quantity: '400', quantityMin: '350', quantityMax: '400', unit: 'MT' })).toBe('350 - 400 MT');
     expect(formatQty({ productType: 'VLSFO', quantity: '400', unit: 'MT' })).toBe('400 MT');
+  });
+
+  test('formatQty: fra-til — min-only renders stem range (min - quantity)', () => {
+    // Moxie pattern: quantity = target, quantity_min = minimum stem
+    expect(formatQty({ productType: 'LSMGO', quantity: '130', quantityMin: '100', unit: 'MT' })).toBe('100 - 130 MT');
+    expect(formatQty({ productType: 'VLSFO', quantity: '220', quantityMin: '180', unit: 'MT' })).toBe('180 - 220 MT');
+    // min == quantity → single value, no degenerate range
+    expect(formatQty({ productType: 'VLSFO', quantity: '400', quantityMin: '400', unit: 'MT' })).toBe('400 MT');
+  });
+
+  test('legacy closing: plain Best regards + name when no signature data', () => {
+    const { body } = renderBookingEmail(baseOrder, 'Sergiy', undefined, 'Frederik Nissen');
+    expect(body).toContain('<p>Best regards,<br/>Frederik Nissen</p>');
+    expect(body).not.toContain('Verdana');
+  });
+
+  test('signature: full contact block with logo when signature data provided', () => {
+    const { body } = renderBookingEmail(baseOrder, 'Sergiy', undefined, {
+      name: 'Daniel Kvist',
+      email: 'daniel@moxiebrokerage.com',
+      phone: '+45 30 497 777',
+      skype: 'dkvist77',
+    }, buildBookingSignatureHtml({
+      name: 'Daniel Kvist',
+      email: 'daniel@moxiebrokerage.com',
+      phone: '+45 30 497 777',
+      skype: 'dkvist77',
+    }, { fromEmail: 'happier@moxiebrokerage.com', website: 'www.moxiebrokerage.com', logoUrl: 'https://moxie.fueld.app/moxie-logo.png' }));
+
+    expect(body).toContain('Best regards,');
+    expect(body).toContain('Daniel Kvist');
+    expect(body).toContain('m: +45 30 497 777 ◦ s: dkvist77');
+    expect(body).toContain('happier@moxiebrokerage.com');
+    expect(body).toContain('www.moxiebrokerage.com');
+    expect(body).toContain('src="https://moxie.fueld.app/moxie-logo.png"');
+    expect(body).not.toContain('daniel@moxiebrokerage.com</a>'); // e: line uses the signature from-email override
+  });
+
+  test('signature: whatsapp line rendered when provided', () => {
+    const { body } = renderBookingEmail(baseOrder, 'Sergiy', undefined, 'Frederik Nissen', buildBookingSignatureHtml({
+      name: 'Frederik Nissen',
+      phone: '+971 (0) 55 246 8292',
+      whatsapp: '+45 60 48 26 16',
+      email: 'happier@moxiebrokerage.com',
+    }));
+
+    expect(body).toContain('m: +971 (0) 55 246 8292');
+    expect(body).toContain('whatsapp: +45 60 48 26 16');
+    expect(body).toContain('happier@moxiebrokerage.com');
+  });
+
+  test('signature values are HTML-escaped', () => {
+    const { body } = renderBookingEmail(baseOrder, 'Sergiy', undefined, 'Evil <b>Boss</b>', buildBookingSignatureHtml({
+      name: 'Evil <b>Boss</b>',
+      phone: '<script>alert(1)</script>',
+      skype: '&quot;x&quot;',
+    }));
+    expect(body).toContain('Evil &lt;b&gt;Boss&lt;/b&gt;');
+    expect(body).toContain('m: &lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(body).not.toContain('<script>');
   });
 });

@@ -258,6 +258,9 @@ export interface TenantSettings {
   bookingEmail?: {
     autoSendOnConvert?: boolean;
     brokerDealCcEmail?: string | null;  // CC email always included on broker deal booking emails (e.g. operations@ocean7projects.com)
+    signatureLogoUrl?: string | null;   // Logo image shown in the booking-email signature block (absolute URL, hosted on the tenant's app origin)
+    signatureWebsite?: string | null;   // Website line in the booking-email signature (e.g. 'www.moxiebrokerage.com')
+    signatureFromEmail?: string | null; // e: line override in the signature (e.g. shared 'happier@' mailbox); falls back to shared-sender email, then user email
   };
   // Configurable reasons required when cancelling inquiries
   inquiryCancelReasons?: string[];
@@ -523,6 +526,8 @@ export const users = pgTable('users', {
   // Profile
   avatarUrl: text('avatar_url'),
   phone: text('phone'),
+  skype: text('skype'),
+  whatsapp: text('whatsapp'),
 
   // IP restriction (JSON array of allowed CIDR/IPs, null = unrestricted)
   allowedIps: text('allowed_ips'),

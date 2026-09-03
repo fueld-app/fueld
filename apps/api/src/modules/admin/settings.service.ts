@@ -1286,7 +1286,13 @@ export async function updateDeliveryMethodSettings(input: {
 //  BUNKER BOOKING EMAIL
 // ═══════════════════════════════════════════════════════════════════
 
-export async function getBookingEmailSettings(): Promise<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null }> {
+export async function getBookingEmailSettings(): Promise<{
+  autoSendOnConvert: boolean;
+  brokerDealCcEmail: string | null;
+  signatureLogoUrl: string | null;
+  signatureWebsite: string | null;
+  signatureFromEmail: string | null;
+}> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
 
@@ -1294,13 +1300,25 @@ export async function getBookingEmailSettings(): Promise<{ autoSendOnConvert: bo
   return {
     autoSendOnConvert: settings.bookingEmail?.autoSendOnConvert ?? false,
     brokerDealCcEmail: settings.bookingEmail?.brokerDealCcEmail ?? null,
+    signatureLogoUrl: settings.bookingEmail?.signatureLogoUrl ?? null,
+    signatureWebsite: settings.bookingEmail?.signatureWebsite ?? null,
+    signatureFromEmail: settings.bookingEmail?.signatureFromEmail ?? null,
   };
 }
 
 export async function updateBookingEmailSettings(input: {
   autoSendOnConvert: boolean;
   brokerDealCcEmail?: string | null;
-}): Promise<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null }> {
+  signatureLogoUrl?: string | null;
+  signatureWebsite?: string | null;
+  signatureFromEmail?: string | null;
+}): Promise<{
+  autoSendOnConvert: boolean;
+  brokerDealCcEmail: string | null;
+  signatureLogoUrl: string | null;
+  signatureWebsite: string | null;
+  signatureFromEmail: string | null;
+}> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
 
@@ -1309,6 +1327,9 @@ export async function updateBookingEmailSettings(input: {
     ...(settings.bookingEmail ?? {}),
     autoSendOnConvert: !!input.autoSendOnConvert,
     brokerDealCcEmail: input.brokerDealCcEmail?.trim() || null,
+    signatureLogoUrl: input.signatureLogoUrl?.trim() || null,
+    signatureWebsite: input.signatureWebsite?.trim() || null,
+    signatureFromEmail: input.signatureFromEmail?.trim() || null,
   };
 
   await db

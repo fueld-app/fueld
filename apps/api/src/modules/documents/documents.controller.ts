@@ -518,9 +518,15 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         const order = await getOrderById(orderId);
         if (!order) { return { success: false, data: null, message: 'Order not found' }; }
 
-        // Sender's display name for the email signature.
-        const [sender] = await db.select({ name: users.name }).from(users).where(eq(users.id, auth.userId)).limit(1);
-        const { subject, body } = await composeBookingEmail(order, sender?.name ?? 'Fueld');
+        // Sender's display name + signature contact details for the email closing block.
+        const [sender] = await db
+          .select({ name: users.name, email: users.email, phone: users.phone, skype: users.skype, whatsapp: users.whatsapp })
+          .from(users)
+          .where(eq(users.id, auth.userId))
+          .limit(1);
+        const { subject, body } = await composeBookingEmail(order, sender
+          ? { name: sender.name || 'Fueld', email: sender.email, phone: sender.phone, skype: sender.skype, whatsapp: sender.whatsapp }
+          : 'Fueld');
         const { to, cc } = await resolveBookingRecipients(order);
 
         return { success: true, data: { to, cc, subject, body } };
