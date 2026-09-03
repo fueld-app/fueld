@@ -438,10 +438,14 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         break;
       }
       case 'this_week': {
+        // Full week (Monday → Sunday), not week-to-date
         const day = now.getDay();
         from = new Date(now);
         from.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
         from.setHours(0, 0, 0, 0);
+        to = new Date(from);
+        to.setDate(from.getDate() + 6);
+        to.setHours(23, 59, 59, 999);
         break;
       }
       case 'last_7_days':
@@ -450,7 +454,9 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         from.setHours(0, 0, 0, 0);
         break;
       case 'this_month':
+        // Full month (1st → last day), not month-to-date — future deliveries/ETAs must count
         from = new Date(now.getFullYear(), now.getMonth(), 1);
+        to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
         break;
       case 'last_30_days':
         from = new Date(now);
@@ -458,8 +464,10 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         from.setHours(0, 0, 0, 0);
         break;
       case 'this_quarter': {
+        // Full quarter (quarter start → quarter end)
         const q = Math.floor(now.getMonth() / 3);
         from = new Date(now.getFullYear(), q * 3, 1);
+        to = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59);
         break;
       }
       case 'this_year':

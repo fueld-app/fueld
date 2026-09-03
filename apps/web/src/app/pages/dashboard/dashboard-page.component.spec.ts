@@ -76,6 +76,29 @@ describe('DashboardPageComponent — date basis', () => {
     localStorage.removeItem('fueld.dashboard.teamView');
   });
 
+  it('this_month spans the full month, not month-to-date', async () => {
+    const component = await createComponent();
+    component.selectDatePreset('this_month');
+    const range = (component as unknown as { dateRange: () => { from: Date; to: Date } }).dateRange();
+    expect(range.from.getDate()).toBe(1);
+    expect(range.to.getFullYear()).toBe(range.from.getFullYear());
+    expect(range.to.getMonth()).toBe(range.from.getMonth());
+    // to must be the last day of the same month
+    const lastDayOfFromMonth = new Date(range.from.getFullYear(), range.from.getMonth() + 1, 0).getDate();
+    expect(range.to.getDate()).toBe(lastDayOfFromMonth);
+    expect(range.to.getHours()).toBe(23);
+  });
+
+  it('this_quarter spans the full quarter', async () => {
+    const component = await createComponent();
+    component.selectDatePreset('this_quarter');
+    const range = (component as unknown as { dateRange: () => { from: Date; to: Date } }).dateRange();
+    expect(range.from.getDate()).toBe(1);
+    // to must be the last day of the quarter's end month
+    const lastDayOfEndMonth = new Date(range.to.getFullYear(), range.to.getMonth() + 1, 0).getDate();
+    expect(range.to.getDate()).toBe(lastDayOfEndMonth);
+  });
+
   it('buildDateQuery includes the current dateBasis param', async () => {
     const component = await createComponent();
     // component selectedDatePreset defaults to this_month
