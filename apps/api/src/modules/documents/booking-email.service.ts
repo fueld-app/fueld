@@ -47,7 +47,10 @@ const DEFAULT_SUBJECT = '${vesselName} @ ${place}';
 //  greeting, an order-details table, a products table and a closing note.
 //  Previously this was plain text with \n line breaks which collapsed into a
 //  single run-on blob in HTML email clients.
-const DEFAULT_BODY = `<div style="font-family: 'Segoe UI', Arial, sans-serif; color: #111827;">
+/** Default booking-email font stack (tenant-configurable via bookingEmail.fontFamily). */
+export const DEFAULT_BOOKING_FONT = "'Segoe UI', Arial, sans-serif";
+
+const DEFAULT_BODY = `<div style="font-family: \${fontFamily}; color: #111827;">
 <p>Dear Captain of <strong>\${vesselName}</strong>,</p>
 
 <p>Please note that we have booked bunkers for your good lady as follows:</p>
@@ -289,7 +292,7 @@ export function resolveSignatureUser(order: BookingOrder, sender?: BookingSender
  */
 export function buildBookingSignatureHtml(
   sender: BookingSender,
-  opts: { fromEmail?: string | null; logoUrl?: string | null; website?: string | null } = {},
+  opts: { fromEmail?: string | null; logoUrl?: string | null; website?: string | null; fontFamily?: string | null } = {},
 ): string {
   const name = sender.name?.trim();
   if (!name) return '';
@@ -321,8 +324,12 @@ export function buildBookingSignatureHtml(
     .map((line) => `<span style="display: inline-block; margin: 1px 0;">${line}</span>`)
     .join('<br/>');
 
+  const fontStyle = opts.fontFamily?.trim()
+    ? ` font-family: ${escapeHtml(opts.fontFamily.trim())};`
+    : '';
+
   return `<p style="margin: 16px 0 0;">Best regards,</p>
-<table style="border-collapse: collapse; width: 300px; max-width: 300px; margin: 8px 0 0;">
+<table style="border-collapse: collapse; width: 300px; max-width: 300px; margin: 8px 0 0;${fontStyle}">
   <tr>
     <td style="border-bottom: 1.5pt solid #16348C; padding: 0 0 2px;">
       <span style="font-size: 9pt; font-weight: bold; color: #16348C;">${escapeHtml(name)}</span>
@@ -345,7 +352,7 @@ export function buildBookingSignatureHtml(
  * `signatureHtml` are already valid HTML (built with escaping in
  * buildBookingProductsHtml / buildBookingSignatureHtml).
  */
-function buildBookingVars(order: BookingOrder, captainName: string, dates: string, senderName: string, signatureHtml: string) {
+function buildBookingVars(order: BookingOrder, captainName: string, dates: string, senderName: string, signatureHtml: string, fontFamily: string) {
   const plain: Record<string, string> = {
     captainName,
     vesselName: order.vessel?.name ?? '',
@@ -357,6 +364,7 @@ function buildBookingVars(order: BookingOrder, captainName: string, dates: strin
     products: buildBookingProductsHtml(order.items ?? []),
     orderNumber: order.orderNumber ?? '',
     senderName,
+    fontFamily,
   };
   // Line-based product block (pre-built escaped HTML) — used by line-based custom templates
   const productLines = buildBookingProductLinesHtml(order.items ?? []);
@@ -371,6 +379,7 @@ function buildBookingVars(order: BookingOrder, captainName: string, dates: strin
     deliveryMethod: escapeHtml(plain.deliveryMethod),
     orderNumber: escapeHtml(plain.orderNumber),
     senderName: escapeHtml(plain.senderName),
+    fontFamily: escapeHtml(plain.fontFamily),
     // Pre-built escaped HTML (buildBookingProductsHtml / buildBookingProductLinesHtml /
     // buildBookingSignatureHtml escape all values)
     signatureHtml,
@@ -386,11 +395,12 @@ export function renderBookingEmail(
   timezone?: string | null,
   sender?: BookingSender | string,
   signatureHtml?: string,
+  fontFamily?: string | null,
 ): { subject: string; body: string } {
   const senderInfo = toBookingSender(sender);
   const dates = formatDates(order.eta ?? null, order.etd ?? null, timezone);
-  const closing = signatureHtml ?? buildBookingSignatureHtml(senderInfo ?? { name: '' });
-  const { plain, html } = buildBookingVars(order, captainName, dates, senderInfo?.name ?? '', closing);
+  const closing = signatureHtml ?? buildBookingSignatureHtml(senderInfo ?? { name: '' }, { fontFamily });
+  const { plain, html } = buildBookingVars(order, captainName, dates, senderInfo?.name ?? '', closing, fontFamily ?? DEFAULT_BOOKING_FONT);
 
   const subject = renderTemplate(DEFAULT_SUBJECT, plain as any);
   const body = renderTemplate(DEFAULT_BODY, html as any);
@@ -444,9 +454,10 @@ export async function composeBookingEmail(
       fromEmail,
       logoUrl: bookingSettings.signatureLogoUrl,
       website: bookingSettings.signatureWebsite,
+      fontFamily: bookingSettings.fontFamily,
     });
   }
-  const { plain, html } = buildBookingVars(order, captainName, dates, signatureUser?.name ?? '', signatureHtml);
+  const { plain, html } = buildBookingVars(order, captainName, dates, signatureUser?.name ?? '', signatureHtml, bookingSettings.fontFamily ?? DEFAULT_BOOKING_FONT);
 
   const subject = renderTemplate(tpl?.subjectTemplate ?? DEFAULT_SUBJECT, plain as any);
   const body = renderTemplate(tpl?.bodyTemplate ?? DEFAULT_BODY, html as any);

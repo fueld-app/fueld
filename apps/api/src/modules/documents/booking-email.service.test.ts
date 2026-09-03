@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { renderBookingEmail, formatDates, formatQty, buildBookingSignatureHtml, resolveSignatureUser, buildBookingProductLinesHtml } from './booking-email.service';
+import { renderBookingEmail, formatDates, formatQty, buildBookingSignatureHtml, resolveSignatureUser, buildBookingProductLinesHtml, DEFAULT_BOOKING_FONT } from './booking-email.service';
 
 const baseOrder = {
   id: 'order-1',
@@ -177,6 +177,16 @@ describe('booking-email.service (pure rendering)', () => {
     expect(sig?.name).toBe('Daniel Kvist');
     const sig2 = resolveSignatureUser(baseOrder as any);
     expect(sig2).toBeUndefined();
+  });
+
+  test('fontFamily: tenant font flows into body + signature', () => {
+    const sig = buildBookingSignatureHtml({ name: 'Daniel Kvist', phone: '+45' }, { fontFamily: "Aptos, 'Segoe UI', Arial, sans-serif" });
+    expect(sig).toContain("font-family: Aptos, 'Segoe UI', Arial, sans-serif;");
+    const { body } = renderBookingEmail(baseOrder, 'Sergiy', undefined, 'Frederik Nissen', undefined, "Aptos, 'Segoe UI', Arial, sans-serif");
+    expect(body).toContain('font-family: Aptos,');
+    // default font when not set
+    const { body: body2 } = renderBookingEmail(baseOrder, 'Sergiy');
+    expect(body2).toContain("font-family: 'Segoe UI', Arial, sans-serif");
   });
 
   test('signature values are HTML-escaped', () => {

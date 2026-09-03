@@ -1293,6 +1293,7 @@ export async function getBookingEmailSettings(): Promise<{
   signatureWebsite: string | null;
   signatureFromEmail: string | null;
   bccEmail: string | null;
+  fontFamily: string | null;
 }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
@@ -1305,6 +1306,7 @@ export async function getBookingEmailSettings(): Promise<{
     signatureWebsite: settings.bookingEmail?.signatureWebsite ?? null,
     signatureFromEmail: settings.bookingEmail?.signatureFromEmail ?? null,
     bccEmail: settings.bookingEmail?.bccEmail ?? null,
+    fontFamily: settings.bookingEmail?.fontFamily ?? null,
   };
 }
 
@@ -1315,6 +1317,7 @@ export async function updateBookingEmailSettings(input: {
   signatureWebsite?: string | null;
   signatureFromEmail?: string | null;
   bccEmail?: string | null;
+  fontFamily?: string | null;
 }): Promise<{
   autoSendOnConvert: boolean;
   brokerDealCcEmail: string | null;
@@ -1322,6 +1325,7 @@ export async function updateBookingEmailSettings(input: {
   signatureWebsite: string | null;
   signatureFromEmail: string | null;
   bccEmail: string | null;
+  fontFamily: string | null;
 }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
@@ -1335,6 +1339,7 @@ export async function updateBookingEmailSettings(input: {
     signatureWebsite: input.signatureWebsite?.trim() || null,
     signatureFromEmail: input.signatureFromEmail?.trim() || null,
     bccEmail: input.bccEmail?.trim() || null,
+    fontFamily: input.fontFamily?.trim() || null,
   };
 
   await db

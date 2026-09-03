@@ -119,6 +119,13 @@ const DOC_LABELS: Record<DocumentType, string> = {
                   placeholder="e.g. happier@moxiebrokerage.com" />
                 <p class="mt-1 text-xs text-gray-500 dark:text-muted">Every booking email is BCC'd to this address (e.g. the shared mailbox archive).</p>
               </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Font</label>
+                <input type="text" [ngModel]="signatureFont()" (ngModelChange)="signatureFont.set($event)"
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                  placeholder="Aptos, 'Segoe UI', Arial, sans-serif" />
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">Font stack for booking emails (body + signature). Empty = default ('Segoe UI', Arial, sans-serif).</p>
+              </div>
             </div>
             <button (click)="saveSignatureSettings()" [disabled]="signatureSaving()"
               class="mt-3 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
@@ -407,6 +414,7 @@ export class EmailSettingsPageComponent implements OnInit {
   readonly signatureWebsite = signal('');
   readonly signatureFromEmail = signal('');
   readonly signatureBccEmail = signal('');
+  readonly signatureFont = signal('');
   readonly signatureSaving = signal(false);
   readonly brokerDealCcSaving = signal(false);
   readonly rules = signal<EmailRule[]>([]);
@@ -455,7 +463,7 @@ export class EmailSettingsPageComponent implements OnInit {
         firstValueFrom(this.http.get<ApiResponse<EmailRule[]>>(`${API}/admin/settings/email-rules`)),
         firstValueFrom(this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API}/companies/own`)),
         firstValueFrom(this.http.get<ApiResponse<TemplateVariable[]>>(`${API}/admin/settings/email-templates/variables`)),
-        firstValueFrom(this.http.get<ApiResponse<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null; signatureLogoUrl: string | null; signatureWebsite: string | null; signatureFromEmail: string | null; bccEmail: string | null }>>(`${API}/admin/settings/booking-email`)),
+        firstValueFrom(this.http.get<ApiResponse<{ autoSendOnConvert: boolean; brokerDealCcEmail: string | null; signatureLogoUrl: string | null; signatureWebsite: string | null; signatureFromEmail: string | null; bccEmail: string | null; fontFamily: string | null }>>(`${API}/admin/settings/booking-email`)),
       ]);
 
       if (templatesRes.success) {
@@ -475,6 +483,7 @@ export class EmailSettingsPageComponent implements OnInit {
         this.signatureWebsite.set(bookingRes.data.signatureWebsite ?? '');
         this.signatureFromEmail.set(bookingRes.data.signatureFromEmail ?? '');
         this.signatureBccEmail.set(bookingRes.data.bccEmail ?? '');
+        this.signatureFont.set(bookingRes.data.fontFamily ?? '');
       }
     } catch {
       // silent
@@ -571,6 +580,7 @@ export class EmailSettingsPageComponent implements OnInit {
           signatureWebsite: this.signatureWebsite().trim() || null,
           signatureFromEmail: this.signatureFromEmail().trim() || null,
           bccEmail: this.signatureBccEmail().trim() || null,
+          fontFamily: this.signatureFont().trim() || null,
         }),
       );
     } catch {
