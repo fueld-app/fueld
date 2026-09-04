@@ -14,6 +14,7 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
 import {
+  listDealEconomics,
   listOrders,
   getOrderById,
   getOrderSuppliers,
@@ -112,6 +113,49 @@ const PaymentTermTypeSchema = t.Union([
 
 export const ordersController = new Elysia({ prefix: '/orders' })
   .use(authGuard)
+
+  // ─── GET /orders/deal-economics (Riviera "DEALS" register) ────────
+  // Restricted: tenant must have the 'deal-economics' view enabled AND the
+  // caller must hold a money-privileged role (admin/finance/credit-manager).
+  // Per-user view assignment may replace the role check later.
+  .get(
+    '/deal-economics',
+    async ({ auth, query }) => {
+      try {
+        const allowedRoles = ['ADMIN', 'FINANCE', 'CREDITMANAGER'];
+        if (!allowedRoles.includes(auth.role)) {
+          return { success: false, data: null, message: 'Forbidden' };
+        }
+        const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+        const views = ((tenant?.settings as any)?.enabledViews ?? []) as string[];
+        if (!views.includes('deal-economics')) {
+          return { success: true, data: [] } satisfies ApiResponse<unknown>;
+        }
+        const params = query as { from?: string; to?: string; dateBasis?: string };
+        const rows = await listDealEconomics(auth.tenantId, {
+          from: params.from ?? null,
+          to: params.to ?? null,
+          dateBasis: params.dateBasis === 'created' ? 'created' : 'delivery',
+        });
+        return { success: true, data: rows } satisfies ApiResponse<unknown>;
+      } catch (err) {
+        console.error('[Orders] Deal economics failed:', err);
+        return { success: false, data: null, message: 'Failed to load deal economics' };
+      }
+    },
+    {
+      query: t.Object({
+        from: t.Optional(t.String()),
+        to: t.Optional(t.String()),
+        dateBasis: t.Optional(t.String()),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Deal economics register — one row per confirmed+ deal with commissions (restricted roles)',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
 
   // ─── List Orders ───────────────────────────────────────────────────
   .get(

@@ -2539,3 +2539,157 @@ export async function getOrderActivity(orderId: string) {
     createdAt: l.createdAt.toISOString(),
   }));
 }
+
+
+// ─── Deal economics register (Riviera "DEALS" sheet / view-gated) ──────────
+
+export interface DealEconomicsRow {
+  id: string;
+  orderNumber: string | null;
+  salesRepName: string | null;
+  vesselName: string;
+  placeName: string;
+  clientName: string;
+  status: string;
+  products: string;
+  totalQuantity: number;
+  costBase: number;
+  revenueBase: number;
+  tpc: number;
+  traderCommission: number;
+  tradingProfit: number;
+  period: string; // YYYY-MM on the selected date basis
+  deliveredAt: string | null;
+  eta: string | null;
+  createdAt: string;
+}
+
+/**
+ * One row per deal (order), confirmed-and-beyond, with full deal economics:
+ * buy (cost base), sell (revenue base), TPC, trader commission and trading
+ * profit — all USD via fx. Delivery-based or created-based period bucketing.
+ * Caller must enforce role + tenant view gating.
+ */
+export async function listDealEconomics(
+  tenantId: string,
+  opts: { from?: string | null; to?: string | null; dateBasis?: 'created' | 'delivery' | null },
+): Promise<DealEconomicsRow[]> {
+  const includedStatuses: (typeof orders.status.enumValues)[number][] = ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'];
+  const conditions = [eq(orders.tenantId, tenantId), inArray(orders.status, includedStatuses)];
+  const basis = opts.dateBasis === 'created' ? 'created' : 'delivery';
+  // Note: `{}` terms → financingDays = 0. Intentional: the register reports
+  // trading profit (pre-financing); financing is not part of this metric.
+  if (opts.from) {
+    const from = new Date(`${opts.from}T00:00:00Z`);
+    conditions.push(basis === 'delivery'
+      ? sql`COALESCE(${orders.deliveredAt}, ${orders.eta}) >= ${from.toISOString()}::timestamptz`
+      : gte(orders.createdAt, from));
+  }
+  if (opts.to) {
+    const to = new Date(`${opts.to}T23:59:59.999Z`);
+    conditions.push(basis === 'delivery'
+      ? sql`COALESCE(${orders.deliveredAt}, ${orders.eta}) <= ${to.toISOString()}::timestamptz`
+      : lte(orders.createdAt, to));
+  }
+  if (basis === 'delivery') {
+    conditions.push(sql`(${orders.deliveredAt} IS NOT NULL OR ${orders.eta} IS NOT NULL)`);
+  }
+
+  const rows = await db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      salesRepName: users.name,
+      vesselName: vessels.name,
+      placeName: places.name,
+      clientName: counterparties.name,
+      status: orders.status,
+      tpcPerMt: orders.tpcPerMt,
+      tpcCurrency: orders.tpcCurrency,
+      traderCommissionPct: orders.traderCommissionPct,
+      isBrokerDeal: orders.isBrokerDeal,
+      commissionPerMt: orders.commissionPerMt,
+      deliveredAt: orders.deliveredAt,
+      eta: orders.eta,
+      createdAt: orders.createdAt,
+      period: basis === 'delivery'
+        ? sql<string>`to_char(COALESCE(${orders.deliveredAt}, ${orders.eta}) AT TIME ZONE 'UTC', 'YYYY-MM')`
+        : sql<string>`to_char(${orders.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM')`,
+    })
+    .from(orders)
+    .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
+    .innerJoin(vessels, eq(orders.vesselId, vessels.id))
+    .innerJoin(places, eq(orders.placeId, places.id))
+    .leftJoin(users, eq(orders.salesRepId, users.id))
+    .where(and(...conditions))
+    .orderBy(asc(orders.createdAt));
+
+  if (rows.length === 0) return [];
+
+  const [itemRows, itemTypes, tenant] = await Promise.all([
+    db
+      .select({
+        orderId: orderItems.orderId,
+        quantity: orderItems.quantity,
+        deliveredQuantity: orderItems.deliveredQuantity,
+        costPrice: orderItems.costPrice,
+        costCurrency: orderItems.costCurrency,
+        costConversionFactor: orderItems.costConversionFactor,
+        salesPrice: orderItems.salesPrice,
+        salesCurrency: orderItems.salesCurrency,
+        unitConversionFactor: orderItems.unitConversionFactor,
+      })
+      .from(orderItems)
+      .where(inArray(orderItems.orderId, rows.map((r) => r.id))),
+    db
+      .select({ orderId: orderItems.orderId, productType: orderItems.productType })
+      .from(orderItems)
+      .where(inArray(orderItems.orderId, rows.map((r) => r.id))),
+    db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { settings: true } }),
+  ]);
+
+  const financingRateAnnual = getFinancingRateAnnual((tenant?.settings ?? {}) as TenantSettings);
+  const itemsByOrder = new Map<string, typeof itemRows>();
+  for (const item of itemRows) {
+    const list = itemsByOrder.get(item.orderId) ?? [];
+    list.push(item);
+    itemsByOrder.set(item.orderId, list);
+  }
+  const typesByOrder = new Map<string, string[]>();
+  for (const t of itemTypes) {
+    const list = typesByOrder.get(t.orderId) ?? [];
+    if (t.productType && !list.includes(t.productType)) list.push(t.productType);
+    typesByOrder.set(t.orderId, list);
+  }
+
+  return rows.map((row) => {
+    const economics = calculateOrderEconomics(
+      {},
+      itemsByOrder.get(row.id) ?? [],
+      financingRateAnnual,
+      row.isBrokerDeal ?? false,
+      row.commissionPerMt,
+      { tpcPerMt: row.tpcPerMt, tpcCurrency: row.tpcCurrency, traderCommissionPct: row.traderCommissionPct },
+    );
+    return {
+      id: row.id,
+      orderNumber: row.orderNumber,
+      salesRepName: row.salesRepName,
+      vesselName: row.vesselName,
+      placeName: row.placeName,
+      clientName: row.clientName,
+      status: row.status,
+      products: (typesByOrder.get(row.id) ?? []).join(', '),
+      totalQuantity: economics.totalQuantity,
+      costBase: economics.totalCostBase,
+      revenueBase: economics.totalRevenueBase,
+      tpc: economics.totalTpc,
+      traderCommission: economics.totalTraderCommission,
+      tradingProfit: economics.tradingProfit,
+      period: row.period,
+      deliveredAt: row.deliveredAt ? row.deliveredAt.toISOString() : null,
+      eta: row.eta ? row.eta.toISOString() : null,
+      createdAt: row.createdAt.toISOString(),
+    };
+  });
+}

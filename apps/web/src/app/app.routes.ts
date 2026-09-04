@@ -157,6 +157,14 @@ export const routes: Routes = [
             title: 'Trading > Active Orders',
           },
           {
+            path: 'deals',
+            loadComponent: () =>
+              import('./features/trading/pages/deals-list/deals-list-page.component').then(
+                (m) => m.DealsListPageComponent,
+              ),
+            title: 'Trading > Deals',
+          },
+          {
             path: 'orders/delivered',
             redirectTo: 'delivered-orders',
             pathMatch: 'full',
