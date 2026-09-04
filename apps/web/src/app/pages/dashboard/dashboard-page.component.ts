@@ -28,6 +28,7 @@ import { Role } from '@fueld/types';
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
 import { DashboardFollowUpsWidgetComponent } from './dashboard-follow-ups-widget.component';
 import { AuthService } from '../../core/auth/auth.service';
+import { ViewsService } from '@app/core/views/views.service';
 import { API } from '@app/core/config/api';
 import { RiskMonitoringService } from '../../core/risk-monitoring/risk-monitoring.service';
 
@@ -381,11 +382,56 @@ function tryLocalStorageGet(key: string): string | null {
           <p class="mt-2 text-3xl font-bold text-red-500 dark:text-red-300">{{ conversionMetrics().totalLost }}</p>
         </div>
       </div>
+
+      <!-- Performance History (tenant 'performance-history' view) -->
+      @if (views.has('performance-history') && auth.canSeePrices()) {
+        <div class="mt-8 app-panel">
+          <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-line">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Performance History</h3>
+              <p class="text-xs text-gray-500 dark:text-muted">Monthly trading profit &amp; turnover (USD, delivery-based)</p>
+            </div>
+            <select [ngModel]="historyYears()" (ngModelChange)="onHistoryYearsChange($event)" class="app-input w-40 bg-white dark:bg-surface">
+              <option [value]="3">Last 3 years</option>
+              <option [value]="5">Last 5 years</option>
+              <option [value]="10">Last 10 years</option>
+              <option [value]="0">All time</option>
+            </select>
+          </div>
+          <div class="p-5">
+            @if (historyLoading()) {
+              <div class="flex items-center justify-center py-10">
+                <svg class="h-6 w-6 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              </div>
+            } @else if (monthlyHistory().length === 0) {
+              <p class="py-10 text-center text-sm text-gray-500 dark:text-muted">No confirmed orders yet — the chart fills as deals are confirmed with delivery dates.</p>
+            } @else {
+              <svg [attr.viewBox]="'0 0 ' + chartWidth() + ' ' + chartHeight()" class="w-full" style="height: 280px" preserveAspectRatio="none">
+                @for (tick of chartTicks(); track tick.value) {
+                  <line [attr.x1]="chartPadLeft()" [attr.x2]="chartWidth() - 10" [attr.y1]="tick.y" [attr.y2]="tick.y" stroke="currentColor" class="text-gray-200 dark:text-line" stroke-width="1"></line>
+                  <text [attr.x]="chartPadLeft() - 6" [attr.y]="tick.y + 3" text-anchor="end" class="fill-gray-400" font-size="9">{{ tick.label }}</text>
+                }
+                <polyline [attr.points]="chartPoints('profit')" fill="none" class="stroke-brand-600 dark:stroke-brand-400" stroke-width="2"></polyline>
+                <polyline [attr.points]="chartPoints('turnover')" fill="none" class="stroke-gray-400 dark:stroke-muted" stroke-width="1.5" stroke-dasharray="4 3"></polyline>
+              </svg>
+              <div class="mt-2 flex items-center gap-5 text-xs text-gray-500 dark:text-muted">
+                <span class="flex items-center gap-1.5"><span class="inline-block h-0.5 w-4 bg-brand-600 dark:bg-brand-400"></span> Trading profit</span>
+                <span class="flex items-center gap-1.5"><span class="inline-block h-0.5 w-4 bg-gray-400 dark:bg-muted"></span> Turnover</span>
+                <span>{{ monthlyHistory()[0]?.year }}–{{ monthlyHistory()[monthlyHistory().length - 1]?.year }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
     </div>
   `,
 })
 export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
+  protected readonly views = inject(ViewsService);
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly riskMonitoringService = inject(RiskMonitoringService);
@@ -574,6 +620,11 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     void this.loadTopCreditGroups();
     void this.loadFollowUps();
     void this.loadFrozenCompanies();
+    void this.views.load().then(() => {
+      if (this.views.has('performance-history') && this.auth.canSeePrices()) {
+        void this.loadMonthlyHistory();
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -680,6 +731,80 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       if (uid) params.set('userId', uid);
     }
     return params.toString();
+  }
+
+  // ─── Performance History (tenant 'performance-history' view) ──────
+  readonly historyYears = signal<number>(3);
+  readonly historyLoading = signal(false);
+  readonly monthlyHistory = signal<{ year: number; month: number; profit: number; turnover: number }[]>([]);
+
+  readonly chartWidth = () => 800;
+  readonly chartHeight = () => 260;
+  readonly chartPadLeft = () => 56;
+
+  onHistoryYearsChange(years: string | number): void {
+    this.historyYears.set(Number(years));
+    void this.loadMonthlyHistory();
+  }
+
+  private chartExtents(): { min: number; max: number } {
+    let max = 0;
+    let min = 0;
+    for (const p of this.monthlyHistory()) {
+      max = Math.max(max, p.turnover, p.profit);
+      min = Math.min(min, p.profit);
+    }
+    if (max === min) max = min + 1;
+    return { min, max };
+  }
+
+  chartTicks(): { value: number; y: number; label: string }[] {
+    const { min, max } = this.chartExtents();
+    const ticks: { value: number; y: number; label: string }[] = [];
+    const top = max <= 0 ? 1 : max;
+    const bottom = min >= 0 ? 0 : min;
+    for (let i = 0; i <= 4; i++) {
+      const value = bottom + ((top - bottom) * i) / 4;
+      const y = this.chartHeight() - 20 - ((value - bottom) / (top - bottom)) * (this.chartHeight() - 40);
+      const abs = Math.abs(value);
+      const label = abs >= 1_000_000 ? (value / 1_000_000).toFixed(1) + 'M' : abs >= 1_000 ? Math.round(value / 1_000) + 'k' : value.toFixed(0);
+      ticks.push({ value, y, label });
+    }
+    return ticks;
+  }
+
+  chartPoints(metric: 'profit' | 'turnover'): string {
+    const data = this.monthlyHistory();
+    if (data.length === 0) return '';
+    const { min, max } = this.chartExtents();
+    const span = max - min;
+    const innerW = this.chartWidth() - this.chartPadLeft() - 10;
+    const innerH = this.chartHeight() - 40;
+    return data
+      .map((p, i) => {
+        const x = this.chartPadLeft() + (data.length === 1 ? innerW / 2 : (i / (data.length - 1)) * innerW);
+        const y = this.chartHeight() - 20 - ((p[metric] - min) / span) * innerH;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
+  }
+
+  private async loadMonthlyHistory(): Promise<void> {
+    this.historyLoading.set(true);
+    try {
+      const years = this.historyYears();
+      const nowYear = new Date().getFullYear();
+      const from = years > 0 ? nowYear - years + 1 : undefined;
+      const qs = from ? `?fromYear=${from}` : '';
+      const res = await firstValueFrom(
+        this.http.get<{ items: { year: number; month: number; profit: number; turnover: number }[] }>(`${API}/dashboard/monthly-history${qs}`),
+      );
+      this.monthlyHistory.set(res.items ?? []);
+    } catch {
+      this.monthlyHistory.set([]);
+    } finally {
+      this.historyLoading.set(false);
+    }
   }
 
   private async loadDashboardData(): Promise<void> {

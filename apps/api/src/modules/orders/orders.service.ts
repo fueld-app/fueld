@@ -94,6 +94,11 @@ interface CreateOrderInput {
   responseDeadlineAt?: string | null;
   isBrokerDeal?: boolean;
   commissionPerMt?: string | null;
+  // Deal economics (view-gated: enabledViews contains 'deal-economics')
+  dealType?: string | null;
+  tpcPerMt?: string | null;
+  tpcCurrency?: string | null;
+  traderCommissionPct?: string | null;
   customFields?: Record<string, string | number | null>;
 }
 
@@ -132,6 +137,11 @@ interface UpdateOrderInput {
   responseDeadlineAt?: string | null;
   isBrokerDeal?: boolean;
   commissionPerMt?: string | null;
+  // Deal economics (view-gated: enabledViews contains 'deal-economics')
+  dealType?: string | null;
+  tpcPerMt?: string | null;
+  tpcCurrency?: string | null;
+  traderCommissionPct?: string | null;
   customFields?: Record<string, string | number | null>;
 }
 
@@ -1000,6 +1010,10 @@ export async function listOrders(query?: ListOrdersQuery) {
         updatedAt: orders.updatedAt,
         isBrokerDeal: orders.isBrokerDeal,
         commissionPerMt: orders.commissionPerMt,
+        dealType: orders.dealType,
+        tpcPerMt: orders.tpcPerMt,
+        tpcCurrency: orders.tpcCurrency,
+        traderCommissionPct: orders.traderCommissionPct,
         customFields: orders.customFields,
       })
       .from(orders)
@@ -1066,6 +1080,11 @@ export async function listOrders(query?: ListOrdersQuery) {
         financingRateByTenant.get(row.tenantId) ?? getFinancingRateAnnual(),
         row.isBrokerDeal ?? false,
         row.commissionPerMt,
+        {
+          tpcPerMt: row.tpcPerMt,
+          tpcCurrency: row.tpcCurrency,
+          traderCommissionPct: row.traderCommissionPct,
+        },
       );
 
       // Determine display currency: uniform across all items → that currency, else USD
@@ -1259,6 +1278,11 @@ export async function getOrderById(idOrNumber: string) {
     financingRateAnnual,
     row.isBrokerDeal ?? false,
     row.commissionPerMt,
+    {
+      tpcPerMt: row.tpcPerMt,
+      tpcCurrency: row.tpcCurrency,
+      traderCommissionPct: row.traderCommissionPct,
+    },
   );
 
   // Resolve price reference names for formula-priced items
@@ -1463,6 +1487,10 @@ export async function createOrder(input: CreateOrderInput) {
     deliveryMethod: input.deliveryMethod ?? null,
     responseDeadlineAt: input.responseDeadlineAt ? new Date(input.responseDeadlineAt) : null,
     isBrokerDeal: input.isBrokerDeal ?? false,
+    dealType: input.dealType ?? null,
+    tpcPerMt: input.tpcPerMt ?? null,
+    tpcCurrency: input.tpcCurrency ?? null,
+    traderCommissionPct: input.traderCommissionPct ?? null,
     commissionPerMt: input.commissionPerMt ?? null,
     customFields: input.customFields ?? {},
   };
@@ -1548,6 +1576,10 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
   if (input.deliveryMethod !== undefined) setData.deliveryMethod = input.deliveryMethod ?? null;
   if (input.responseDeadlineAt !== undefined) setData.responseDeadlineAt = input.responseDeadlineAt ? new Date(input.responseDeadlineAt) : null;
   if (input.isBrokerDeal !== undefined) setData.isBrokerDeal = input.isBrokerDeal;
+  if (input.dealType !== undefined) setData.dealType = input.dealType;
+  if (input.tpcPerMt !== undefined) setData.tpcPerMt = input.tpcPerMt;
+  if (input.tpcCurrency !== undefined) setData.tpcCurrency = input.tpcCurrency;
+  if (input.traderCommissionPct !== undefined) setData.traderCommissionPct = input.traderCommissionPct;
   if (input.commissionPerMt !== undefined) setData.commissionPerMt = input.commissionPerMt;
   if (input.customFields !== undefined) setData.customFields = input.customFields;
 

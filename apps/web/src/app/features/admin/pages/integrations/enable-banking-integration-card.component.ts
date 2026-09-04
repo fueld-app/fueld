@@ -91,7 +91,8 @@ const BANKING_COUNTRIES = [
                     <span class="text-sm font-medium text-gray-700 dark:text-ink">{{ conn.aspsp_name }}</span>
                     <span class="ml-2 text-xs text-gray-400">{{ conn.aspsp_country }}</span>
                     @if (conn.status === 'expired') {
-                      <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-red-50 dark:bg-red-900/20 px-2 py-0.5 text-xs font-medium text-red-600">Expired — re-authorize</span>
+                      <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-red-50 dark:bg-red-900/20 px-2 py-0.5 text-xs font-medium text-red-600">Expired</span>
+                      <button type="button" (click)="reAuthorize(conn)" class="ml-2 text-xs text-blue-500 hover:underline">Re-authorize</button>
                     } @else if (conn.last_synced_at) {
                       <span class="ml-2 text-xs text-gray-400">synced {{ conn.last_synced_at | date:'short' }}</span>
                     }
@@ -295,7 +296,8 @@ const BANKING_COUNTRIES = [
                 <p class="font-semibold">⚠️ Your Enable Banking app needs to be activated</p>
                 <p>Your app has been created but is not yet active. To activate it:</p>
                 <ol class="list-decimal list-inside space-y-1">
-                  <li>Click <strong>"Send login email"</strong> below — you'll receive an email from Enable Banking</li>
+                  <li>Click <strong>"Go to Enable Banking login"</strong> below</li>
+                  <li>Enter your email on the EB sign-in page — you'll receive a login link</li>
                   <li>Click the link in the email to log in to the Enable Banking Control Panel</li>
                   <li>Find your app and click <strong>"Link accounts"</strong></li>
                   <li>Follow the bank consent flow to link your bank accounts</li>
@@ -303,22 +305,15 @@ const BANKING_COUNTRIES = [
                 </ol>
                 <p class="pt-1">Once activated, come back here and click "Retry" to load available banks.</p>
                 <div class="flex gap-2 pt-1">
-                  <button type="button" (click)="sendEbLoginEmail()" [disabled]="sendingLoginEmail()"
-                    class="inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50">
-                    @if (sendingLoginEmail()) {
-                      Sending…
-                    } @else {
-                      Send login email
-                    }
-                  </button>
+                  <a href="https://enablebanking.com/sign-in" target="_blank" rel="noopener"
+                    class="inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+                    Go to Enable Banking login →
+                  </a>
                   <button type="button" (click)="loadBanks()"
                     class="inline-flex items-center rounded-lg border border-amber-300 dark:border-amber-700 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30">
                     Retry loading banks
                   </button>
                 </div>
-                @if (loginEmailSent()) {
-                  <p class="text-green-600 dark:text-green-400">✓ Login email sent! Check your inbox and click the link.</p>
-                }
               </div>
             } @else {
               <div>
@@ -368,6 +363,8 @@ export class EnableBankingIntegrationCardComponent implements OnInit, OnDestroy 
   readonly ssOobCodeInput = signal('');
   readonly sendingLoginEmail = signal(false);
   readonly loginEmailSent = signal(false);
+  readonly cpConfigured = signal(false);
+  readonly quickSetupLoading = signal(false);
 
   // Setup form
   readonly appId = signal('');
@@ -412,11 +409,12 @@ export class EnableBankingIntegrationCardComponent implements OnInit, OnDestroy 
   private async loadStatus(): Promise<void> {
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ configured: boolean; connections: BankConnection[] }>>(`${API}/banking/status`),
+        this.http.get<ApiResponse<{ configured: boolean; connections: BankConnection[] }> & { data?: any }>(`${API}/banking/status`),
       );
       if (res.success && res.data) {
         this.configured.set(res.data.configured);
         this.connections.set(res.data.connections ?? []);
+        this.cpConfigured.set(res.data?.cpConfigured ?? false);
       }
     } catch {}
   }
@@ -477,32 +475,59 @@ export class EnableBankingIntegrationCardComponent implements OnInit, OnDestroy 
       );
       if (res.success && res.data?.authorizationUrl) {
         const oauthState = res.data.state;
+        const bankName = this.selectedBank();
         // Open OAuth2 flow in popup
         const popup = window.open(res.data.authorizationUrl, 'enablebanking-auth', 'width=600,height=700');
+        let completed = false;
+
         // Listen for callback postMessage
         const handler = async (event: MessageEvent) => {
           if (event.data?.type === 'enablebanking-callback' && event.data?.code) {
+            completed = true;
             window.removeEventListener('message', handler);
             popup?.close();
-            // Complete the flow — pass state for CSRF validation
-            const completeRes = await firstValueFrom(
-              this.http.post<ApiResponse<any>>(`${API}/banking/complete`, {
-                code: event.data.code,
-                state: oauthState,
-                aspspName: this.selectedBank(),
-                country: this.country(),
-              }),
-            );
-            if (completeRes.success) {
-              this.toast.show('success', `${this.selectedBank()} connected`);
-              this.showConnect.set(false);
-              this.loadStatus();
-            } else {
-              this.toast.show('error', completeRes.message ?? 'Failed to complete connection');
+            this.toast.show('success', `Completing ${bankName} connection…`);
+            try {
+              const completeRes = await firstValueFrom(
+                this.http.post<ApiResponse<any>>(`${API}/banking/complete`, {
+                  code: event.data.code,
+                  state: oauthState,
+                  aspspName: bankName,
+                  country: this.country(),
+                }),
+              );
+              if (completeRes.success) {
+                this.toast.show('success', `${bankName} connected`);
+                this.showConnect.set(false);
+                this.loadStatus();
+              } else {
+                this.toast.show('error', completeRes.message ?? 'Failed to complete connection');
+              }
+            } catch (e: any) {
+              this.toast.show('error', e?.message ?? 'Failed to complete connection');
             }
           }
         };
         window.addEventListener('message', handler);
+
+        // Poll for popup close (in case postMessage doesn't fire)
+        const closeChecker = setInterval(async () => {
+          if (popup?.closed) {
+            clearInterval(closeChecker);
+            if (!completed) {
+              window.removeEventListener('message', handler);
+              // Popup closed without postMessage — check if connection was created anyway
+              this.toast.show('success', 'Bank authentication complete. Checking connection…');
+              await this.loadStatus();
+              // If status shows new connections, close the connect panel
+              setTimeout(() => {
+                if (this.connections().length > 0) {
+                  this.showConnect.set(false);
+                }
+              }, 500);
+            }
+          }
+        }, 1000);
       }
     } catch (e: any) {
       this.toast.show('error', 'Failed to start connection: ' + (e?.message ?? ''));
@@ -516,6 +541,66 @@ export class EnableBankingIntegrationCardComponent implements OnInit, OnDestroy 
       this.loadStatus();
     } catch (e: any) {
       this.toast.show('error', 'Failed to remove connection');
+    }
+  }
+
+  async reAuthorize(conn: BankConnection): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<{ authorizationUrl: string; state: string }>>(`${API}/banking/connect`, {
+          aspspName: conn.aspsp_name,
+          country: conn.aspsp_country,
+        }),
+      );
+      if (res.success && res.data?.authorizationUrl) {
+        const oauthState = res.data.state;
+        const popup = window.open(res.data.authorizationUrl, 'enablebanking-auth', 'width=600,height=700');
+        let completed = false;
+
+        const handler = async (event: MessageEvent) => {
+          if (event.data?.type === 'enablebanking-callback' && event.data?.code) {
+            completed = true;
+            window.removeEventListener('message', handler);
+            popup?.close();
+            this.toast.show('success', `Re-authorizing ${conn.aspsp_name}…`);
+            try {
+              // Delete old connection and complete new one
+              await firstValueFrom(this.http.delete<ApiResponse<any>>(`${API}/banking/connections/${conn.id}`));
+              const completeRes = await firstValueFrom(
+                this.http.post<ApiResponse<any>>(`${API}/banking/complete`, {
+                  code: event.data.code,
+                  state: oauthState,
+                  aspspName: conn.aspsp_name,
+                  country: conn.aspsp_country,
+                }),
+              );
+              if (completeRes.success) {
+                this.toast.show('success', `${conn.aspsp_name} re-authorized`);
+                this.loadStatus();
+              } else {
+                this.toast.show('error', completeRes.message ?? 'Failed to re-authorize');
+              }
+            } catch (e: any) {
+              this.toast.show('error', e?.message ?? 'Failed to re-authorize');
+            }
+          }
+        };
+        window.addEventListener('message', handler);
+
+        // Popup close detection
+        const closeChecker = setInterval(async () => {
+          if (popup?.closed) {
+            clearInterval(closeChecker);
+            if (!completed) {
+              window.removeEventListener('message', handler);
+              this.toast.show('success', 'Authentication complete. Checking…');
+              await this.loadStatus();
+            }
+          }
+        }, 1000);
+      }
+    } catch (e: any) {
+      this.toast.show('error', 'Failed to start re-authorization: ' + (e?.message ?? ''));
     }
   }
 
@@ -665,6 +750,32 @@ export class EnableBankingIntegrationCardComponent implements OnInit, OnDestroy 
       this.toast.show('error', e?.message ?? 'Failed to send email');
     } finally {
       this.sendingLoginEmail.set(false);
+    }
+  }
+
+  async quickSetup(): Promise<void> {
+    this.quickSetupLoading.set(true);
+    this.ssStep.set('completing');
+    this.ssError.set(null);
+    try {
+      const email = this.ssEmail() || this.auth.userEmail();
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<{ appId: string }>>(`${API}/banking/enablebanking/quick-setup`, { email }),
+      );
+      if (res.success) {
+        this.ssStep.set('completed');
+        this.configured.set(true);
+        this.toast.show('success', 'Enable Banking app created!');
+        this.loadStatus();
+      } else {
+        this.ssStep.set('error');
+        this.ssError.set(res.message ?? 'Failed to create app');
+      }
+    } catch (e: any) {
+      this.ssStep.set('error');
+      this.ssError.set(e?.message ?? 'Failed to create app');
+    } finally {
+      this.quickSetupLoading.set(false);
     }
   }
 

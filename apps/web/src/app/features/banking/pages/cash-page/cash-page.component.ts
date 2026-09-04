@@ -230,10 +230,12 @@ export class CashPageComponent implements OnInit {
 
   private async loadTransactions(): Promise<void> {
     const res = await firstValueFrom(
-      this.http.get<ApiResponse<BankTransaction[]>>(`${API}/banking/transactions?limit=50`),
+      this.http.get<ApiResponse<{ transactions: BankTransaction[]; total: number; hasMore: boolean }>>(`${API}/banking/transactions?limit=50`),
     );
-    if (res.success && res.data) {
-      this.transactions.set(res.data);
+    if (res.success && res.data?.transactions) {
+      this.transactions.set(res.data.transactions);
+    } else {
+      this.transactions.set([]);
     }
   }
 

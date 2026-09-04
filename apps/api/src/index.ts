@@ -804,8 +804,8 @@ export async function createApp(options: CreateAppOptions = {}) {
           } catch (e) { /* tenant may not have banking configured — skip silently */ }
         }
       } catch (e) { console.error('[Banking] Periodic sync failed:', e); }
-    }, 2 * 60 * 60 * 1000);
-    console.log('[Banking] Background sync job started (interval: 2h)');
+    }, 60 * 60 * 1000);
+    console.log('[Banking] Background sync job started (interval: 1h — keeps sessions alive)');
   }
 
   return app;

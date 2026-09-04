@@ -50,9 +50,18 @@
         [isBrokerDeal]="isBrokerDeal()"
         [brokerDealLabel]="brokerDealLabel()"
         [isReadonly]="isReadonly()"
+        [dealEconomicsEnabled]="dealEconomicsEnabled()"
+        [dealType]="order()?.dealType ?? null"
+        [tpcPerMt]="order()?.tpcPerMt ?? null"
+        [tpcCurrency]="order()?.tpcCurrency ?? null"
+        [traderCommissionPct]="order()?.traderCommissionPct ?? null"
         (currencyChange)="onCurrencyChange($event)"
         (categoryChange)="onCategoryChange($event)"
         (brokerDealChange)="onBrokerDealToggle($event)"
+        (dealTypeChange)="onDealTypeChange($event)"
+        (tpcPerMtChange)="onTpcPerMtChange($event)"
+        (tpcCurrencyChange)="onTpcCurrencyChange($event)"
+        (traderCommissionPctChange)="onTraderCommissionPctChange($event)"
       />
     </div>
   </app-trading-detail-header>
@@ -247,6 +256,9 @@
   [allowDeliveredEdit]="allowDeliveredEdit()"
   [canSeePrices]="auth.canSeePrices()"
   [isBrokerDeal]="isBrokerDeal()"
+  [tpcPerMt]="order()?.tpcPerMt ?? null"
+  [tpcCurrency]="order()?.tpcCurrency ?? null"
+  [traderCommissionPct]="order()?.traderCommissionPct ?? null"
   [supplierOptionsInput]="itemSupplierOptions()"
   [financingRateAnnual]="isBrokerDeal() ? 0 : financingRateAnnual()"
   [financingDays]="financingDays()"
@@ -291,6 +303,8 @@
       [financingDays]="financingDays()"
       [financingDayCountConvention]="financingDayCountConvention()"
       [economics]="itemEconomics()"
+      [hasCommissions]="hasDealCommissions()"
+      [tradingProfit]="itemEconomics().tradingProfit ?? null"
     />
   </div>
 }

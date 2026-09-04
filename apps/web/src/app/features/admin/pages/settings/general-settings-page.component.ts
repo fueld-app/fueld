@@ -14,11 +14,13 @@ import type { ApiResponse, OrderNumberSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
 import { SettingsToastService } from './settings-toast.service';
+import { CustomColumnsSettingsCardComponent } from './custom-columns-settings-card.component';
+import { ViewsSettingsCardComponent } from './views-settings-card.component';
 
 @Component({
   selector: 'app-general-settings-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, CustomColumnsSettingsCardComponent, ViewsSettingsCardComponent],
   template: `
     <div>
       <!-- Header -->
@@ -401,6 +403,11 @@ import { SettingsToastService } from './settings-toast.service';
               </div>
             </div>
           </div>
+
+          <!-- Custom Columns card -->
+          <app-custom-columns-settings-card />
+
+          <app-views-settings-card />
 
         </div>
       }

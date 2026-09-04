@@ -151,7 +151,8 @@ export class EnableBankingClient {
       access: {
         balances: true,
         transactions: true,
-        valid_until: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+        available_accounts: 'all',
+        valid_until: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, '.000000+00:00'),
       },
     };
     const resp = await fetch(`${API_BASE}/auth`, {
@@ -171,7 +172,9 @@ export class EnableBankingClient {
       body: JSON.stringify({ code }),
     });
     if (!resp.ok) throw new Error(`createSession failed: ${resp.status} ${await resp.text()}`);
-    const data = await resp.json() as { session_id?: string; accounts?: any[] };
+    const raw = await resp.text();
+    console.log('[Banking] /sessions response:', raw.substring(0, 500));
+    const data = JSON.parse(raw) as any;
     const sid = data.session_id;
     if (!sid) throw new Error('No session_id in response');
     this.sessionId = sid;
@@ -351,8 +354,8 @@ export class EnableBankingClient {
     const btcObj = btc && typeof btc === 'object' ? btc : {};
 
     return {
-      transactionId: t.transactionId ?? t.transaction_id ?? t._id ?? '',
-      bookingDate: t.bookingDate ?? t.booking_date,
+      transactionId: t.transactionId ?? t.transaction_id ?? t._id ?? t.entryReference ?? t.entry_reference ?? '',
+      bookingDate: t.bookingDate ?? t.booking_date ?? t.valueDate ?? t.value_date ?? t.transactionDate ?? t.transaction_date,
       valueDate: t.valueDate ?? t.value_date,
       amount,
       currency,

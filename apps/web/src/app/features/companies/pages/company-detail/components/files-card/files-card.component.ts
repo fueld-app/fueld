@@ -20,7 +20,18 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
         </div>
       </div>
       <div class="px-5 py-4 space-y-4">
-        <div class="rounded-lg border border-dashed border-gray-200 dark:border-line bg-gray-50/60 p-4 dark:bg-surface-2">
+        <div
+          class="rounded-lg border border-dashed bg-gray-50/60 p-4 dark:bg-surface-2 transition-colors"
+          [class.border-brand-400]="dragging()"
+          [class.bg-brand-50]="dragging()"
+          [class.border-gray-200]="!dragging()"
+          [class.dark:border-brand-500]="dragging()"
+          [class.dark:border-line]="!dragging()"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event)"
+        >
+          <p class="mb-2 text-xs text-gray-400 dark:text-muted">Drag and drop files here, or use the file picker below.</p>
           <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div class="min-w-0">
               <input
@@ -102,8 +113,51 @@ export class FilesCardComponent implements OnInit {
   readonly attachments = signal<CompanyAttachmentDto[]>([]);
   readonly loading = signal(false);
   readonly uploading = signal(false);
+  readonly dragging = signal(false);
   readonly deleteTarget = signal<CompanyAttachmentDto | null>(null);
   selectedFile: File | null = null;
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.dragging.set(true);
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    // Only clear when the pointer truly leaves the dropzone (not when entering a child element).
+    if (event.currentTarget && event.relatedTarget && (event.currentTarget as HTMLElement).contains(event.relatedTarget as Node)) return;
+    this.dragging.set(false);
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.dragging.set(false);
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) void this.uploadFiles(Array.from(files));
+  }
+
+  /** Upload one or more dropped/picked files to the company attachments endpoint. */
+  async uploadFiles(files: File[]): Promise<void> {
+    if (!files.length) return;
+    this.uploading.set(true);
+    try {
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+          const res = await firstValueFrom(this.http.post<ApiResponse<CompanyAttachmentDto>>(`${API}/companies/local/${this.companyId()}/attachments`, fd));
+          if (res.success && res.data) this.attachments.update(a => [...a, res.data!]);
+        } catch (err: any) {
+          console.error('Failed to upload file:', err);
+        }
+      }
+    } finally {
+      this.uploading.set(false);
+    }
+  }
 
   ngOnInit(): void { this.load(); }
 

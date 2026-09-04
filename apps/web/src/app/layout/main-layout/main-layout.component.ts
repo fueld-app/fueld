@@ -450,7 +450,7 @@ const NAVIGATION: NavItem[] = [
       [class.lg:pl-64]="!sidebarCollapsed()"
       [class.lg:pl-16]="sidebarCollapsed()">
       @if (showUpdateToast()) {
-        <div class="app-update-toast fixed z-50 w-80 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-4 py-3 shadow-lg">
+        <div class="app-update-toast fixed z-50 w-80 rounded-xl border border-amber-200 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-950 px-4 py-3 shadow-lg">
           <p class="text-sm font-semibold text-amber-900 dark:text-amber-300">Update available</p>
           <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">Reload to get the latest fixes and features.</p>
           <div class="mt-3 flex items-center gap-2">

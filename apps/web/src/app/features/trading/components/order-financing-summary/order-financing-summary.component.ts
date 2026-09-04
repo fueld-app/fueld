@@ -40,6 +40,18 @@ import type { OrderItemsEconomics } from '../order-items/order-item.types';
           </p>
         </div>
 
+        <!-- Trading Profit (gross − TPC − trader commission) — deal-economics view -->
+        @if (hasCommissions()) {
+          <div class="px-4 py-3">
+            <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-muted">Trading</p>
+            <p class="mt-1 text-lg font-bold tabular-nums leading-tight"
+              [class.text-green-600]="(tradingProfit() ?? 0) > 0"
+              [class.text-red-600]="(tradingProfit() ?? 0) < 0">
+              {{ (tradingProfit() ?? 0) | number:'1.2-2' }}
+            </p>
+          </div>
+        }
+
         <!-- Net Profit -->
         <div class="px-4 py-3">
           <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-muted">Net</p>
@@ -66,6 +78,8 @@ import type { OrderItemsEconomics } from '../order-items/order-item.types';
 })
 export class OrderFinancingSummaryComponent {
   readonly baseCurrency = input('USD');
+  readonly hasCommissions = input(false);
+  readonly tradingProfit = input<number | null>(null);
   readonly financingRateAnnual = input(0.08);
   readonly financingDays = input(0);
   readonly financingDayCountConvention = input(365);

@@ -265,6 +265,15 @@ export interface TenantSettings {
     bookingColumnEnabled?: boolean;     // Show the Sendt Bunker Booking indicator column on order lists (Moxie only by default)
     fontFamily?: string | null;         // Font stack for booking emails (default "'Segoe UI', Arial, sans-serif"; Moxie uses Aptos)
   };
+  // ── View modules (tenant-gated data views) ──
+  // Enabled optional views: 'deal-economics' (per-deal commissions + Profit),
+  // 'performance-history' (monthly profit/turnover chart on the dashboard).
+  enabledViews?: string[];
+  // Trader commission schemes (the Excel "Annexe"): per trader, commission %
+  // keyed by deal type (e.g. { SPOT: 7, MILITARY: 0 }). Compensation data —
+  // admin-only API + UI.
+  traderCommissions?: { userId: string; rates: Record<string, number> }[];
+
   // Configurable reasons required when cancelling inquiries
   inquiryCancelReasons?: string[];
   inquirySettings?: {
@@ -1054,6 +1063,18 @@ export const orders = pgTable('orders', {
 
   // Inquiry response deadline — when the supplier should reply by
   responseDeadlineAt: timestamp('response_deadline_at', { withTimezone: true }),
+
+  // ── Deal economics (Riviera / trader-commission model) ──
+  // Deal type in trader vocabulary (SPOT / MILITARY / ...) — selects the
+  // trader's commission rate from the tenant traderCommissions config.
+  dealType: text('deal_type'),
+  // Third-party commission (TPC): money off-record, no invoice received.
+  // Rate per MT + its currency (USD/MT or EUR/MT — decided per deal).
+  tpcPerMt: numeric('tpc_per_mt', { precision: 12, scale: 4 }),
+  tpcCurrency: text('tpc_currency'),
+  // Trader's own agreed commission, % of margin (sell − buy − TPC).
+  // Snapshot on the order: auto-filled from tenant config, editable.
+  traderCommissionPct: numeric('trader_commission_pct', { precision: 8, scale: 4 }),
 
   // Bunker Booking sent indicator (Moxie request): NULL = not sent (red),
   // set = sent (green). Auto-set when a BUNKER_BOOKING email is sent from

@@ -692,7 +692,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 <input type="file" class="hidden" (change)="uploadAttachment($any($event.target).files[0])" />
               </label>
             </div>
-            <div class="flex-1 min-h-0 overflow-y-auto p-4">
+            <div class="flex-1 min-h-0 overflow-y-auto p-4 transition-colors"
+              [class.bg-brand-50]="vesselDragOver()"
+              [class.dark:bg-brand-700]="vesselDragOver()"
+              (dragover)="onVesselDragOver($event)"
+              (dragleave)="onVesselDragLeave($event)"
+              (drop)="onVesselDrop($event)"
+            >
+              <p class="mb-3 text-xs text-gray-400 dark:text-muted">Drag and drop files here, or use the Upload button.</p>
               @if (vesselAttachments().length > 0) {
                 <ul class="space-y-2">
                   @for (att of vesselAttachments(); track att.id) {
@@ -1149,6 +1156,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly vesselPersonTitles = signal<string[]>(['Captain']);
   readonly vesselCapacities = signal<Array<{ id: string; productType: string; capacity: string | null; unit: string }>>([]);
   readonly vesselAttachments = signal<Array<{ id: string; fileName: string; filePath: string; mimeType: string; fileSize: number; createdAt: string }>>([]);
+  readonly vesselDragOver = signal(false);
   readonly productsList = signal<string[]>([]);
   readonly vesselId = computed(() => this.vessel()?.id ?? '');
   readonly syncing = signal(false);
@@ -2206,6 +2214,31 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
         this.vesselAttachments.update((list) => [res.data, ...list]);
       }
     } catch { this.showToast('error', 'Failed to upload file.'); }
+  }
+
+  onVesselDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.vesselDragOver.set(true);
+  }
+
+  onVesselDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    // Only clear when the pointer truly leaves the dropzone (not when entering a child element).
+    if (event.currentTarget && event.relatedTarget && (event.currentTarget as HTMLElement).contains(event.relatedTarget as Node)) return;
+    this.vesselDragOver.set(false);
+  }
+
+  async onVesselDrop(event: DragEvent): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+    this.vesselDragOver.set(false);
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      await this.uploadAttachment(file);
+    }
   }
 
   async deleteAttachment(attachmentId: string): Promise<void> {

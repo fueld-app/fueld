@@ -941,6 +941,10 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly canSeePrices = input(true);
   readonly isBrokerDeal = input(false);
   readonly currency = input('USD');
+  // Deal economics (tenant 'deal-economics' view) — order-level commissions
+  readonly tpcPerMt = input<string | null>(null);
+  readonly tpcCurrency = input<string | null>(null);
+  readonly traderCommissionPct = input<string | null>(null);
   readonly financingRateAnnual = input(0.08);
   readonly financingDays = input(0);
   readonly financingDayCountConvention = input(365);
@@ -1066,6 +1070,9 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
         financingCostPerMt: this.financingCostPerMt(),
         totalNetProfit: this.totalNetProfit(),
         netMarginPct: this.netMarginPct(),
+        totalTpc: this.totalTpc(),
+        totalTraderCommission: this.totalTraderCommission(),
+        tradingProfit: this.tradingProfit(),
       });
     });
 
@@ -1156,6 +1163,27 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   });
 
   readonly totalNetProfit = computed(() => this.totalProfit() - this.totalFinancingCost());
+
+  // ── Deal commissions (Mario/Riviera model) ──
+  readonly totalTpc = computed(() => {
+    const rate = Number(this.tpcPerMt() ?? 0);
+    if (!rate) return 0;
+    const cur = (this.tpcCurrency() ?? this.currency() ?? 'USD').toUpperCase();
+    const rateFx = this.getFxRate(cur);
+    return this.toDisplayCurrency(this.totalQty() * rate * rateFx);
+  });
+
+  readonly totalTraderCommission = computed(() => {
+    const pct = Number(this.traderCommissionPct() ?? 0);
+    if (!pct) return 0;
+    const marginAfterTpc = this.totalProfit() - this.totalTpc();
+    return Math.max(0, marginAfterTpc) * (pct / 100);
+  });
+
+  /** Mario's "Total Profit": gross − TPC − trader commission (no financing). */
+  readonly tradingProfit = computed(() =>
+    this.totalProfit() - this.totalTpc() - this.totalTraderCommission(),
+  );
 
   readonly netMarginPct = computed(() => {
     const revenue = this.totalRevenue();

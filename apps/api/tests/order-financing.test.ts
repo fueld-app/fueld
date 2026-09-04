@@ -13,6 +13,7 @@ import {
   type FinancingItemInput,
   type FinancingTermsInput,
 } from '../src/modules/orders/order-financing';
+import { getFxRate } from '../src/modules/prices/price.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Unit tests for order-financing (calculateOrderEconomics & helpers)
@@ -390,5 +391,67 @@ describe('order-financing', () => {
         expect(avgDealSize).toBe(85_000);
       });
     });
+  });
+});
+
+describe('calculateOrderEconomics — deal commissions (Mario/Riviera model)', () => {
+  const terms: FinancingTermsInput = { customerPaymentTermType: 'COD', supplierPaymentTermType: 'COD' };
+
+  it('TPC (per MT) and trader % of margin-after-TPC match the sheet formula', () => {
+    // Mario: sell 1327.85, buy 1171.808, qty 371.232 MT, TPC 109.228 $/MT, trader 7% (SPOT)
+    // TpcTot = 109.228 × 371.232 = 40548.55…
+    // BrokTot = (1327.85 − 1171.808 − 109.228) × 7% × 371.232 = 46.814 × 0.07 × 371.232 = 1217.05…
+    // Total Profit = (sell − buy − tpc − brok/MT) × MT = 46.814 × 0.93 × 371.232 = 16178.5…
+    const items: FinancingItemInput[] = [
+      { quantity: '371.232', salesPrice: '1327.85', salesCurrency: 'USD', costPrice: '1171.808', costCurrency: 'USD' },
+    ];
+    const result = calculateOrderEconomics(terms, items, 0.08, false, null, {
+      tpcPerMt: '109.228',
+      tpcCurrency: 'USD',
+      traderCommissionPct: '7',
+    });
+    expect(result.totalTpc).toBeCloseTo(109.228 * 371.232, 2);
+    const gross = (1327.85 - 1171.808) * 371.232;
+    const marginAfterTpc = gross - 109.228 * 371.232;
+    expect(result.totalGrossProfit).toBeCloseTo(gross, 2);
+    expect(result.totalTraderCommission).toBeCloseTo(marginAfterTpc * 0.07, 2);
+    expect(result.tradingProfit).toBeCloseTo(marginAfterTpc * 0.93, 2);
+    // netProfit keeps the existing meaning (gross − financing; commissions
+    // are NOT deducted there — existing views unchanged); financingDays = 0.
+    expect(result.totalNetProfit).toBeCloseTo(result.totalGrossProfit, 2);
+  });
+
+  it('EUR TPC converts via FX and trader % only applies when margin after TPC is positive', () => {
+    const items: FinancingItemInput[] = [
+      { quantity: '100', salesPrice: '1200', salesCurrency: 'EUR', costPrice: '1000', costCurrency: 'EUR' },
+    ];
+    const result = calculateOrderEconomics(terms, items, 0.08, false, null, {
+      tpcPerMt: '10',
+      tpcCurrency: 'EUR',
+      traderCommissionPct: '7',
+    });
+    const eurRate = getFxRate('EUR');
+    // revenue = 100×1200×rate, cost = 100×1000×rate, tpc = 100×10×rate
+    expect(result.totalTpc).toBeCloseTo(1000 * eurRate, 2);
+    expect(result.totalTraderCommission).toBeCloseTo((120_000 - 100_000 - 1_000) * eurRate * 0.07, 2);
+
+    // Negative margin after TPC → trader commission clamped to 0
+    const loss = calculateOrderEconomics(terms, items, 0.08, false, null, {
+      tpcPerMt: '250',
+      tpcCurrency: 'EUR',
+      traderCommissionPct: '7',
+    });
+    expect(loss.totalTraderCommission).toBe(0);
+    expect(loss.tradingProfit).toBeLessThan(0);
+  });
+
+  it('no commissions configured → tradingProfit equals grossProfit', () => {
+    const items: FinancingItemInput[] = [
+      { quantity: '10', salesPrice: '100', salesCurrency: 'USD', costPrice: '80', costCurrency: 'USD' },
+    ];
+    const result = calculateOrderEconomics(terms, items, 0.08, false, null, undefined);
+    expect(result.totalTpc).toBe(0);
+    expect(result.totalTraderCommission).toBe(0);
+    expect(result.tradingProfit).toBe(result.totalGrossProfit);
   });
 });

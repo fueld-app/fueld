@@ -236,8 +236,8 @@ export async function syncBankConnection(tenantId: string, connectionId: string)
     }
 
     // Fetch transactions (last 90 days)
-    const dateFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const txns = await client.getTransactions(account.id, dateFrom);
+    const dateFrom = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]; // Jan 1st of current year
+    const txns = await client.getTransactions(account.id, dateFrom, undefined, false); // withDetails=false for speed
     for (const txn of txns) {
       // Insert if not exists (UNIQUE constraint on connection_id + transaction_id)
       await db.execute(sql`
@@ -288,10 +288,10 @@ export async function syncAllConnections(tenantId: string): Promise<{ synced: nu
   let synced = 0;
   let errors = 0;
   for (const conn of conns) {
-    // Skip expired connections silently — admin needs to re-authorize
+    // Skip expired/pending connections silently
     if ((conn as any).status === 'expired' || (conn as any).status === 'pending') continue;
     try {
-      await syncBankConnection(tenantId, (conn as any).id);
+      await syncBankConnectionForUser(tenantId, (conn as any).id);
       synced++;
     } catch (e) {
       console.error(`[Banking] Sync failed for ${(conn as any).aspsp_name}:`, e);
@@ -332,7 +332,7 @@ export async function getTransactions(
   tenantId: string,
   opts: { accountId?: string; dateFrom?: string; dateTo?: string; limit?: number; offset?: number } = {},
 ) {
-  const limit = Math.min(opts.limit ?? 100, 500);
+  const limit = Math.min(opts.limit ?? 100, 1000);
   const offset = opts.offset ?? 0;
 
   let query = sql`
@@ -355,7 +355,27 @@ export async function getTransactions(
   query = sql`${query} ORDER BY bt.booking_date DESC LIMIT ${limit} OFFSET ${offset}`;
 
   const result = await db.execute(query);
-  return result as any[];
+  const transactions = result as any[];
+
+  // Get total count for pagination
+  let countQuery = sql`
+    SELECT count(*) as total FROM bank_transactions bt
+    JOIN bank_connections bc ON bc.id = bt.connection_id
+    WHERE bt.tenant_id = ${tenantId}
+  `;
+  if (opts.accountId) {
+    countQuery = sql`${countQuery} AND bt.account_id = ${opts.accountId}`;
+  }
+  if (opts.dateFrom) {
+    countQuery = sql`${countQuery} AND bt.booking_date >= ${opts.dateFrom}`;
+  }
+  if (opts.dateTo) {
+    countQuery = sql`${countQuery} AND bt.booking_date <= ${opts.dateTo}`;
+  }
+  const countResult = await db.execute(countQuery);
+  const total = (countResult as any[])[0]?.total ?? 0;
+
+  return { transactions, total, hasMore: offset + limit < total };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -445,7 +465,79 @@ export async function getUserEnableBankingCredentials(userId: string, tenantId: 
   return getEnableBankingCredentials(tenantId);
 }
 
-/** Check if user has per-user Enable Banking configured. */
+/** Fetch transaction details on-demand and update the DB with enriched data. */
+export async function enrichTransactionDetails(
+  tenantId: string,
+  transactionDbId: string,
+): Promise<{ enriched: boolean; remittanceInfo?: string }> {
+  // Get the transaction from DB
+  const txnRows = await db.execute(sql`
+    SELECT bt.transaction_id, bt.account_id, bc.session_id, bc.user_id
+    FROM bank_transactions bt
+    JOIN bank_connections bc ON bc.id = bt.connection_id
+    WHERE bt.id = ${transactionDbId} AND bt.tenant_id = ${tenantId}
+  `) as any[];
+  if (txnRows.length === 0) throw new Error('Transaction not found');
+  const txn = txnRows[0];
+  if (!txn.session_id) throw new Error('Connection has no session');
+
+  // Get credentials
+  let creds;
+  if (txn.user_id) {
+    creds = await getUserEnableBankingCredentials(txn.user_id, tenantId);
+  }
+  if (!creds) {
+    creds = await getEnableBankingCredentials(tenantId);
+  }
+  if (!creds) throw new Error('Enable Banking not configured');
+
+  const client = new EnableBankingClient({
+    appId: creds.appId,
+    privateKeyPem: creds.privateKeyPem,
+    redirectUrl: creds.redirectUrl,
+  });
+  client.setSessionId(txn.session_id);
+
+  // Fetch details from Enable Banking API
+  const detailResp = await fetch(
+    `https://api.enablebanking.com/accounts/${txn.account_id}/transactions/${txn.transaction_id}`,
+    { headers: (client as any).sessionHeaders() },
+  );
+  if (!detailResp.ok) {
+    throw new Error(`Details fetch failed: ${detailResp.status}`);
+  }
+  const detail = await detailResp.json() as any;
+
+  // Extract enriched fields
+  let remittanceInfo = '';
+  const ri = detail.remittance_information ?? detail.remittanceInformation;
+  if (Array.isArray(ri)) remittanceInfo = ri.join('\n');
+  else if (typeof ri === 'string') remittanceInfo = ri;
+
+  const debtorObj = detail.debtor && typeof detail.debtor === 'object' ? detail.debtor : {};
+  const creditorObj = detail.creditor && typeof detail.creditor === 'object' ? detail.creditor : {};
+  const debtorAccount = detail.debtor_account && typeof detail.debtor_account === 'object' ? detail.debtor_account : {};
+  const creditorAccount = detail.creditor_account && typeof detail.creditor_account === 'object' ? detail.creditor_account : {};
+  const balAfter = detail.balance_after_transaction ?? detail.balanceAfterTransaction ?? {};
+
+  // Update the DB with enriched data
+  await db.execute(sql`
+    UPDATE bank_transactions SET
+      remittance_info = ${remittanceInfo || null},
+      debtor_name = ${debtorObj.name ?? null},
+      creditor_name = ${creditorObj.name ?? null},
+      debtor_account_iban = ${debtorAccount.iban ?? null},
+      creditor_account_iban = ${creditorAccount.iban ?? null},
+      balance_after_amount = ${balAfter.amount ?? null},
+      balance_after_currency = ${balAfter.currency ?? null},
+      bank_transaction_code = ${detail.bank_transaction_code?.code ?? null},
+      resource_id = ${detail.resource_id ?? null},
+      raw_data = ${JSON.stringify(detail)}
+    WHERE id = ${transactionDbId}
+  `);
+
+  return { enriched: true, remittanceInfo };
+}
 export async function isUserEnableBankingConfigured(userId: string): Promise<boolean> {
   const rows = await db.execute(sql`
     SELECT 1 FROM enable_banking_user_credentials
@@ -841,29 +933,57 @@ export async function syncBankConnectionForUser(
     accounts = await client.listAccounts();
   } catch (e: any) {
     const errMsg = String(e?.message ?? '');
-    if (errMsg.includes('401') || errMsg.includes('403') || errMsg.includes('Unauthorized') || errMsg.includes('session')) {
+    // Don't mark as expired on 404 — might be a temporary provisioning delay. Retry once.
+    if (errMsg.includes('401') || errMsg.includes('403') || errMsg.includes('Unauthorized')) {
       await db.execute(sql`UPDATE bank_connections SET status = 'expired', updated_at = NOW() WHERE id = ${connectionId}`);
-      throw new Error(`Bank session for ${conn.aspsp_name} has expired. Please re-authorize this bank connection.`);
+      throw new Error(`Bank session for ${conn.aspsp_name} has expired. Please re-authorize.`);
     }
-    throw e;
+    console.warn(`[Banking] listAccounts failed (${errMsg}), retrying in 3s...`);
+    await new Promise(r => setTimeout(r, 3000));
+    try {
+      accounts = await client.listAccounts();
+    } catch (e2: any) {
+      console.error(`[Banking] listAccounts retry failed: ${e2.message}`);
+      throw e2;
+    }
   }
 
   let balanceCount = 0;
   let txnCount = 0;
 
+  // Delete ALL existing balances for this connection before re-syncing
+  // (account IDs may change between sessions, so we can't delete per-account)
+  await db.execute(sql`DELETE FROM bank_account_balances WHERE connection_id = ${connectionId}`);
+
   for (const account of accounts) {
+    try {
     const balances = await client.getAccountBalances(account.id);
-    for (const bal of balances) {
-      await db.execute(sql`DELETE FROM bank_account_balances WHERE connection_id = ${connectionId} AND account_id = ${account.id}`);
+    // Only store one balance per account — prefer CLBD (closing booked), then VALU, then first
+    const bestBalance = balances.find(b => (b.balanceType ?? '').toUpperCase() === 'CLBD')
+      ?? balances.find(b => (b.balanceType ?? '').toUpperCase() === 'VALU')
+      ?? balances[0];
+    if (bestBalance) {
       await db.execute(sql`
         INSERT INTO bank_account_balances (connection_id, tenant_id, account_id, iban, account_name, balance, currency, balance_type, synced_at)
-        VALUES (${connectionId}, ${tenantId}, ${account.id}, ${account.iban ?? null}, ${account.name ?? null}, ${bal.amount}, ${bal.currency}, ${bal.balanceType ?? null}, NOW())
+        VALUES (${connectionId}, ${tenantId}, ${account.id}, ${account.iban ?? null}, ${account.name ?? null}, ${bestBalance.amount}, ${bestBalance.currency}, ${bestBalance.balanceType ?? null}, NOW())
       `);
       balanceCount++;
     }
 
-    const dateFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const txns = await client.getTransactions(account.id, dateFrom);
+    const dateFrom = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]; // Jan 1st of current year
+    let txns: BankTransaction[] = [];
+    try {
+      txns = await client.getTransactions(account.id, dateFrom, undefined, false);
+    } catch (txnErr: any) {
+      // Some banks only allow 90 days of history — retry with 90 days
+      if (String(txnErr?.message ?? '').includes('422') || String(txnErr?.message ?? '').includes('WRONG_TRANSACTIONS_PERIOD')) {
+        const fallbackDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        console.warn(`[Banking] ${conn.aspsp_name}: 90-day limit, retrying from ${fallbackDate}`);
+        txns = await client.getTransactions(account.id, fallbackDate, undefined, false);
+      } else {
+        throw txnErr;
+      }
+    }
     for (const txn of txns) {
       await db.execute(sql`
         INSERT INTO bank_transactions (
@@ -892,6 +1012,10 @@ export async function syncBankConnectionForUser(
         ON CONFLICT (connection_id, transaction_id) DO NOTHING
       `);
       txnCount++;
+    }
+    } catch (e: any) {
+      console.warn(`[Banking] Sync failed for account ${account.id}: ${e.message}`);
+      // Continue with next account — don't let one failure stop the whole sync
     }
   }
 

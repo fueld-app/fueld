@@ -631,6 +631,11 @@ export interface OrderDto {
   categoryKey?: string | null;
   isBrokerDeal?: boolean;
   commissionPerMt?: string | null;
+  // Deal economics (tenant 'deal-economics' view)
+  dealType?: string | null;
+  tpcPerMt?: string | null;
+  tpcCurrency?: string | null;
+  traderCommissionPct?: string | null;
   closedAt: string | null;
   createdAt: string;
   updatedAt: string;

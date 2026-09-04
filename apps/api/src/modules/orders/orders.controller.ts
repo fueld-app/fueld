@@ -48,6 +48,48 @@ import { db } from '../../db';
 import { users, tenants, orders } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
+/**
+ * Deal economics (Riviera / trader-commission model) — tenant-gated by the
+ * 'deal-economics' view. When the view is disabled, strip the fields. When
+ * enabled and the trader commission % is not explicitly provided, auto-fill
+ * it from the tenant traderCommissions config (per trader, per deal type).
+ */
+async function gateDealEconomicsFields(
+  tenantId: string,
+  body: Record<string, unknown>,
+  salesRepId?: string | null,
+  currentOrderId?: string | null,
+): Promise<void> {
+  const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  const views = ((tenant?.settings as any)?.enabledViews ?? []) as string[];
+  if (!views.includes('deal-economics')) {
+    // View disabled: ignore (drop) the keys instead of nulling them, so a
+    // full-payload autosave cannot erase stored deal data.
+    delete body.dealType;
+    delete body.tpcPerMt;
+    delete body.tpcCurrency;
+    delete body.traderCommissionPct;
+    return;
+  }
+  // Auto-fill the trader commission snapshot from the tenant scheme when the
+  // client did not provide one (undefined OR null — the client clears it on
+  // deal-type change expecting a re-fill). Uses the effective sales rep:
+  // the one in the body, or the order's current rep for updates.
+  if (body.traderCommissionPct == null && body.dealType) {
+    let repId = salesRepId ?? null;
+    if (!repId && currentOrderId) {
+      const [current] = await db.select({ salesRepId: orders.salesRepId }).from(orders).where(eq(orders.id, currentOrderId)).limit(1);
+      repId = current?.salesRepId ?? null;
+    }
+    if (repId) {
+      const dealType = String(body.dealType).trim().toUpperCase();
+      const schemes = ((tenant?.settings as any)?.traderCommissions ?? []) as { userId: string; rates: Record<string, number> }[];
+      const pct = schemes.find((c) => c.userId === repId)?.rates?.[dealType];
+      if (pct !== undefined && pct !== null) body.traderCommissionPct = String(pct);
+    }
+  }
+}
+
 /** Check if broker deals are enabled for the tenant. If not, strip broker deal fields from request body. */
 async function gateBrokerDealFields(tenantId: string, body: Record<string, unknown>): Promise<void> {
   const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
@@ -489,6 +531,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
 
         // Gate broker deal fields by tenant setting
         await gateBrokerDealFields(user.tenantId, body as Record<string, unknown>);
+        await gateDealEconomicsFields(user.tenantId, body as Record<string, unknown>, (body as any).salesRepId ?? null);
 
         const order = await createOrder({
           tenantId: user.tenantId,
@@ -572,6 +615,10 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         etd: t.Optional(t.String()),
         isBrokerDeal: t.Optional(t.Boolean()),
         commissionPerMt: t.Optional(t.String()),
+        dealType: t.Optional(t.Nullable(t.String())),
+        tpcPerMt: t.Optional(t.Nullable(t.String())),
+        tpcCurrency: t.Optional(t.Nullable(t.String())),
+        traderCommissionPct: t.Optional(t.Nullable(t.String())),
         customFields: t.Optional(t.Record(t.String(), t.Union([t.String(), t.Number(), t.Null()]))),
       }),
       detail: {
@@ -590,6 +637,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         if (!orderId) return { success: false, data: null, message: 'Order not found' };
         // Gate broker deal fields by tenant setting
         await gateBrokerDealFields(auth.tenantId, body as Record<string, unknown>);
+        await gateDealEconomicsFields(auth.tenantId, body as Record<string, unknown>, (body as any).salesRepId ?? null, orderId);
         const updated = await updateOrder(orderId, body, auth.sub);
         if (!updated) {
           return { success: false, data: null, message: 'Order not found' };
@@ -637,6 +685,10 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         lossReason: t.Optional(t.Nullable(t.String())),
         isBrokerDeal: t.Optional(t.Boolean()),
         commissionPerMt: t.Optional(t.Nullable(t.String())),
+        dealType: t.Optional(t.Nullable(t.String())),
+        tpcPerMt: t.Optional(t.Nullable(t.String())),
+        tpcCurrency: t.Optional(t.Nullable(t.String())),
+        traderCommissionPct: t.Optional(t.Nullable(t.String())),
         customFields: t.Optional(t.Record(t.String(), t.Union([t.String(), t.Number(), t.Null()]))),
       }),
       detail: {

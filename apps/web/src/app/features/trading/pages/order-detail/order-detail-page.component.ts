@@ -13,6 +13,7 @@ import {
   ElementRef,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { ViewsService } from '@app/core/views/views.service';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map, skip, type Subscription } from 'rxjs';
@@ -177,6 +178,7 @@ import type {
 })
 export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
+  protected readonly views = inject(ViewsService);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   protected readonly auth = inject(AuthService);
@@ -1041,6 +1043,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.checkWhatsAppLinked();
     this.dateFormatSvc.load();
     this.brokerDealSvc.load();
+    void this.views.load();
 
     // React to same-route navigation (e.g. global search clicking another order).
     // Angular reuses the component when only the :id param changes, so ngOnInit
@@ -2693,6 +2696,31 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.order.update((o) => (o ? { ...o, categoryKey: categoryKey || null } : o));
   }
 
+  // ── Deal economics (tenant 'deal-economics' view) ──
+  readonly dealEconomicsEnabled = computed(() => this.views.has('deal-economics'));
+  readonly hasDealCommissions = computed(() =>
+    !!(this.order()?.tpcPerMt || this.order()?.traderCommissionPct),
+  );
+
+  onDealTypeChange(dealType: string | null): void {
+    // Clear the commission snapshot on type change — the server re-fills it
+    // from the tenant traderCommissions scheme on save (auto-fill only when
+    // the client does not send an explicit pct).
+    this.order.update((o) => (o ? { ...o, dealType, traderCommissionPct: null } as any : o));
+  }
+
+  onTpcPerMtChange(value: string | null): void {
+    this.order.update((o) => (o ? { ...o, tpcPerMt: value } as any : o));
+  }
+
+  onTpcCurrencyChange(value: string | null): void {
+    this.order.update((o) => (o ? { ...o, tpcCurrency: value } as any : o));
+  }
+
+  onTraderCommissionPctChange(value: string | null): void {
+    this.order.update((o) => (o ? { ...o, traderCommissionPct: value } as any : o));
+  }
+
 
 
 
@@ -2717,6 +2745,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         loadCustomerCreditLines: (cid) => this.financialSvc.loadCustomerCreditLines(cid),
         loadSupplierCreditLines: (scid) => this.financialSvc.loadSupplierCreditLines(scid),
         activeSupplierCompanyId: () => this.activeOrderSupplier()?.companyId ?? null,
+        onDealFieldsSaved: (fields) => {
+          this.order.update((o) => (o ? { ...o, dealType: fields.dealType, traderCommissionPct: fields.traderCommissionPct } as any : o));
+        },
       });
       if (success) this.lastSaved.set(new Date());
     } finally {

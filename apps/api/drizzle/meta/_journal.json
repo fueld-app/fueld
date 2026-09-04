@@ -820,6 +820,13 @@
       "when": 1788160001000,
       "tag": "0116_user_signature_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1788160002000,
+      "tag": "0117_deal_economics",
+      "breakpoints": true
     }
   ]
 }

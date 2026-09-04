@@ -32,6 +32,7 @@ import {
   startBankConnectionForUser,
   handleOAuthCallbackForUser,
   syncBankConnectionForUser,
+  enrichTransactionDetails,
 } from './banking.service';
 import { sql } from 'drizzle-orm';
 // ─── OAuth2 State Management (database-backed, survives restarts) ───
@@ -107,9 +108,10 @@ export const bankingController = new Elysia({ prefix: '/banking' })
     try {
       const userConfigured = await isUserEnableBankingConfigured(auth!.userId);
       const tenantConfigured = await isEnableBankingConfigured(auth!.tenantId);
+      const cpConfigured = await isControlPanelConfigured(auth!.tenantId);
       const connections = await listBankConnections(auth!.tenantId);
       const setupStatus = await getEnableBankingSetupStatus(auth!.userId);
-      return { success: true, data: { configured: userConfigured || tenantConfigured, userConfigured, tenantConfigured, connections, setupStatus } } satisfies ApiResponse<any>;
+      return { success: true, data: { configured: userConfigured || tenantConfigured, userConfigured, tenantConfigured, cpConfigured, connections, setupStatus } } satisfies ApiResponse<any>;
     } catch (e: any) {
       return { success: false, data: null, message: e.message };
     }
@@ -204,15 +206,18 @@ export const bankingController = new Elysia({ prefix: '/banking' })
       // to prevent tampering
       const result = await handleOAuthCallbackForUser(auth!.userId, auth!.tenantId, body.code, pending.aspspName, pending.country);
       console.log(`[Banking] OAuth2 complete success: user=${auth!.userId}, bank=${pending.aspspName}, session=${result.sessionId}, accounts=${result.accounts.length}`);
-      // Auto-sync after connecting
+      // Auto-sync after connecting — delay 5s to let the session provision on EB's side
       const conns = await listBankConnections(auth!.tenantId);
       const newConn = conns.find((c: any) => c.session_id === result.sessionId);
       if (newConn) {
+        // Delay to allow session to fully provision
+        await new Promise(r => setTimeout(r, 5000));
         try {
           const syncResult = await syncBankConnectionForUser(auth!.tenantId, (newConn as any).id);
           console.log(`[Banking] Auto-sync after connect: ${syncResult.accounts} accounts, ${syncResult.balances} balances, ${syncResult.transactions} transactions`);
         } catch (syncErr: any) {
-          console.error(`[Banking] Auto-sync after connect failed:`, syncErr.message);
+          console.error(`[Banking] Auto-sync after connect failed (will retry on next manual sync):`, syncErr.message);
+          // Don't fail the connection — the session is valid, sync can be retried
         }
       }
       return { success: true, data: result } satisfies ApiResponse<any>;
@@ -230,9 +235,9 @@ export const bankingController = new Elysia({ prefix: '/banking' })
     detail: { tags: ['Banking'], summary: 'Complete OAuth2 flow and create bank connection (Admin, Finance)' },
   })
 
-  // ─── Delete connection (ADMIN) ───────────────────────────────────
+  // ─── Delete connection (ADMIN, FINANCE) ─────────────────────────
   .delete('/connections/:id', async ({ auth, params }) => {
-    const denied = requireAdmin(auth);
+    const denied = requireFinanceOrAdmin(auth);
     if (denied) return denied satisfies ApiResponse<null>;
     try {
       await deleteBankConnection(auth!.tenantId, params.id);
@@ -243,7 +248,7 @@ export const bankingController = new Elysia({ prefix: '/banking' })
     }
   }, {
     params: t.Object({ id: t.String() }),
-    detail: { tags: ['Banking'], summary: 'Delete a bank connection (Admin only)' },
+    detail: { tags: ['Banking'], summary: 'Delete a bank connection (Admin, Finance)' },
   })
 
   // ─── Cash overview (ADMIN, FINANCE) ──────────────────────────────
@@ -285,6 +290,21 @@ export const bankingController = new Elysia({ prefix: '/banking' })
       offset: t.Optional(t.String()),
     })),
     detail: { tags: ['Banking'], summary: 'List bank transactions with optional filters (Admin, Finance)' },
+  })
+
+  // ─── Enrich transaction details on-demand (ADMIN, FINANCE) ──
+  .post('/transactions/:txnId/enrich', async ({ auth, params }) => {
+    const denied = requireFinanceOrAdmin(auth);
+    if (denied) return denied satisfies ApiResponse<null>;
+    try {
+      const result = await enrichTransactionDetails(auth!.tenantId, params.txnId);
+      return { success: true, data: result } satisfies ApiResponse<any>;
+    } catch (e: any) {
+      return { success: false, data: null, message: e.message };
+    }
+  }, {
+    params: t.Object({ txnId: t.String() }),
+    detail: { tags: ['Banking'], summary: 'Fetch enriched transaction details from Enable Banking (Admin, Finance)' },
   })
 
   // ─── Sync (ADMIN, FINANCE) ───────────────────────────────────────

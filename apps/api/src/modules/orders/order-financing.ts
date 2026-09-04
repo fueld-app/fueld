@@ -33,6 +33,14 @@ export interface LineEconomics {
   netProfit: number;
 }
 
+export interface DealCommissionInput {
+  /** Third-party commission rate per MT (in tpcCurrency). */
+  tpcPerMt?: number | string | null;
+  tpcCurrency?: string | null;
+  /** Trader's own commission, % of (gross − TPC). */
+  traderCommissionPct?: number | string | null;
+}
+
 export interface OrderEconomics {
   financingRateAnnual: number;
   dayCountConvention: number;
@@ -45,6 +53,13 @@ export interface OrderEconomics {
   financingCostPerMt: number | null;
   totalNetProfit: number;
   netMarginPct: number | null;
+  // ── Deal commissions (Mario/Riviera model, applied after gross, before financing) ──
+  // TPC total = per-MT rate × MT converted to USD.
+  totalTpc: number;
+  // Trader commission = traderPct × (gross − TPC), matching the Annexe formula.
+  totalTraderCommission: number;
+  // Mario's "Total Profit": gross − TPC − trader commission (no financing term).
+  tradingProfit: number;
   lineEconomics: LineEconomics[];
 }
 
@@ -156,6 +171,7 @@ export function calculateOrderEconomics(
   financingRateAnnual: number,
   isBrokerDeal = false,
   commissionPerMt: number | string | null = null,
+  dealCommissions?: DealCommissionInput,
 ): OrderEconomics {
   const financingDays = getFinancingDays(terms);
   const orderCommissionPerMt = parseNumber(commissionPerMt) || 0;
@@ -180,7 +196,21 @@ export function calculateOrderEconomics(
     },
   );
 
+  // Deal commissions (Mario's model): TPC is a per-MT rate in its own
+  // currency; trader commission is a % of margin after TPC (Annexe formula:
+  // (sell − buy − tpc) × pct). Both deducted before financing so
+  // tradingProfit matches the sheet's Total Profit.
+  const tpcPerMt = parseNumber(dealCommissions?.tpcPerMt);
+  const tpcRate = getFxRate(normalizedCurrency(dealCommissions?.tpcCurrency));
+  const totalTpc = totals.totalQuantity * tpcPerMt * tpcRate;
+  const traderPct = parseNumber(dealCommissions?.traderCommissionPct) / 100;
+  const totalTraderCommission = Math.max(0, totals.totalGrossProfit - totalTpc) * traderPct;
+  const tradingProfit = totals.totalGrossProfit - totalTpc - totalTraderCommission;
+
   return {
+    totalTpc,
+    totalTraderCommission,
+    tradingProfit,
     financingRateAnnual,
     dayCountConvention: DEFAULT_FINANCING_DAY_COUNT,
     financingDays,

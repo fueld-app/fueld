@@ -72,4 +72,8 @@ export interface OrderItemsEconomics {
   financingCostPerMt: number | null;
   totalNetProfit: number;
   netMarginPct: number | null;
+  // Deal commissions (tenant 'deal-economics' view; from backend OrderEconomics)
+  totalTpc?: number;
+  totalTraderCommission?: number;
+  tradingProfit?: number;
 }

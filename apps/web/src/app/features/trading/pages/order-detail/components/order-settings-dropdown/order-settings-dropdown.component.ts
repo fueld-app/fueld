@@ -69,6 +69,57 @@ import type { DropdownOption } from '@app/shared/components/searchable-dropdown/
               </label>
             </div>
           }
+
+          @if (dealEconomicsEnabled() && !isBrokerDeal()) {
+            <div class="mt-3 border-t border-gray-100 dark:border-line pt-3 space-y-2">
+              <label class="block text-xs font-medium text-gray-500 dark:text-muted">Deal type</label>
+              <select
+                [ngModel]="dealType()"
+                (ngModelChange)="dealTypeChange.emit($event)"
+                [disabled]="isReadonly()"
+                class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-2 py-1.5 text-sm text-gray-900 dark:text-ink outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+              >
+                <option value="">— None —</option>
+                @for (t of dealTypeOptions(); track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+
+              <label class="block text-xs font-medium text-gray-500 dark:text-muted">TPC (per MT, off-record)</label>
+              <div class="flex gap-1.5">
+                <input
+                  type="text"
+                  [ngModel]="tpcPerMt()"
+                  (ngModelChange)="tpcPerMtChange.emit($event)"
+                  [disabled]="isReadonly()"
+                  inputmode="decimal"
+                  class="w-20 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-2 py-1.5 text-sm text-gray-900 dark:text-ink outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                  placeholder="0.00"
+                />
+                <select
+                  [ngModel]="tpcCurrency()"
+                  (ngModelChange)="tpcCurrencyChange.emit($event)"
+                  [disabled]="isReadonly()"
+                  class="flex-1 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-2 py-1.5 text-sm text-gray-900 dark:text-ink outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                >
+                  <option [value]="currency()">Deal ccy</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </div>
+
+              <label class="block text-xs font-medium text-gray-500 dark:text-muted">Trader commission % (of margin after TPC)</label>
+              <input
+                type="text"
+                [ngModel]="traderCommissionPct()"
+                (ngModelChange)="traderCommissionPctChange.emit($event)"
+                [disabled]="isReadonly()"
+                inputmode="decimal"
+                class="w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-2 py-1.5 text-sm text-gray-900 dark:text-ink outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
+                placeholder="e.g. 7 = 7%"
+              />
+            </div>
+          }
         </div>
       }
     </div>
@@ -88,6 +139,18 @@ export class OrderSettingsDropdownComponent {
   readonly currencyChange = output<string>();
   readonly categoryChange = output<string>();
   readonly brokerDealChange = output<boolean>();
+  // Deal economics (tenant 'deal-economics' view)
+  readonly dealEconomicsEnabled = input(false);
+  readonly dealType = input<string | null>(null);
+  readonly dealTypeOptions = input<string[]>(['SPOT', 'MILITARY']);
+  readonly tpcPerMt = input<string | null>(null);
+  readonly tpcCurrency = input<string | null>(null);
+  readonly traderCommissionPct = input<string | null>(null);
+
+  readonly dealTypeChange = output<string | null>();
+  readonly tpcPerMtChange = output<string | null>();
+  readonly tpcCurrencyChange = output<string | null>();
+  readonly traderCommissionPctChange = output<string | null>();
 
   protected readonly isOpen = signal(false);
   protected positionStyle = signal('top: 0px; left: 0px');

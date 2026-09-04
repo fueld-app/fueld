@@ -687,6 +687,69 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     detail: { tags: ['Admin Settings'], summary: 'Get tenant-configurable custom columns for current tenant' },
   })
 
+  .get('/my-views', async ({ auth }) => {
+    try {
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      const views = ((tenant?.settings as any)?.enabledViews ?? []) as string[];
+      return { success: true, data: { views } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Enabled optional data views for the current tenant (non-admin read)' },
+  })
+
+  .put('/views', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      if (!tenant) throw new Error('No tenant found');
+      const settings = { ...(tenant.settings as any) };
+      settings.enabledViews = Array.isArray(body.views) ? body.views.map(String) : [];
+      await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+      return { success: true, data: { views: settings.enabledViews } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({ views: t.Array(t.String()) }),
+    detail: { tags: ['Admin Settings'], summary: 'Enable/disable optional data views (admin)' },
+  })
+
+  .get('/trader-commissions', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      const schemes = ((tenant?.settings as any)?.traderCommissions ?? []) as { userId: string; rates: Record<string, number> }[];
+      return { success: true, data: schemes } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Trader commission schemes (compensation data — admin only)' },
+  })
+
+  .put('/trader-commissions', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      if (!tenant) throw new Error('No tenant found');
+      const settings = { ...(tenant.settings as any) };
+      settings.traderCommissions = Array.isArray(body.schemes) ? body.schemes : [];
+      await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+      return { success: true, data: settings.traderCommissions } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({ schemes: t.Array(t.Object({ userId: t.String(), rates: t.Record(t.String(), t.Number()) })) }),
+    detail: { tags: ['Admin Settings'], summary: 'Set trader commission schemes (compensation data — admin only)' },
+  })
+
   .get('/my-booking-column', async ({ auth }) => {
     try {
       const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);

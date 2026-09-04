@@ -641,3 +641,117 @@ async function resolveVisibleTraderIds(
 
   return Array.from(ids);
 }
+
+
+// ─── Monthly history (Riviera "MEDIA GRAFICO" view) ─────────────
+
+export interface MonthlyHistoryPoint {
+  year: number;
+  month: number; // 1-12
+  /** Trading profit (gross − TPC − trader commission), no financing. USD. */
+  profit: number;
+  /** Gross order value (turnover, incl. any VAT — invoiced gross). USD. */
+  turnover: number;
+  orderCount: number;
+}
+
+/**
+ * Monthly trading profit + turnover series for the historical performance
+ * chart. Delivery-based bucketing: COALESCE(delivered_at, eta), strict
+ * (orders with neither are excluded), matching the dashboard delivery view.
+ * Turnover = gross order value (Mario: "gross total invoice amount incl. VAT").
+ * Excludes INQUIRY / CANCELLED / LOST.
+ */
+export async function getMonthlyHistory(
+  tenantId: string,
+  fromYear?: number,
+  toYear?: number,
+): Promise<MonthlyHistoryPoint[]> {
+  const excludedStatuses: (typeof orders.status.enumValues)[number][] = ['INQUIRY', 'CANCELLED', 'LOST'];
+  const conditions = [
+    eq(orders.tenantId, tenantId),
+    notInArray(orders.status, excludedStatuses),
+    sql`(${orders.deliveredAt} IS NOT NULL OR ${orders.eta} IS NOT NULL)`,
+  ];
+  if (fromYear) {
+    conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.eta}) >= ${`${fromYear}-01-01`}::timestamptz`);
+  }
+  if (toYear) {
+    conditions.push(sql`COALESCE(${orders.deliveredAt}, ${orders.eta}) < ${`${toYear + 1}-01-01`}::timestamptz`);
+  }
+
+  const orderRows = await db
+    .select({
+      id: orders.id,
+      isBrokerDeal: orders.isBrokerDeal,
+      commissionPerMt: orders.commissionPerMt,
+      tpcPerMt: orders.tpcPerMt,
+      tpcCurrency: orders.tpcCurrency,
+      traderCommissionPct: orders.traderCommissionPct,
+      period: sql<string>`to_char(COALESCE(${orders.deliveredAt}, ${orders.eta}) AT TIME ZONE 'UTC', 'YYYY-MM')`,
+    })
+    .from(orders)
+    .where(and(...conditions));
+
+  if (orderRows.length === 0) return [];
+
+  const [itemRows, tenant] = await Promise.all([
+    db
+      .select({
+        orderId: orderItems.orderId,
+        quantity: orderItems.quantity,
+        deliveredQuantity: orderItems.deliveredQuantity,
+        costPrice: orderItems.costPrice,
+        costCurrency: orderItems.costCurrency,
+        costConversionFactor: orderItems.costConversionFactor,
+        salesPrice: orderItems.salesPrice,
+        salesCurrency: orderItems.salesCurrency,
+        unitConversionFactor: orderItems.unitConversionFactor,
+      })
+      .from(orderItems)
+      .where(inArray(orderItems.orderId, orderRows.map((row) => row.id))),
+    db.query.tenants.findFirst({ where: eq(tenants.id, tenantId), columns: { settings: true } }),
+  ]);
+
+  const financingRateAnnual = getFinancingRateAnnual((tenant?.settings ?? {}) as TenantSettings);
+  const itemsByOrder = new Map<string, typeof itemRows>();
+  for (const item of itemRows) {
+    const current = itemsByOrder.get(item.orderId) ?? [];
+    current.push(item);
+    itemsByOrder.set(item.orderId, current);
+  }
+
+  const buckets = new Map<string, MonthlyHistoryPoint & { _period: string }>();
+  for (const row of orderRows) {
+    const economics = calculateOrderEconomics(
+      {}, // financing not part of this metric
+      itemsByOrder.get(row.id) ?? [],
+      financingRateAnnual,
+      row.isBrokerDeal ?? false,
+      row.commissionPerMt,
+      {
+        tpcPerMt: row.tpcPerMt,
+        tpcCurrency: row.tpcCurrency,
+        traderCommissionPct: row.traderCommissionPct,
+      },
+    );
+    const period = String(row.period).slice(0, 7); // YYYY-MM
+    const key = period;
+    const bucket = buckets.get(key) ?? {
+      _period: period,
+      year: Number(period.slice(0, 4)),
+      month: Number(period.slice(5, 7)),
+      profit: 0,
+      turnover: 0,
+      orderCount: 0,
+    };
+    bucket.profit += economics.tradingProfit;
+    bucket.turnover += economics.totalRevenueBase;
+    bucket.orderCount += 1;
+    buckets.set(key, bucket);
+  }
+
+  return Array.from(buckets.values())
+    .sort((a, b) => a._period.localeCompare(b._period))
+    .map(({ _period, ...rest }) => rest);
+}

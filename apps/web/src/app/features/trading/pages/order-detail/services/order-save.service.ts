@@ -113,6 +113,8 @@ export class OrderSaveService {
       loadCustomerCreditLines: (clientId: string) => Promise<void>;
       loadSupplierCreditLines: (supplierCompanyId?: string | null) => Promise<void>;
       activeSupplierCompanyId: () => string | null;
+      /** Called after save when the server refilled deal-economics fields. */
+      onDealFieldsSaved?: (fields: { dealType: string | null; traderCommissionPct: string | null }) => void;
     },
     onError?: (msg: string) => void,
   ): Promise<boolean> {
@@ -149,9 +151,25 @@ export class OrderSaveService {
           // autosave; the manual Save button is hidden via [showSave]="false").
           isBrokerDeal: (o as any).isBrokerDeal ?? false,
           commissionPerMt: (o as any).commissionPerMt ?? null,
+          // Deal economics (view-gated) — see gateDealEconomicsFields API-side
+          dealType: (o as any).dealType ?? null,
+          tpcPerMt: (o as any).tpcPerMt ?? null,
+          tpcCurrency: (o as any).tpcCurrency ?? null,
+          traderCommissionPct: (o as any).traderCommissionPct ?? null,
         }),
       );
       if (!orderRes.success) { onError?.('Failed to save order.'); return false; }
+      // Adopt server-refilled deal fields (trader commission snapshot is
+      // auto-filled from the tenant scheme when the client sends null) so the
+      // local signal does not drift from the persisted row and re-trigger
+      // autosave with stale values.
+      const saved = (orderRes.data ?? {}) as Record<string, unknown> | null;
+      if (saved && ('traderCommissionPct' in saved || 'dealType' in saved)) {
+        options.onDealFieldsSaved?.({
+          dealType: (saved['dealType'] as string | null) ?? null,
+          traderCommissionPct: (saved['traderCommissionPct'] as string | null) ?? null,
+        });
+      }
 
       await options.syncSupplierRecords(id);
 

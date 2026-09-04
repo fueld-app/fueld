@@ -206,7 +206,7 @@ interface Transaction {
               @if (t.remittance_info) {
                 <div>
                   <dt class="text-sm text-gray-500">Remittance Information</dt>
-                  <dd class="mt-0.5 text-sm text-gray-900 dark:text-ink">{{ t.remittance_info }}</dd>
+                  <dd class="mt-0.5 text-sm text-gray-900 dark:text-ink whitespace-pre-wrap break-words">{{ t.remittance_info }}</dd>
                 </div>
               }
               @if (t.remittance_info_structured) {
@@ -298,16 +298,38 @@ export class TransactionDetailPageComponent implements OnInit {
   async loadTransaction(accountId: string, txnId: string): Promise<void> {
     this.loading.set(true);
     try {
+      // First load from DB
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<Transaction[]>>(`${API}/banking/transactions?accountId=${accountId}&limit=200`),
+        this.http.get<ApiResponse<{ transactions: Transaction[] }>>(`${API}/banking/transactions?accountId=${accountId}&limit=1000`),
       );
       if (res.success && res.data) {
-        this.txn.set(res.data.find((t) => t.id === txnId) ?? null);
+        const found = res.data.transactions.find((t) => t.id === txnId) ?? null;
+        this.txn.set(found);
       }
     } catch (e: any) {
       console.error('Failed to load transaction', e);
     } finally {
       this.loading.set(false);
+    }
+
+    // Then try to enrich from Enable Banking API (updates DB + shows richer data)
+    try {
+      const enrichRes = await firstValueFrom(
+        this.http.post<ApiResponse<{ enriched: boolean }>>(`${API}/banking/transactions/${txnId}/enrich`, {}),
+      );
+      if (enrichRes.success && enrichRes.data?.enriched) {
+        // Reload the enriched transaction from DB
+        const res2 = await firstValueFrom(
+          this.http.get<ApiResponse<{ transactions: Transaction[] }>>(`${API}/banking/transactions?accountId=${accountId}&limit=1000`),
+        );
+        if (res2.success && res2.data) {
+          const enriched = res2.data.transactions.find((t) => t.id === txnId) ?? null;
+          if (enriched) this.txn.set(enriched);
+        }
+      }
+    } catch (e: any) {
+      // Enrichment failed (session expired, etc.) — show what we have from the list
+      console.warn('Enrichment failed:', e.message);
     }
   }
 }

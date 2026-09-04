@@ -1,6 +1,9 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { getCollections, getTeamStats, getPipelineSummary, getLossAnalysis, getConversionMetrics, getFollowUps, parseDateBasis } from './dashboard.service';
+import { db } from '../../db';
+import { tenants } from '../../db/schema';
+import { eq } from 'drizzle-orm';
+import { getCollections, getTeamStats, getPipelineSummary, getLossAnalysis, getConversionMetrics, getFollowUps, parseDateBasis, getMonthlyHistory } from './dashboard.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Controller
@@ -14,6 +17,41 @@ function isLightUser(role: string): boolean {
 export const dashboardController = new Elysia({ prefix: '/dashboard' })
   // ── Require authentication for all routes ──
   .use(authGuard)
+
+  // ── GET /dashboard/monthly-history ──────────────────────────────
+  .get(
+    '/monthly-history',
+    async ({ auth, query }) => {
+      // LIGHT users must not see profit/turnover data
+      if (isLightUser(auth.role)) {
+        return { items: [] };
+      }
+      // Tenant-gated by the 'performance-history' view
+      const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, auth.tenantId)).limit(1);
+      const views = ((tenant?.settings as any)?.enabledViews ?? []) as string[];
+      if (!views.includes('performance-history')) {
+        return { items: [] };
+      }
+      const params = query as { fromYear?: string; toYear?: string };
+      const items = await getMonthlyHistory(
+        auth.tenantId,
+        params.fromYear ? Number(params.fromYear) : undefined,
+        params.toYear ? Number(params.toYear) : undefined,
+      );
+      return { items, count: items.length };
+    },
+    {
+      query: t.Object({
+        fromYear: t.Optional(t.String()),
+        toYear: t.Optional(t.String()),
+      }),
+      detail: {
+        tags: ['Dashboard'],
+        summary: 'Monthly trading profit + turnover series (historical performance chart)',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
 
   // ── GET /dashboard/collections ─────────────────────────────────────
   .get(
