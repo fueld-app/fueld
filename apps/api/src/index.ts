@@ -377,6 +377,42 @@ export async function createApp(options: CreateAppOptions = {}) {
   const buildInfo = getBuildInfo();
 
   const app = new Elysia()
+    .onError({ as: 'global' }, ({ request, code, error, set }) => {
+      // Log client-visible failures (thrown errors + schema-validation 422s) so
+      // they leave a server-side trace. Note: handlers that RETURN a 4xx/5xx
+      // (e.g. `set.status = 400; return { message: ... }` gates) are normal
+      // responses and do NOT pass through here — the frontend surfaces those
+      // messages directly instead. Unmatched routes (NOT_FOUND) are skipped to
+      // avoid internet-scanner log noise.
+      if (code === 'NOT_FOUND') return;
+      const status =
+        (error as any)?.status ??
+        (typeof set.status === 'number' && set.status >= 400 ? set.status : 500);
+      if (status < 400) return;
+      // Validation errors embed the full request body (`found`) in their
+      // message — log a redacted summary instead of dumping email content /
+      // recipient PII into journalctl.
+      let detail: string;
+      if (code === 'VALIDATION') {
+        try {
+          const parsed = JSON.parse((error as any).message ?? '{}');
+          detail = `on=${parsed.on ?? '?'} property=${parsed.property ?? '(root)'} summary=${parsed.summary ?? '(none)'}`;
+        } catch {
+          detail = '(unparsable validation error)';
+        }
+      } else {
+        detail = String(error instanceof Error ? error.message : error).slice(0, 500);
+      }
+      let path: string;
+      try {
+        path = new URL(request.url).pathname;
+      } catch {
+        path = request.url;
+      }
+      const line = `[HTTP ${status}] ${request.method} ${path} code=${code} ${detail}`;
+      if (status >= 500) console.error(line);
+      else console.warn(line);
+    })
     .use(
       swagger({
         documentation: {

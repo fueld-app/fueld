@@ -1,5 +1,5 @@
 import { Service, inject, signal } from '@angular/core';
-import { HttpClient, type HttpResponse } from '@angular/common/http';
+import { HttpClient, type HttpResponse, type HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
 import { API_URL } from '@app/core/config/api';
@@ -160,9 +160,34 @@ export class OrderCommunicationService {
           }
           onSuccess?.();
         },
-        error: () => {
+        error: (err: HttpErrorResponse) => {
           emailModal?.done();
-          showToast('error', 'Failed to send email. Check SMTP settings in Admin → Settings → Integrations, or re-link your Microsoft 365 account if it has expired.');
+          const generic =
+            'Failed to send email. Check SMTP settings in Admin → Settings → Integrations, or re-link your Microsoft 365 account if it has expired.';
+          // Schema-validation (422): Elysia's error body is { type: 'validation', ... }
+          // and in production mode carries no human-readable `message`. Map to a
+          // friendly hint instead of the generic (misleading) SMTP/M365 text.
+          if ((err?.error as any)?.type === 'validation') {
+            showToast(
+              'error',
+              'Some fields could not be validated — most likely one of the email addresses (check the To/CC/BCC fields for typos or extra spaces).',
+            );
+            return;
+          }
+          // Prefer the server's specific business message (e.g. "Select a bank
+          // account first", "Select an invoicing company first").
+          const raw: any = err?.error;
+          const serverMessage: string | undefined =
+            typeof raw?.message === 'string' && raw.message.length <= 500
+              ? raw.message
+              : undefined;
+          // Only accept plain-string bodies when short and not an HTML error page
+          // (nginx 502/504 gateway pages arrive as strings).
+          const plainMessage: string | undefined =
+            typeof raw === 'string' && raw.length <= 500 && !raw.trimStart().startsWith('<')
+              ? raw
+              : undefined;
+          showToast('error', serverMessage ?? plainMessage ?? generic);
         },
       });
   }
