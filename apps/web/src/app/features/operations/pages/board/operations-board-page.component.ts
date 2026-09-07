@@ -177,17 +177,31 @@ export class OperationsBoardPageComponent implements OnInit {
   });
 
   /** Sort orders by due date (responseDeadlineAt) ascending.
-   *  Orders with no due date are pushed to the end. */
+   *  Orders with no due date are pushed to the end, ordered by ETA. */
   private sortByDueDate(orders: OrderListRowDto[]): OrderListRowDto[] {
     return [...orders].sort((a, b) => {
       const aDate = a.responseDeadlineAt ? new Date(a.responseDeadlineAt).getTime() : null;
       const bDate = b.responseDeadlineAt ? new Date(b.responseDeadlineAt).getTime() : null;
-      // No due date → sort last
-      if (aDate === null && bDate === null) return 0;
+      // No due date → sort last, ordered by ETA
+      if (aDate === null && bDate === null) return this.compareEta(a, b);
       if (aDate === null) return 1;
       if (bDate === null) return -1;
       return aDate - bDate;
     });
+  }
+
+  /** Sort orders by ETA ascending; orders with no ETA keep a stable relative order at the end. */
+  private sortByEta(orders: OrderListRowDto[]): OrderListRowDto[] {
+    return [...orders].sort((a, b) => this.compareEta(a, b));
+  }
+
+  private compareEta(a: OrderListRowDto, b: OrderListRowDto): number {
+    const aEta = a.eta ? new Date(a.eta).getTime() : null;
+    const bEta = b.eta ? new Date(b.eta).getTime() : null;
+    if (aEta === null && bEta === null) return 0;
+    if (aEta === null) return 1;
+    if (bEta === null) return -1;
+    return aEta - bEta;
   }
 
   readonly columns = computed(() => {
@@ -201,17 +215,17 @@ export class OperationsBoardPageComponent implements OnInit {
       {
         status: OrderStatus.Confirmed,
         label: 'Confirmed',
-        orders: this.sortByDueDate(all.filter((o) => o.status === OrderStatus.Confirmed)),
+        orders: this.sortByEta(all.filter((o) => o.status === OrderStatus.Confirmed)),
       },
       {
         status: OrderStatus.Delivered,
         label: 'Delivered',
-        orders: this.sortByDueDate(all.filter((o) => o.status === OrderStatus.Delivered)),
+        orders: this.sortByEta(all.filter((o) => o.status === OrderStatus.Delivered)),
       },
       {
         status: OrderStatus.Invoiced,
         label: 'Invoiced',
-        orders: this.sortByDueDate(all.filter((o) => o.status === OrderStatus.Invoiced)),
+        orders: this.sortByEta(all.filter((o) => o.status === OrderStatus.Invoiced)),
       },
     ];
   });
