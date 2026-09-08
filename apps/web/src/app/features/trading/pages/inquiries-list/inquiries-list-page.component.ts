@@ -26,6 +26,9 @@ import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import { DateFormatService } from '@app/core/services/date-format.service';
 import { firstValueFrom } from 'rxjs';
 import { FilterOverlayComponent, type FilterState, EMPTY_FILTERS, type FilterFieldDef } from '../../../../shared/components/filter-overlay/filter-overlay.component';
+import { SavedViewsMenuComponent } from '../../../../shared/components/saved-views-menu.component';
+import { SkeletonTableComponent, SkeletonCardsComponent } from '../../../../shared/components/skeleton.component';
+import { ToastService } from '@app/core/ui/toast.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Inquiries List Page — INQUIRY + OFFER status orders
@@ -34,6 +37,8 @@ import { FilterOverlayComponent, type FilterState, EMPTY_FILTERS, type FilterFie
 import { API } from '@app/core/config/api';
 import { AuthService } from '@app/core/auth/auth.service';
 import { UserPreferencesService } from '@app/core/services/user-preferences.service';
+import { viewChild } from '@angular/core';
+import type { SavedViewsMenuComponent as SavedViewsMenuComponentType } from '../../../../shared/components/saved-views-menu.component';
 import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.service';
 
 // TeamUserOption is defined in inquiries-list.types.ts
@@ -41,7 +46,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
 @Component({
   selector: 'app-inquiries-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, DateLabelPipe, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent, FilterOverlayComponent],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, DateLabelPipe, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent, FilterOverlayComponent, SavedViewsMenuComponent, SkeletonTableComponent, SkeletonCardsComponent],
   template: `
     <div>
       <!-- Header -->
@@ -80,6 +85,12 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
             [applying]="applyingFilters()"
             (filtersChange)="onFiltersChange($event)"
           />
+          <app-saved-views-menu
+            #viewsMenu
+            [pageKey]="'list-' + resolvedMode()"
+            [snapshot]="savedViewSnapshot"
+            (applyView)="applySavedView($event)"
+          />
         </div>
         <div class="ml-auto">
           <app-column-picker
@@ -109,13 +120,14 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
         </div>
       }
 
-      <!-- Loading state -->
-      @if (loading()) {
-        <div class="flex items-center justify-center py-20">
-          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-          </svg>
+      <!-- Loading state: skeleton rows on first load (layout-stable, no spinner jump);
+           subsequent loads keep existing rows visible to avoid flicker. -->
+      @if (loading() && inquiries().length === 0) {
+        <div class="hidden md:block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-line dark:bg-surface">
+          <app-skeleton-table [rows]="10" [cols]="6" />
+        </div>
+        <div class="md:hidden">
+          <app-skeleton-cards [rows]="5" />
         </div>
       } @else {
         <!-- Batch complete bar (invoiced orders only) -->
@@ -446,17 +458,6 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
       />
     }
 
-    <!-- Toast -->
-    @if (toast()) {
-      <div
-        class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg"
-        [class]="toast()!.type === 'success'
-          ? 'border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 text-green-800 dark:text-green-300'
-          : 'border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-800 dark:text-red-300'"
-      >
-        {{ toast()!.message }}
-      </div>
-    }
   `,
 })
 export class InquiriesListPageComponent implements OnInit, OnDestroy {
@@ -564,7 +565,12 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   /** Backwards-compatible single sort field for API calls. */
   readonly activeSortBy = computed(() => this.activeSortFields()[0]?.field ?? this.defaultSortBy());
   readonly activeSortDir = computed<'asc' | 'desc'>(() => this.activeSortFields()[0]?.dir ?? this.defaultSortDir());
-  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+  private readonly toastService = inject(ToastService);
+  /** Back-compat shim — existing call sites now render in the global toast stack. */
+  private showToast(type: 'success' | 'error', message: string): void {
+    if (type === 'success') this.toastService.success(message);
+    else this.toastService.error(message);
+  }
 
   // ─── Batch selection (invoiced orders only) ────────────────────────
   readonly selectedOrderIds = signal<Set<string>>(new Set());
@@ -777,6 +783,31 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   });
 
   private readonly filterStorageKey = computed(() => `filter_${this.resolvedMode()}`);
+  protected readonly viewsMenu = viewChild<SavedViewsMenuComponentType>('viewsMenu');
+
+  // ─── Saved views ────────────────────────────────────────────────────
+  /** Snapshot of current list state — persisted into named views. */
+  readonly savedViewSnapshot = (): Record<string, unknown> => ({
+    'searchTerm': this.searchTerm(),
+    'filters': this.filterState(),
+    'sortFields': this.sortFields(),
+  });
+
+  applySavedView(state: Record<string, unknown>): void {
+    if (typeof state['searchTerm'] === 'string') this.searchTerm.set(state['searchTerm']);
+    if (state['filters'] && typeof state['filters'] === 'object') {
+      this.filterState.set({ ...EMPTY_FILTERS, ...(state['filters'] as FilterState) });
+    }
+    if (Array.isArray(state['sortFields'])) {
+      this.sortFields.set(state['sortFields'] as SortField[]);
+    }
+    this.currentPage.set(1);
+    void this.loadInquiries();
+  }
+
+  private clearActiveViewBadge(): void {
+    this.viewsMenu()?.clearActiveView();
+  }
 
   // ─── New inquiry modal ────────────────────────────────────────────
 
@@ -1064,6 +1095,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onSearch(term: string): void {
+    this.clearActiveViewBadge();
     this.searchTerm.set(term);
     if (this.searchTimeout) clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {
@@ -1073,6 +1105,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   }
 
   onFiltersChange(state: FilterState): void {
+    this.clearActiveViewBadge();
     this.filterState.set(state);
     this.saveFilters();
     this.currentPage.set(1);
@@ -1080,6 +1113,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   }
 
   removeFilter(key: string): void {
+    this.clearActiveViewBadge();
     this.filterState.update((f) => {
       const next = { ...f, [key]: '' };
       const { [key]: _removed, ...restLabels } = f.labels;
@@ -1092,6 +1126,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   }
 
   clearAllFilters(): void {
+    this.clearActiveViewBadge();
     this.filterState.set({ labels: {} });
     this.saveFilters();
     this.currentPage.set(1);
@@ -1177,6 +1212,13 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
             this.inquiries.update(rows =>
               rows.map(r => r.id === inq.id ? { ...r, bunkerBookingSentAt: res.data!.bunkerBookingSentAt } : r),
             );
+            if (newSent) {
+              // Real undo: the endpoint is a toggle, so flipping it back restores the prior state.
+              this.toastService.show('Bunker Booking marked as sent', {
+                type: 'success',
+                action: { label: 'Undo', run: () => this.toggleBunkerBookingSent(inq.orderNumber || inq.id, false, prev) },
+              });
+            }
           } else {
             // Roll back
             this.inquiries.update(rows => rows.map(r => r.id === inq.id ? { ...r, bunkerBookingSentAt: prev } : r));
@@ -1184,6 +1226,33 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
         },
         error: () => {
           this.inquiries.update(rows => rows.map(r => r.id === inq.id ? { ...r, bunkerBookingSentAt: prev } : r));
+          this.toastService.error('Could not update Bunker Booking status');
+        },
+      });
+  }
+
+  /** Undo path for the bunker-booking toggle. */
+  private toggleBunkerBookingSent(orderRef: string, sent: boolean, fallback: string | null | undefined): void {
+    this.inquiries.update(rows =>
+      rows.map(r => (r.orderNumber === orderRef || r.id === orderRef) ? { ...r, bunkerBookingSentAt: sent ? new Date().toISOString() : fallback } : r),
+    );
+    this.http
+      .put<ApiResponse<{ bunkerBookingSentAt: string | null }>>(
+        `${API}/orders/${orderRef}/bunker-booking-sent`,
+        { sent },
+      )
+      .subscribe({
+        next: (res) => {
+          if (res.success && res.data) {
+            this.inquiries.update(rows =>
+              rows.map(r => (r.orderNumber === orderRef || r.id === orderRef) ? { ...r, bunkerBookingSentAt: res.data!.bunkerBookingSentAt } : r),
+            );
+          }
+        },
+        error: () => {
+          this.inquiries.update(rows =>
+            rows.map(r => (r.orderNumber === orderRef || r.id === orderRef) ? { ...r, bunkerBookingSentAt: fallback ?? null } : r),
+          );
         },
       });
   }
@@ -1213,13 +1282,6 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       event.preventDefault();
       this.openInNewTab(this.buildDetailUrl(id));
     }
-  }
-
-  // ─── Toast ─────────────────────────────────────────────────────────
-
-  private showToast(type: 'success' | 'error', message: string): void {
-    this.toast.set({ type, message });
-    setTimeout(() => this.toast.set(null), 4000);
   }
 
   // ─── Batch selection ─────────────────────────────────────────────────

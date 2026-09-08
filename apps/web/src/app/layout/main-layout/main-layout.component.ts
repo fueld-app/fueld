@@ -19,7 +19,7 @@ import { Title } from '@angular/platform-browser';
 import { AuthService } from '../../core/auth/auth.service';
 import { WebSocketService } from '../../core/websocket/websocket.service';
 import { UserMenuComponent } from '../../shared/components/user-menu/user-menu.component';
-import type { ApiResponse, PlaceDto, VesselDto } from '@fueld/types';
+import type { ApiResponse } from '@fueld/types';
 import { AppUpdateService } from '../../core/pwa/app-update.service';
 import { LlmHealthService } from '../../core/llm/llm-health.service';
 import { NewInquiryModalService } from '../../core/trading/new-inquiry-modal.service';
@@ -29,6 +29,13 @@ import {
 } from '../../core/runtime/app-health.service';
 import { BrokerDealService } from '../../core/services/broker-deal.service';
 import { ViewsService } from '@app/core/views/views.service';
+import { ToastService } from '../../core/ui/toast.service';
+import { ToastContainerComponent } from '../../core/ui/toast-container.component';
+import { CommandPaletteService } from '../../core/ui/command-palette.service';
+import { CommandPaletteComponent } from '../../core/ui/command-palette.component';
+import { DensityService } from '../../core/ui/density.service';
+import { PwaInstallService } from '../../core/ui/pwa-install.service';
+import { ThemeService } from '../../core/theme.service';
 import { ThroughputReportService } from '../../core/services/throughput-report.service';
 
 import { API } from '@app/core/config/api';
@@ -174,14 +181,6 @@ function decodePricePatchPayload(data: WirePricePatchPayload): PricePatchPayload
   };
 }
 
-interface SearchResult {
-  id: string;
-  name: string;
-  subtitle: string;
-  kind: 'place' | 'company' | 'vessel' | 'order';
-  orderStatus?: string;
-}
-
 // ═══════════════════════════════════════════════════════════════════════
 //  Main Layout — Responsive sidebar + top bar shell
 //
@@ -308,7 +307,7 @@ const NAVIGATION: NavItem[] = [
 @Component({
   selector: 'app-main-layout',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, DecimalPipe],
+  imports: [DateLabelPipe, RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, DecimalPipe, ToastContainerComponent, CommandPaletteComponent],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Mobile Overlay Backdrop                                       -->
@@ -348,7 +347,7 @@ const NAVIGATION: NavItem[] = [
             <!-- Simple nav link -->
             <a
               [routerLink]="item.route"
-              routerLinkActive="bg-surface-3 text-ink"
+              routerLinkActive="nav-item-active text-ink"
               [routerLinkActiveOptions]="{ exact: item.route === '/' }"
               class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-tint-strong hover:text-ink focus-visible:outline-none"
               [class.justify-center]="sidebarCollapsed()"
@@ -396,7 +395,7 @@ const NAVIGATION: NavItem[] = [
                     @if ((!child.hiddenForRoles || !child.hiddenForRoles.includes(auth.userRole())) && (!child.allowedRoles || child.allowedRoles.includes('ADMIN') && auth.isAdmin() || child.allowedRoles.includes(auth.userRole()))) {
                     <a
                       [routerLink]="child.route"
-                      routerLinkActive="text-ink bg-surface-3"
+                      routerLinkActive="text-ink nav-child-active"
                       class="block rounded-md px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-tint-strong hover:text-ink focus-visible:outline-none"
                       (click)="closeSidebar()"
                     >
@@ -488,78 +487,20 @@ const NAVIGATION: NavItem[] = [
           </svg>
         </button>
 
-        <!-- Global Search -->
-        <div class="relative flex-1 transition-all duration-300" [class]="searchFocused() ? 'max-w-2xl' : 'max-w-md'" #searchWrapper>
-          <div class="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search…"
-              class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-700
-                     placeholder:text-gray-400 transition-colors
-                     focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100
-                     dark:border-line dark:bg-bg-2 dark:text-ink-dim dark:placeholder:text-muted
-                     dark:focus:border-brand-500 dark:focus:bg-surface dark:focus:ring-brand-500/20"
-              [value]="searchTerm()"
-              (input)="onSearchInput($event)"
-              (focus)="onSearchFocus()"
-              (blur)="onSearchBlur()"
-              (keydown.escape)="closeSearch()"
-              (keydown.enter)="navigateFirstResult()"
-            />
-            @if (searchLoading()) {
-              <svg class="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-            }
-          </div>
-
-          <!-- Search Results Dropdown -->
-          @if (searchOpen() && (searchResults().length || (searchTerm().length >= 2 && !searchLoading()))) {
-            <div class="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden dark:border-line dark:bg-surface">
-              @if (searchResults().length) {
-                @for (result of searchResults(); track result.id + result.kind) {
-                  <a
-                    [routerLink]="resultRouterLink(result)"
-                    (click)="closeSearchPanel()"
-                    class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-surface-tint"
-                  >
-                    @if (result.kind === 'order') {
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-amber-500 dark:text-amber-300" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
-                      </svg>
-                    } @else if (result.kind === 'company') {
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
-                      </svg>
-                    } @else if (result.kind === 'vessel') {
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-teal-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M3 18h18l-3-9H6L3 18zM10 2l2 7H8l2-7z" />
-                      </svg>
-                    } @else {
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
-                      </svg>
-                    }
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate font-medium text-gray-900 dark:text-ink">{{ result.name }}</p>
-                      <p class="truncate text-xs text-gray-500 dark:text-muted">{{ result.subtitle }}</p>
-                    </div>
-                    <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      [class]="result.kind === 'order' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400' : result.kind === 'company' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400' : result.kind === 'vessel' ? 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400' : 'bg-gray-100 text-gray-500 dark:bg-surface-3 dark:text-muted'">
-                      {{ result.kind === 'order' ? 'Order' : result.kind === 'company' ? 'Company' : result.kind === 'vessel' ? 'Vessel' : 'Place' }}
-                    </span>
-                  </a>
-                }
-              } @else {
-                <div class="px-4 py-3 text-sm text-gray-500 dark:text-muted">No results found</div>
-              }
-            </div>
-          }
-        </div>
+        <!-- Global search / command palette trigger (⌘K) -->
+        <button
+          type="button"
+          (click)="palette.openPalette()"
+          class="cmdk-trigger group flex flex-1 items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm text-gray-400 transition-colors hover:border-gray-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 dark:border-line dark:bg-surface-tint dark:text-muted dark:hover:border-line-strong dark:hover:bg-surface-tint-strong md:max-w-md"
+          aria-label="Search or jump to"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+          </svg>
+          <span class="hidden md:inline">Search or jump to…</span>
+          <span class="md:hidden">Search…</span>
+          <kbd class="ml-auto hidden shrink-0 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:border-line dark:bg-surface-2 dark:text-muted md:block">⌘K</kbd>
+        </button>
 
         <!-- Right side actions -->
         <div class="ml-auto flex items-center gap-3">
@@ -608,6 +549,40 @@ const NAVIGATION: NavItem[] = [
             <div class="hidden h-6 w-px bg-gray-200 dark:bg-surface-3 md:block dark:bg-line"></div>
           }
 
+          <!-- PWA install prompt (when the browser allows installation) -->
+          @if (pwa.canInstall() && !pwa.installed()) {
+            <button
+              type="button"
+              (click)="installApp()"
+              class="hidden rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 md:block dark:text-muted dark:hover:bg-surface-tint-strong dark:hover:text-ink-dim"
+              aria-label="Install Fueld app"
+              title="Install Fueld app"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            </button>
+          }
+
+          <!-- Density toggle -->
+          <button
+            type="button"
+            (click)="density.toggle()"
+            class="hidden rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 md:block dark:text-muted dark:hover:bg-surface-tint-strong dark:hover:text-ink-dim"
+            [attr.aria-label]="density.density() === 'compact' ? 'Switch to comfortable density' : 'Switch to compact density'"
+            [title]="density.density() === 'compact' ? 'Comfortable rows' : 'Compact rows'"
+          >
+            @if (density.density() === 'compact') {
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 12h18M3 18h18" />
+              </svg>
+            } @else {
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 5h18M3 10h18M3 15h18M3 20h18" />
+              </svg>
+            }
+          </button>
+
           <!-- New Inquiry quick button -->
           <button
             (click)="openNewInquiry()"
@@ -642,6 +617,15 @@ const NAVIGATION: NavItem[] = [
           <app-user-menu />
         </div>
       </header>
+
+      @if (pwa.offline()) {
+        <div class="flex items-center justify-center gap-2 border-b border-amber-300/60 bg-amber-50 px-4 py-1.5 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300" role="status">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z" />
+          </svg>
+          You're offline — reconnecting automatically. Data shown may be stale.
+        </div>
+      }
 
       @if (auth.mfaSetupRequired()) {
         <section class="border-b border-amber-200 bg-amber-50/90 px-4 py-3 sm:px-6 lg:px-8 dark:border-amber-500/30 dark:bg-amber-500/10">
@@ -834,6 +818,12 @@ const NAVIGATION: NavItem[] = [
         </div>
       </div>
     }
+
+    <!-- Global toast stack (with undo actions) -->
+    <app-toast-container />
+
+    <!-- ⌘K command palette -->
+    <app-command-palette />
   `,
   styles: `
     :host {
@@ -861,6 +851,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly brokerDealSvc = inject(BrokerDealService);
   private readonly views = inject(ViewsService);
   private readonly throughputReportSvc = inject(ThroughputReportService);
+  protected readonly palette = inject(CommandPaletteService);
+  protected readonly density = inject(DensityService);
+  protected readonly pwa = inject(PwaInstallService);
+  private readonly toast = inject(ToastService);
+  private readonly themeService = inject(ThemeService);
   private routerSub: Subscription | null = null;
   private priceSub: Subscription | null = null;
   private rfqSub: Subscription | null = null;
@@ -992,6 +987,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       .subscribe((data) => {
         this.pendingRfqs.update((list) => [data, ...list]);
       });
+
+    // Register command-palette actions (re-evaluated each time it opens)
+    this.palette.register(() => this.buildPaletteActions());
 
     // Load pending RFQs on startup
     this.loadPendingRfqs();
@@ -1141,218 +1139,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     });
   });
 
-  // ─── Global search ──────────────────────────────────────────────
-  readonly searchTerm = signal('');
-  readonly searchFocused = signal(false);
-  readonly searchResults = signal<SearchResult[]>([]);
-  readonly searchLoading = signal(false);
-  readonly searchOpen = signal(false);
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
-  readonly searchWrapper = viewChild<ElementRef<HTMLDivElement>>('searchWrapper');
-
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    const wrapper = this.searchWrapper()?.nativeElement;
-    if (wrapper && !wrapper.contains(event.target as Node)) {
-      this.closeSearch();
-    }
-  }
-
-  onSearchInput(event: Event): void {
-    const term = (event.target as HTMLInputElement).value;
-    this.searchTerm.set(term);
-
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-
-    if (term.trim().length < 2) {
-      this.searchResults.set([]);
-      this.searchOpen.set(false);
-      return;
-    }
-
-    this.searchLoading.set(true);
-    this.searchOpen.set(true);
-
-    this.searchTimer = setTimeout(() => this.executeSearch(term.trim()), 300);
-  }
-
-  onSearchFocus(): void {
-    this.searchFocused.set(true);
-    if (this.searchTerm().length >= 2 && this.searchResults().length) {
-      this.searchOpen.set(true);
-    }
-  }
-
-  onSearchBlur(): void {
-    // Delay to allow click on search results
-    setTimeout(() => this.searchFocused.set(false), 200);
-  }
-
-  closeSearch(): void {
-    this.searchOpen.set(false);
-    this.searchFocused.set(false);
-  }
-
-  async executeSearch(term: string): Promise<void> {
-    try {
-      const [placesRes, companiesRes, vesselsRes, ordersRes] = await Promise.all([
-        firstValueFrom(
-          this.http.get<ApiResponse<{ places: PlaceDto[]; total: number }>>(
-            `${API}/lloyds/places/local?search=${encodeURIComponent(term)}&limit=5`,
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ companies: any[]; total: number }>>(
-            `${API}/companies/local?search=${encodeURIComponent(term)}&limit=5`,
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ vessels: VesselDto[]; total: number }>>(
-            `${API}/vessels/local?search=${encodeURIComponent(term)}&limit=5`,
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ items: any[]; total: number }>>(
-            `${API}/orders?search=${encodeURIComponent(term)}&limit=5`,
-          ),
-        ),
-      ]);
-
-      const results: SearchResult[] = [];
-
-      if (companiesRes.success && companiesRes.data?.companies?.length) {
-        for (const c of companiesRes.data.companies) {
-          results.push({
-            id: c.id,
-            name: c.name,
-            subtitle: [c.country, c.types?.join(', ')].filter(Boolean).join(' · '),
-            kind: 'company',
-          });
-        }
-      }
-
-      if (placesRes.success && placesRes.data?.places?.length) {
-        for (const p of placesRes.data.places) {
-          results.push({
-            id: p.id,
-            name: p.name,
-            subtitle: [p.country, p.placeType].filter(Boolean).join(' · '),
-            kind: 'place',
-          });
-        }
-      }
-
-      if (vesselsRes.success && vesselsRes.data?.vessels?.length) {
-        for (const v of vesselsRes.data.vessels) {
-          results.push({
-            id: v.id,
-            name: v.name,
-            subtitle: [v.imo ? `IMO ${v.imo}` : null, v.flag, v.type].filter(Boolean).join(' · '),
-            kind: 'vessel',
-          });
-        }
-      }
-
-      if (ordersRes.success && ordersRes.data?.items?.length) {
-        for (const o of ordersRes.data.items) {
-          const orderRouteId = o.id ?? o.orderNumber;
-          if (!orderRouteId) continue;
-          results.push({
-            id: orderRouteId,
-            name: o.orderNumber ?? o.id ?? 'Order',
-            subtitle: [o.status, o.clientName, o.vesselName, o.placeName].filter(Boolean).join(' · '),
-            kind: 'order',
-            orderStatus: o.status,
-          });
-        }
-      }
-
-      this.searchResults.set(results);
-    } catch {
-      this.searchResults.set([]);
-    } finally {
-      this.searchLoading.set(false);
-    }
-  }
-
-  goToPlace(id: string): void {
-    this.searchOpen.set(false);
-    this.searchTerm.set('');
-    this.searchResults.set([]);
-    this.router.navigate(['/places', id]);
-  }
-
-  goToCompany(id: string): void {
-    this.searchOpen.set(false);
-    this.searchTerm.set('');
-    this.searchResults.set([]);
-    this.router.navigate(['/companies', id]);
-  }
-
-  goToVessel(id: string): void {
-    this.searchOpen.set(false);
-    this.searchTerm.set('');
-    this.searchResults.set([]);
-    this.router.navigate(['/vessels', id]);
-  }
-
-  private orderDetailRoute(status?: string):
-    '/trading/orders'
-    | '/trading/inquiries'
-    | '/trading/delivered-orders'
-    | '/trading/invoiced-orders'
-    | '/trading/completed-orders'
-    | '/trading/cancelled-orders' {
-    if (status === 'INQUIRY' || status === 'OFFER') return '/trading/inquiries';
-    if (status === 'DELIVERED') return '/trading/delivered-orders';
-    if (status === 'INVOICED') return '/trading/invoiced-orders';
-    if (status === 'PAID') return '/trading/completed-orders';
-    if (status === 'CANCELLED') return '/trading/cancelled-orders';
-    return '/trading/orders';
-  }
-
-  goToOrder(orderNumber: string, status?: string): void {
-    this.searchOpen.set(false);
-    this.searchTerm.set('');
-    this.searchResults.set([]);
-    this.router.navigate([this.orderDetailRoute(status), orderNumber]);
-  }
-
-  goToResult(result: SearchResult): void {
-    if (result.kind === 'order') {
-      this.goToOrder(result.id, result.orderStatus);
-    } else if (result.kind === 'company') {
-      this.goToCompany(result.id);
-    } else if (result.kind === 'vessel') {
-      this.goToVessel(result.id);
-    } else {
-      this.goToPlace(result.id);
-    }
-  }
-
-  /** Returns the routerLink array for a search result, or null for unknown types. */
-  resultRouterLink(result: SearchResult): string[] | null {
-    if (result.kind === 'place') return ['/places', result.id];
-    if (result.kind === 'company') return ['/companies', result.id];
-    if (result.kind === 'vessel') return ['/vessels', result.id];
-    if (result.kind === 'order') return [this.orderDetailRoute(result.orderStatus), result.id];
-    return null;
-  }
-
-  /** Closes the search panel (used by routerLink search result clicks). */
-  closeSearchPanel(): void {
-    this.searchOpen.set(false);
-    this.searchTerm.set('');
-    this.searchResults.set([]);
-  }
-
-  navigateFirstResult(): void {
-    const results = this.searchResults();
-    if (results.length) {
-      this.goToResult(results[0]);
-    }
-  }
-
   readonly sidebarClasses = computed(() => {
     const base =
       'app-sidebar fixed inset-y-0 left-0 z-50 flex flex-col bg-surface transition-all duration-300 ease-in-out';
@@ -1387,6 +1173,102 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     return this.openGroups().has(label);
   }
 
+  // ─── Command palette ────────────────────────────────────────────
+
+  private buildPaletteActions() {
+    const actions: import('../../core/ui/command-palette.service').CommandAction[] = [];
+
+    actions.push({
+      id: 'new-inquiry',
+      label: 'New Inquiry',
+      hint: 'N',
+      section: 'Actions',
+      keywords: 'create order rfq',
+      icon: 'M12 4.5v15m7.5-7.5h-15',
+      run: () => this.openNewInquiry(),
+    });
+    actions.push({
+      id: 'incoming-rfqs',
+      label: 'Incoming RFQs',
+      section: 'Actions',
+      keywords: 'whatsapp rfq inbox notifications',
+      icon: 'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0',
+      run: () => this.toggleRfqPanel(),
+    });
+    actions.push({
+      id: 'toggle-density',
+      label: this.density.density() === 'compact' ? 'Use comfortable density' : 'Use compact density',
+      section: 'Actions',
+      keywords: 'density rows compact table terminal',
+      icon: 'M3 6h18M3 12h18M3 18h18',
+      run: () => this.density.toggle(),
+    });
+    actions.push({
+      id: 'toggle-theme',
+      label: 'Switch theme',
+      section: 'Actions',
+      keywords: 'dark light appearance theme mode',
+      icon: 'M21.752 15.002A9.72 9.72 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z',
+      run: () => this.cycleTheme(),
+    });
+    if (this.pwa.canInstall() && !this.pwa.installed()) {
+      actions.push({
+        id: 'install-app',
+        label: 'Install Fueld app',
+        section: 'Actions',
+        keywords: 'pwa install home screen offline app',
+        icon: 'M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3',
+        run: () => this.installApp(),
+      });
+    }
+
+    for (const item of this.navItems()) {
+      if (item.route) {
+        actions.push({
+          id: `nav:${item.route}`,
+          label: item.label,
+          section: 'Navigate',
+          icon: item.icon,
+          run: () => {
+            this.closeSidebar();
+            void this.router.navigate([item.route!]);
+          },
+        });
+      }
+      for (const child of item.children ?? []) {
+        actions.push({
+          id: `nav:${child.route}`,
+          label: `${item.label} · ${child.label}`,
+          section: 'Navigate',
+          icon: item.icon,
+          run: () => {
+            this.closeSidebar();
+            void this.router.navigate([child.route]);
+          },
+        });
+      }
+    }
+    return actions;
+  }
+
+  /** Cycles theme: light → dark → device → light. */
+  cycleTheme(): void {
+    const order = ['light', 'dark', 'device'] as const;
+    const current = order.indexOf(this.themeService.pref()) ?? 0;
+    const next = order[(current + 1) % order.length];
+    this.themeService.set(next);
+    this.toast.info(`Theme: ${next === 'device' ? 'follow device' : next}`);
+  }
+
+  async installApp(): Promise<void> {
+    const outcome = await this.pwa.install();
+    if (outcome === 'accepted') {
+      this.toast.success('Fueld installed 🎉');
+    } else if (outcome === 'unavailable') {
+      this.toast.info('Use your browser menu → "Add to Home Screen" to install.');
+    }
+  }
+
   // ─── RFQ panel methods ──────────────────────────────────────────
 
   toggleRfqPanel(): void {
@@ -1413,14 +1295,47 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     }
   }
 
-  async dismissRfqItem(rfqId: string): Promise<void> {
-    try {
-      await firstValueFrom(
-        this.http.put(`${API}/rfqs/${rfqId}/dismiss`, {}),
-      );
-      this.pendingRfqs.update((list) => list.filter((r) => r.id !== rfqId));
-    } catch { /* ignore */ }
+  /**
+   * Dismiss an RFQ with undo. The item disappears immediately (optimistic)
+   * but the server-side delete only happens after the undo window expires —
+   * so "Undo" is a true undo, not a best-effort reverse.
+   */
+  dismissRfqItem(rfqId: string): void {
+    const removed = this.pendingRfqs().find((r) => r.id === rfqId);
+    if (!removed) return;
+    const removedIndex = this.pendingRfqs().indexOf(removed);
+
+    this.pendingRfqs.update((list) => list.filter((r) => r.id !== rfqId));
+
+    const commit = () => {
+      firstValueFrom(this.http.put(`${API}/rfqs/${rfqId}/dismiss`, {})).catch(() => {
+        // Restore on failure — dismissal must never silently lose an RFQ
+        this.pendingRfqs.update((list) => {
+          const next = [...list];
+          next.splice(Math.min(removedIndex, next.length), 0, removed);
+          return next;
+        });
+        this.toast.error('Could not dismiss RFQ — restored.');
+      });
+    };
+
+    this.toast.show('RFQ dismissed', {
+      type: 'info',
+      action: { label: 'Undo', run: () => {
+        if (this.dismissTimer) clearTimeout(this.dismissTimer);
+        this.dismissTimer = null;
+        this.pendingRfqs.update((list) => {
+          const next = [...list];
+          next.splice(Math.min(removedIndex, next.length), 0, removed);
+          return next;
+        });
+      } },
+      // Undo window = toast lifetime; commit afterwards.
+      duration: 7000,
+    });
+    this.dismissTimer = setTimeout(commit, 7000);
   }
+  private dismissTimer: ReturnType<typeof setTimeout> | null = null;
 
   createInquiryFromRfq(rfq: any): void {
     // Navigate to inquiry creation page with pre-filled data from the RFQ
