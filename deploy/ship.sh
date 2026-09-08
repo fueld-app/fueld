@@ -116,7 +116,7 @@ if [ "$ASSUME_YES" = false ]; then
 fi
 
 # ─── 4. Upload ────────────────────────────────────────────────────────
-log "Uploading payload to $VPS_HOST…"
+log "Uploading payload to ${VPS_HOST}…"
 ssh "$VPS_USER@$VPS_HOST" "mkdir -p $APP_DIR/staging"
 if [ "$WEB_ONLY" = true ]; then
   # Frontend-only: do NOT upload the binary — deploy.sh promotes the web
@@ -145,7 +145,7 @@ fi
 rm -f /tmp/enum-check.$$
 
 # ─── 6. Deploy ────────────────────────────────────────────────────────
-log "Running deploy.sh on $VPS_HOST…"
+log "Running deploy.sh on ${VPS_HOST}…"
 ssh "$VPS_USER@$VPS_HOST" "APP_DIR='$APP_DIR' bash $APP_DIR/staging/deploy.sh"
 
 # ─── 7. Verify ────────────────────────────────────────────────────────
