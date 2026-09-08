@@ -763,6 +763,12 @@ const schemas = [
     const wire = document.querySelector('.dk-pipeline__wire') as HTMLElement | null;
     const nodes = Array.from(document.querySelectorAll('.dk-node')) as HTMLElement[];
 
+    // ticker tape — duplicate the tick set once so the marquee loops seamlessly
+    const tickerInner = document.querySelector('.dk-ticker__inner');
+    if (tickerInner) {
+      Array.from(tickerInner.children).forEach((t) => tickerInner.appendChild(t.cloneNode(true)));
+    }
+
     let lastY = window.scrollY;
     let vel = 0;
     let dirty = true;
