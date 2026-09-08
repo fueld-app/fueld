@@ -338,6 +338,12 @@ jobs:
             build-info.json \
             ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }}:${{ steps.target.outputs.app_dir }}/staging/build-info.json
 
+      - name: Generate payload checksum manifest
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }} \
+            "cd '${{ steps.target.outputs.app_dir }}/staging' && sha256sum app-release.gz web-browser.tar.gz drizzle.tar.gz build-info.json > MANIFEST.sha256"
+
       - name: Execute deployment
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \

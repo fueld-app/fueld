@@ -1,13 +1,29 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════
 #  Fueld Blue-Green Deploy Script
-#  Run on VPS by GitHub Actions: bash deploy.sh
+#  Run on VPS by GitHub Actions, or manually after uploading a payload.
+#
+#  Payload (in $APP_DIR/staging/):
+#    app-release.gz      optional — API binary (skips slot ops when absent)
+#    web-browser.tar.gz  optional — frontend build
+#    drizzle.tar.gz      optional — migration files (applied only together
+#                                   with the binary — the API runs them on
+#                                   startup; applying DB changes without the
+#                                   matching binary can break the running one)
+#    build-info.json     optional — build metadata
+#    MANIFEST.sha256     optional — sha256sum -c checksums for the payload
+#
+#  Modes:
+#    binary + web  → full blue/green deploy
+#    binary only   → blue/green deploy (backend only)
+#    web only      → frontend promotion only (no slot ops, no nginx switch)
 # ═══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/fueld}"
 APP_LLM_DIR="${APP_DIR}/llm"
 APP_PROMPTS_DIR="${APP_DIR}/prompts"
+STAGING="$APP_DIR/staging"
 HEALTH_TIMEOUT=15   # seconds to wait for health check
 HEALTH_RETRIES=5
 
@@ -20,6 +36,114 @@ NC='\033[0m'
 log() { echo -e "${GREEN}▶${NC} $1"; }
 warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 err() { echo -e "${RED}✖${NC} $1"; }
+
+# ─── 0. Payload checksum verification (before applying anything) ─────
+# MANIFEST.sha256 is a `sha256sum -c` file listing every payload file. A
+# missing, extra-corrupt, or hash-mismatched file aborts the deploy before
+# any payload file is consumed. This is the guard against truncated/mixed-up
+# uploads — today's failure mode.
+MANIFEST="$STAGING/MANIFEST.sha256"
+if [ -f "$MANIFEST" ]; then
+  log "Verifying payload checksums against MANIFEST.sha256…"
+  if (cd "$STAGING" && sha256sum --quiet -c MANIFEST.sha256 >/dev/null 2>&1); then
+    log "Payload verified ✓"
+  else
+    err "Payload checksum verification FAILED — deploy aborted, nothing applied."
+    err "Details:"
+    (cd "$STAGING" && sha256sum -c MANIFEST.sha256) || true
+    exit 1
+  fi
+else
+  warn "No MANIFEST.sha256 in staging/ — skipping checksum verification (generate one when packaging)"
+fi
+
+# ─── Prepare archived deploy payloads ───────────────────────────────
+if [ -f "$STAGING/app-release.gz" ]; then
+  log "Extracting API binary archive..."
+  gzip -dc "$STAGING/app-release.gz" > "$STAGING/app-release"
+  chmod +x "$STAGING/app-release"
+  rm -f "$STAGING/app-release.gz"
+fi
+
+if [ -f "$STAGING/drizzle.tar.gz" ]; then
+  log "Extracting migration archive..."
+  rm -rf "$STAGING/drizzle"
+  mkdir -p "$STAGING/drizzle"
+  tar -xzf "$STAGING/drizzle.tar.gz" -C "$STAGING/drizzle"
+  rm -f "$STAGING/drizzle.tar.gz"
+fi
+
+if [ -f "$STAGING/web-browser.tar.gz" ]; then
+  log "Extracting frontend archive..."
+  rm -rf "$STAGING/web"
+  mkdir -p "$STAGING/web"
+  tar -xzf "$STAGING/web-browser.tar.gz" -C "$STAGING/web"
+  rm -f "$STAGING/web-browser.tar.gz"
+fi
+
+# ─── Detect payload contents ─────────────────────────────────────────
+HAS_BINARY=false
+HAS_WEB=false
+HAS_DRIZZLE=false
+[ -f "$STAGING/app-release" ] && HAS_BINARY=true
+[ -d "$STAGING/web/browser" ] && HAS_WEB=true
+[ -d "$STAGING/drizzle" ] && HAS_DRIZZLE=true
+
+if [ "$HAS_BINARY" = false ] && [ "$HAS_WEB" = false ]; then
+  err "Nothing to deploy — staging/ contains no app-release or web payload."
+  err "Contents of staging/:"
+  ls -la "$STAGING" | head -20
+  exit 1
+fi
+
+# Migrations travel with the binary (the API applies them on startup).
+# Applying DB migrations without the matching binary can break the
+# currently-running old binary — so they wait for the next full deploy.
+if [ "$HAS_DRIZZLE" = true ] && [ "$HAS_BINARY" = false ]; then
+  warn "Migration files present without a new binary — skipping migrations (applied on next full deploy)"
+  HAS_DRIZZLE=false
+fi
+
+# Promote the frontend into $APP_DIR/web (shared by both deploy modes).
+promote_frontend() {
+  # Guard: detect and fix double-nested browser/browser/browser/ directory
+  # The expected structure is staging/web/browser/index.html (nginx root = /opt/fueld/web/browser)
+  if [ -d "$STAGING/web/browser/browser" ] && [ -f "$STAGING/web/browser/browser/index.html" ] && [ ! -f "$STAGING/web/browser/index.html" ]; then
+    warn "Detected double-nested browser/browser/browser/ — flattening..."
+    mv "$STAGING/web/browser/browser" "$STAGING/web/browser-flat"
+    cp -a "$STAGING/web/browser-flat/"* "$STAGING/web/browser/" 2>/dev/null || true
+    rm -rf "$STAGING/web/browser-flat"
+    log "Double-nested directory flattened"
+  fi
+
+  # Guard: verify index.html exists in browser/ before promoting
+  if [ ! -f "$STAGING/web/browser/index.html" ]; then
+    err "index.html not found in frontend build — aborting frontend promotion"
+    err "Contents of staging/web:"
+    ls -la "$STAGING/web/" | head -20
+    exit 1
+  fi
+
+  rm -rf "$APP_DIR/web"
+  mv "$STAGING/web" "$APP_DIR/web"
+  log "Frontend deployed"
+}
+
+# ─── Web-only deploy: promote frontend, leave slots/nginx untouched ──
+if [ "$HAS_BINARY" = false ]; then
+  log "Web-only payload detected — promoting frontend (API unchanged, no slot ops)"
+  promote_frontend
+  rm -rf "$STAGING"
+  echo ""
+  log "═══════════════════════════════════════════════════════════"
+  log "  ✅ Frontend deploy complete (running API untouched)"
+  log "═══════════════════════════════════════════════════════════"
+  exit 0
+fi
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Full blue/green deploy (binary present)
+# ═══════════════════════════════════════════════════════════════════════
 
 # ─── Determine slots ─────────────────────────────────────────────────
 ACTIVE_SLOT=$(cat "$APP_DIR/active-slot" 2>/dev/null || echo "blue")
@@ -36,57 +160,28 @@ fi
 log "Current active: ${ACTIVE_SLOT} (port ${ACTIVE_PORT})"
 log "Deploying to:   ${NEXT_SLOT} (port ${NEXT_PORT})"
 
-# ─── Prepare archived deploy payloads ───────────────────────────────
-if [ -f "$APP_DIR/staging/app-release.gz" ]; then
-  log "Extracting API binary archive..."
-  gzip -dc "$APP_DIR/staging/app-release.gz" > "$APP_DIR/staging/app-release"
-  chmod +x "$APP_DIR/staging/app-release"
-  rm -f "$APP_DIR/staging/app-release.gz"
-fi
-
-if [ -f "$APP_DIR/staging/drizzle.tar.gz" ]; then
-  log "Extracting migration archive..."
-  rm -rf "$APP_DIR/staging/drizzle"
-  mkdir -p "$APP_DIR/staging/drizzle"
-  tar -xzf "$APP_DIR/staging/drizzle.tar.gz" -C "$APP_DIR/staging/drizzle"
-  rm -f "$APP_DIR/staging/drizzle.tar.gz"
-fi
-
-if [ -f "$APP_DIR/staging/web-browser.tar.gz" ]; then
-  log "Extracting frontend archive..."
-  rm -rf "$APP_DIR/staging/web"
-  mkdir -p "$APP_DIR/staging/web"
-  tar -xzf "$APP_DIR/staging/web-browser.tar.gz" -C "$APP_DIR/staging/web"
-  rm -f "$APP_DIR/staging/web-browser.tar.gz"
-fi
-
 # ─── 1. Deploy migration files ───────────────────────────────────────
-if [ -d "$APP_DIR/staging/drizzle" ]; then
+if [ "$HAS_DRIZZLE" = true ]; then
   log "Updating migration files..."
   rm -rf "$APP_DIR/drizzle"
-  mv "$APP_DIR/staging/drizzle" "$APP_DIR/drizzle"
+  mv "$STAGING/drizzle" "$APP_DIR/drizzle"
   log "Migration files updated"
 fi
 
 # ─── 2. Deploy backend binary ────────────────────────────────────────
-if [ -f "$APP_DIR/staging/app-release" ]; then
-  log "Deploying backend binary to ${NEXT_SLOT}..."
-  mkdir -p "$APP_DIR/$NEXT_SLOT"
-  mv "$APP_DIR/staging/app-release" "$APP_DIR/$NEXT_SLOT/app-release"
-  chmod +x "$APP_DIR/$NEXT_SLOT/app-release"
-  log "Binary deployed to $APP_DIR/$NEXT_SLOT/"
-else
-  err "No binary found at $APP_DIR/staging/app-release"
-  exit 1
-fi
+log "Deploying backend binary to ${NEXT_SLOT}..."
+mkdir -p "$APP_DIR/$NEXT_SLOT"
+mv "$STAGING/app-release" "$APP_DIR/$NEXT_SLOT/app-release"
+chmod +x "$APP_DIR/$NEXT_SLOT/app-release"
+log "Binary deployed to $APP_DIR/$NEXT_SLOT/"
 
 # ─── 2b. Ensure LLM + prompts directories exist ──────────────────────
 mkdir -p "$APP_DIR/llm/bin" "$APP_DIR/llm/models" "$APP_DIR/prompts"
 log "LLM + prompts directories ensured"
 
 # ─── 2c. Deploy build metadata ───────────────────────────────────────
-if [ -f "$APP_DIR/staging/build-info.json" ]; then
-  mv "$APP_DIR/staging/build-info.json" "$APP_DIR/build-info.json"
+if [ -f "$STAGING/build-info.json" ]; then
+  mv "$STAGING/build-info.json" "$APP_DIR/build-info.json"
   log "Build metadata deployed"
 fi
 
@@ -174,31 +269,9 @@ fi
 log "Health check passed ✓"
 
 # ─── 5. Promote frontend after API health passes ─────────────────────
-if [ -d "$APP_DIR/staging/web" ]; then
+if [ "$HAS_WEB" = true ]; then
   log "Promoting frontend after healthy API start..."
-
-  # Guard: detect and fix double-nested browser/browser/browser/ directory
-  # The expected structure is staging/web/browser/index.html (nginx root = /opt/fueld/web/browser)
-  # Double nesting occurs when browser/browser/browser/index.html exists but browser/browser/index.html does not
-  if [ -d "$APP_DIR/staging/web/browser/browser" ] && [ -f "$APP_DIR/staging/web/browser/browser/index.html" ] && [ ! -f "$APP_DIR/staging/web/browser/index.html" ]; then
-    warn "Detected double-nested browser/browser/browser/ — flattening..."
-    mv "$APP_DIR/staging/web/browser/browser" "$APP_DIR/staging/web/browser-flat"
-    cp -a "$APP_DIR/staging/web/browser-flat/"* "$APP_DIR/staging/web/browser/" 2>/dev/null || true
-    rm -rf "$APP_DIR/staging/web/browser-flat"
-    log "Double-nested directory flattened"
-  fi
-
-  # Guard: verify index.html exists in browser/ before promoting
-  if [ ! -f "$APP_DIR/staging/web/browser/index.html" ]; then
-    err "index.html not found in frontend build — aborting frontend promotion"
-    err "Contents of staging/web:"
-    ls -la "$APP_DIR/staging/web/" | head -20
-    exit 1
-  fi
-
-  rm -rf "$APP_DIR/web"
-  mv "$APP_DIR/staging/web" "$APP_DIR/web"
-  log "Frontend deployed"
+  promote_frontend
 fi
 
 # ─── 6. Switch nginx upstream ────────────────────────────────────────
@@ -221,7 +294,7 @@ sudo systemctl stop "fueld-api@${ACTIVE_SLOT}" 2>/dev/null || true
 log "Old slot stopped"
 
 # ─── 9. Cleanup staging ──────────────────────────────────────────────
-rm -rf "$APP_DIR/staging"
+rm -rf "$STAGING"
 
 echo ""
 log "═══════════════════════════════════════════════════════════"
