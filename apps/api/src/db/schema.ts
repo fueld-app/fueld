@@ -534,6 +534,9 @@ export const users = pgTable('users', {
 
   // Session management
   refreshToken: text('refresh_token'),
+  /** Previous rotation's token hash — honoured briefly for concurrent refreshes. */
+  previousRefreshToken: text('previous_refresh_token'),
+  previousRefreshTokenAt: timestamp('previous_refresh_token_at', { withTimezone: true }),
 
   // Profile
   avatarUrl: text('avatar_url'),

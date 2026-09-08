@@ -17,6 +17,7 @@ import {
   enable2fa,
   disable2fa,
   verify2faToken,
+  REFRESH_GRACE_MS,
 } from './auth.service';
 import {
   buildAuthorizationUrl,
@@ -987,7 +988,24 @@ export const authController = new Elysia({ prefix: '/auth' })
 
         const user = await findUserById(decoded.sub);
 
-        if (!user || (user.refreshToken !== refreshTokenValue && user.refreshToken !== hashRefreshToken(refreshTokenValue))) {
+        // Token matches the current stored hash (normal path) — or the
+        // previous rotation's token within the grace window (concurrent
+        // refreshes: multi-tab, parallel 401s, proactive timer racing the
+        // interceptor). Outside the grace window a rotated-away token is
+        // treated as revoked, as before.
+        const matchesCurrent =
+          user.refreshToken === refreshTokenValue ||
+          user.refreshToken === hashRefreshToken(refreshTokenValue);
+        const rotatedAt = user.previousRefreshTokenAt
+          ? new Date(user.previousRefreshTokenAt).getTime()
+          : 0;
+        const withinGrace = Date.now() - rotatedAt < REFRESH_GRACE_MS;
+        const matchesPrevious =
+          !!user.previousRefreshToken &&
+          (user.previousRefreshToken === refreshTokenValue ||
+            user.previousRefreshToken === hashRefreshToken(refreshTokenValue));
+
+        if (!user || (!matchesCurrent && !(withinGrace && matchesPrevious))) {
           return {
             success: false,
             data: null,

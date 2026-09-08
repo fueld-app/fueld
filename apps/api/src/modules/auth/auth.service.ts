@@ -167,13 +167,33 @@ export function hashRefreshToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
+/**
+ * Rotation grace window: how long the previous refresh token stays valid
+ * after a rotation, so concurrent refreshes (multi-tab, parallel 401s, the
+ * proactive timer racing the interceptor) don't revoke the session.
+ */
+export const REFRESH_GRACE_MS = 60_000;
+
 export async function storeRefreshToken(
   userId: string,
   refreshToken: string,
 ): Promise<void> {
+  // Stash the current hash before overwriting — it stays valid for the
+  // grace window so an in-flight duplicate refresh is not rejected.
+  const [current] = await db
+    .select({ refreshToken: users.refreshToken })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
   await db
     .update(users)
-    .set({ refreshToken: hashRefreshToken(refreshToken), updatedAt: new Date() })
+    .set({
+      previousRefreshToken: current?.refreshToken ?? null,
+      previousRefreshTokenAt: new Date(),
+      refreshToken: hashRefreshToken(refreshToken),
+      updatedAt: new Date(),
+    })
     .where(eq(users.id, userId));
 }
 

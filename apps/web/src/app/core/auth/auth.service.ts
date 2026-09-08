@@ -265,7 +265,24 @@ export class AuthService {
     return data;
   }
 
-  async refreshToken(): Promise<boolean> {
+  /**
+   * Single-flight refresh: the proactive timer, the 401 interceptor, and any
+   * other caller share one in-flight request. Without this, two concurrent
+   * refreshes race the server-side token rotation — the loser presents the
+   * just-rotated-away token and gets logged out.
+   */
+  private refreshInFlight: Promise<boolean> | null = null;
+
+  refreshToken(): Promise<boolean> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.doRefreshToken().finally(() => {
+        this.refreshInFlight = null;
+      });
+    }
+    return this.refreshInFlight;
+  }
+
+  private async doRefreshToken(): Promise<boolean> {
     // Refresh token is in the HTTP-only cookie — server reads it automatically
     try {
       const res = await firstValueFrom(

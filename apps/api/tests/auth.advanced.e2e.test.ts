@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import * as OTPAuth from 'otpauth';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { users } from '../src/db/schema';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { loginE2E, requestJson, requestRaw } from './helpers/e2e';
@@ -188,5 +188,56 @@ describe('auth advanced e2e', () => {
     expect(refreshRevoked.status).toBe(200);
     expect(refreshRevoked.data?.success).toBe(false);
     expect(String(refreshRevoked.data?.message ?? '')).toContain('Refresh token revoked or invalid');
+  });
+
+  it('honours a rotated-away refresh token within the grace window (concurrent refresh race)', async () => {
+    const seeded = await seedAuthBasics();
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const originalRefreshToken = login.refreshToken as string;
+    expect(originalRefreshToken).toBeTruthy();
+
+    // First refresh rotates the token (as any single refresh does)
+    const first = await requestJson('/auth/refresh', {
+      method: 'POST',
+      body: { refreshToken: originalRefreshToken },
+    });
+    expect(first.status).toBe(200);
+    expect(first.data?.success).toBe(true);
+    const rotatedToken = first.data?.data?.refreshToken as string;
+
+    // A concurrent refresh (second tab / parallel 401) still presents the
+    // ORIGINAL rotated-away token — within the grace window this must
+    // succeed, not silently revoke the session.
+    const concurrent = await requestJson('/auth/refresh', {
+      method: 'POST',
+      body: { refreshToken: originalRefreshToken },
+    });
+    expect(concurrent.status).toBe(200);
+    expect(concurrent.data?.success).toBe(true);
+    expect(concurrent.data?.data?.accessToken).toBeTruthy();
+    const concurrentToken = concurrent.data?.data?.refreshToken as string;
+
+    // Deterministic grace-expiry setup: make concurrentToken the rotated-away
+    // previous token, backdate the rotation past the grace window, and point
+    // the current token elsewhere (avoids same-second JWT collisions).
+    const db = await getDb();
+    const { hashRefreshToken } = await import('../src/modules/auth/auth.service');
+    await db
+      .update(users)
+      .set({
+        previousRefreshToken: hashRefreshToken(concurrentToken),
+        previousRefreshTokenAt: new Date(Date.now() - 5 * 60_000),
+        refreshToken: hashRefreshToken('not-the-current-token'),
+      })
+      .where(eq(users.id, seeded.user.id));
+
+    // Presenting the rotated-away token after the grace window revokes the
+    // session, as before.
+    const expiredGrace = await requestJson('/auth/refresh', {
+      method: 'POST',
+      body: { refreshToken: concurrentToken },
+    });
+    expect(expiredGrace.data?.success).toBe(false);
+    expect(String(expiredGrace.data?.message ?? '')).toContain('Refresh token revoked or invalid');
   });
 });

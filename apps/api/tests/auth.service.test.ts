@@ -10,6 +10,7 @@ import {
   findUserByEmail,
   generate2faSecret,
   getAuthEnforcement,
+  hashRefreshToken,
   loginWithO365,
   loginWithPassword,
   registerUser,
@@ -157,11 +158,21 @@ describe('auth.service', () => {
     expect(autoProvisioned.o365Id).toBe('ms-auto-1');
   });
 
-  test('stores and clears refresh tokens', async () => {
+  test('stores, rotates, and clears refresh tokens', async () => {
     const seeded = await seedBasics();
 
     await storeRefreshToken(seeded.user.id, 'refresh-token-1');
-    expect((await findUserByEmail(seeded.user.email))?.refreshToken).toBe('refresh-token-1');
+    // Tokens are stored hashed, never in plaintext
+    expect((await findUserByEmail(seeded.user.email))?.refreshToken).toBe(
+      hashRefreshToken('refresh-token-1'),
+    );
+
+    // Rotation keeps the previous hash for the grace window
+    await storeRefreshToken(seeded.user.id, 'refresh-token-2');
+    const rotated = await findUserByEmail(seeded.user.email);
+    expect(rotated?.refreshToken).toBe(hashRefreshToken('refresh-token-2'));
+    expect(rotated?.previousRefreshToken).toBe(hashRefreshToken('refresh-token-1'));
+    expect(rotated?.previousRefreshTokenAt).toBeTruthy();
 
     await clearRefreshToken(seeded.user.id);
     expect((await findUserByEmail(seeded.user.email))?.refreshToken).toBeNull();
