@@ -111,7 +111,7 @@ const faqs = [
   },
 ];
 
-const customers = ['Riviera Marine', 'Moxie', 'ChannelTX'];
+const customers = ['Riviera Marine', 'Moxie Brokerage', 'ChannelTX'];
 
 const schemas = [
   {
@@ -314,9 +314,9 @@ const schemas = [
       {customers.map((c) => <li>{c}</li>)}
     </ul>
     <ul class="dk-proof__stats" role="list">
-      <li><strong>&lt; 200 ms</strong><span>median API response</span></li>
-      <li><strong>99.9%</strong><span>uptime SLO on managed</span></li>
-      <li><strong>1 day</strong><span>self-host install</span></li>
+      <li><strong data-count="200" data-prefix="&lt; " data-suffix=" ms">&lt; 200 ms</strong><span>median API response</span></li>
+      <li><strong data-count="99.9" data-decimals="1" data-suffix="%">99.9%</strong><span>uptime SLO on managed</span></li>
+      <li><strong data-count="1" data-suffix=" day">1 day</strong><span>self-host install</span></li>
       <li><strong>EU · UK · US · UAE · SG</strong><span>hosting regions</span></li>
     </ul>
   </section>
@@ -366,8 +366,8 @@ const schemas = [
         <path class="dk-pipeline__wire-flow" d="M60 40 H 940" />
       </svg>
       <ol class="dk-pipeline__nodes" role="list">
-        {pipeline.map((step) => (
-          <li class={`dk-node dk-node--${step.tone}`} tabindex="0">
+        {pipeline.map((step, i) => (
+          <li class={`dk-node dk-node--${step.tone}`} tabindex="0" style={`--i:${i}`}>
             <span class="dk-node__code">{step.code}</span>
             <span class="dk-node__pulse" aria-hidden="true"></span>
             <h3>{step.label}</h3>
@@ -388,8 +388,8 @@ const schemas = [
     </div>
 
     <div class="dk-manifest">
-      {manifest.map((item) => (
-        <article class="dk-manifest__row">
+      {manifest.map((item, i) => (
+        <article class="dk-manifest__row" style={`--i:${i}`}>
           <span class="dk-manifest__index">{item.index}</span>
           <div class="dk-manifest__body">
             <h3>{item.title}</h3>
@@ -629,4 +629,122 @@ const schemas = [
       io.observe(el);
     });
   }
-</script>
+
+  // ── Scrollytelling & parallax engine ──────────────────────────────
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+
+    // 0) scroll progress stem (fixed bar)
+    const stem = document.createElement('div');
+    stem.className = 'dk-stem';
+    stem.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(stem);
+
+    // 1) scene observer — palette typing, sovereignty materialize, heading reveals
+    //    (class is removed on exit so the scene can replay)
+    const sceneIO = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.target.classList.toggle('is-scene', e.isIntersecting)),
+      { threshold: 0.3 }
+    );
+    document.querySelectorAll('.dk-palette, .dk-sov, .section-heading').forEach((el) => sceneIO.observe(el));
+
+    // 2) count-up stats
+    const statIO = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          statIO.unobserve(e.target);
+          const el = e.target as HTMLElement;
+          const target = parseFloat(el.dataset.count!);
+          const dec = parseInt(el.dataset.decimals ?? '0', 10);
+          const prefix = el.dataset.prefix ?? '';
+          const suffix = el.dataset.suffix ?? '';
+          const t0 = performance.now();
+          const tick = (t: number) => {
+            const k = Math.min(1, (t - t0) / 1100);
+            const eased = 1 - Math.pow(1 - k, 3);
+            el.textContent = `${prefix}${(target * eased).toFixed(dec)}${suffix}`;
+            if (k < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }
+      },
+      { threshold: 0.6 }
+    );
+    document.querySelectorAll('[data-count]').forEach((el) => statIO.observe(el));
+
+    // 3) unified rAF scroll loop — parallax, pipeline progress, velocity skew, stem
+    const heroPlot = document.querySelector('.dk-hero__plot') as HTMLElement | null;
+    const heroCopy = document.querySelector('.dk-hero__copy') as HTMLElement | null;
+    const appframe = document.querySelector('.dk-appframe') as HTMLElement | null;
+    const chipA = document.querySelector('.dk-floatchip--a') as HTMLElement | null;
+    const chipB = document.querySelector('.dk-floatchip--b') as HTMLElement | null;
+    const stage = document.querySelector('.dk-hero__stage') as HTMLElement | null;
+    const ticker = document.querySelector('.dk-ticker') as HTMLElement | null;
+    const marquee = document.querySelector('.dk-marquee') as HTMLElement | null;
+    const pipelineSec = document.getElementById('pipeline');
+    const wire = document.querySelector('.dk-pipeline__wire') as HTMLElement | null;
+    const nodes = Array.from(document.querySelectorAll('.dk-node')) as HTMLElement[];
+
+    let lastY = window.scrollY;
+    let vel = 0;
+    let dirty = true;
+    window.addEventListener('scroll', () => { dirty = true; }, { passive: true });
+
+    const frame = () => {
+      if (dirty) {
+        dirty = false;
+        const y = window.scrollY;
+        const vh = window.innerHeight;
+        vel = vel * 0.82 + (y - lastY) * 0.18;
+        lastY = y;
+
+        // progress stem
+        stem.style.transform = `scaleX(${clamp(y / Math.max(1, document.documentElement.scrollHeight - vh), 0, 1)})`;
+
+        // scroll-velocity skew on the market data strips
+        const skew = clamp(vel * 0.05, -3, 3);
+        if (ticker) ticker.style.transform = `skewX(${skew}deg)`;
+        if (marquee) marquee.style.transform = `skewX(${(skew * 0.6).toFixed(2)}deg)`;
+
+        // hero parallax layers
+        const hero = document.querySelector('.dk-hero') as HTMLElement | null;
+        if (hero && hero.getBoundingClientRect().bottom > 0) {
+          const r = hero.getBoundingClientRect();
+          const p = clamp(-r.top / r.height, 0, 1);
+          if (heroPlot) heroPlot.style.transform = `translateY(${(p * 110).toFixed(1)}px)`;
+          if (appframe) appframe.style.transform = `translateY(${(p * -70).toFixed(1)}px)`;
+          if (chipA) chipA.style.transform = `translate(${(p * -24).toFixed(1)}px, ${(p * -150).toFixed(1)}px)`;
+          if (chipB) chipB.style.transform = `translate(${(p * 24).toFixed(1)}px, ${(p * -210).toFixed(1)}px)`;
+          if (heroCopy) {
+            heroCopy.style.transform = `translateY(${(p * 44).toFixed(1)}px)`;
+            heroCopy.style.opacity = `${(1 - p * 1.05).toFixed(3)}`;
+          }
+        }
+
+        // pipeline scrollytelling — wire fills left→right, nodes ignite in order
+        if (pipelineSec && wire) {
+          const r = pipelineSec.getBoundingClientRect();
+          const p = clamp((vh * 0.9 - r.top) / (r.height + vh * 0.55), 0, 1);
+          wire.style.clipPath = `inset(0 ${((1 - p) * 100).toFixed(2)}% 0 0)`;
+          nodes.forEach((n, i) => n.classList.toggle('is-live', p >= (i + 0.55) / nodes.length));
+        }
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+
+    // 4) pointer tilt on the hero stage (fine pointers only)
+    if (stage && window.matchMedia('(pointer: fine)').matches) {
+      window.addEventListener('pointermove', (e) => {
+        const r = stage.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > window.innerHeight) return;
+        const x = (e.clientX - r.left) / r.width - 0.5;
+        const y = (e.clientY - r.top) / r.height - 0.5;
+        stage.style.transform = `perspective(1100px) rotateY(${(x * 3.2).toFixed(2)}deg) rotateX(${(y * -2.4).toFixed(2)}deg)`;
+      }, { passive: true });
+      document.documentElement.addEventListener('pointerleave', () => {
+        stage.style.transform = 'perspective(1100px)';
+      });
+    }
+  }</script>
