@@ -838,12 +838,14 @@ export function buildOfferForAccountOfText(params: {
   vesselName: string;
   vesselImo?: string | null;
   clientName?: string | null;
+  /** For broker deals: the customer account the supply is for (overrides companyName on nomination "For account of"). */
+  accountName?: string | null;
   companyName?: string | null;
 }): string {
   const vesselRef = `${params.vesselName}${params.vesselImo ? ` (IMO: ${params.vesselImo})` : ''}`;
   const vesselDisplay = params.vesselName.startsWith('MV ') ? vesselRef : `MV ${vesselRef}`;
   const forAccountParts = params.title === 'NOMINATION'
-    ? [params.companyName?.trim() || 'Invoicing company']
+    ? [params.accountName?.trim() || params.companyName?.trim() || 'Invoicing company']
     : [`Master and/or owner and/or charterers and/or ${vesselDisplay}`];
 
   if (params.title !== 'NOMINATION' && params.clientName) {
@@ -1715,6 +1717,9 @@ export function buildOfferDocument(data: {
   customerNote: string | null;
   termsAndConditions: string | null;
   placeRemark: string | null;
+  // Broker deals: the nomination is for the account of the deal's customer
+  // account (e.g. Ocean7 Chartering), not our own invoicing company.
+  accountName?: string | null;
   companyName: string | null;
   companyAddress: string | null;
   companyPhone: string | null;
@@ -1906,6 +1911,7 @@ export function buildOfferDocument(data: {
     vesselName: data.vesselName,
     vesselImo: data.vesselImo,
     clientName: data.clientName,
+    accountName: data.accountName,
     companyName: data.companyName,
   });
 
@@ -2500,6 +2506,9 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
       'Nomination',
     ),
     placeRemark: null,
+    // Broker deals: the nomination is for the account of the deal's customer
+    // account (e.g. Ocean7 Chartering), not our own invoicing company.
+    accountName: order.isBrokerDeal ? order.client?.name ?? null : undefined,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
