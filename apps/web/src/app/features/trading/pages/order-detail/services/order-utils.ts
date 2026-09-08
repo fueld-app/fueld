@@ -12,7 +12,13 @@ export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuant
       productType: r.productType,
       quantity: r.quantity != null ? String(r.quantity) : '0',
       quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
-      quantityMax: r.quantityMax != null ? String(r.quantityMax) : null,
+      // The delivery max lives in `quantity` (quantityMax is never edited in the
+      // grid and is normally null in stored data). Mirroring the current quantity
+      // here — instead of persisting the stale stored value — keeps the min–max
+      // range correct on confirmation/nomination PDFs after a quantity edit.
+      quantityMax: r.quantity != null
+        ? String(r.quantity)
+        : r.quantityMax != null ? String(r.quantityMax) : null,
       unit: r.unit, costUnit: r.costUnit, salesUnit: r.salesUnit,
       costConversionFactor: r.costConversionFactor != null ? String(r.costConversionFactor) : '1',
       unitConversionFactor: r.unitConversionFactor != null ? String(r.unitConversionFactor) : '1',
