@@ -586,12 +586,12 @@ const NAVIGATION: NavItem[] = [
           <!-- New Inquiry quick button -->
           <button
             (click)="openNewInquiry()"
-            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 p-2 sm:px-3.5 sm:py-2 text-sm font-semibold
+            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 p-2.5 sm:px-3.5 sm:py-2 text-sm font-semibold
                    text-white shadow-sm transition-colors hover:bg-brand-800
                    focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2"
             aria-label="New Inquiry"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-4 sm:w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
             </svg>
             <span class="hidden sm:inline">New Inquiry</span>
@@ -1151,6 +1151,12 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   toggleSidebar(): void {
     this.sidebarOpen.update((v) => !v);
+  }
+
+  /** Close the mobile drawer on Escape (drawer has no visible close button). */
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.sidebarOpen()) this.closeSidebar();
   }
 
   closeSidebar(): void {

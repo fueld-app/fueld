@@ -397,8 +397,8 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
         </section>
 
         @if (drilldownData() || drilldownLoading() || drilldownError()) {
-          <section class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm" data-testid="reports-drilldown-panel">
-            <div class="flex items-center justify-between gap-4">
+          <section class="min-w-0 rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm" data-testid="reports-drilldown-panel">
+            <div class="flex items-center justify-between gap-4 min-w-0">
               <div>
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Drill-down</h2>
                 <p class="text-sm text-gray-500 dark:text-muted">{{ drilldownData()?.title || 'Inspect the source records behind a summary row.' }}</p>
@@ -477,8 +477,8 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
           </section>
         }
 
-        <section class="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-          <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
+        <section class="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div class="min-w-0 rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
             <div class="flex flex-col gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Invoice Aging</h2>

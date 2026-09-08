@@ -783,3 +783,33 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .toast-item, .toast-leaving { animation: none; transition: none; }
 }
+
+/* ─── Mobile: make inline unit/currency selects discoverable ───────────
+   On desktop the bare inline selects (USD / MT) are a deliberate compact
+   pattern for mouse users. On touch they're undiscoverable (16px tall,
+   zero affordance) — give them a chevron and a taller tap area on phones. */
+@media (max-width: 640px) {
+  .order-item-inline-select-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .order-item-inline-select-wrap::after {
+    content: '';
+    pointer-events: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-left: 0.15rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0L5.23 8.29a.75.75 0 01.02-1.08z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-size: contain;
+  }
+  .order-item-inline-select {
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+    color: var(--ink-dim) !important;
+    font-weight: 600;
+    border-radius: 0.25rem;
+    background-color: var(--surface-tint) !important;
+  }
+}

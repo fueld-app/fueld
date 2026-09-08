@@ -72,7 +72,7 @@ export type PaymentSide = 'customer' | 'supplier';
             }
             @if (side() === 'customer') {
               <button (click)="requestCredit.emit()"
-                class="ml-2 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request Increase</button>
+                class="ml-2 inline-flex items-center rounded-md px-2 py-1.5 -my-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request Increase</button>
             }
           } @else {
             <span>No credit line on file.</span>
@@ -120,7 +120,7 @@ export type PaymentSide = 'customer' | 'supplier';
           </div>
         } @else {
           <button (click)="showNoteChange.emit(true)"
-            class="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 dark:text-muted hover:text-brand-600 transition-colors">
+            class="mt-2 inline-flex items-center gap-1 rounded-md px-1.5 py-1.5 -my-1 text-xs text-gray-400 dark:text-muted hover:text-brand-600 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 10.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Z" />
             </svg>

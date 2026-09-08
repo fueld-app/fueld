@@ -71,7 +71,7 @@ function tryLocalStorageGet(key: string): string | null {
         </div>
 
         <!-- Date Range + Team Toggle -->
-        <div class="flex w-full items-center justify-end gap-3 flex-shrink-0 sm:w-auto">
+        <div class="flex w-full flex-wrap items-center justify-start gap-x-3 gap-y-2 flex-shrink-0 sm:w-auto sm:justify-end">
           @if (canUseTeamView()) {
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-600 dark:text-ink-dim">My Orders</span>

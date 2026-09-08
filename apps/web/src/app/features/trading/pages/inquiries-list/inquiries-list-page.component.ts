@@ -70,13 +70,13 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
 
       <!-- Search bar + Filter button -->
       <div class="mb-4 flex flex-wrap items-center gap-3">
-        <div class="flex flex-1 items-center gap-3">
+        <div class="flex flex-1 flex-wrap items-center gap-3">
           <input
             type="text"
             [ngModel]="searchTerm()"
             (ngModelChange)="onSearch($event)"
             [placeholder]="searchPlaceholder()"
-            class="min-w-0 flex-1 max-w-md rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+            class="w-full min-w-0 sm:w-auto sm:flex-1 sm:max-w-md rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
           />
           <app-filter-overlay
             [filters]="filterState()"
@@ -342,7 +342,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                     @if (!isOrders()) {
         <button
                         (click)="openNewInquiryModal()"
-                        class="mt-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700"
+                        class="mt-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
                       >
                         + Create your first inquiry
                       </button>
@@ -436,7 +436,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
               @if (!isOrders()) {
                   <button
                     (click)="openNewInquiryModal()"
-                    class="mt-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700"
+                    class="mt-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
                   >
                     + Create your first inquiry
                   </button>

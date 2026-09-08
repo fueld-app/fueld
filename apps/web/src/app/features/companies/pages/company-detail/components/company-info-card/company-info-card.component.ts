@@ -99,7 +99,7 @@ interface CompanyEnrichment {
               @if (editSaving()) { Saving… } @else { Save }
             </button>
           }
-          <div class="flex gap-1">
+          <div class="flex flex-wrap gap-1">
             <button
               type="button"
               class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"

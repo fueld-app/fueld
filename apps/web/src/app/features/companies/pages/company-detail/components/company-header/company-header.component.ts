@@ -39,7 +39,7 @@ interface UserOption {
   `],
   template: `
     <div class="mb-6">
-      <div class="flex items-center gap-3 mb-1">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-1">
         @if (companyFlag()) { <span class="text-2xl">{{ companyFlag() }}</span> }
         <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">{{ company().name }}</h1>
         @for (t of companyTypes(); track t) {
@@ -116,7 +116,7 @@ interface UserOption {
           }
         </div>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         @if (company().lastSynced) {
           <span class="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-muted" title="Last synced with Seasearcher">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">

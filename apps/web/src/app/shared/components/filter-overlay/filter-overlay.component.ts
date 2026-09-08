@@ -78,7 +78,7 @@ export interface FilterFieldDef {
           <div class="max-h-[60vh] overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
             <!-- Dropdown fields -->
             @if (dropdownFields().length > 0) {
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 @for (field of dropdownFields(); track field.key) {
                   <div>
                     <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">{{ field.label }}</label>
@@ -106,7 +106,7 @@ export interface FilterFieldDef {
             @for (field of dateRangeFields(); track field.key) {
               <div>
                 <div class="mb-1 text-xs font-medium text-gray-500 dark:text-muted">{{ field.label }} range</div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div class="relative">
                     <input
                       type="date"

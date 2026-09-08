@@ -7,6 +7,7 @@ import {
   signal,
   computed,
   effect,
+  HostListener,
   OnInit,
 } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -172,6 +173,12 @@ export class SavedViewsMenuComponent implements OnInit {
     const opening = !this.menuOpen();
     this.menuOpen.set(opening);
     if (opening) this.nameError.set(null);
+  }
+
+  /** Close on document-level Escape (matches the filter overlay behaviour). */
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.menuOpen()) this.menuOpen.set(false);
   }
 
   saveCurrent(): void {
