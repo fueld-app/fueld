@@ -145,6 +145,7 @@ describe('OrderDetailPageComponent', () => {
             userName: signal('Test User'),
             userEmail: signal('test@fueld.local'),
             isAdmin: () => false,
+            isCreditManager: () => false,
             isLight: () => false,
             canSeePrices: () => true,
           },
