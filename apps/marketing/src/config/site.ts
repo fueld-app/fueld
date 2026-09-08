@@ -8,7 +8,7 @@ export const siteConfig = {
   description:
     'Dedicated bunker trading software for teams that need data sovereignty, regional hosting control, and mobile-ready workflows without multi-tenant compromise.',
   siteUrl,
-  socialImage: '/og-card.svg',
+  socialImage: '/og-card.png',
   nav: [
     { href: '/features/', label: 'Features' },
     { href: '/deployment/', label: 'Deployment' },
