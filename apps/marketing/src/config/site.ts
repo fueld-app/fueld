@@ -13,7 +13,7 @@ export const siteConfig = {
     { href: '/features/', label: 'Features' },
     { href: '/deployment/', label: 'Deployment' },
     { href: '/privacy/', label: 'Privacy' },
-    { href: '/#contact', label: 'Book a meeting' },
+    { href: '/#contact', label: 'Book a demo' },
   ],
   contactEmail,
 };
