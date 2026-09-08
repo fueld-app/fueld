@@ -7,18 +7,23 @@ export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuant
       ? getEffectiveDeliveredQuantity(r)
       : r.deliveredQuantity;
 
+    // Delivery max semantics:
+    // - quantityMax is not editable in the UI grid and normally tracks `quantity`.
+    // - A stored max ≥ quantity is an intentional distinct range (set via the
+    //   API) — keep it so PDFs render the real "min - max" range.
+    // - A stored max below the current quantity is stale from earlier quantity
+    //   edits — mirror the current quantity instead, never persist it.
+    const quantityMax = r.quantityMax != null && r.quantity != null && r.quantityMax >= r.quantity
+      ? String(r.quantityMax)
+      : r.quantity != null ? String(r.quantity)
+      : r.quantityMax != null ? String(r.quantityMax)
+      : null;
     return {
       orderSupplierId: r.orderSupplierId ?? null,
       productType: r.productType,
       quantity: r.quantity != null ? String(r.quantity) : '0',
       quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
-      // The delivery max lives in `quantity` (quantityMax is never edited in the
-      // grid and is normally null in stored data). Mirroring the current quantity
-      // here — instead of persisting the stale stored value — keeps the min–max
-      // range correct on confirmation/nomination PDFs after a quantity edit.
-      quantityMax: r.quantity != null
-        ? String(r.quantity)
-        : r.quantityMax != null ? String(r.quantityMax) : null,
+      quantityMax,
       unit: r.unit, costUnit: r.costUnit, salesUnit: r.salesUnit,
       costConversionFactor: r.costConversionFactor != null ? String(r.costConversionFactor) : '1',
       unitConversionFactor: r.unitConversionFactor != null ? String(r.unitConversionFactor) : '1',

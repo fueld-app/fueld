@@ -158,8 +158,8 @@ import type {
               <td class="px-4 py-2">
                 @if (readonly()) {
                   <span class="block text-right tabular-nums">
-                    @if (row.quantityMin != null && row.quantityMin !== row.quantity) {
-                      {{ row.quantityMin | number:'1.0-3' }} – {{ row.quantity | number:'1.0-3' }}
+                    @if (rangeLabel(row)) {
+                      {{ rangeLabel(row) }}
                     } @else {
                       {{ row.quantity | number:'1.0-3' }}
                     }
@@ -623,8 +623,8 @@ import type {
               <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Quantity</label>
               @if (readonly()) {
                 <span class="text-sm tabular-nums">
-                  @if (row.quantityMin != null && row.quantityMin !== row.quantity) {
-                    {{ row.quantityMin | number:'1.0-3' }} – {{ row.quantity | number:'1.0-3' }}
+                  @if (rangeLabel(row)) {
+                    {{ rangeLabel(row) }}
                   } @else {
                     {{ row.quantity | number:'1.0-3' }}
                   }
@@ -1398,15 +1398,37 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     return (productType ?? '').replace(/_/g, ' ');
   }
 
-  /** Update the main quantity (used for calculations/invoicing) */
-  /** Update the ordered quantity; economics will use delivered quantity when one has been entered. */
+  /**
+   * "min – max" label when a real delivery range exists:
+   * min set and differs from the effective max (quantityMax when it exceeds
+   * the ordered quantity, otherwise quantity itself). Empty string otherwise.
+   */
+  rangeLabel(row: OrderItemRow): string {
+    const fmt = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(n);
+    const max = row.quantityMax != null && row.quantityMax > (row.quantity ?? 0)
+      ? row.quantityMax
+      : row.quantity;
+    if (row.quantityMin != null && max != null && row.quantityMin !== max) {
+      return `${fmt(row.quantityMin)} – ${fmt(max)}`;
+    }
+    return '';
+  }
+
+  /** Update the ordered quantity; economics will use delivered quantity when one has been entered. */  /** Update the ordered quantity; economics will use delivered quantity when one has been entered. */
   updateQuantity(index: number, value: number): void {
     this.rows.update((prev) => {
       const updated = [...prev];
       const row = { ...updated[index]! };
+      const previousQuantity = row.quantity;
       row.quantity = row.quantityMin !== null && value < row.quantityMin
         ? row.quantityMin
         : value;
+      // Keep quantityMax tracking the quantity unless it holds an intentional
+      // distinct range (set via the API). A stale tracker from earlier edits
+      // must not survive — PDFs would render the wrong delivery max.
+      if (row.quantityMax === null || row.quantityMax === previousQuantity) {
+        row.quantityMax = row.quantity;
+      }
       // Auto-recalculate economics using delivered quantity when available.
       row.profit = this.profitForRow(row);
       updated[index] = row;

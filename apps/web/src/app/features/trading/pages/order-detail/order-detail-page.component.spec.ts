@@ -289,6 +289,53 @@ describe('OrderDetailPageComponent', () => {
     expect(payload[0]?.quantityMax).toBe('300');
   });
 
+  it('keeps an intentional distinct quantityMax (≥ quantity) so PDFs render a real range', async () => {
+    const { component } = await createComponent();
+
+    const payload = (component as any).buildItemPayload([
+      {
+        id: 'item-1',
+        orderSupplierId: null,
+        productType: 'VLSFO',
+        description: 'RMG380',
+        quantity: 300,
+        quantityMin: 265,
+        quantityMax: 320,
+        unit: 'MT',
+        costUnit: 'MT',
+        salesUnit: 'MT',
+        costConversionFactor: 1,
+        unitConversionFactor: 1,
+        costPrice: 0,
+        costCurrency: 'USD',
+        salesPrice: 0,
+        salesCurrency: 'USD',
+        profit: 0,
+        paymentTerms: '',
+        customerNote: null,
+        deliveredQuantity: null,
+        costPricingModel: 'FIXED',
+        costReferenceId: null,
+        costPlattsEntryId: null,
+        costPremium: null,
+        costBarging: null,
+        costBargingUnit: null,
+        costCreditDays: null,
+        costPriceFinalized: false,
+        salesPricingModel: 'FIXED',
+        salesReferenceId: null,
+        salesPlattsEntryId: null,
+        salesPremium: null,
+        salesBarging: null,
+        salesBargingUnit: null,
+        salesCreditDays: null,
+        salesPriceFinalized: false,
+      },
+    ]);
+
+    expect(payload[0]?.quantityMax).toBe('320');
+  });
+
   it('formats ETA min date in the port timezone for positive-offset ports', async () => {
     const { component } = await createComponent();
 
