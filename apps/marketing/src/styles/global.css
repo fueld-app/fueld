@@ -1663,7 +1663,11 @@ img {
 .dk-floatchip__delta { font-size: 0.68rem; }
 .dk-floatchip__delta--up { color: var(--emerald); }
 @media (max-width: 900px) {
-  .dk-floatchip { display: none; }
+  .dk-floatchip { padding: 0.55rem 0.75rem; border-radius: 10px; }
+  .dk-floatchip--a { bottom: 16px; left: 10px; }
+  .dk-floatchip--b { top: -12px; right: 10px; }
+  .dk-floatchip__value { font-size: 1.05rem; }
+  .dk-floatchip__label { font-size: 0.56rem; }
 }
 
 /* Live ticker — always dark (it's a terminal board, in both themes) */

@@ -790,15 +790,16 @@ const schemas = [
         if (ticker) ticker.style.transform = `skewX(${skew}deg)`;
         if (marquee) marquee.style.transform = `skewX(${(skew * 0.6).toFixed(2)}deg)`;
 
-        // hero parallax layers
+        // hero parallax layers (chip flight is desktop-only — they'd leave the frame on mobile)
+        const wide = window.innerWidth > 900;
         const hero = document.querySelector('.dk-hero') as HTMLElement | null;
         if (hero && hero.getBoundingClientRect().bottom > 0) {
           const r = hero.getBoundingClientRect();
           const p = clamp(-r.top / r.height, 0, 1);
           if (heroPlot) heroPlot.style.transform = `translateY(${(p * 110).toFixed(1)}px)`;
           if (appframe) appframe.style.transform = `translateY(${(p * -70).toFixed(1)}px)`;
-          if (chipA) chipA.style.transform = `translate(${(p * -24).toFixed(1)}px, ${(p * -150).toFixed(1)}px)`;
-          if (chipB) chipB.style.transform = `translate(${(p * 24).toFixed(1)}px, ${(p * -210).toFixed(1)}px)`;
+          if (chipA) chipA.style.transform = wide ? `translate(${(p * -24).toFixed(1)}px, ${(p * -150).toFixed(1)}px)` : '';
+          if (chipB) chipB.style.transform = wide ? `translate(${(p * 24).toFixed(1)}px, ${(p * -210).toFixed(1)}px)` : '';
           if (heroCopy) {
             heroCopy.style.transform = `translateY(${(p * 44).toFixed(1)}px)`;
             heroCopy.style.opacity = `${(1 - p * 1.05).toFixed(3)}`;
