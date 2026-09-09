@@ -367,6 +367,8 @@ const NAVIGATION: NavItem[] = [
               <button
                 (click)="toggleGroup(item.label)"
                 class="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-tint-strong hover:text-ink focus-visible:outline-none"
+                [class.nav-item-active]="isGroupActive(item)"
+                [class.text-ink]="isGroupActive(item)"
                 [class.justify-center]="sidebarCollapsed()"
                 [attr.aria-expanded]="isGroupOpen(item.label)"
                 [title]="sidebarCollapsed() ? item.label : ''"
@@ -491,21 +493,21 @@ const NAVIGATION: NavItem[] = [
         <button
           type="button"
           (click)="palette.openPalette()"
-          class="cmdk-trigger group flex flex-1 items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm text-gray-400 transition-colors hover:border-gray-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 dark:border-line dark:bg-surface-tint dark:text-muted dark:hover:border-line-strong dark:hover:bg-surface-tint-strong md:max-w-md"
+          class="cmdk-trigger group flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm text-gray-400 transition-colors hover:border-gray-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 dark:border-line dark:bg-surface-tint dark:text-muted dark:hover:border-line-strong dark:hover:bg-surface-tint-strong md:max-w-md"
           aria-label="Search or jump to"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
           </svg>
-          <span class="hidden md:inline">Search or jump to…</span>
-          <span class="md:hidden">Search…</span>
+          <span class="hidden truncate md:inline">Search or jump to…</span>
+          <span class="truncate md:hidden">Search…</span>
           <kbd class="ml-auto hidden shrink-0 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:border-line dark:bg-surface-2 dark:text-muted md:block">⌘K</kbd>
         </button>
 
         <!-- Right side actions -->
         <div class="ml-auto flex items-center gap-3">
-          <!-- Commodity Prices (shrinks / hides when search expands) -->
-          <div class="hidden shrink items-center gap-3 overflow-hidden md:flex">
+          <!-- Commodity Prices (xl+ only — starves the search trigger below that) -->
+          <div class="hidden shrink items-center gap-3 overflow-hidden xl:flex">
             @if (eurRate() !== null) {
               <div class="flex shrink-0 flex-col leading-tight">
                 <div class="flex items-center gap-1 text-xs">
@@ -546,7 +548,7 @@ const NAVIGATION: NavItem[] = [
           </div>
 
           @if (commodityPrices().length > 0) {
-            <div class="hidden h-6 w-px bg-gray-200 dark:bg-surface-3 md:block dark:bg-line"></div>
+            <div class="hidden h-6 w-px bg-gray-200 dark:bg-surface-3 xl:block dark:bg-line"></div>
           }
 
           <!-- PWA install prompt (when the browser allows installation) -->
@@ -945,10 +947,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.routerSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe((event) => {
+        this.currentUrl.set(event.urlAfterRedirects.split('?')[0]);
+        this.openGroupForUrl(event.urlAfterRedirects);
         setTimeout(() => {
           this.wsService.sendPresence(event.urlAfterRedirects, this.titleService.getTitle());
         }, 50);
       });
+
+    // Track the current URL for the group-active highlight (OnPush-safe)
+    this.currentUrl.set(this.router.url.split('?')[0]);
+    this.openGroupForUrl(this.router.url);
 
     // Send initial presence
     setTimeout(() => {
@@ -1163,7 +1171,25 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.sidebarOpen.set(false);
   }
 
+  // Current URL (without query string), tracked as a signal so OnPush
+  // templates re-render the group-active highlight on every navigation.
+  readonly currentUrl = signal('');
+
   toggleGroup(label: string): void {
+    // In a collapsed sidebar the children can never render (see the
+    // `!sidebarCollapsed()` guard in the template), so a click on a group icon
+    // would silently toggle state with no visible effect. Expand the sidebar
+    // and open the group instead — the click always does something visible.
+    if (this.sidebarCollapsed()) {
+      this.sidebarCollapsed.set(false);
+      this.openGroups.update((groups) => {
+        if (groups.has(label)) return groups;
+        const next = new Set(groups);
+        next.add(label);
+        return next;
+      });
+      return;
+    }
     this.openGroups.update((groups) => {
       const next = new Set(groups);
       if (next.has(label)) {
@@ -1177,6 +1203,31 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   isGroupOpen(label: string): boolean {
     return this.openGroups().has(label);
+  }
+
+  /** True when any child route of this expandable group is the active page. */
+  isGroupActive(item: NavItem): boolean {
+    const path = this.currentUrl();
+    return (item.children ?? []).some(
+      (c) => path === c.route || path.startsWith(`${c.route}/`),
+    );
+  }
+
+  /** Auto-opens the sidebar group containing the active child route. */
+  private openGroupForUrl(url: string): void {
+    const path = url.split('?')[0];
+    for (const item of this.navItems()) {
+      if (
+        item.children?.some((c) => path === c.route || path.startsWith(`${c.route}/`))
+      ) {
+        this.openGroups.update((groups) => {
+          if (groups.has(item.label)) return groups;
+          const next = new Set(groups);
+          next.add(item.label);
+          return next;
+        });
+      }
+    }
   }
 
   // ─── Command palette ────────────────────────────────────────────
