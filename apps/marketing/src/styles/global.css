@@ -1658,8 +1658,8 @@ img {
 }
 .dk-floatchip--a { bottom: 42px; left: -20px; }
 .dk-floatchip--b { top: -16px; right: -14px; }
-.dk-floatchip__label { font-size: 0.62rem; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
-.dk-floatchip__value { font-size: 1.35rem; font-weight: 600; color: var(--ink); }
+.dk-floatchip__label { font-size: 0.62rem; letter-spacing: 0.14em; color: #a7b0c0; text-transform: uppercase; }
+.dk-floatchip__value { font-size: 1.35rem; font-weight: 600; color: #f3f5fa; }
 .dk-floatchip__delta { font-size: 0.68rem; }
 .dk-floatchip__delta--up { color: var(--emerald); }
 @media (max-width: 900px) {
@@ -1985,8 +1985,8 @@ img {
 .dk-sim__result-label { color: #8a93a6; }
 .dk-sim__result-value { color: #f3f5fa; }
 .dk-sim__row { display: grid; grid-template-columns: 1fr auto; gap: 0.3rem 1rem; }
-.dk-sim__row label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.dk-sim__out { font-size: 0.9rem; font-weight: 600; color: var(--ink); }
+.dk-sim__row label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.dk-sim__out { font-size: 0.9rem; font-weight: 600; }
 .dk-sim__row input[type='range'] {
   grid-column: 1 / -1;
   appearance: none;
@@ -2020,15 +2020,15 @@ img {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   padding-top: 1rem;
-  border-top: 1px dashed var(--line);
+  border-top: 1px dashed rgba(255, 255, 255, 0.14);
 }
 .dk-sim__result > div { display: grid; gap: 0.15rem; }
 .dk-sim__margin {
   padding-left: 1rem;
-  border-left: 1px solid var(--line-strong);
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
 }
-.dk-sim__result-label { font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-.dk-sim__result-value { font-size: 1.05rem; font-weight: 600; color: var(--ink); }
+.dk-sim__result-label { font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.dk-sim__result-value { font-size: 1.05rem; font-weight: 600; }
 @media (max-width: 900px) {
   .dk-sim { grid-template-columns: 1fr; gap: 1.5rem; }
   .dk-sim__result { grid-template-columns: 1fr; }
