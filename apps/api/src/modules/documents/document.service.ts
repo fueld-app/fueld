@@ -1970,6 +1970,14 @@ export function buildOfferDocument(data: {
         leftTexts.push({ text: line, fontSize: 8, color: '#374151' } as Content);
       }
     }
+    // VAT / registration belong with the company address block (per Daniel/Moxie
+    // feedback) rather than in the middle contact column.
+    if (data.vatNumber?.trim()) {
+      leftTexts.push({ text: `VAT No : ${data.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    }
+    if (data.companyRegistrationNumber?.trim()) {
+      leftTexts.push({ text: `Reg. No : ${data.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    }
     const middleTexts: Content[] = [];
     if (data.companyPhone?.trim()) {
       const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
@@ -1977,12 +1985,6 @@ export function buildOfferDocument(data: {
     }
     if (data.companyEmail?.trim()) {
       middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
-    }
-    if (data.companyRegistrationNumber?.trim()) {
-      middleTexts.push({ text: `Reg. No : ${data.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
-    }
-    if (data.vatNumber?.trim()) {
-      middleTexts.push({ text: `VAT No : ${data.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
     }
 
     return {
@@ -2800,6 +2802,14 @@ function buildProformaDocument(data: {
         leftTexts.push({ text: line, fontSize: 8, color: '#374151' } as Content);
       }
     }
+    // VAT / registration belong with the company address block (per Daniel/Moxie
+    // feedback) rather than in the middle contact column.
+    if (data.vatNumber?.trim()) {
+      leftTexts.push({ text: `VAT No : ${data.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    }
+    if (data.companyRegistrationNumber?.trim()) {
+      leftTexts.push({ text: `Reg. No : ${data.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    }
     const middleTexts: Content[] = [];
     if (data.companyPhone?.trim()) {
       const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
@@ -2807,12 +2817,6 @@ function buildProformaDocument(data: {
     }
     if (data.companyEmail?.trim()) {
       middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
-    }
-    if (data.companyRegistrationNumber?.trim()) {
-      middleTexts.push({ text: `Reg. No : ${data.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
-    }
-    if (data.vatNumber?.trim()) {
-      middleTexts.push({ text: `VAT No : ${data.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
     }
 
     return {
