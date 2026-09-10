@@ -2,7 +2,7 @@
 //  Credit Applications Service — Trader → Credit Manager approval workflow
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, sql, desc, asc, inArray } from 'drizzle-orm';
+import { eq, and, or, isNull, gte, sql, desc, asc, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   creditApplications,
@@ -415,23 +415,58 @@ async function autoApplyCreditLine(app: typeof creditApplications.$inferSelect) 
       })
       .where(eq(creditLines.id, app.creditLineId));
   } else {
-    // Create new credit line
-    const [created] = await db
-      .insert(creditLines)
-      .values({
-        tenantId: app.tenantId,
-        type: app.type,
-        creditAmount: app.requestedAmount,
-        currency: app.requestedCurrency,
-        periodDays: app.requestedDays ?? 30,
-      })
-      .returning();
+    // Dedupe: an identical line (same tenant/type/currency/amount/counterparty,
+    // not expired) can be created twice when the same request is submitted or
+    // approved twice (e.g. duplicate applications minutes apart). Link to the
+    // existing line instead of creating a duplicate that double-counts credit.
+    const now = new Date().toISOString().slice(0, 10);
+    const [duplicate] = await db
+      .select({ id: creditLines.id })
+      .from(creditLines)
+      .innerJoin(creditLineCounterparties, eq(creditLineCounterparties.creditLineId, creditLines.id))
+      .where(
+        and(
+          eq(creditLines.tenantId, app.tenantId),
+          eq(creditLines.type, app.type),
+          eq(creditLines.currency, app.requestedCurrency),
+          eq(creditLines.creditAmount, app.requestedAmount),
+          eq(creditLineCounterparties.counterpartyId, app.counterpartyId),
+          or(isNull(creditLines.expires), gte(creditLines.expires, now)),
+        ),
+      )
+      .limit(1);
 
-    // Link the counterparty
-    await db.insert(creditLineCounterparties).values({
-      creditLineId: created.id,
-      counterpartyId: app.counterpartyId,
-    });
+    if (duplicate) {
+      await db
+        .update(creditApplications)
+        .set({ creditLineId: duplicate.id, updatedAt: new Date() })
+        .where(eq(creditApplications.id, app.id));
+    } else {
+      // Create new credit line
+      const [created] = await db
+        .insert(creditLines)
+        .values({
+          tenantId: app.tenantId,
+          type: app.type,
+          creditAmount: app.requestedAmount,
+          currency: app.requestedCurrency,
+          periodDays: app.requestedDays ?? 30,
+        })
+        .returning();
+
+      // Link the counterparty
+      await db.insert(creditLineCounterparties).values({
+        creditLineId: created.id,
+        counterpartyId: app.counterpartyId,
+      });
+
+      // Backfill the application → line link so lines are traceable to their
+      // application (audit) and future dedupe/increase logic can find them.
+      await db
+        .update(creditApplications)
+        .set({ creditLineId: created.id, updatedAt: new Date() })
+        .where(eq(creditApplications.id, app.id));
+    }
   }
 
   // Sync the counterparty's manual "Credit Limit" (shown on the company card)

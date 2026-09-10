@@ -39,6 +39,7 @@ async function calcUsedAmountForSupplier(
   isBrokerCreditLine: boolean = false,
   bufferDays: number = 0,
   autoReleaseCredit: boolean = true,
+  currency?: string,
 ): Promise<string> {
   if (!counterpartyIds.length) return '0';
   const [row] = await db
@@ -60,6 +61,10 @@ async function calcUsedAmountForSupplier(
         isBrokerCreditLine
           ? eq(orders.isBrokerDeal, true)
           : eq(orders.isBrokerDeal, false),
+        // Credit lines are currency-scoped facilities: only count exposure in
+        // the line's own currency (costPrice is stored in the order's currency,
+        // so a raw cross-currency sum would corrupt availableAmount).
+        ...(currency ? [eq(orders.currency, currency)] : []),
         // Credit is still "in use" when:
         // 1. Not manually marked paid (paidAt IS NULL), AND
         // 2. For broker deals (when autoReleaseCredit is enabled):
@@ -81,7 +86,7 @@ async function calcUsedAmountForSupplier(
   return row?.total ?? '0';
 }
 
-async function calcUsedAmountForCustomer(counterpartyIds: string[]): Promise<string> {
+async function calcUsedAmountForCustomer(counterpartyIds: string[], currency?: string): Promise<string> {
   if (!counterpartyIds.length) return '0';
   const [row] = await db
     .select({
@@ -94,6 +99,8 @@ async function calcUsedAmountForCustomer(counterpartyIds: string[]): Promise<str
         inArray(orders.clientId, counterpartyIds),
         eq(orders.customerPaymentTermType, 'CREDIT'),
         inArray(orders.status, [...CUSTOMER_ACTIVE_STATUSES]),
+        // Currency-scoped: only count exposure in the line's own currency.
+        ...(currency ? [eq(orders.currency, currency)] : []),
       ),
     );
   return row?.total ?? '0';
@@ -182,8 +189,8 @@ async function enrichCreditLine(row: RawCreditLine): Promise<CreditLineDto> {
 
   const usedAmount =
     row.type === 'SUPPLIER'
-      ? await calcUsedAmountForSupplier(sides.counterpartyIds, row.isBrokerCreditLine, bufferDays, autoReleaseCredit)
-      : await calcUsedAmountForCustomer(sides.counterpartyIds);
+      ? await calcUsedAmountForSupplier(sides.counterpartyIds, row.isBrokerCreditLine, bufferDays, autoReleaseCredit, row.currency)
+      : await calcUsedAmountForCustomer(sides.counterpartyIds, row.currency);
 
   const creditNum = parseFloat(row.creditAmount) || 0;
   const usedNum = parseFloat(usedAmount) || 0;

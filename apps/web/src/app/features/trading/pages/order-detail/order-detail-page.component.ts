@@ -819,22 +819,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly customerCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
-    const lines = this.customerCreditLines().filter((line) => line.currency === currency);
-    if (!lines.length) return null;
-    const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
-    const maxDays = Math.max(...lines.map((line) => line.periodDays));
-    return { currency, available, maxDays };
+    return this.summarizeLines(this.customerCreditLines(), currency);
   });
 
   readonly canUseCustomerCredit = computed(() => !!this.customerCreditSummary() && !this.customerCreditFrozen());
 
   readonly supplierCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
-    const lines = this.supplierCreditLines().filter((line) => line.currency === currency);
-    if (!lines.length) return null;
-    const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
-    const maxDays = Math.max(...lines.map((line) => line.periodDays));
-    return { currency, available, maxDays };
+    return this.summarizeLines(this.supplierCreditLines(), currency);
   });
 
   readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());

@@ -657,6 +657,7 @@
     [counterpartyName]="creditModalCounterpartyName()"
     [orderId]="order()!.id"
     [defaultType]="creditModalSide()"
+    [defaultCurrency]="order()?.currency ?? 'USD'"
     (closed)="showCreditApplicationModal.set(false)"
     (submitted)="onCreditApplicationSubmitted()"
   />

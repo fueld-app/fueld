@@ -143,6 +143,8 @@ export class CreditApplicationModalComponent {
   readonly creditLineId = input<string | undefined>(undefined);
   /** Pre-set type. */
   readonly defaultType = input<CreditLineType>('CUSTOMER');
+  /** Currency the new line should default to (usually the deal currency). */
+  readonly defaultCurrency = input('USD');
 
   /** Emitted when the modal should close. */
   readonly closed = output<void>();
@@ -158,17 +160,23 @@ export class CreditApplicationModalComponent {
   readonly error = signal('');
   readonly success = signal(false);
 
+  private wasOpen = false;
+
   ngOnChanges() {
-    // Reset form when modal opens
-    if (this.open()) {
+    // Reset the form only when the modal opens (open false→true edge) —
+    // resetting on any input change would wipe a half-filled form if a
+    // background reload touches the bound signals while the user is typing.
+    const nowOpen = this.open();
+    if (nowOpen && !this.wasOpen) {
       this.type.set(this.defaultType());
       this.amount.set('');
-      this.currency.set('USD');
+      this.currency.set(this.defaultCurrency());
       this.days.set(30);
       this.reason.set('');
       this.error.set('');
       this.success.set(false);
     }
+    this.wasOpen = nowOpen;
   }
 
   close() {
