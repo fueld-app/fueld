@@ -194,6 +194,8 @@
       [creditLoading]="customerCreditLoading()"
       [creditFrozen]="customerCreditFrozen()"
       [canUseCredit]="canUseCustomerCredit()"
+      [dealCurrency]="order()?.currency ?? 'USD'"
+      [creditMismatch]="customerCreditMismatch()"
       [showCreditDetails]="auth.canSeePrices()"
       [note]="order()?.customerNote ?? null"
       [showNote]="showCustomerPaymentNote()"
@@ -202,7 +204,7 @@
       (creditDaysChange)="onCustomerCreditDaysChange($event)"
       (noteChange)="onCustomerNoteChange($event)"
       (showNoteChange)="showCustomerPaymentNote.set($event)"
-      (requestCredit)="showCreditApplicationModal.set(true)"
+      (requestCredit)="onCustomerRequestCredit()"
     />
   </div>
   <!-- Supplier Payment (projected into supplier card) -->
@@ -215,6 +217,8 @@
       [creditSummary]="supplierCreditSummary()"
       [creditLoading]="supplierCreditLoading()"
       [canUseCredit]="canUseSupplierCredit()"
+      [dealCurrency]="order()?.currency ?? 'USD'"
+      [creditMismatch]="supplierCreditMismatch()"
       [showCreditDetails]="auth.canSeePrices()"
       [note]="activeSupplierNote() ?? null"
       [showNote]="showSupplierPaymentNote()"
@@ -223,6 +227,7 @@
       (creditDaysChange)="onSupplierCreditDaysChange($event)"
       (noteChange)="onSupplierNoteChange($event)"
       (showNoteChange)="showSupplierPaymentNote.set($event)"
+      (requestCredit)="onSupplierRequestCredit()"
     />
   </div>
   <!-- Notes + T&C (projected into invoicing card) -->
@@ -644,14 +649,14 @@
 } @placeholder { <div></div> }
 
 
-<!-- Credit Application Modal -->
-@if (order()?.clientId) {
+<!-- Credit Application Modal (customer or supplier, per creditModalSide) -->
+@if (creditModalCounterpartyId()) {
   <app-credit-application-modal
     [open]="showCreditApplicationModal()"
-    [counterpartyId]="order()!.clientId"
-    [counterpartyName]="clientName()"
+    [counterpartyId]="creditModalCounterpartyId()"
+    [counterpartyName]="creditModalCounterpartyName()"
     [orderId]="order()!.id"
-    defaultType="CUSTOMER"
+    [defaultType]="creditModalSide()"
     (closed)="showCreditApplicationModal.set(false)"
     (submitted)="onCreditApplicationSubmitted()"
   />

@@ -61,6 +61,12 @@ export type PaymentSide = 'customer' | 'supplier';
         <div class="mt-2 text-xs text-gray-500 dark:text-muted">
           @if (creditLoading()) {
             <span>Loading credit line...</span>
+          } @else if (creditMismatch(); as m) {
+            <span class="text-amber-600 dark:text-amber-400">
+              Credit line on file: @if (m.available !== null) { {{ m.available | number:'1.2-2' }} {{ m.currency }} } @else { {{ m.currency }} } — deal is {{ dealCurrency() }}
+            </span>
+            <button (click)="requestCredit.emit()"
+              class="ml-2 inline-flex items-center rounded-md px-2 py-1.5 -my-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request {{ dealCurrency() }} line</button>
           } @else if (creditSummary(); as cs) {
             @if (creditFrozen()) {
               <span class="text-red-600 dark:text-red-400 font-medium">Credit frozen — risk monitoring hit</span>
@@ -70,16 +76,12 @@ export type PaymentSide = 'customer' | 'supplier';
                 {{ cs.currency }} · Max {{ cs.maxDays }} days
               </span>
             }
-            @if (side() === 'customer') {
-              <button (click)="requestCredit.emit()"
-                class="ml-2 inline-flex items-center rounded-md px-2 py-1.5 -my-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request Increase</button>
-            }
+            <button (click)="requestCredit.emit()"
+              class="ml-2 inline-flex items-center rounded-md px-2 py-1.5 -my-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request Increase</button>
           } @else {
             <span>No credit line on file.</span>
-            @if (side() === 'customer') {
-              <button (click)="requestCredit.emit()"
-                class="ml-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request Credit</button>
-            }
+            <button (click)="requestCredit.emit()"
+              class="ml-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request Credit</button>
           }
         </div>
         } @else {
@@ -90,6 +92,10 @@ export type PaymentSide = 'customer' | 'supplier';
           } @else if (creditFrozen()) {
             <span class="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
               <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span> Credit blocked
+            </span>
+          } @else if (creditMismatch()) {
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+              <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span> No {{ dealCurrency() }} credit line
             </span>
           } @else if (creditSummary()) {
             <span class="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
@@ -142,6 +148,10 @@ export class OrderPaymentTermsCardComponent {
   readonly creditLoading = input(false);
   readonly creditFrozen = input(false);
   readonly canUseCredit = input(false);
+  /** Deal currency — used to explain credit lines held in another currency. */
+  readonly dealCurrency = input('USD');
+  /** Set when a credit line exists but in a different currency than the deal. */
+  readonly creditMismatch = input<{ currency: string; available: number | null } | null>(null);
   /** When false (LIGHT users), hide credit amounts/lines and show only a status badge. */
   readonly showCreditDetails = input(true);
   readonly note = input<string | null>(null);

@@ -31,6 +31,7 @@ import {
   type CustomerPaymentDto,
   type CompanyContactDto,
   type BankAccountDto,
+  type CreditLineDto,
   type OrderSupplierDto,
   type SupplierPaymentDto,
   type SupplierNominationSummaryDto,
@@ -838,6 +839,65 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());
 
+  /** Aggregates same-currency lines for a side into a CreditSummary. */
+  private summarizeLines(lines: CreditLineDto[], currency: string) {
+    if (!lines.length) return null;
+    const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
+    const maxDays = Math.max(...lines.map((line) => line.periodDays));
+    return { currency, available, maxDays };
+  }
+
+  /** Set when a side has credit lines but none in the deal currency (e.g. EUR line on a USD deal). */
+  private creditMismatchFor(lines: () => CreditLineDto[]) {
+    const dealCurrency = this.order()?.currency ?? 'USD';
+    const others = lines().filter((line) => line.currency !== dealCurrency);
+    if (!others.length) return null;
+    const byCurrency = new Map<string, number>();
+    for (const line of others) {
+      const available = parseFloat(line.availableAmount) || 0;
+      byCurrency.set(line.currency, (byCurrency.get(line.currency) ?? 0) + available);
+    }
+    const entries = [...byCurrency.entries()];
+    return entries.length === 1
+      ? { currency: entries[0][0], available: entries[0][1] }
+      : { currency: entries.map(([currency]) => currency).join(', '), available: null };
+  }
+
+  readonly customerCreditMismatch = computed(() => {
+    if (this.customerCreditSummary()) return null;
+    return this.creditMismatchFor(() => this.customerCreditLines());
+  });
+
+  readonly supplierCreditMismatch = computed(() => {
+    if (this.supplierCreditSummary()) return null;
+    return this.creditMismatchFor(() => this.supplierCreditLines());
+  });
+
+  /** Which side the shared credit-application modal is opened for. */
+  readonly creditModalSide = signal<'CUSTOMER' | 'SUPPLIER'>('CUSTOMER');
+  readonly creditModalCounterpartyId = computed(() =>
+    this.creditModalSide() === 'CUSTOMER'
+      ? this.order()?.clientId ?? ''
+      : this.activeSupplierCompanyId(),
+  );
+  readonly creditModalCounterpartyName = computed(() =>
+    this.creditModalSide() === 'CUSTOMER' ? this.clientName() : this.supplierName(),
+  );
+
+  onCustomerRequestCredit(): void {
+    this.creditModalSide.set('CUSTOMER');
+    this.showCreditApplicationModal.set(true);
+  }
+
+  onSupplierRequestCredit(): void {
+    if (!this.activeSupplierCompanyId()) {
+      this.showToast('error', 'Select a supplier company first.');
+      return;
+    }
+    this.creditModalSide.set('SUPPLIER');
+    this.showCreditApplicationModal.set(true);
+  }
+
   readonly financingRateAnnual = computed(() => this.order()?.financingRateAnnual ?? 0.08);
   readonly financingDayCountConvention = computed(() => this.order()?.financingDayCountConvention ?? 365);
   readonly financingDays = computed(() => {
@@ -1511,7 +1571,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   onSupplierPaymentTermChange(value: string): void {
     const ptt = value as any;
     if (ptt === 'CREDIT' && !this.canUseSupplierCredit()) {
-      this.showToast('error', 'No supplier credit line is available.');
+      const mismatch = this.supplierCreditMismatch();
+      this.showToast(
+        'error',
+        mismatch
+          ? `Supplier credit line is in ${mismatch.currency} — this deal is ${this.order()?.currency ?? 'USD'}. Request a ${this.order()?.currency ?? 'USD'} line.`
+          : 'No supplier credit line is available.',
+      );
       return;
     }
     if (this.orderSuppliers().length === 0) {
@@ -2957,7 +3023,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   onCreditApplicationSubmitted(): void {
     // Reload credit lines after application is submitted
-    this.financialSvc.loadCustomerCreditLines(this.order()?.clientId);
+    if (this.creditModalSide() === 'SUPPLIER') {
+      void this.financialSvc.loadSupplierCreditLines(this.activeSupplierCompanyId());
+    } else {
+      this.financialSvc.loadCustomerCreditLines(this.order()?.clientId);
+    }
   }
 
   private requireApiSuccess<T>(response: ApiResponse<T>, fallbackMessage: string): T {
