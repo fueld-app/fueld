@@ -355,7 +355,9 @@ export async function checkCreditAvailability(opts: {
     (sum, line) => sum + (parseFloat(line.availableAmount) || 0),
     0,
   );
-  const ok = available + 1e-9 >= opts.required;
+  // Zero-cost commitments (no priced items yet) still require that a line
+  // EXISTS in the deal currency — otherwise any CREDIT term passes.
+  const ok = matching.length > 0 && available + 1e-9 >= opts.required;
   const sideLabel = opts.type === 'SUPPLIER' ? 'Supplier' : 'Customer';
   const brokerNote = opts.isBrokerDeal ? ' for a broker deal' : '';
   const reason = ok
