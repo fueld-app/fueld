@@ -309,6 +309,63 @@ export async function listCreditLines(query?: {
   return { items, total: countResult[0]?.count ?? 0 };
 }
 
+// ═════════════════════════════════════════════════════════════════
+//  SERVER-SIDE CREDIT ENFORCEMENT
+//  The deal UI filters lines by currency and gates the CREDIT option,
+//  but the API must not rely on that: direct API calls, scripts, or
+//  races could otherwise commit credit that doesn't exist.
+// ═════════════════════════════════════════════════════════════════
+
+export interface CreditAvailability {
+  ok: boolean;
+  /** Summed availability of matching lines, in the requested currency. */
+  available: number;
+  required: number;
+  currency: string;
+  /** Human-readable explanation when ok === false. */
+  reason: string | null;
+}
+
+/**
+ * Sums the available amount of active, non-expired credit lines for a
+ * counterparty in a given currency (broker lines only for broker deals,
+ * regular lines only for regular deals — same split as usage tracking).
+ */
+export async function checkCreditAvailability(opts: {
+  type: 'SUPPLIER' | 'CUSTOMER';
+  counterpartyId: string;
+  currency: string;
+  isBrokerDeal: boolean;
+  required: number;
+  label: string; // e.g. 'Supplier credit' — used in the rejection message
+}): Promise<CreditAvailability> {
+  const { items } = await listCreditLines({
+    type: opts.type,
+    counterpartyId: opts.counterpartyId,
+    limit: 100,
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  const matching = items.filter(
+    (line) =>
+      line.currency === opts.currency &&
+      line.isBrokerCreditLine === opts.isBrokerDeal &&
+      (!line.expires || line.expires >= today),
+  );
+  const available = matching.reduce(
+    (sum, line) => sum + (parseFloat(line.availableAmount) || 0),
+    0,
+  );
+  const ok = available + 1e-9 >= opts.required;
+  const sideLabel = opts.type === 'SUPPLIER' ? 'Supplier' : 'Customer';
+  const brokerNote = opts.isBrokerDeal ? ' for a broker deal' : '';
+  const reason = ok
+    ? null
+    : matching.length === 0
+      ? `${sideLabel} credit line on file in ${opts.currency}${brokerNote} is required — none found. Request a ${opts.currency} credit line or choose another payment term.`
+      : `Insufficient ${sideLabel.toLowerCase()} credit: ${available.toFixed(2)} ${opts.currency} available, ${opts.required.toFixed(2)} ${opts.currency} required. Request a credit increase or choose another payment term.`;
+  return { ok, available, required: opts.required, currency: opts.currency, reason };
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  GET SINGLE CREDIT LINE
 // ═══════════════════════════════════════════════════════════════════════

@@ -29,6 +29,7 @@ import {
 } from '../../db/schema';
 import type { Order, TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
+import { checkCreditAvailability } from '../credit/credit.service';
 import { sendTemplatedGroupMessage, buildProductTemplateVariables } from '../whatsapp/whatsapp.service';
 import {
   calculateGrossProfitBase,
@@ -724,6 +725,26 @@ export async function addOrderSupplier(orderId: string, input: {
 
   await ensureUniqueOrderSupplierCompany(orderId, input.companyId);
 
+  // Server-side credit enforcement: a new leg created directly on CREDIT
+  // must be backed by a supplier credit line in the deal currency.
+  if (input.paymentTermType === 'CREDIT') {
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (order && order.orderKind !== 'INTERNAL_TRANSFER' && !(await creditEnforcementDisabled(order.tenantId))) {
+      const result = await checkCreditAvailability({
+        type: 'SUPPLIER',
+        counterpartyId: input.companyId,
+        currency: order.currency ?? 'USD',
+        isBrokerDeal: order.isBrokerDeal === true,
+        required: 0,
+        label: 'Supplier credit',
+      });
+      if (!result.ok) {
+        const company = await getCounterpartyById(input.companyId);
+        throw new Error(`${company?.name ?? 'Supplier'}: ${result.reason ?? 'Insufficient supplier credit'}`);
+      }
+    }
+  }
+
   const [created] = await db
     .insert(orderSuppliers)
     .values({
@@ -743,6 +764,144 @@ export async function addOrderSupplier(orderId: string, input: {
   return (await listOrderSuppliers(orderId)).find((supplier) => supplier.id === created.id) ?? null;
 }
 
+// ─── SERVER-SIDE CREDIT ENFORCEMENT ───────────────────────────────
+// The deal UI gates the CREDIT option (currency match + availability),
+// but the API is the real boundary: reject CREDIT terms that the
+// supplier/customer credit lines cannot actually back. Enforcement is
+// transition-only (only when terms CHANGE to CREDIT, and at confirmation)
+// so idempotent autosaves never get blocked by concurrent usage changes.
+// Tenants can opt out via settings.credit.enforceOnServer = false.
+
+async function creditEnforcementDisabled(tenantId: string): Promise<boolean> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  return ((tenant?.settings as Record<string, unknown> | null)?.['credit'] as any)?.['enforceOnServer'] === false;
+}
+
+/** Sum an order-items money column (optionally scoped to one supplier leg). */
+async function sumOrderItemsPrice(
+  orderId: string,
+  column: 'costPrice' | 'salesPrice',
+  supplierLegId?: string,
+): Promise<number> {
+  const conditions = [eq(orderItems.orderId, orderId)];
+  if (supplierLegId) conditions.push(eq(orderItems.orderSupplierId, supplierLegId));
+  const moneyColumn = column === 'costPrice' ? orderItems.costPrice : orderItems.salesPrice;
+  const [row] = await db
+    .select({
+      total: sql<string>`coalesce(sum(${moneyColumn}::numeric * ${orderItems.quantity}::numeric), 0)::text`,
+    })
+    .from(orderItems)
+    .where(and(...conditions));
+  return parseFloat(row?.total ?? '0') || 0;
+}
+
+/**
+ * Validates all credit-backed payment terms on an order: customer CREDIT
+ * terms against the client's credit lines, and every supplier leg on CREDIT
+ * against the supplier's lines (grouped per company). Used at confirmation
+ * and whenever terms newly transition to CREDIT.
+ */
+async function assertCreditTermsAllowed(input: {
+  orderId: string;
+  order: typeof orders.$inferSelect;
+  checkCustomer: boolean;
+  checkSupplierLegs: boolean;
+  /** Legacy order-level supplier terms newly set to CREDIT (pre-leg-sync). */
+  orderLevelSupplierToCredit?: { companyId: string };
+}): Promise<void> {
+  const order = input.order;
+  const currency = order.currency ?? 'USD';
+  const isBrokerDeal = order.isBrokerDeal === true;
+
+  if (input.checkCustomer && order.clientId) {
+    const required = await sumOrderItemsPrice(input.orderId, 'salesPrice');
+    const result = await checkCreditAvailability({
+      type: 'CUSTOMER',
+      counterpartyId: order.clientId,
+      currency,
+      isBrokerDeal,
+      required,
+      label: 'Customer credit',
+    });
+    if (!result.ok) throw new Error(result.reason ?? 'Insufficient customer credit');
+  }
+
+  // Legacy single-supplier orders: the order-level fields are the source of
+  // truth until syncPrimaryOrderSupplierFromLegacy copies them to the leg,
+  // so validate the target company directly.
+  if (input.orderLevelSupplierToCredit) {
+    const required = await sumOrderItemsPrice(input.orderId, 'costPrice');
+    const result = await checkCreditAvailability({
+      type: 'SUPPLIER',
+      counterpartyId: input.orderLevelSupplierToCredit.companyId,
+      currency,
+      isBrokerDeal,
+      required,
+      label: 'Supplier credit',
+    });
+    if (!result.ok) {
+      const company = await getCounterpartyById(input.orderLevelSupplierToCredit.companyId);
+      throw new Error(`${company?.name ?? 'Supplier'}: ${result.reason ?? 'Insufficient supplier credit'}`);
+    }
+    return;
+  }
+
+  if (!input.checkSupplierLegs) return;
+
+  const legs = await listOrderSuppliers(input.orderId);
+  const usableLegs = legs.filter((leg) => leg.paymentTermType === 'CREDIT' && leg.companyId);
+  // Legacy orders without legs: fall back to the order-level supplier fields.
+  if (!usableLegs.length && !legs.length && order.supplierId && order.supplierPaymentTermType === 'CREDIT') {
+    const required = await sumOrderItemsPrice(input.orderId, 'costPrice');
+    const result = await checkCreditAvailability({
+      type: 'SUPPLIER',
+      counterpartyId: order.supplierId,
+      currency,
+      isBrokerDeal,
+      required,
+      label: 'Supplier credit',
+    });
+    if (!result.ok) throw new Error(result.reason ?? 'Insufficient supplier credit');
+    return;
+  }
+
+  // Group leg cost per company: two legs on the same supplier both draw
+  // the same line, so their combined exposure must fit the availability.
+  const requiredByCompany = new Map<string, number>();
+  const singleLeg = usableLegs.length <= 1;
+  for (const leg of usableLegs) {
+    const cost = singleLeg
+      ? await sumOrderItemsPrice(input.orderId, 'costPrice')
+      : await sumOrderItemsPrice(input.orderId, 'costPrice', leg.id);
+    requiredByCompany.set(leg.companyId, (requiredByCompany.get(leg.companyId) ?? 0) + cost);
+  }
+  for (const [companyId, required] of requiredByCompany) {
+    const result = await checkCreditAvailability({
+      type: 'SUPPLIER',
+      counterpartyId: companyId,
+      currency,
+      isBrokerDeal,
+      required,
+      label: 'Supplier credit',
+    });
+    if (!result.ok) {
+      const companyName = usableLegs.find((leg) => leg.companyId === companyId)?.company?.name ?? 'supplier';
+      throw new Error(`${companyName}: ${result.reason ?? 'Insufficient supplier credit'}`);
+    }
+  }
+}
+
+export async function assertCreditForConfirmation(orderId: string): Promise<void> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+  if (!order || order.orderKind === 'INTERNAL_TRANSFER') return;
+  if (await creditEnforcementDisabled(order.tenantId)) return;
+  await assertCreditTermsAllowed({ orderId, order, checkCustomer: true, checkSupplierLegs: true });
+}
+
 export async function updateOrderSupplierRecord(orderId: string, supplierRecordId: string, input: {
   companyId?: string;
   contactId?: string | null;
@@ -760,6 +919,32 @@ export async function updateOrderSupplierRecord(orderId: string, supplierRecordI
     .limit(1);
 
   if (!existing) return null;
+
+  // Server-side credit enforcement: only when terms transition INTO CREDIT
+  // (idempotent autosaves with unchanged terms must never be blocked by
+  // concurrent usage changes on other deals).
+  if (input.paymentTermType === 'CREDIT' && existing.paymentTermType !== 'CREDIT') {
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    if (order && order.orderKind !== 'INTERNAL_TRANSFER' && !(await creditEnforcementDisabled(order.tenantId))) {
+      const legs = await listOrderSuppliers(orderId);
+      const singleLeg = legs.length <= 1;
+      const required = singleLeg
+        ? await sumOrderItemsPrice(orderId, 'costPrice')
+        : await sumOrderItemsPrice(orderId, 'costPrice', existing.id);
+      const result = await checkCreditAvailability({
+        type: 'SUPPLIER',
+        counterpartyId: existing.companyId,
+        currency: order.currency ?? 'USD',
+        isBrokerDeal: order.isBrokerDeal === true,
+        required,
+        label: 'Supplier credit',
+      });
+      if (!result.ok) {
+        const company = await getCounterpartyById(existing.companyId);
+        throw new Error(`${company?.name ?? 'Supplier'}: ${result.reason ?? 'Insufficient supplier credit'}`);
+      }
+    }
+  }
 
   if (input.companyId !== undefined) {
     await ensureUniqueOrderSupplierCompany(orderId, input.companyId, supplierRecordId);
@@ -1517,6 +1702,31 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
     .limit(1);
 
   if (!currentOrder) return null;
+
+  // Server-side credit enforcement — transition-only, so unchanged CREDIT
+  // terms in an autosave payload are never re-validated and never blocked.
+  const customerCreditTransition =
+    input.customerPaymentTermType === 'CREDIT' && currentOrder.customerPaymentTermType !== 'CREDIT';
+  const supplierCreditTransition =
+    input.supplierPaymentTermType === 'CREDIT' && currentOrder.supplierPaymentTermType !== 'CREDIT';
+  const confirming = input.status === 'CONFIRMED' && currentOrder.status !== 'CONFIRMED';
+  if (
+    (customerCreditTransition || supplierCreditTransition || confirming) &&
+    currentOrder.orderKind !== 'INTERNAL_TRANSFER' &&
+    !(await creditEnforcementDisabled(currentOrder.tenantId))
+  ) {
+    const orderLevelSupplierToCredit =
+      supplierCreditTransition && currentOrder.supplierId
+        ? { companyId: currentOrder.supplierId }
+        : undefined;
+    await assertCreditTermsAllowed({
+      orderId: id,
+      order: currentOrder,
+      checkCustomer: customerCreditTransition || confirming,
+      checkSupplierLegs: confirming && !orderLevelSupplierToCredit,
+      orderLevelSupplierToCredit,
+    });
+  }
 
   const nextCurrency = input.currency ?? currentOrder.currency;
   const requestedInvoicingCompanyId = input.invoicingCompanyId !== undefined

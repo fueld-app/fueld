@@ -26,6 +26,7 @@ import {
   deleteOrder,
   saveOrderItems,
   updateOrderStatus,
+  assertCreditForConfirmation,
   getOrderActivity,
   resolveOrderId,
   listOrderAttachments,
@@ -690,7 +691,11 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
       } catch (err) {
         console.error('[Orders] Update failed:', err);
-        return { success: false, data: null, message: 'Failed to update order' };
+        return {
+          success: false,
+          data: null,
+          message: err instanceof Error ? err.message : 'Failed to update order',
+        };
       }
     },
     {
@@ -757,6 +762,13 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         if (body.status === 'CONFIRMED') {
           if (!order?.items?.length) {
             return { success: false, data: null, message: 'Add at least one line item before converting to order' };
+          }
+          // Server-side credit enforcement: every CREDIT term on the deal must
+          // be backed by same-currency availability at the moment of conversion.
+          // Only on a real transition — re-saving CONFIRMED must not fail on
+          // the deal's own usage, which already counts against the line.
+          if (order.status !== 'CONFIRMED') {
+            await assertCreditForConfirmation(orderId);
           }
         }
 
@@ -841,7 +853,11 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
       } catch (err) {
         console.error('[Orders] Status update failed:', err);
-        return { success: false, data: null, message: 'Failed to update status' };
+        return {
+          success: false,
+          data: null,
+          message: err instanceof Error ? err.message : 'Failed to update status',
+        };
       }
     },
     {
