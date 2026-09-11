@@ -817,7 +817,9 @@ async function assertCreditTermsAllowed(input: {
   const currency = order.currency ?? 'USD';
   const isBrokerDeal = order.isBrokerDeal === true;
 
-  if (input.checkCustomer && order.clientId) {
+  // Only credit-backed terms are validated: a deal on COD/PREPAY doesn't
+  // draw the customer's credit line, so its availability is irrelevant.
+  if (input.checkCustomer && order.customerPaymentTermType === 'CREDIT' && order.clientId) {
     const required = await sumOrderItemsPrice(input.orderId, 'salesPrice');
     const result = await checkCreditAvailability({
       type: 'CUSTOMER',
