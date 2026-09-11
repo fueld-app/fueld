@@ -2181,11 +2181,22 @@ function buildThroughputEmailHtml(tenantName: string, report: ThroughputReportDt
     .map((row) => `<tr><td style="padding:6px 0;">${escHtml(row.productType)}</td><td style="padding:6px 0; text-align:right;">${row.totalQuantity}</td><td style="padding:6px 0;">${escHtml(row.unit)}</td><td style="padding:6px 0; text-align:right;">${row.orderCount}</td></tr>`)
     .join('');
 
+  const locationRows = report.byLocation
+    .map((loc) => {
+      const top = loc.rows.slice(0, 5)
+        .map((row) => `<tr><td style="padding:4px 0; padding-left:12px; color:#6b7280;">${escHtml(row.productType)}</td><td style="padding:4px 0; text-align:right;">${row.totalQuantity}</td><td style="padding:4px 0; color:#6b7280;">${escHtml(row.unit)}</td><td style="padding:4px 0; text-align:right;">${row.orderCount}</td></tr>`)
+        .join('');
+      const header = `<tr><td colspan="4" style="padding:10px 0 4px; font-weight:bold;">${escHtml(loc.location)} — ${loc.orderCount} order${loc.orderCount === 1 ? '' : 's'}</td></tr>`;
+      return header + top;
+    })
+    .join('');
+
   return `
     <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;">
       <h2 style="margin:0 0 12px;">${escHtml(tenantName)} throughput report</h2>
       <p style="margin:0 0 18px; color:#6b7280;">${report.rows.length} product${report.rows.length === 1 ? '' : 's'} | ${report.totalOrderCount} order${report.totalOrderCount === 1 ? '' : 's'}${report.from ? ` | From: ${report.from}` : ''}${report.to ? ` | To: ${report.to}` : ''}</p>
       <table style="width:100%; border-collapse:collapse;"><thead><tr><th style="padding:6px 0; text-align:left; border-bottom:1px solid #e5e7eb;">Product / Service</th><th style="padding:6px 0; text-align:right; border-bottom:1px solid #e5e7eb;">Total Quantity</th><th style="padding:6px 0; text-align:left; border-bottom:1px solid #e5e7eb;">Unit</th><th style="padding:6px 0; text-align:right; border-bottom:1px solid #e5e7eb;">Orders</th></tr></thead><tbody>${tableRows || '<tr><td colspan="4">No data for this period</td></tr>'}</tbody></table>
+      ${locationRows ? `<h3 style="margin:20px 0 8px; font-size:14px;">Breakdown by delivery location</h3><table style="width:100%; border-collapse:collapse;"><tbody>${locationRows}</tbody></table><p style="margin:8px 0 0; color:#6b7280; font-size:12px;">Top 5 products per location — see the attached XLSX “By Location” sheet for the full breakdown.</p>` : ''}
     </div>
   `;
 }
@@ -2206,7 +2217,19 @@ async function runScheduleForTenant(tenantId: string, tenantName: string, schedu
   // THROUGHPUT report has its own data source — doesn't need the full ReleaseTwo payload
   if (schedule.reportType === 'THROUGHPUT') {
     const filters = schedule.filters ?? {};
-    const throughput = await buildThroughputReport(tenantId, filters.from ?? undefined, filters.to ?? undefined);
+    let from = filters.from ?? undefined;
+    let to = filters.to ?? undefined;
+    if (!from || !to) {
+      // No explicit window configured — default to the previous calendar
+      // month (schedules run after month close, matching monthly reporting).
+      const now = new Date();
+      const prevStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+      const prevEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59));
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      from = from ?? iso(prevStart);
+      to = to ?? iso(prevEnd);
+    }
+    const throughput = await buildThroughputReport(tenantId, from, to);
     if (schedule.sendOnlyWhenNonEmpty && throughput.rows.length === 0) return false;
 
     const html = buildThroughputEmailHtml(tenantName, throughput);

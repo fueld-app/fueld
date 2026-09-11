@@ -780,7 +780,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                 <div class="flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-4 py-3 lg:flex-row lg:items-center lg:justify-between" [attr.data-testid]="'reports-schedule-card-' + schedule.id">
                   <div>
                     <div class="font-medium text-gray-900 dark:text-ink">{{ schedule.name }}</div>
-                    <div class="text-sm text-gray-500 dark:text-muted">{{ scheduleModeLabel(schedule.reportMode) }} · {{ schedule.reportType === 'MARGIN_ANALYSIS' ? 'Margin analysis' : 'Summary' }} · {{ schedule.hourUtc }}:00 UTC · {{ formatRecipientRoles(schedule.recipientRoles) }}</div>
+                    <div class="text-sm text-gray-500 dark:text-muted">{{ scheduleModeLabel(schedule.reportMode) }} · {{ schedule.reportType === 'MARGIN_ANALYSIS' ? 'Margin analysis' : schedule.reportType === 'THROUGHPUT' ? 'Throughput / Sales' : 'Summary' }} · {{ schedule.hourUtc }}:00 UTC · {{ formatRecipientRoles(schedule.recipientRoles) }}</div>
                     <div class="text-xs text-gray-500 dark:text-muted">Delivery: {{ describeDeliveryMode(schedule.deliveryMode) }} · {{ describeBodyMode(schedule.bodyMode) }} · {{ schedule.isActive ? 'Active' : 'Paused' }}</div>
                     @if (schedule.reportMode === 'EXCEPTIONS') {
                       <div class="text-xs text-gray-500 dark:text-muted">{{ schedule.sendOnlyWhenNonEmpty ? 'Send only when non-empty' : 'Always send' }} · {{ formatExceptionTypes(schedule.exceptionTypes) }}</div>

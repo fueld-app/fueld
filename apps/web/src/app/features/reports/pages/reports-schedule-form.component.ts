@@ -49,6 +49,7 @@ import { Role } from '@fueld/types';
         >
           <option value="SUMMARY">Summary</option>
           <option value="MARGIN_ANALYSIS">Margin analysis</option>
+          <option value="THROUGHPUT">Throughput / Sales</option>
         </select>
         <select
           data-testid="reports-schedule-delivery-mode"
