@@ -1997,11 +1997,29 @@ export interface ThroughputReportRowDto {
   orderCount: number;
 }
 
+/** Throughput report — one product row within a single delivery location (port). */
+export interface ThroughputLocationRowDto {
+  location: string;
+  productType: string;
+  totalQuantity: number;
+  unit: string;
+  orderCount: number;
+}
+
+/** Throughput report — totals for one delivery location (port), with per-product drilldown. */
+export interface ThroughputLocationDto {
+  location: string;
+  orderCount: number;
+  rows: ThroughputLocationRowDto[];
+}
+
 export interface ThroughputReportDto {
   from: string | null;
   to: string | null;
   rows: ThroughputReportRowDto[];
   totalOrderCount: number;
+  /** Breakdown by delivery location (port), e.g. "CMF - FUEL DOCK". */
+  byLocation: ThroughputLocationDto[];
 }
 
 /** Scheduled report delivery configuration. */

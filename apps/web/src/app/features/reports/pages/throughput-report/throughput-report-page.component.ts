@@ -9,10 +9,11 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, ThroughputReportDto, ThroughputReportRowDto } from '@fueld/types';
+import type { ApiResponse, ThroughputReportDto, ThroughputReportRowDto, ThroughputLocationDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
 
 type DateMode = 'daily' | 'weekly' | 'monthly' | 'custom';
+type ReportView = 'product' | 'location';
 
 @Component({
   selector: 'app-throughput-report-page',
@@ -123,41 +124,102 @@ type DateMode = 'daily' | 'weekly' | 'monthly' | 'custom';
           </div>
         </div>
 
-        <!-- Results table -->
-        @if (r.rows.length > 0) {
-          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-gray-100 dark:border-line bg-gray-50 dark:bg-surface-2">
-                  <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-muted">Product / Service</th>
-                  <th class="px-4 py-3 text-right font-medium text-gray-500 dark:text-muted">Total Quantity</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-muted">Unit</th>
-                  <th class="px-4 py-3 text-right font-medium text-gray-500 dark:text-muted">Orders</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-50 dark:divide-line">
-                @for (row of r.rows; track row.productType) {
-                  <tr class="hover:bg-gray-50/50 dark:hover:bg-surface-tint">
-                    <td class="px-4 py-2.5 text-gray-900 dark:text-ink">{{ row.productType }}</td>
-                    <td class="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-ink">{{ formatQty(row.totalQuantity) }}</td>
-                    <td class="px-4 py-2.5 text-gray-600 dark:text-ink-dim">{{ row.unit }}</td>
-                    <td class="px-4 py-2.5 text-right text-gray-600 dark:text-ink-dim">{{ row.orderCount }}</td>
+        <!-- View toggle: by product vs by delivery location -->
+        @if (r.byLocation.length > 0) {
+          <div class="mb-4 inline-flex rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-surface-2 p-0.5">
+            <button type="button" (click)="view.set('product')"
+              class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
+              [class]="view() === 'product' ? 'bg-white dark:bg-surface shadow text-gray-900 dark:text-ink' : 'text-gray-500 dark:text-muted hover:text-gray-700 dark:hover:text-ink'">
+              By Product
+            </button>
+            <button type="button" (click)="view.set('location')"
+              class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
+              [class]="view() === 'location' ? 'bg-white dark:bg-surface shadow text-gray-900 dark:text-ink' : 'text-gray-500 dark:text-muted hover:text-gray-700 dark:hover:text-ink'">
+              By Location
+            </button>
+          </div>
+        }
+
+        <!-- Results table (by product) -->
+        @if (view() === 'product') {
+          @if (r.rows.length > 0) {
+            <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-gray-100 dark:border-line bg-gray-50 dark:bg-surface-2">
+                    <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-muted">Product / Service</th>
+                    <th class="px-4 py-3 text-right font-medium text-gray-500 dark:text-muted">Total Quantity</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-muted">Unit</th>
+                    <th class="px-4 py-3 text-right font-medium text-gray-500 dark:text-muted">Orders</th>
                   </tr>
-                }
-              </tbody>
-              <tfoot>
-                <tr class="border-t-2 border-gray-200 dark:border-line-strong bg-gray-50 dark:bg-surface-2">
-                  <td class="px-4 py-3 font-semibold text-gray-900 dark:text-ink">Total</td>
-                  <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-ink">{{ r.totalOrderCount }} orders</td>
-                  <td colspan="2"></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                </thead>
+                <tbody class="divide-y divide-gray-50 dark:divide-line">
+                  @for (row of r.rows; track row.productType) {
+                    <tr class="hover:bg-gray-50/50 dark:hover:bg-surface-tint">
+                      <td class="px-4 py-2.5 text-gray-900 dark:text-ink">{{ row.productType }}</td>
+                      <td class="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-ink">{{ formatQty(row.totalQuantity) }}</td>
+                      <td class="px-4 py-2.5 text-gray-600 dark:text-ink-dim">{{ row.unit }}</td>
+                      <td class="px-4 py-2.5 text-right text-gray-600 dark:text-ink-dim">{{ row.orderCount }}</td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr class="border-t-2 border-gray-200 dark:border-line-strong bg-gray-50 dark:bg-surface-2">
+                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-ink">Total</td>
+                    <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-ink">{{ r.totalOrderCount }} orders</td>
+                    <td colspan="2"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          } @else {
+            <div class="text-center py-12 text-gray-400 dark:text-muted">
+              No data found for the selected period.
+            </div>
+          }
         } @else {
-          <div class="text-center py-12 text-gray-400 dark:text-muted">
-            No data found for the selected period.
-          </div>
+          <!-- Drilldown by delivery location (port) -->
+          @if (r.byLocation.length > 0) {
+            <div class="space-y-4">
+              @for (loc of r.byLocation; track loc.location) {
+                <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden">
+                  <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-line bg-gray-50 dark:bg-surface-2">
+                    <div class="min-w-0">
+                      <p class="font-semibold text-gray-900 dark:text-ink truncate">{{ loc.location }}</p>
+                      <p class="text-xs text-gray-500 dark:text-muted">{{ loc.rows.length }} product{{ loc.rows.length === 1 ? '' : 's' }}</p>
+                    </div>
+                    <span class="rounded-full bg-gray-100 dark:bg-surface-3 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-ink-dim">
+                      {{ loc.orderCount }} order{{ loc.orderCount === 1 ? '' : 's' }}
+                    </span>
+                  </div>
+                  <table class="w-full text-sm">
+                    <thead>
+                      <tr class="border-b border-gray-100 dark:border-line">
+                        <th class="px-4 py-2 text-left font-medium text-gray-500 dark:text-muted">Product / Service</th>
+                        <th class="px-4 py-2 text-right font-medium text-gray-500 dark:text-muted">Total Quantity</th>
+                        <th class="px-4 py-2 text-left font-medium text-gray-500 dark:text-muted">Unit</th>
+                        <th class="px-4 py-2 text-right font-medium text-gray-500 dark:text-muted">Orders</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50 dark:divide-line">
+                      @for (row of loc.rows; track row.productType) {
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-surface-tint">
+                          <td class="px-4 py-2 text-gray-900 dark:text-ink">{{ row.productType }}</td>
+                          <td class="px-4 py-2 text-right font-medium text-gray-900 dark:text-ink">{{ formatQty(row.totalQuantity) }}</td>
+                          <td class="px-4 py-2 text-gray-600 dark:text-ink-dim">{{ row.unit }}</td>
+                          <td class="px-4 py-2 text-right text-gray-600 dark:text-ink-dim">{{ row.orderCount }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="text-center py-12 text-gray-400 dark:text-muted">
+              No data found for the selected period.
+            </div>
+          }
         }
       } @else if (!loading()) {
         <div class="text-center py-12 text-gray-400 dark:text-muted">
@@ -176,6 +238,7 @@ export class ThroughputReportPageComponent implements OnInit {
   readonly toDate = signal('');
   readonly loading = signal(false);
   readonly report = signal<ThroughputReportDto | null>(null);
+  readonly view = signal<ReportView>('product');
   readonly throughputEnabled = signal(false);
   readonly throughputChecked = signal(false);
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);

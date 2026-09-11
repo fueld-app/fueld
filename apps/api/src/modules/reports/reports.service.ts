@@ -37,6 +37,7 @@ import type {
   BrokerCommissionReportOrderDto,
   ThroughputReportDto,
   ThroughputReportRowDto,
+  ThroughputLocationDto,
 } from '@fueld/types';
 import { Role } from '@fueld/types';
 import * as XLSX from 'xlsx';
@@ -2701,13 +2702,22 @@ export async function buildThroughputReport(
       quantity: orderItems.quantity,
       unit: orderItems.unit,
       orderId: orderItems.orderId,
+      location: places.name,
     })
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .leftJoin(places, eq(orders.placeId, places.id))
     .where(and(...conditions));
+
+  const NO_LOCATION = '(No location)';
 
   // Group by productType and aggregate
   const grouped = new Map<string, { totalQuantity: number; unit: string; orderIds: Set<string> }>();
+  // Group by (location, productType) for the port drilldown
+  const locationGrouped = new Map<
+    string,
+    Map<string, { totalQuantity: number; unit: string; orderIds: Set<string> }>
+  >();
   for (const row of rows) {
     const key = row.productType;
     const displayUnit = determineDisplayUnit(key);
@@ -2727,6 +2737,24 @@ export async function buildThroughputReport(
         orderIds: new Set([row.orderId]),
       });
     }
+
+    const locKey = row.location ?? NO_LOCATION;
+    let byProduct = locationGrouped.get(locKey);
+    if (!byProduct) {
+      byProduct = new Map();
+      locationGrouped.set(locKey, byProduct);
+    }
+    const locExisting = byProduct.get(key);
+    if (locExisting) {
+      locExisting.totalQuantity += convertedQty;
+      locExisting.orderIds.add(row.orderId);
+    } else {
+      byProduct.set(key, {
+        totalQuantity: convertedQty,
+        unit: finalUnit,
+        orderIds: new Set([row.orderId]),
+      });
+    }
   }
 
   const reportRows: ThroughputReportRowDto[] = Array.from(grouped.entries())
@@ -2738,6 +2766,24 @@ export async function buildThroughputReport(
     }))
     .sort((a, b) => a.productType.localeCompare(b.productType));
 
+  const byLocation: ThroughputLocationDto[] = Array.from(locationGrouped.entries())
+    .map(([location, byProduct]) => ({
+      location,
+      orderCount: new Set(
+        Array.from(byProduct.values()).flatMap((p) => Array.from(p.orderIds)),
+      ).size,
+      rows: Array.from(byProduct.entries())
+        .map(([productType, data]) => ({
+          location,
+          productType,
+          totalQuantity: Math.round(data.totalQuantity * 1000) / 1000,
+          unit: data.unit,
+          orderCount: data.orderIds.size,
+        }))
+        .sort((a, b) => a.productType.localeCompare(b.productType)),
+    }))
+    .sort((a, b) => b.orderCount - a.orderCount || a.location.localeCompare(b.location));
+
   const uniqueOrders = new Set(rows.map((r) => r.orderId));
 
   return {
@@ -2745,6 +2791,7 @@ export async function buildThroughputReport(
     to: toDate ?? null,
     rows: reportRows,
     totalOrderCount: uniqueOrders.size,
+    byLocation,
   };
 }
 
@@ -2762,6 +2809,27 @@ export async function exportThroughputXlsx(
     'Order Count': row.orderCount,
   }));
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sheetData), 'Throughput');
+
+  // Sheet 2 — drilldown by delivery location (port), e.g. "CMF - FUEL DOCK"
+  const locationSheetData: Array<Record<string, string | number>> = [];
+  for (const loc of report.byLocation) {
+    for (const row of loc.rows) {
+      locationSheetData.push({
+        'Location / Port': row.location,
+        'Product / Service': row.productType,
+        'Total Quantity': row.totalQuantity,
+        'Unit': row.unit,
+        'Order Count': row.orderCount,
+      });
+    }
+  }
+  if (locationSheetData.length > 0) {
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(locationSheetData),
+      'By Location',
+    );
+  }
 
   const suffix = `${report.from ?? 'all'}_to_${report.to ?? 'now'}`;
   return {
