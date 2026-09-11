@@ -87,10 +87,13 @@ export async function loginE2E(email: string, password: string) {
     method: 'POST',
     body: { email, password },
   });
+  if (!res.data?.data?.accessToken) {
+    throw new Error(`E2E login failed for ${email}`);
+  }
 
   return {
     ...res,
-    accessToken: res.data?.data?.accessToken as string | undefined,
+    accessToken: res.data.data.accessToken as string,
     refreshToken: res.data?.data?.refreshToken as string | undefined,
   };
 }

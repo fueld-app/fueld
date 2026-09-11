@@ -832,11 +832,12 @@ export async function createApp(options: CreateAppOptions = {}) {
       try {
         // Sync all tenants that have Enable Banking configured
         const { sql } = await import('drizzle-orm');
-        const tenants = await db.execute(sql`SELECT id FROM tenants`);
-        for (const t of tenants.rows) {
+        const tenantsResult = await db.execute(sql`SELECT id FROM tenants`);
+        const tenantRows = (Array.isArray(tenantsResult) ? tenantsResult : (tenantsResult as any).rows) as Array<{ id: string }>;
+        for (const t of tenantRows) {
           try {
-            const result = await syncAllBankConnections((t as any).id);
-            if (result.synced > 0) console.log(`[Banking] Synced ${result.synced} connections for tenant ${(t as any).id}`);
+            const result = await syncAllBankConnections(t.id);
+            if (result.synced > 0) console.log(`[Banking] Synced ${result.synced} connections for tenant ${t.id}`);
           } catch (e) { /* tenant may not have banking configured — skip silently */ }
         }
       } catch (e) { console.error('[Banking] Periodic sync failed:', e); }

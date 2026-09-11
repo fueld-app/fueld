@@ -245,7 +245,7 @@ describe('two-sided settlement — credit line sensitivity', () => {
 
     // Settle both legs
     await createSupplierPayment(legA.id, { amount: '200', currency: 'USD' });
-    await createSupplierPayment(legB.id, { amount: '300', currency: 'USD' });
+    await createSupplierPayment(legB!.id, { amount: '300', currency: 'USD' });
 
     expect((await usedAmount(creditA!.id)).used).toBe('0.00');
     expect((await usedAmount(creditB!.id)).used).toBe('0.00');

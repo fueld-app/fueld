@@ -434,7 +434,7 @@ describe('documents mail service', () => {
 
   test('regression: uses current user token when shared sender db query fails (no shared sender configured)', async () => {
     mockGraphToken = 'token-current-user';
-    globalThis.fetch = (async () => new Response('', { status: 202 })) as typeof fetch;
+    globalThis.fetch = (async () => new Response('', { status: 202 })) as unknown as typeof fetch;
 
     await sendDocumentEmail(baseOptions);
 
@@ -447,7 +447,7 @@ describe('documents mail service', () => {
 
   test('regression: uses current user token when Graph is available (default per-user mode)', async () => {
     mockGraphToken = 'token-per-user';
-    globalThis.fetch = (async () => new Response('', { status: 202 })) as typeof fetch;
+    globalThis.fetch = (async () => new Response('', { status: 202 })) as unknown as typeof fetch;
 
     const result = await sendDocumentEmail(baseOptions);
 

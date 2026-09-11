@@ -1458,6 +1458,7 @@ export async function getDeliveryDocumentationSettings(): Promise<DeliveryDocume
 export async function updateDeliveryDocumentationSettings(data: {
   requireDeliveryDocumentation?: boolean;
   deliveryDocumentationTypes?: string[];
+  brokerDeals?: import('../../db/schema').TenantSettings['brokerDeals'];
 }): Promise<DeliveryDocumentationSettings> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');

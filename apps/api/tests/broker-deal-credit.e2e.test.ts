@@ -60,7 +60,7 @@ describe('broker credit auto-release', () => {
 
     expect(line).toBeTruthy();
     // C1 FIXED: isBrokerCreditLine is now returned by getCreditLineById
-    expect(line.isBrokerCreditLine).toBe(true);
+    expect(line!.isBrokerCreditLine).toBe(true);
   });
 
   it('credit line update accepts isBrokerCreditLine flag', async () => {
@@ -85,10 +85,10 @@ describe('broker credit auto-release', () => {
     });
     // C1 BUG: isBrokerCreditLine not returned by getCreditLineById
     // Verify via DB that it defaults to false
-    const [dbRow1] = await db.select().from(creditLines).where(eq(creditLines.id, line.id)).limit(1);
+    const [dbRow1] = await db.select().from(creditLines).where(eq(creditLines.id, line!.id)).limit(1);
     expect(dbRow1?.isBrokerCreditLine).toBe(false);
 
-    const updated = await updateCreditLine(line.id, { isBrokerCreditLine: true });
+    const updated = await updateCreditLine(line!.id, { isBrokerCreditLine: true });
     expect(updated).toBeTruthy();
     // C1 FIXED: isBrokerCreditLine is now selected in queries
     expect(updated?.isBrokerCreditLine).toBe(true);
@@ -152,7 +152,7 @@ describe('broker credit auto-release', () => {
     });
 
     // Regular credit line filters is_broker_deal = false, so broker deals excluded
-    const fetched = await getCreditLineById(line.id);
+    const fetched = await getCreditLineById(line!.id);
     expect(fetched).toBeTruthy();
     expect(parseFloat(fetched!.usedAmount)).toBe(0);
   });
@@ -255,7 +255,7 @@ describe('broker credit auto-release', () => {
     // calcUsedAmountForSupplier correctly filters for broker deals.
     // Broker credit line should now count only broker deals ($50000),
     // NOT regular orders ($30000).
-    const fetched = await getCreditLineById(line.id);
+    const fetched = await getCreditLineById(line!.id);
     expect(fetched).toBeTruthy();
     expect(parseFloat(fetched!.usedAmount)).toBe(50000);
   });
@@ -325,7 +325,7 @@ describe('broker credit auto-release', () => {
     // C1 FIXED: broker credit line now correctly filters for is_broker_deal=true.
     // The broker deal was delivered 60 days ago with 30-day credit period,
     // so it should be auto-released (usedAmount = 0).
-    const fetched = await getCreditLineById(line.id);
+    const fetched = await getCreditLineById(line!.id);
     expect(fetched).toBeTruthy();
     expect(parseFloat(fetched!.usedAmount)).toBe(0);
   });
@@ -389,7 +389,7 @@ describe('broker credit auto-release', () => {
     });
 
     // Credit should be released (usedAmount = 0) because paidAt is set
-    const fetched = await getCreditLineById(line.id);
+    const fetched = await getCreditLineById(line!.id);
     expect(fetched).toBeTruthy();
     expect(parseFloat(fetched!.usedAmount)).toBe(0);
   });
@@ -461,7 +461,7 @@ describe('broker credit auto-release', () => {
     });
 
     // Credit should still be in use (50 days < 70 days with buffer)
-    const fetched = await getCreditLineById(line.id);
+    const fetched = await getCreditLineById(line!.id);
     expect(fetched).toBeTruthy();
     expect(parseFloat(fetched!.usedAmount)).toBe(50000); // costPrice=500 × qty=100
   });
@@ -532,7 +532,7 @@ describe('broker credit auto-release', () => {
     });
 
     // Credit should STILL be in use — autoReleaseCredit=false prevents time-based release
-    const fetched = await getCreditLineById(line.id);
+    const fetched = await getCreditLineById(line!.id);
     expect(fetched).toBeTruthy();
     expect(parseFloat(fetched!.usedAmount)).toBe(50000); // still in use
   });

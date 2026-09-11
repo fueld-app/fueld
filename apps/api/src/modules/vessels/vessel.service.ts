@@ -293,7 +293,7 @@ export async function updateVessel(
   if (data.phone !== undefined && data.phone !== null && data.phone.trim()) {
     const normalized = data.phone.trim();
     const [{ count }] = await db
-      .select({ count: sql`COUNT(*)::int` })
+      .select({ count: sql<number>`COUNT(*)::int` })
       .from(vessels)
       .where(and(eq(vessels.phone, normalized), sql`${vessels.id} != ${id}`));
     if (count >= 5) {

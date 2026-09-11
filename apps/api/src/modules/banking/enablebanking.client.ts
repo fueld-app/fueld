@@ -178,7 +178,7 @@ export class EnableBankingClient {
     const sid = data.session_id;
     if (!sid) throw new Error('No session_id in response');
     this.sessionId = sid;
-    const accounts: BankAccount[] = (data.accounts ?? []).map((a) => {
+    const accounts: BankAccount[] = (data.accounts ?? []).map((a: any) => {
       if (typeof a === 'string') return { id: a, currency: '' };
       return {
         id: a.uid ?? a._id ?? a.id ?? '',

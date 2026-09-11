@@ -987,6 +987,13 @@ export const authController = new Elysia({ prefix: '/auth' })
         }
 
         const user = await findUserById(decoded.sub);
+        if (!user) {
+          return {
+            success: false,
+            data: null,
+            message: 'Refresh token revoked or invalid',
+          } satisfies ApiResponse<null>;
+        }
 
         // Token matches the current stored hash (normal path) — or the
         // previous rotation's token within the grace window (concurrent
@@ -1005,7 +1012,7 @@ export const authController = new Elysia({ prefix: '/auth' })
           (user.previousRefreshToken === refreshTokenValue ||
             user.previousRefreshToken === hashRefreshToken(refreshTokenValue));
 
-        if (!user || (!matchesCurrent && !(withinGrace && matchesPrevious))) {
+        if (!matchesCurrent && !(withinGrace && matchesPrevious)) {
           return {
             success: false,
             data: null,

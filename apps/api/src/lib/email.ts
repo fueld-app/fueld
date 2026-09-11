@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db';
 import { integrationCredentials } from '../db/schema';
@@ -110,7 +111,7 @@ export async function getTransporter() {
     },
     family: 4, // Force IPv4 — some VPS environments lack IPv6 connectivity,
                // causing ECONNREFUSED when DNS resolves to an AAAA record.
-  });
+  } as SMTPTransport.Options);
 }
 
 export async function sendInviteEmail(payload: InviteEmailPayload): Promise<boolean> {

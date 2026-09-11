@@ -2362,7 +2362,9 @@ export async function buildBrokerCommissionReport(
     .limit(1);
 
   const bd = (tenant?.settings as any)?.brokerDeals ?? {};
-  const reportStatuses: string[] = bd.reportStatuses ?? ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'];
+  const reportStatuses: (typeof orders.status.enumValues)[number][] = (bd.reportStatuses ?? [
+    'CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID',
+  ]) as (typeof orders.status.enumValues)[number][];
   const reportDateField: string = bd.reportDateField ?? 'deliveredAt';
   const reportDateFallback: string = bd.reportDateFallback ?? 'eta';
   const defaultCommissionPerMt: string = String(bd.defaultCommissionPerMt ?? 0);
