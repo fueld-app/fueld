@@ -23,7 +23,7 @@ import { creditController } from './modules/credit/credit.controller';
 import { creditApplicationsController } from './modules/credit/credit-applications.controller';
 import { adminController, inviteController } from './modules/admin/admin.controller';
 import { backupController } from './modules/admin/backup.controller';
-import { settingsController } from './modules/admin/settings.controller';
+import { settingsController, quickbooksOAuthController } from './modules/admin/settings.controller';
 import { securityController } from './modules/admin/security.controller';
 import { llmController } from './modules/admin/llm.controller';
 import { activityController, adminActivityController } from './modules/activity/activity.controller';
@@ -516,6 +516,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(creditApplicationsController)
     .use(adminController)
     .use(backupController)
+    .use(quickbooksOAuthController)
     .use(settingsController)
     .use(inviteController)
     .use(activityController)

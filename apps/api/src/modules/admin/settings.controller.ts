@@ -1269,79 +1269,6 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     detail: { tags: ['Admin Settings'], summary: 'Get QuickBooks Online OAuth2 authorization URL' },
   })
 
-  // OAuth2 relay — single whitelisted callback for ALL tenants. Encodes the
-  // tenant origin in `state` (see quickbooks.service.ts); forwards the Intuit
-  // response to that tenant's own callback. No auth — Intuit redirects here.
-  .get('/integrations/quickbooks/relay', async ({ query }) => {
-    const state = query['state'] as string | undefined;
-    const qs = new URLSearchParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (key === 'state') continue;
-      if (typeof value === 'string') qs.set(key, value);
-    }
-
-    let target: string | null = null;
-    if (state) {
-      const origin = decodeQBStateOrigin(state);
-      if (origin) {
-        qs.set('state', state);
-        target = `${origin}/api/admin/settings/integrations/quickbooks/callback?${qs.toString()}`;
-      }
-    }
-
-    if (!target) {
-      // Unknown/unparseable state — generic error page, nothing to leak
-      return new Response('Invalid OAuth relay state', { status: 400 });
-    }
-    return new Response(null, { status: 302, headers: { Location: target } });
-  }, {
-    query: t.Optional(t.Object({
-      code: t.Optional(t.String()),
-      realmId: t.Optional(t.String()),
-      state: t.Optional(t.String()),
-      error: t.Optional(t.String()),
-    })),
-    detail: { tags: ['Admin Settings'], summary: 'QuickBooks OAuth2 relay (single shared callback URL for all tenants)' },
-  })
-
-  // OAuth2 callback — Intuit redirects here after user authorizes
-  .get('/integrations/quickbooks/callback', async ({ query }) => {
-    const code = query['code'] as string | undefined;
-    const realmId = query['realmId'] as string | undefined;
-    const state = query['state'] as string | undefined;
-    const error = query['error'] as string | undefined;
-
-    if (error) {
-      const frontendUrl = process.env['CORS_ORIGIN'] ?? 'http://localhost:4200';
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${frontendUrl}/admin/integrations?qb=error&reason=${error}` },
-      });
-    }
-
-    if (!code || !realmId || !state) {
-      const frontendUrl = process.env['CORS_ORIGIN'] ?? 'http://localhost:4200';
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${frontendUrl}/admin/integrations?qb=error&reason=missing_params` },
-      });
-    }
-
-    const result = await handleOAuthCallback(code, realmId, state);
-    return new Response(null, {
-      status: 302,
-      headers: { Location: result.redirectUrl },
-    });
-  }, {
-    query: t.Optional(t.Object({
-      code: t.Optional(t.String()),
-      realmId: t.Optional(t.String()),
-      state: t.Optional(t.String()),
-      error: t.Optional(t.String()),
-    })),
-    detail: { tags: ['Admin Settings'], summary: 'QuickBooks OAuth2 callback (redirect from Intuit)' },
-  })
-
   // Save QuickBooks Desktop (Web Connector) credentials
   .put('/integrations/quickbooks/desktop', async ({ auth, body }) => {
     try {
@@ -2981,4 +2908,88 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get date format for current tenant' },
+  });
+
+/**
+ * Public (unauthenticated) QuickBooks OAuth2 routes — Intuit redirects the
+ * user's browser here, so the auth guard must not apply. The tenant's own
+ * auth cookie only exists on the tenant's domain, which is why the relay
+ * especially has to be public.
+ */
+export const quickbooksOAuthController = new Elysia({
+  prefix: '/admin/settings',
+  detail: { tags: ['Admin Settings'] },
+})
+  // Relay — single whitelisted callback for ALL tenants. Encodes the tenant
+  // origin in `state` (see quickbooks.service.ts) and forwards the Intuit
+  // response to that tenant's own callback.
+  .get('/integrations/quickbooks/relay', async ({ query }) => {
+    const state = query['state'] as string | undefined;
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (key === 'state') continue;
+      if (typeof value === 'string') qs.set(key, value);
+    }
+
+    let target: string | null = null;
+    if (state) {
+      const origin = decodeQBStateOrigin(state);
+      if (origin) {
+        qs.set('state', state);
+        target = `${origin}/api/admin/settings/integrations/quickbooks/callback?${qs.toString()}`;
+      }
+    }
+
+    if (!target) {
+      // Unknown/unparseable state — generic error page, nothing to leak
+      return new Response('Invalid OAuth relay state', { status: 400 });
+    }
+    return new Response(null, { status: 302, headers: { Location: target } });
+  }, {
+    query: t.Optional(t.Object({
+      code: t.Optional(t.String()),
+      realmId: t.Optional(t.String()),
+      state: t.Optional(t.String()),
+      error: t.Optional(t.String()),
+    })),
+    detail: { summary: 'QuickBooks OAuth2 relay (single shared callback URL for all tenants)' },
+  })
+
+  // Callback — Intuit redirects here after the user authorizes (direct mode,
+  // or after the relay forwarded). Runs on the tenant's own domain.
+  .get('/integrations/quickbooks/callback', async ({ query }) => {
+    const code = query['code'] as string | undefined;
+    const realmId = query['realmId'] as string | undefined;
+    const state = query['state'] as string | undefined;
+    const error = query['error'] as string | undefined;
+
+    if (error) {
+      const frontendUrl = process.env['CORS_ORIGIN'] ?? 'http://localhost:4200';
+      return new Response(null, {
+        status: 302,
+        headers: { Location: `${frontendUrl}/admin/integrations?qb=error&reason=${error}` },
+      });
+    }
+
+    if (!code || !realmId || !state) {
+      const frontendUrl = process.env['CORS_ORIGIN'] ?? 'http://localhost:4200';
+      return new Response(null, {
+        status: 302,
+        headers: { Location: `${frontendUrl}/admin/integrations?qb=error&reason=missing_params` },
+      });
+    }
+
+    const result = await handleOAuthCallback(code, realmId, state);
+    return new Response(null, {
+      status: 302,
+      headers: { Location: result.redirectUrl },
+    });
+  }, {
+    query: t.Optional(t.Object({
+      code: t.Optional(t.String()),
+      realmId: t.Optional(t.String()),
+      state: t.Optional(t.String()),
+      error: t.Optional(t.String()),
+    })),
+    detail: { summary: 'QuickBooks OAuth2 callback (redirect from Intuit)' },
   });
