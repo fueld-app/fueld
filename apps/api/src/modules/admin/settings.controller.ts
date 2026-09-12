@@ -1259,7 +1259,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .get('/integrations/quickbooks/auth-url', async ({ auth }) => {
     try {
       requireAdmin(auth);
-      const authUrl = generateAuthUrl(auth.sub);
+      const authUrl = await generateAuthUrl(auth.sub);
       return { success: true, data: { authUrl } } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
