@@ -6,7 +6,7 @@
 //  using the same AES-256-GCM scheme as LLI credentials.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, or, desc } from 'drizzle-orm';
 import { db } from '../../db';
 import { integrationCredentials, tenants, users, orders, invoices, orderItems, counterparties, type TenantSettings } from '../../db/schema';
 import { encrypt, decrypt } from '../../lib/crypto';
@@ -31,20 +31,73 @@ const SCOPES = 'com.intuit.quickbooks.accounting';
 // ─── Config helpers ──────────────────────────────────────────────────
 
 function getQBConfig() {
-  const clientId = process.env['QB_CLIENT_ID'] ?? '';
-  const clientSecret = process.env['QB_CLIENT_SECRET'] ?? '';
   const redirectUri =
     process.env['QB_REDIRECT_URI'] ??
-    'http://localhost:3000/admin/settings/integrations/quickbooks/callback';
-  const environment = (process.env['QB_ENVIRONMENT'] ?? 'sandbox') as 'sandbox' | 'production';
+    deriveRedirectUri();
+  const environment = (process.env['QB_ENVIRONMENT'] ?? 'production') as 'sandbox' | 'production';
   const frontendUrl = process.env['CORS_ORIGIN'] ?? 'http://localhost:4200';
 
-  return { clientId, clientSecret, redirectUri, environment, frontendUrl };
+  return { redirectUri, environment, frontendUrl };
 }
 
-function isQBAppConfigured(): boolean {
-  const { clientId, clientSecret } = getQBConfig();
-  return !!(clientId && clientSecret);
+/**
+ * Derive the OAuth redirect URI from the public origin when QB_REDIRECT_URI
+ * is not set. The API is publicly served under the /api prefix, so the
+ * Intuit-registered callback is `<origin>/api/admin/settings/.../callback`.
+ */
+function deriveRedirectUri(): string {
+  const origin = process.env['CORS_ORIGIN'] ?? '';
+  if (!origin) return 'http://localhost:3000/admin/settings/integrations/quickbooks/callback';
+  return `${origin}/api/admin/settings/integrations/quickbooks/callback`;
+}
+
+/**
+ * Resolve the Intuit app credentials (Client ID + Secret) for a tenant.
+ * Server env vars (QB_CLIENT_ID / QB_CLIENT_SECRET) take precedence;
+ * when they are absent, per-tenant credentials saved from the admin UI
+ * (integration_credentials, encrypted) are used. This lets each tenant
+ * connect their own QuickBooks company without any server-side changes.
+ */
+async function getQBAppCredentials(tenantId: string): Promise<{
+  clientId: string;
+  clientSecret: string;
+  source: 'env' | 'tenant' | 'none';
+}> {
+  const envClientId = process.env['QB_CLIENT_ID'] ?? '';
+  const envClientSecret = process.env['QB_CLIENT_SECRET'] ?? '';
+  if (envClientId && envClientSecret) {
+    return { clientId: envClientId, clientSecret: envClientSecret, source: 'env' };
+  }
+
+  const [storedId, storedSecret] = await Promise.all([
+    getCredential(tenantId, 'app_client_id'),
+    getCredential(tenantId, 'app_client_secret'),
+  ]);
+  if (storedId && storedSecret) {
+    return { clientId: storedId, clientSecret: storedSecret, source: 'tenant' };
+  }
+
+  return { clientId: '', clientSecret: '', source: 'none' };
+}
+
+async function isQBAppConfigured(tenantId: string): Promise<boolean> {
+  const { source } = await getQBAppCredentials(tenantId);
+  return source !== 'none';
+}
+
+/**
+ * Resolve the QBO environment (production vs sandbox).
+ * Env var wins; otherwise the per-tenant saved value; else production.
+ */
+async function getEnvironment(tenantId: string): Promise<'sandbox' | 'production'> {
+  const envVal = process.env['QB_ENVIRONMENT'];
+  if (envVal === 'sandbox' || envVal === 'production') return envVal;
+  const stored = await getCredential(tenantId, 'app_environment');
+  return stored === 'sandbox' ? 'sandbox' : 'production';
+}
+
+function apiBaseFor(environment: 'sandbox' | 'production'): string {
+  return environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
 }
 
 /** Get the single tenant id. */
@@ -151,23 +204,25 @@ async function deleteAllCredentials(tenantId: string) {
  * Generate the Intuit OAuth2 authorization URL.
  * Returns the URL that the admin should be redirected to.
  */
-export function generateAuthUrl(userId: string): string {
-  if (!isQBAppConfigured()) {
+export async function generateAuthUrl(userId: string): Promise<string> {
+  const tenantId = await getTenantId();
+  if (!(await isQBAppConfigured(tenantId))) {
     throw new Error(
-      'QuickBooks app not configured. Set QB_CLIENT_ID and QB_CLIENT_SECRET environment variables.',
+      'QuickBooks app not configured. Save the Intuit app Client ID and Secret below, or set QB_CLIENT_ID and QB_CLIENT_SECRET on the server.',
     );
   }
 
   cleanExpiredStates();
 
-  const { clientId, redirectUri } = getQBConfig();
+  const { redirectUri } = getQBConfig();
+  const { clientId: resolvedClientId } = await getQBAppCredentials(tenantId);
   const nonce = randomBytes(16).toString('hex');
   const state = randomBytes(24).toString('hex');
 
   pendingStates.set(state, { userId, nonce, createdAt: Date.now() });
 
   const params = new URLSearchParams({
-    client_id: clientId,
+    client_id: resolvedClientId,
     response_type: 'code',
     scope: SCOPES,
     redirect_uri: redirectUri,
@@ -197,7 +252,9 @@ export async function handleOAuthCallback(
   pendingStates.delete(state);
 
   const { userId } = pending;
-  const { clientId, clientSecret, redirectUri, frontendUrl } = getQBConfig();
+  const tenantId = await getTenantId();
+  const { clientId, clientSecret } = await getQBAppCredentials(tenantId);
+  const { redirectUri, frontendUrl } = getQBConfig();
 
   try {
     // Exchange code for tokens
@@ -233,8 +290,8 @@ export async function handleOAuthCallback(
     // Fetch company info from QBO API to get company name
     let companyName = `Realm ${realmId}`;
     try {
-      const { environment } = getQBConfig();
-      const apiBase = environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
+      const environment = await getEnvironment(tenantId);
+      const apiBase = apiBaseFor(environment);
       const companyRes = await fetch(
         `${apiBase}/v3/company/${realmId}/companyinfo/${realmId}?minorversion=65`,
         {
@@ -255,7 +312,6 @@ export async function handleOAuthCallback(
     }
 
     // Store all tokens and metadata encrypted
-    const tenantId = await getTenantId();
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
     const refreshExpiresAt = new Date(
       Date.now() + tokenData.x_refresh_token_expires_in * 1000,
@@ -288,7 +344,7 @@ export async function refreshAccessToken(): Promise<boolean> {
   const refreshToken = await getCredential(tenantId, 'refresh_token');
   if (!refreshToken) return false;
 
-  const { clientId, clientSecret } = getQBConfig();
+  const { clientId, clientSecret } = await getQBAppCredentials(tenantId);
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
   try {
@@ -505,7 +561,7 @@ export async function disconnect(userId: string): Promise<void> {
   if (connectionType === 'online') {
     const refreshToken = await getCredential(tenantId, 'refresh_token');
     if (refreshToken) {
-      const { clientId, clientSecret } = getQBConfig();
+      const { clientId, clientSecret } = await getQBAppCredentials(tenantId);
       const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
       try {
         await fetch(INTUIT_REVOKE_URL, {
@@ -527,11 +583,81 @@ export async function disconnect(userId: string): Promise<void> {
 }
 
 /**
- * Check if QuickBooks app credentials (Client ID + Secret) are configured
- * at the environment level (needed before OAuth can work).
+ * Check if QuickBooks app credentials (Client ID + Secret) are configured —
+ * either at the environment level or as per-tenant credentials saved from
+ * the admin UI (needed before OAuth can work).
  */
-export function isAppConfigured(): boolean {
-  return isQBAppConfigured();
+export async function isAppConfigured(): Promise<boolean> {
+  const tenantId = await getTenantId();
+  return isQBAppConfigured(tenantId);
+}
+
+/**
+ * Details about the Intuit app configuration for the admin UI:
+ * where the credentials come from, a masked client id for verification,
+ * and the exact redirect URI to whitelist in the Intuit developer dashboard.
+ */
+export async function getAppConfigInfo(): Promise<{
+  appConfigured: boolean;
+  source: 'env' | 'tenant' | 'none';
+  clientIdMasked: string | null;
+  hasTenantCredentials: boolean;
+  redirectUri: string;
+  environment: 'sandbox' | 'production';
+}> {
+  const tenantId = await getTenantId();
+  const { clientId, source } = await getQBAppCredentials(tenantId);
+  const hasTenantCredentials = !!(
+    await getCredential(tenantId, 'app_client_id')
+  );
+  const { redirectUri } = getQBConfig();
+  const environment = await getEnvironment(tenantId);
+  return {
+    appConfigured: source !== 'none',
+    source,
+    clientIdMasked: clientId ? `${clientId.slice(0, 6)}…${clientId.slice(-4)}` : null,
+    hasTenantCredentials,
+    redirectUri,
+    environment,
+  };
+}
+
+/**
+ * Save per-tenant Intuit app credentials (admin UI fallback when the
+ * QB_CLIENT_ID / QB_CLIENT_SECRET env vars are not set on this server).
+ */
+export async function setAppCredentials(
+  clientId: string,
+  clientSecret: string,
+  environment: 'sandbox' | 'production' | undefined,
+  userId: string,
+): Promise<void> {
+  const tenantId = await getTenantId();
+  await upsertCredential(tenantId, 'app_client_id', clientId.trim(), userId);
+  await upsertCredential(tenantId, 'app_client_secret', clientSecret.trim(), userId);
+  if (environment) {
+    await upsertCredential(tenantId, 'app_environment', environment, userId);
+  }
+  console.log(`[QB] App credentials saved for tenant ${tenantId} (source: tenant)`);
+}
+
+/** Remove the per-tenant Intuit app credentials override. */
+export async function clearAppCredentials(): Promise<void> {
+  const tenantId = await getTenantId();
+  await db
+    .delete(integrationCredentials)
+    .where(
+      and(
+        eq(integrationCredentials.tenantId, tenantId),
+        eq(integrationCredentials.provider, PROVIDER),
+        or(
+          eq(integrationCredentials.key, 'app_client_id'),
+          eq(integrationCredentials.key, 'app_client_secret'),
+          eq(integrationCredentials.key, 'app_environment'),
+        ),
+      ),
+    );
+  console.log(`[QB] Per-tenant app credentials cleared for tenant ${tenantId}`);
 }
 
 // ─── QuickBooks Invoice Sync ────────────────────────────────────────────
@@ -573,7 +699,7 @@ export async function findOrCreateQBCustomer(counterpartyId: string): Promise<{ 
   if (!tokenInfo) throw new Error('QuickBooks is not connected. Please connect via Settings → Integrations → QuickBooks.');
 
   const { token, realmId } = tokenInfo;
-  const apiBase = getQBConfig().environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
+  const apiBase = apiBaseFor(await getEnvironment(tenantId));
 
   // Query QB for an existing customer with the same DisplayName
   const queryRes = await fetch(
@@ -669,7 +795,7 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
   if (!tokenInfo) throw new Error('QuickBooks is not connected.');
 
   const { token, realmId } = tokenInfo;
-  const apiBase = getQBConfig().environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
+  const apiBase = apiBaseFor(await getEnvironment(tenantId));
 
   // Load product mappings from TenantSettings
   const [tenantRow] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
@@ -819,7 +945,7 @@ export async function getInvoiceSyncStatus(invoiceId: string): Promise<{
     const tokenInfo = await getValidAccessToken();
     if (tokenInfo) {
       const { token, realmId } = tokenInfo;
-      const apiBase = getQBConfig().environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
+      const apiBase = apiBaseFor(await getEnvironment(tenantId));
       const res = await fetch(
         `${apiBase}/v3/company/${realmId}/query?query=${encodeURIComponent(`SELECT DocNumber FROM Invoice WHERE Id = '${qbInvoiceId}' MAXRESULTS 1`)}`,
         { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } },
@@ -886,7 +1012,7 @@ export async function getQBItems(): Promise<Array<{ id: string; name: string; ty
   if (!tokenInfo) throw new Error('QuickBooks is not connected.');
 
   const { token, realmId } = tokenInfo;
-  const apiBase = getQBConfig().environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
+  const apiBase = apiBaseFor(await getEnvironment(await getTenantId()));
 
   const res = await fetch(
     `${apiBase}/v3/company/${realmId}/query?query=${encodeURIComponent('SELECT Id, Name, Type FROM Item WHERE Active = true ORDER BY Name MAXRESULTS 100')}`,

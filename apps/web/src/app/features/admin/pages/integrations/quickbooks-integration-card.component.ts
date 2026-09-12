@@ -14,6 +14,15 @@ import type { ApiResponse, IntegrationStatusDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
 import { IntegrationsToastService } from './integrations-toast.service';
 
+interface QbAppStatus {
+  appConfigured: boolean;
+  source: 'env' | 'tenant' | 'none';
+  clientIdMasked: string | null;
+  hasTenantCredentials: boolean;
+  redirectUri: string;
+  environment: 'sandbox' | 'production';
+}
+
 @Component({
   selector: 'app-quickbooks-integration-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -147,6 +156,90 @@ import { IntegrationsToastService } from './integrations-toast.service';
           @if (qbConnectionType() === 'online') {
             <!-- QuickBooks Online — OAuth2 Connect -->
             <div class="space-y-4">
+              <!-- Intuit app credentials (server env vars or per-tenant fallback) -->
+              @if (appStatus(); as app) {
+                <div class="rounded-lg border border-gray-200 dark:border-line bg-gray-50/60 dark:bg-surface-2 p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-gray-900 dark:text-ink">Intuit app</p>
+                      <p class="mt-0.5 text-xs text-gray-500 dark:text-muted">
+                        @if (app.appConfigured) {
+                          @if (app.source === 'env') {
+                            Configured on the server (env)
+                          } @else {
+                            Saved for this tenant
+                          }
+                          @if (app.clientIdMasked) { · {{ app.clientIdMasked }} }
+                        } @else {
+                          Not configured yet
+                        }
+                      </p>
+                    </div>
+                    <button type="button" (click)="showAppCreds.set(!showAppCreds())"
+                      class="rounded-md px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-100 dark:hover:bg-surface-3 transition-colors">
+                      {{ showAppCreds() ? 'Hide' : (app.appConfigured ? 'Manage' : 'Set up') }}
+                    </button>
+                  </div>
+                  @if (showAppCreds()) {
+                    <div class="mt-4 space-y-3">
+                      <p class="text-xs text-gray-500 dark:text-muted">
+                        Create an app at <span class="font-medium">developer.intuit.com</span> (QuickBooks Online,
+                        scope “com.intuit.quickbooks.accounting”), and whitelist this callback URL in its settings:
+                      </p>
+                      <div class="flex items-center gap-2">
+                        <code class="min-w-0 flex-1 truncate rounded-md bg-gray-100 dark:bg-surface-3 px-2.5 py-1.5 text-xs text-gray-700 dark:text-ink-dim">{{ app.redirectUri }}</code>
+                        <button type="button" (click)="copyRedirectUri()" title="Copy callback URL"
+                          class="rounded-md border border-gray-300 dark:border-line-strong px-2 py-1.5 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-100 dark:hover:bg-surface-3 transition-colors">
+                          Copy
+                        </button>
+                      </div>
+                      @if (app.appConfigured && !showAppCredsForm()) {
+                        <button type="button" (click)="showAppCredsForm.set(true)"
+                          class="text-xs font-medium text-brand-600 hover:text-brand-700">
+                          Replace credentials…
+                        </button>
+                      }
+                      @if (!app.appConfigured || showAppCredsForm()) {
+                        <div class="grid gap-3">
+                          <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Client ID</label>
+                            <input type="text" [ngModel]="qbAppClientId()" (ngModelChange)="qbAppClientId.set($event)"
+                              class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm font-mono focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                              placeholder="e.g. ABcdEfGh1234567890IjKlMnOpQrStUvWxYz" autocomplete="off" />
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Client Secret</label>
+                            <input type="password" [ngModel]="qbAppClientSecret()" (ngModelChange)="qbAppClientSecret.set($event)"
+                              class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm font-mono focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+                              autocomplete="new-password" />
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Environment</label>
+                            <select [ngModel]="qbAppEnvironment()" (ngModelChange)="qbAppEnvironment.set($event)"
+                              class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface">
+                              <option value="production">Production</option>
+                              <option value="sandbox">Sandbox (testing)</option>
+                            </select>
+                          </div>
+                          <div class="flex items-center gap-3">
+                            <button (click)="saveAppCredentials()" [disabled]="qbSaving()"
+                              class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                              @if (qbSaving()) { Saving… } @else { Save app credentials }
+                            </button>
+                            @if (app.hasTenantCredentials) {
+                              <button type="button" (click)="clearAppCredentials()" [disabled]="qbSaving()"
+                                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-100 dark:hover:bg-surface-3 transition-colors">
+                                Remove saved credentials
+                              </button>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+
               <div class="rounded-lg bg-blue-50 dark:bg-blue-500/15 border border-blue-100 dark:border-blue-500/25 p-4">
                 <div class="flex gap-3">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
@@ -252,6 +345,13 @@ export class QuickBooksIntegrationCardComponent implements OnInit {
   readonly qbSuccessMessage = signal('');
   readonly qbErrorMessage = signal('');
 
+  readonly appStatus = signal<QbAppStatus | null>(null);
+  readonly showAppCreds = signal(false);
+  readonly showAppCredsForm = signal(false);
+  readonly qbAppClientId = signal('');
+  readonly qbAppClientSecret = signal('');
+  readonly qbAppEnvironment = signal<'sandbox' | 'production'>('production');
+
   status(): IntegrationStatusDto | null {
     return this.toastService.getProvider('QUICKBOOKS') ?? this.integration() ?? null;
   }
@@ -267,6 +367,83 @@ export class QuickBooksIntegrationCardComponent implements OnInit {
   ngOnInit(): void {
     const s = this.status();
     if (s?.connectionType) this.qbConnectionType.set(s.connectionType);
+    void this.loadAppStatus();
+  }
+
+  async loadAppStatus(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<QbAppStatus>>(`${API}/admin/settings/integrations/quickbooks/app-status`),
+      );
+      if (res.success && res.data) {
+        this.appStatus.set(res.data);
+        this.qbAppEnvironment.set(res.data.environment);
+      }
+    } catch {
+      // Non-critical — the card still works without app status details
+    }
+  }
+
+  copyRedirectUri(): void {
+    const uri = this.appStatus()?.redirectUri;
+    if (uri) void navigator.clipboard.writeText(uri);
+  }
+
+  async saveAppCredentials(): Promise<void> {
+    const clientId = this.qbAppClientId().trim();
+    const clientSecret = this.qbAppClientSecret().trim();
+    if (!clientId || !clientSecret) {
+      this.qbErrorMessage.set('Both Client ID and Client Secret are required.');
+      return;
+    }
+
+    this.qbSaving.set(true);
+    this.qbErrorMessage.set('');
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ saved: boolean }>>(`${API}/admin/settings/integrations/quickbooks/app-credentials`, {
+          clientId,
+          clientSecret,
+          environment: this.qbAppEnvironment(),
+        }),
+      );
+      if (res.success) {
+        this.qbAppClientSecret.set('');
+        this.showAppCredsForm.set(false);
+        this.qbSuccessMessage.set('Intuit app credentials saved — you can now connect to QuickBooks Online.');
+        this.toastService.show('success', 'QuickBooks app credentials saved.');
+        await this.loadAppStatus();
+      }
+    } catch (err: any) {
+      const msg = err?.error?.message ?? 'Failed to save app credentials.';
+      this.qbErrorMessage.set(msg);
+    } finally {
+      this.qbSaving.set(false);
+    }
+  }
+
+  async clearAppCredentials(): Promise<void> {
+    if (!confirm('Remove the saved Intuit app credentials for this tenant? The server env vars will be used instead (if set).')) {
+      return;
+    }
+    this.qbSaving.set(true);
+    this.qbErrorMessage.set('');
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<{ cleared: boolean }>>(`${API}/admin/settings/integrations/quickbooks/app-credentials`),
+      );
+      if (res.success) {
+        this.qbAppClientId.set('');
+        this.qbAppClientSecret.set('');
+        this.toastService.show('success', 'Saved QuickBooks app credentials removed.');
+        await this.loadAppStatus();
+      }
+    } catch (err: any) {
+      const msg = err?.error?.message ?? 'Failed to remove app credentials.';
+      this.qbErrorMessage.set(msg);
+    } finally {
+      this.qbSaving.set(false);
+    }
   }
 
   async connectQuickBooksOnline(): Promise<void> {

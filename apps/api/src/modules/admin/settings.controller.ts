@@ -110,7 +110,9 @@ import {
   handleOAuthCallback,
   disconnect as disconnectQuickBooks,
   setDesktopCredentials,
-  isAppConfigured as isQBAppConfigured,
+  getAppConfigInfo as getQBAppConfigInfo,
+  setAppCredentials as setQBAppCredentials,
+  clearAppCredentials as clearQBAppCredentials,
   syncOrderToQuickBooks,
   getOrderSyncStatus,
 } from '../quickbooks/quickbooks.service';
@@ -1207,16 +1209,49 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .get('/integrations/quickbooks/app-status', async ({ auth }) => {
     try {
       requireAdmin(auth);
+      const info = await getQBAppConfigInfo();
       return {
         success: true,
-        data: { appConfigured: isQBAppConfigured() },
+        data: info,
       } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
       return { success: false, data: null, message } satisfies ApiResponse<null>;
     }
   }, {
-    detail: { tags: ['Admin Settings'], summary: 'Check if QuickBooks app credentials are set' },
+    detail: { tags: ['Admin Settings'], summary: 'QuickBooks Intuit app configuration status (env vs per-tenant credentials, redirect URI)' },
+  })
+
+  // Save per-tenant Intuit app credentials (fallback when env vars are unset)
+  .put('/integrations/quickbooks/app-credentials', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      await setQBAppCredentials(body.clientId, body.clientSecret, body.environment, auth.sub);
+      return { success: true, data: { saved: true } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      clientId: t.String({ minLength: 1 }),
+      clientSecret: t.String({ minLength: 1 }),
+      environment: t.Optional(t.Union([t.Literal('sandbox'), t.Literal('production')])),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Save per-tenant Intuit app credentials (Client ID + Secret)' },
+  })
+
+  .delete('/integrations/quickbooks/app-credentials', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      await clearQBAppCredentials();
+      return { success: true, data: { cleared: true } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Remove per-tenant Intuit app credentials (falls back to env vars)' },
   })
 
   // Generate OAuth2 authorization URL for QuickBooks Online

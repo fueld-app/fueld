@@ -47,13 +47,13 @@ describe('quickbooks.service', () => {
     delete process.env.QB_CLIENT_ID;
     delete process.env.QB_CLIENT_SECRET;
 
-    expect(qb.isAppConfigured()).toBe(false);
-    expect(() => qb.generateAuthUrl('user-id')).toThrow('QuickBooks app not configured');
+    expect(await qb.isAppConfigured()).toBe(false);
+    await expect(qb.generateAuthUrl('user-id')).rejects.toThrow('QuickBooks app not configured');
 
     setQbEnv();
-    expect(qb.isAppConfigured()).toBe(true);
+    expect(await qb.isAppConfigured()).toBe(true);
 
-    const url = qb.generateAuthUrl('user-id');
+    const url = await qb.generateAuthUrl('user-id');
     expect(url.startsWith('https://appcenter.intuit.com/connect/oauth2?')).toBe(true);
     const params = new URL(url).searchParams;
     expect(params.get('client_id')).toBe('qb-client');
@@ -98,7 +98,7 @@ describe('quickbooks.service', () => {
       return new Response('', { status: 404 });
     }) as unknown as typeof globalThis.fetch;
 
-    const authUrl = qb.generateAuthUrl(user.id);
+    const authUrl = await qb.generateAuthUrl(user.id);
     const state = new URL(authUrl).searchParams.get('state')!;
 
     const callback = await qb.handleOAuthCallback('auth-code', 'realm-123', state);
@@ -200,7 +200,7 @@ describe('quickbooks.service', () => {
       return new Response('', { status: 404 });
     }) as unknown as typeof globalThis.fetch;
 
-    const authUrl = qb.generateAuthUrl(user.id);
+    const authUrl = await qb.generateAuthUrl(user.id);
     const state = new URL(authUrl).searchParams.get('state')!;
 
     const callback = await qb.handleOAuthCallback('auth-code', 'realm-refresh', state);
@@ -251,7 +251,7 @@ describe('quickbooks.service', () => {
       return new Response('', { status: 404 });
     }) as unknown as typeof globalThis.fetch;
 
-    const authUrl = qb.generateAuthUrl(user.id);
+    const authUrl = await qb.generateAuthUrl(user.id);
     const state = new URL(authUrl).searchParams.get('state')!;
 
     const callback = await qb.handleOAuthCallback('auth-code', 'realm-refresh-fail', state);
@@ -273,7 +273,7 @@ describe('quickbooks.service', () => {
     globalThis.fetch = mockFetch;
 
     // Connect QBO via OAuth callback
-    const authUrl = qb.generateAuthUrl(user.id);
+    const authUrl = await qb.generateAuthUrl(user.id);
     const state = new URL(authUrl).searchParams.get('state')!;
     const callback = await qb.handleOAuthCallback('auth-code', 'realm-sync', state);
     expect(callback.success).toBe(true);
