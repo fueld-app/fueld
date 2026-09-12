@@ -113,6 +113,7 @@ import {
   getAppConfigInfo as getQBAppConfigInfo,
   setAppCredentials as setQBAppCredentials,
   clearAppCredentials as clearQBAppCredentials,
+  decodeStateOrigin as decodeQBStateOrigin,
   syncOrderToQuickBooks,
   getOrderSyncStatus,
 } from '../quickbooks/quickbooks.service';
@@ -1266,6 +1267,41 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get QuickBooks Online OAuth2 authorization URL' },
+  })
+
+  // OAuth2 relay — single whitelisted callback for ALL tenants. Encodes the
+  // tenant origin in `state` (see quickbooks.service.ts); forwards the Intuit
+  // response to that tenant's own callback. No auth — Intuit redirects here.
+  .get('/integrations/quickbooks/relay', async ({ query }) => {
+    const state = query['state'] as string | undefined;
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (key === 'state') continue;
+      if (typeof value === 'string') qs.set(key, value);
+    }
+
+    let target: string | null = null;
+    if (state) {
+      const origin = decodeQBStateOrigin(state);
+      if (origin) {
+        qs.set('state', state);
+        target = `${origin}/api/admin/settings/integrations/quickbooks/callback?${qs.toString()}`;
+      }
+    }
+
+    if (!target) {
+      // Unknown/unparseable state — generic error page, nothing to leak
+      return new Response('Invalid OAuth relay state', { status: 400 });
+    }
+    return new Response(null, { status: 302, headers: { Location: target } });
+  }, {
+    query: t.Optional(t.Object({
+      code: t.Optional(t.String()),
+      realmId: t.Optional(t.String()),
+      state: t.Optional(t.String()),
+      error: t.Optional(t.String()),
+    })),
+    detail: { tags: ['Admin Settings'], summary: 'QuickBooks OAuth2 relay (single shared callback URL for all tenants)' },
   })
 
   // OAuth2 callback — Intuit redirects here after user authorizes

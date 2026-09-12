@@ -28,6 +28,48 @@ const QB_API_BASE_SANDBOX = 'https://sandbox-quickbooks.api.intuit.com';
 // OAuth2 scopes
 const SCOPES = 'com.intuit.quickbooks.accounting';
 
+/**
+ * Relay mode — one shared OAuth callback URL for ALL tenants.
+ *
+ * Intuit only allows whitelisting redirect URIs manually in the developer
+ * dashboard (no API/CLI), and caps them (~25 per app), so per-tenant URIs
+ * don't scale. Instead, a single relay URL is whitelisted in the Intuit app
+ * and the tenant's origin is encoded in the OAuth `state` parameter:
+ *
+ *   state = `${base64url(tenantOrigin)}.${randomHex}`
+ *
+ * The relay endpoint (mounted on every instance) validates the origin
+ * against an allowlist and 302-forwards the Intuit response to that
+ * tenant's normal callback. Adding a new tenant then requires ZERO
+ * changes in the Intuit dashboard.
+ *
+ * Set QB_OAUTH_RELAY_ORIGIN (e.g. https://oauth.fueld.app) on every VPS
+ * to enable; the relay URL is then `<QB_OAUTH_RELAY_ORIGIN>/api/admin/
+ * settings/integrations/quickbooks/relay`.
+ */
+const QB_RELAY_PATH = '/api/admin/settings/integrations/quickbooks/relay';
+
+function qbRelayOrigin(): string {
+  return (process.env['QB_OAUTH_RELAY_ORIGIN'] ?? '').replace(/\/$/, '');
+}
+
+function encodeStateOrigin(origin: string): string {
+  return Buffer.from(origin).toString('base64url');
+}
+
+export function decodeStateOrigin(state: string): string | null {
+  try {
+    const [encoded] = state.split('.');
+    const origin = Buffer.from(encoded, 'base64url').toString('utf8');
+    // Allowlist: only fueld.app subdomains over HTTPS — prevents abuse of
+    // the relay as an open redirector while allowing any future tenant.
+    if (!/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.fueld\.app$/.test(origin)) return null;
+    return origin;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Config helpers ──────────────────────────────────────────────────
 
 function getQBConfig() {
@@ -214,10 +256,21 @@ export async function generateAuthUrl(userId: string): Promise<string> {
 
   cleanExpiredStates();
 
-  const { redirectUri } = getQBConfig();
+  const relayOrigin = qbRelayOrigin();
+  const { redirectUri: directRedirectUri, frontendUrl } = getQBConfig();
   const { clientId: resolvedClientId } = await getQBAppCredentials(tenantId);
   const nonce = randomBytes(16).toString('hex');
-  const state = randomBytes(24).toString('hex');
+  const randomState = randomBytes(24).toString('hex');
+
+  // Relay mode (single whitelisted URL for all tenants) encodes this
+  // tenant's origin into the state so the relay can route the callback.
+  // Direct mode keeps the plain state and uses the per-domain redirect URI.
+  const state = relayOrigin
+    ? `${encodeStateOrigin(frontendUrl)}.${randomState}`
+    : randomState;
+  const redirectUri = relayOrigin
+    ? `${relayOrigin}${QB_RELAY_PATH}`
+    : directRedirectUri;
 
   pendingStates.set(state, { userId, nonce, createdAt: Date.now() });
 
