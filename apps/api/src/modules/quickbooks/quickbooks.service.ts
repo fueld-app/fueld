@@ -656,6 +656,7 @@ export async function getAppConfigInfo(): Promise<{
   clientIdMasked: string | null;
   hasTenantCredentials: boolean;
   redirectUri: string;
+  relayMode: boolean;
   environment: 'sandbox' | 'production';
 }> {
   const tenantId = await getTenantId();
@@ -663,7 +664,13 @@ export async function getAppConfigInfo(): Promise<{
   const hasTenantCredentials = !!(
     await getCredential(tenantId, 'app_client_id')
   );
-  const { redirectUri } = getQBConfig();
+  // In relay mode the whitelisted redirect URI is the shared relay, not the
+  // per-domain callback — show the URL that must be registered at Intuit.
+  const relayOrigin = qbRelayOrigin();
+  const relayMode = !!relayOrigin;
+  const redirectUri = relayMode
+    ? `${relayOrigin}${QB_RELAY_PATH}`
+    : getQBConfig().redirectUri;
   const environment = await getEnvironment(tenantId);
   return {
     appConfigured: source !== 'none',
@@ -671,6 +678,7 @@ export async function getAppConfigInfo(): Promise<{
     clientIdMasked: clientId ? `${clientId.slice(0, 6)}…${clientId.slice(-4)}` : null,
     hasTenantCredentials,
     redirectUri,
+    relayMode,
     environment,
   };
 }
