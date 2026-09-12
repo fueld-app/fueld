@@ -29,6 +29,15 @@ const QB_API_BASE_SANDBOX = 'https://sandbox-quickbooks.api.intuit.com';
 const SCOPES = 'com.intuit.quickbooks.accounting';
 
 /**
+ * Extract Intuit's `intuit_tid` correlation id from a failed response —
+ * included in every error message/log so Intuit support can trace the
+ * exact request when troubleshooting.
+ */
+function intuitTid(res: Response): string {
+  return res.headers.get('intuit_tid') ?? 'not-present';
+}
+
+/**
  * Relay mode — one shared OAuth callback URL for ALL tenants.
  *
  * Intuit only allows whitelisting redirect URIs manually in the developer
@@ -328,7 +337,7 @@ export async function handleOAuthCallback(
 
     if (!tokenRes.ok) {
       const errorText = await tokenRes.text().catch(() => '');
-      console.error('[QB] Token exchange failed:', tokenRes.status, errorText);
+      console.error('[QB] Token exchange failed:', tokenRes.status, `(intuit_tid: ${intuitTid(tokenRes)})`, errorText);
       return { success: false, redirectUrl: `${frontendUrl}/admin/integrations?qb=error&reason=token_exchange` };
     }
 
@@ -415,7 +424,8 @@ export async function refreshAccessToken(): Promise<boolean> {
     });
 
     if (!res.ok) {
-      console.error('[QB] Token refresh failed:', res.status);
+      const errorText = await res.text().catch(() => '');
+      console.error('[QB] Token refresh failed:', res.status, `(intuit_tid: ${intuitTid(res)})`, errorText);
       return false;
     }
 
@@ -801,7 +811,7 @@ export async function findOrCreateQBCustomer(counterpartyId: string): Promise<{ 
 
   if (!createRes.ok) {
     const errText = await createRes.text();
-    throw new Error(`Failed to create QuickBooks customer: ${createRes.status} ${errText}`);
+    throw new Error(`Failed to create QuickBooks customer: ${createRes.status} (intuit_tid: ${intuitTid(createRes)}) ${errText}`);
   }
 
   const createData = await createRes.json() as { Customer?: { Id: string; DisplayName: string } };
@@ -932,7 +942,7 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
 
   if (!createRes.ok) {
     const errText = await createRes.text();
-    throw new Error(`Failed to create QuickBooks invoice: ${createRes.status} ${errText}`);
+    throw new Error(`Failed to create QuickBooks invoice: ${createRes.status} (intuit_tid: ${intuitTid(createRes)}) ${errText}`);
   }
 
   const createData = await createRes.json() as { Invoice?: { Id: string; DocNumber: string } };
@@ -1080,7 +1090,7 @@ export async function getQBItems(): Promise<Array<{ id: string; name: string; ty
     { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } },
   );
 
-  if (!res.ok) throw new Error(`Failed to fetch QB items: ${res.status}`);
+  if (!res.ok) throw new Error(`Failed to fetch QB items: ${res.status} (intuit_tid: ${intuitTid(res)})`);
 
   const data = await res.json() as { QueryResponse?: { Item?: { Id: string; Name: string; Type: string }[] } };
   return (data.QueryResponse?.Item ?? []).map((item) => ({ id: item.Id, name: item.Name, type: item.Type }));
