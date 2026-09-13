@@ -17,9 +17,13 @@ import {
       50%  { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
+    /* Brand re-skin: dark navy + amber glow (matches marketing site + app icons) */
     .hero-bg {
-      background: linear-gradient(135deg, #1c1917 0%, var(--color-brand-900) 40%, var(--color-brand-800) 70%, var(--color-brand-700) 100%);
-      background-size: 300% 300%;
+      background:
+        radial-gradient(55% 45% at 18% 0%, rgba(245, 158, 11, 0.16), transparent 62%),
+        radial-gradient(40% 35% at 90% 100%, rgba(249, 115, 22, 0.08), transparent 60%),
+        linear-gradient(160deg, #06080d 0%, #0b101b 45%, #0f1421 100%);
+      background-size: 100% 100%, 100% 100%, 300% 300%;
       animation: drift 20s ease-in-out infinite;
     }
     @keyframes float-up {
@@ -31,8 +35,36 @@ import {
     .bubble {
       position: absolute;
       border-radius: 50%;
-      background: rgba(255,255,255,0.08);
+      background: rgba(245, 158, 11, 0.09);
+      box-shadow: inset 0 0 12px rgba(245, 158, 11, 0.12);
       animation: float-up linear infinite;
+    }
+    .brand-glyph {
+      display: grid;
+      place-items: center;
+      width: 3rem;
+      height: 3rem;
+      border-radius: 0.8rem;
+      background: linear-gradient(135deg, #f59e0b 0%, #fb923c 60%, #f97316 100%);
+      color: #1a1208;
+      font-weight: 800;
+      font-size: 1.35rem;
+      font-family: var(--font-display, system-ui);
+      letter-spacing: -0.02em;
+      box-shadow: 0 6px 20px -4px rgba(245, 158, 11, 0.55);
+    }
+    .btn-signin {
+      background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+      color: #1a1208;
+      transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+    }
+    .btn-signin:hover:not(:disabled) {
+      filter: brightness(1.06);
+      box-shadow: 0 8px 24px -8px rgba(245, 158, 11, 0.65);
+    }
+    .btn-signin:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.4);
     }
   `,
   template: `
@@ -56,13 +88,26 @@ import {
         <!-- Content -->
         <div class="relative z-10 p-12">
           <div class="flex items-center gap-3">
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
-              </svg>
-            </div>
+            <div class="brand-glyph" aria-hidden="true">F</div>
             <span class="text-xl font-bold tracking-tight text-white">Fueld</span>
           </div>
+        </div>
+
+        <div class="relative z-10 flex-1 flex items-center px-12">
+          <ul class="max-w-md space-y-4" aria-label="Product highlights">
+            <li class="flex items-start gap-3">
+              <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l6.3-6.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+              <span class="text-sm leading-relaxed text-white/70">Run the deal from RFQ to BDN — quotes, credit, documents, delivery.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l6.3-6.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+              <span class="text-sm leading-relaxed text-white/70">Sanctions screening and ledger reconciliation built in.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l6.3-6.3a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
+              <span class="text-sm leading-relaxed text-white/70">Dedicated deployment — your data never leaves your control.</span>
+            </li>
+          </ul>
         </div>
 
         <div class="relative z-10 p-12">
@@ -71,7 +116,7 @@ import {
               "Streamline your bunker trades from inquiry to invoice — all in one place."
             </p>
             <footer class="mt-6 flex items-center gap-3">
-              <div class="h-px w-8 bg-white/30"></div>
+              <div class="h-px w-8 bg-amber-400/60"></div>
               <span class="text-sm font-medium text-white/50">Bunker Trading SaaS</span>
             </footer>
           </blockquote>
@@ -83,10 +128,9 @@ import {
         <div class="w-full max-w-md">
           <!-- Mobile brand (hidden on desktop) -->
           <div class="mb-8 text-center lg:hidden">
-            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-700">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
-              </svg>
+            <div class="mx-auto flex items-center justify-center gap-2.5">
+              <div class="brand-glyph !h-11 !w-11 !rounded-xl !text-lg" aria-hidden="true">F</div>
+              <span class="text-xl font-bold tracking-tight text-gray-900 dark:text-ink">Fueld</span>
             </div>
           </div>
 
@@ -133,7 +177,7 @@ import {
               <button
                 type="submit"
                 [disabled]="loading()"
-                class="w-full rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-brand-800 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-signin w-full rounded-lg px-4 py-2.5 text-sm font-bold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 @if (loading()) {
                   <span class="inline-flex items-center gap-2">
