@@ -82,10 +82,10 @@ const commonOfferInput = {
   companyName: 'Fueld Trading Ltd',
   companyAddress: 'Main Street 2, Oslo',
   companyPhone: '+4799998888',
-  companyEmail: 'ops@fueld.com',
+  companyEmail: 'ops@fueld.app',
   companyRegistrationNumber: 'NO123456',
   vatNumber: 'VAT-123',
-  companyWebsite: 'https://fueld.com',
+  companyWebsite: 'https://fueld.app',
   companyLogoDataUrl: null,
   itemNotes: [{ label: 'VLSFO', note: 'Low sulphur required' }],
   currency: 'USD',
@@ -173,7 +173,7 @@ describe('document.service formatting helpers', () => {
 
   it('builds phone/email text nodes with defaults and custom options', () => {
     const phoneNode = __documentTestUtils.phoneTextNode('Direct Phone:  ', '+4526131217');
-    const emailNode = __documentTestUtils.emailTextNode('Direct Email:  ', 'ops@fueld.com', {
+    const emailNode = __documentTestUtils.emailTextNode('Direct Email:  ', 'ops@fueld.app', {
       fontSize: 9,
       margin: [0, 1, 0, 3],
     });
@@ -184,7 +184,7 @@ describe('document.service formatting helpers', () => {
     expect(phoneText).toContain('Direct Phone:  ');
     expect(phoneText).toContain('+45 26 13 12 17');
     expect(emailText).toContain('Direct Email:  ');
-    expect(emailText).toContain('ops@fueld.com');
+    expect(emailText).toContain('ops@fueld.app');
 
     const emailRecord = emailNode as unknown as Record<string, unknown>;
     expect(emailRecord.fontSize).toBe(9);
@@ -448,7 +448,7 @@ describe('document.service formatting helpers', () => {
       companyLogoDataUrl: null,
       companyAddress: 'Main Street 2, Oslo',
       companyPhone: '+4799998888',
-      companyEmail: 'ops@fueld.com',
+      companyEmail: 'ops@fueld.app',
       printMeta: null,
     });
 
@@ -542,9 +542,9 @@ describe('document.service formatting helpers', () => {
       companyName: 'Fueld Trading Ltd',
       companyAddress: 'Main Street 2, Oslo',
       companyPhone: '+4799998888',
-      companyEmail: 'ops@fueld.com',
+      companyEmail: 'ops@fueld.app',
       companyRegistrationNumber: 'NO123456',
-      companyWebsite: 'https://fueld.com',
+      companyWebsite: 'https://fueld.app',
       companyLogoDataUrl: null,
       itemNotes: [{ label: 'VLSFO', note: 'Low sulphur required' }],
       items: [
@@ -829,9 +829,9 @@ describe('document.service formatting helpers', () => {
       companyName: 'Fueld Trading Ltd',
       companyAddress: 'Main Street 2, Oslo',
       companyPhone: '+4799998888',
-      companyEmail: 'ops@fueld.com',
+      companyEmail: 'ops@fueld.app',
       companyRegistrationNumber: 'NO123456',
-      companyWebsite: 'https://fueld.com',
+      companyWebsite: 'https://fueld.app',
       companyLogoDataUrl: null,
       itemNotes: [],
       items: [
@@ -1713,9 +1713,9 @@ describe('document.service formatting helpers', () => {
         customerTerms: 'Default terms for ${documentName}',
         headOfficeAddress: 'Main Street 1',
         headOfficePhone: '+4799998888',
-        headOfficeEmail: 'ops@fueld.com',
+        headOfficeEmail: 'ops@fueld.app',
         vatNumber: 'VAT-123',
-        website: 'https://fueld.com',
+        website: 'https://fueld.app',
         logoUrl: null,
         updatedAt: new Date('2026-03-04T00:00:00.000Z'),
       },
@@ -1820,9 +1820,9 @@ describe('document.service formatting helpers', () => {
         supplierTerms: 'Supplier terms for ${documentName}',
         headOfficeAddress: 'Main Street 1',
         headOfficePhone: '+4799998888',
-        headOfficeEmail: 'ops@fueld.com',
+        headOfficeEmail: 'ops@fueld.app',
         vatNumber: 'VAT-123',
-        website: 'https://fueld.com',
+        website: 'https://fueld.app',
         logoUrl: null,
         updatedAt: new Date('2026-03-04T00:00:00.000Z'),
       },
@@ -1934,9 +1934,9 @@ describe('document.service formatting helpers', () => {
         name: 'Fueld Trading Ltd',
         headOfficeAddress: 'Main Street 1',
         headOfficePhone: '+4799998888',
-        headOfficeEmail: 'ops@fueld.com',
+        headOfficeEmail: 'ops@fueld.app',
         vatNumber: 'VAT-123',
-        website: 'https://fueld.com',
+        website: 'https://fueld.app',
         fraudPreventionText: 'Verify account details by phone',
         latePaymentInterest: '2%',
         logoUrl: null,
@@ -2225,9 +2225,9 @@ describe('document.service formatting helpers', () => {
         customerTerms: 'Default terms for ${documentName}',
         headOfficeAddress: 'Main Street 1',
         headOfficePhone: '+4799998888',
-        headOfficeEmail: 'ops@fueld.com',
+        headOfficeEmail: 'ops@fueld.app',
         vatNumber: 'VAT-123',
-        website: 'https://fueld.com',
+        website: 'https://fueld.app',
         logoUrl: null,
         updatedAt: new Date('2026-03-04T00:00:00.000Z'),
       },
@@ -2335,9 +2335,9 @@ describe('document.service formatting helpers', () => {
         supplierTerms: 'Supplier terms',
         headOfficeAddress: 'Main Street 1',
         headOfficePhone: '+4799998888',
-        headOfficeEmail: 'ops@fueld.com',
+        headOfficeEmail: 'ops@fueld.app',
         vatNumber: 'VAT-123',
-        website: 'https://fueld.com',
+        website: 'https://fueld.app',
         logoUrl: null,
         updatedAt: new Date('2026-03-04T00:00:00.000Z'),
       },
@@ -2453,9 +2453,9 @@ describe('document.service formatting helpers', () => {
         name: 'Fueld Trading Ltd',
         headOfficeAddress: 'Main Street 1',
         headOfficePhone: '+4799998888',
-        headOfficeEmail: 'ops@fueld.com',
+        headOfficeEmail: 'ops@fueld.app',
         vatNumber: 'VAT-123',
-        website: 'https://fueld.com',
+        website: 'https://fueld.app',
         fraudPreventionText: 'Verify account details by phone',
         latePaymentInterest: '2%',
         logoUrl: null,
@@ -2560,7 +2560,7 @@ describe('document.service formatting helpers', () => {
       companyLogoDataUrl: null,
       companyAddress: 'Line 1, Oslo\nLine 2',
       companyPhone: '+4526131217',
-      companyEmail: 'ops@fueld.com',
+      companyEmail: 'ops@fueld.app',
       printMeta: {
         issuedAt: new Date('2026-03-01T00:00:00.000Z'),
         revisionNumber: 1,
@@ -2575,7 +2575,7 @@ describe('document.service formatting helpers', () => {
     expect(footerText).toContain('Line 1');
     expect(footerText).toContain('Line 2');
     expect(footerText).toContain('Phone No : +45 26 13 12 17');
-    expect(footerText).toContain('Email : ops@fueld.com');
+    expect(footerText).toContain('Email : ops@fueld.app');
     expect(footerText).toContain('Reg. No : NO123456');
   });
 

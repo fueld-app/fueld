@@ -78,7 +78,7 @@ async function seedDocumentReadyOrder() {
       isOwnCompany: true,
       headOfficeAddress: 'Main Street 2, Oslo',
       headOfficePhone: '+4799998888',
-      headOfficeEmail: 'ops@fueld.com',
+      headOfficeEmail: 'ops@fueld.app',
       vatNumber: 'VAT-123',
       companyRegistrationNumber: 'NO123456',
       fraudPreventionText: 'Verify bank details by phone.',
