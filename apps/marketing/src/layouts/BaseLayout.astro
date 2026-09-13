@@ -84,6 +84,16 @@ const pageTitle = `${title} | ${siteConfig.name}`;
             </nav>
             <button
               type="button"
+              class="nav-toggle"
+              aria-expanded="false"
+              aria-controls="mobile-nav"
+              aria-label="Open menu"
+              data-nav-toggle
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
+            <button
+              type="button"
               class="theme-toggle"
               aria-label="Toggle color theme"
               data-theme-toggle
@@ -93,7 +103,41 @@ const pageTitle = `${title} | ${siteConfig.name}`;
             </button>
           </div>
         </div>
+        <nav id="mobile-nav" class="mobile-nav" aria-label="Primary mobile" hidden>
+          <ul>
+            {siteConfig.nav.slice(0, -1).map((item) => (
+              <li><a href={item.href}>{item.label}</a></li>
+            ))}
+          </ul>
+        </nav>
       </header>
+      <script is:inline>
+        (function () {
+          var toggle = document.querySelector('[data-nav-toggle]');
+          var panel = document.getElementById('mobile-nav');
+          if (!toggle || !panel) return;
+          function setOpen(open) {
+            panel.hidden = !open;
+            toggle.setAttribute('aria-expanded', String(open));
+            toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+          }
+          toggle.addEventListener('click', function () {
+            setOpen(panel.hidden);
+          });
+          document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !panel.hidden) { setOpen(false); toggle.focus(); }
+          });
+          document.addEventListener('click', function (e) {
+            if (!panel.hidden && !panel.contains(e.target) && !toggle.contains(e.target)) setOpen(false);
+          });
+          panel.addEventListener('click', function (e) {
+            if (e.target.closest('a')) setOpen(false);
+          });
+          window.addEventListener('resize', function () {
+            if (window.innerWidth > 720 && !panel.hidden) setOpen(false);
+          });
+        })();
+      </script>
       <main id="main-content">
         <slot />
       </main>
