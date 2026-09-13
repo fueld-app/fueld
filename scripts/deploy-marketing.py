@@ -55,7 +55,10 @@ os.chdir(MARKETING_DIR)
 
 import subprocess
 print("Building…")
-subprocess.run(['npx', 'astro', 'build'], check=True, capture_output=True)
+# PUBLIC_SITE_URL is REQUIRED — without it canonical/og:url/og:image bake the
+# fueld.example.com placeholder, breaking WhatsApp/social link previews.
+env = {**os.environ, 'PUBLIC_SITE_URL': 'https://www.fueld.app'}
+subprocess.run(['npx', 'astro', 'build'], check=True, capture_output=True, env=env)
 print("Build complete.")
 
 # Collect files. HTML gets a unique revision marker so its digest is always
