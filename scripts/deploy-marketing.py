@@ -59,7 +59,9 @@ subprocess.run(['npx', 'astro', 'build'], check=True, capture_output=True)
 print("Build complete.")
 
 # Collect files. HTML gets a unique revision marker so its digest is always
-# fresh (avoids the poisoned-dedup-store 422/required:0 trap).
+# fresh (avoids the poisoned-dedup-store 422/required:0 trap). Marker is
+# HTML-only by design — binary assets (og-card.png, icons) keep stable digests
+# so social-preview URLs don't churn.
 marker = f"\n<!-- r:{int(time.time())} -->\n".encode()
 file_map = {}
 for root, dirs, fns in os.walk('dist'):
@@ -111,14 +113,26 @@ for i in range(30):
             print(f"  error: {st['error_message']}")
         break
 
-# Verify MIME on production
-time.sleep(10)
+# Verify MIME on production — EVERY declared path, not just a spot-check
 import urllib.request as ur
-with ur.urlopen('https://www.fueld.app/') as r:
-    ct = r.headers.get('content-type', '')
-print(f"Live content-type: {ct}")
-if 'text/html' not in ct:
-    print("⚠️  WARNING: root is not text/html — deploy may be broken!")
+time.sleep(10)
+failures = []
+check_paths = [p for p in file_map if mime_for(p).startswith('text/html')]
+check_paths += ['/']  # pretty root serves from /index.html
+for p in sorted(set(check_paths)):
+    url = f'https://www.fueld.app{p}'
+    try:
+        with ur.urlopen(url + f'?cb={int(time.time())}') as r:
+            ct = r.headers.get('content-type', '')
+        status = 'ok' if ct.startswith('text/html') else 'BAD'
+        print(f"  {status} {p} -> {ct or '(none)'}")
+        if not ct.startswith('text/html'):
+            failures.append((p, ct))
+    except Exception as e:
+        print(f"  {p} -> ERROR {e}")
+        failures.append((p, str(e)))
+if failures:
+    print(f"\n⚠️  {len(failures)} path(s) not serving text/html — deploy broken!")
     sys.exit(2)
 
-print(f"\n✅ Deployed: https://www.fueld.app (deploy {dep_id})")
+print(f"\n✅ Deployed: https://www.fueld.app (deploy {dep_id}) — all HTML paths verified text/html")
