@@ -1,5 +1,5 @@
 const siteUrl = (import.meta.env.PUBLIC_SITE_URL ?? 'https://fueld.example.com').replace(/\/$/, '');
-const contactEmail = import.meta.env.PUBLIC_CONTACT_EMAIL ?? 'sales@fueld.com';
+const contactEmail = import.meta.env.PUBLIC_CONTACT_EMAIL ?? 'sales@fueld.app';
 
 export const siteConfig = {
   name: 'Fueld',
