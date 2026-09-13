@@ -2628,6 +2628,31 @@ img {
   border-color: rgba(44, 160, 28, 0.35);
   background: rgba(44, 160, 28, 0.08);
 }
+.dk-qb__row--hit {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.08);
+}
+.dk-qb__pill--alert {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.55);
+}
+/* Risk provider chips (sanctions scene) */
+.dk-risk__providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.dk-risk__chip {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab3c5;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+}
 .dk-qb__arrow { color: #aab3c5; }
 .dk-qb__pill {
   font-size: 0.62rem;

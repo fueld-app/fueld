@@ -449,7 +449,7 @@ const schemas = [
     <div class="section-heading">
       <p class="eyebrow">Integrations</p>
       <h2 id="integrations-title">Plugged into the tools your teams already live in.</h2>
-      <p>Identity, communication, banking, market data, accounting, and AI — connected out of the box, inside your deployment boundary.</p>
+      <p>Identity, communication, banking, compliance, market data, accounting, and AI — connected out of the box, inside your deployment boundary.</p>
     </div>
 
     <!-- Integration scenes: WhatsApp / Outlook / QuickBooks -->
@@ -550,6 +550,58 @@ const schemas = [
           </div>
           <div class="dk-intcard dk-intcard--flat">
             <span>Bank balances and transactions flow straight into the ledger — payment status without chasing statements.</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Sanctions screening (OpenSanctions / Seasearcher / Companies House) -->
+      <article class="dk-intscene" role="img" aria-label="A counterparty and vessel screening hit that auto-holds an order pending compliance approval">
+        <header class="dk-intscene__head">
+          <span class="dk-intscene__badge" style="--badge:#f87171">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Sanctions screening
+          </span>
+          <span class="dk-intscene__meta">24h re-screening</span>
+        </header>
+        <div class="dk-intscene__body">
+          <div class="dk-risk__providers" aria-hidden="true">
+            <span class="dk-risk__chip">OpenSanctions</span>
+            <span class="dk-risk__chip">Seasearcher</span>
+            <span class="dk-risk__chip">Companies House</span>
+          </div>
+          <div class="dk-qb__row"><span>New counterparty · Pacific Shipping Pte</span><span>clear ✓</span></div>
+          <div class="dk-qb__row dk-qb__row--hit">
+            <span>MV Gulf Star · vessel match</span>
+            <span class="dk-qb__pill dk-qb__pill--alert">auto-hold</span>
+          </div>
+          <div class="dk-qb__row">
+            <span class="dk-qb__arrow" aria-hidden="true">→ override requested · awaiting compliance</span>
+          </div>
+          <div class="dk-intcard dk-intcard--flat">
+            <span>Every counterparty and vessel is re-screened daily across three registries — a hit holds the order until a compliance override is approved.</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Platts pricing (report parse → price book) -->
+      <article class="dk-intscene" role="img" aria-label="A Platts price report parsed into the price book with formula-priced quotes repriced automatically">
+        <header class="dk-intscene__head">
+          <span class="dk-intscene__badge" style="--badge:#f59e0b">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            Platts pricing
+          </span>
+          <span class="dk-intscene__meta">reports → quotes</span>
+        </header>
+        <div class="dk-intscene__body">
+          <div class="dk-qb__row"><span>Platts report · PDF upload</span><span>128 lines parsed</span></div>
+          <div class="dk-qb__row"><span>VLSFO 0.5% · Singapore</span><span>$573.50 ▲2.1</span></div>
+          <div class="dk-qb__row"><span>MGO · Singapore</span><span>$611.25 ▼0.4</span></div>
+          <div class="dk-qb__row dk-qb__row--sync">
+            <span class="dk-qb__arrow" aria-hidden="true">→ formula pricing on 6 open quotes</span>
+            <span class="dk-qb__pill">repriced</span>
+          </div>
+          <div class="dk-intcard dk-intcard--flat">
+            <span>Drop in the Platts PDF — price lines are parsed and matched to your products, so formula-priced quotes update without re-keying.</span>
           </div>
         </div>
       </article>
