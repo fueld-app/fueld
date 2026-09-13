@@ -70,7 +70,7 @@ for root, dirs, fns in os.walk('dist'):
         rel = '/' + os.path.relpath(p, 'dist').replace(os.sep, '/')
         with open(p, 'rb') as f: body = f.read()
         if rel.endswith('.html'):
-            body += marker.encode()
+            body += marker
         file_map[rel] = {'sha': hashlib.sha1(body).hexdigest(), 'body': body}
 
 digests = {path: info['sha'] for path, info in file_map.items()}

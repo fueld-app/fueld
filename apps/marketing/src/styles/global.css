@@ -2496,6 +2496,7 @@ img {
 .dk-int-scenes {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr; /* equalize row heights — avoids bottom-heavy 339/371 mismatch */
   gap: 1.2rem;
   margin: 2.4rem 0 2.6rem;
 }
@@ -2540,10 +2541,11 @@ img {
 }
 .dk-intscene__meta {
   font-family: var(--font-mono);
-  font-size: 0.64rem;
+  font-size: 0.68rem;
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--emerald);
+  color: #6ee7b7;
 }
 .dk-intscene__body {
   display: grid;
@@ -2629,10 +2631,11 @@ img {
 .dk-qb__arrow { color: #aab3c5; }
 .dk-qb__pill {
   font-size: 0.62rem;
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--emerald);
-  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.55);
   border-radius: 999px;
   padding: 0.12rem 0.5rem;
 }
@@ -2652,18 +2655,20 @@ img {
 .dk-intcard strong { color: #fff; }
 .dk-intcard__code {
   font-family: var(--font-mono);
-  font-size: 0.64rem;
+  font-size: 0.66rem;
+  font-weight: 600;
   letter-spacing: 0.14em;
-  color: var(--accent);
+  color: #fbbf24; /* brighter than --accent: amber-on-amber card was low contrast */
 }
 .dk-intcard__pill {
   justify-self: start;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.66rem;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--emerald);
-  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.55);
   border-radius: 999px;
   padding: 0.18rem 0.55rem;
 }
