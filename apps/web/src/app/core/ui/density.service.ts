@@ -43,7 +43,7 @@ export class DensityService {
     } catch {
       // ignore
     }
-    return 'comfortable';
+    return 'compact'; // Brand Dark direction: Terminal-Ops density is the default
   }
 
   private apply(d: Density): void {

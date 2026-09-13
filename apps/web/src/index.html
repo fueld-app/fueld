@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <title>Fueld — Bunker Trading</title>
   <base href="/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,10 +17,11 @@
       var dark;
       if (p === 'light') dark = false;
       else if (p === 'dark') dark = true;
-      else dark = matchMedia('(prefers-color-scheme: dark)').matches; /* device / null */
+      else if (p === 'device') dark = matchMedia('(prefers-color-scheme: dark)').matches;
+      else dark = true; /* Brand Dark: dark is the brand default for new users */
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     } catch (_) {
-      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.setAttribute('data-theme', 'dark');
     }
   </script>
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f7fb" />

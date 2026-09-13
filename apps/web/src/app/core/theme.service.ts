@@ -60,7 +60,7 @@ export class ThemeService {
     } catch {
       // ignore
     }
-    return 'device';
+    return 'dark'; // Brand Dark: dark is the brand default for new users
   }
 
   private apply(t: 'light' | 'dark'): void {

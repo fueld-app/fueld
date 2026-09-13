@@ -73,6 +73,8 @@
 
   /* Fonts */
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* ─── Base resets ─────────────────────────────────────────────────── */
@@ -83,6 +85,47 @@ body {
   font-family: var(--font-sans);
   overflow-x: hidden;
   overscroll-behavior-x: none;
+}
+
+/* ─── Brand Dark typography ─────────────────────────────────────────
+   Space Grotesk for headings; mono + tabular numerals for data tables
+   (the 'Terminal Ops' density borrow). */
+
+.app-main h1,
+.app-main h2,
+.app-main h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+.app-main table th {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.app-main table th,
+.app-main table td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Brand glyph (amber F mark — shared: sidebar, mobile drawer) ──── */
+.brand-glyph {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 0.6rem;
+  background: linear-gradient(135deg, #f59e0b 0%, #fb923c 60%, #f97316 100%);
+  color: #1a1208;
+  font-weight: 800;
+  font-size: 1.05rem;
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  box-shadow: 0 6px 20px -4px rgba(245, 158, 11, 0.55);
 }
 
 /* ─── iOS PWA safe-area handling ───────────────────────────────────
