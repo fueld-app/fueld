@@ -42,6 +42,16 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 @theme {
+  /* Corner system — "Fintech": sharp-leaning controls, 12px cards.
+     Status pills (rounded-full) are unaffected — round chips against
+     near-square controls is the deliberate contrast. */
+  --radius-sm:  0.25rem;  /* 4px */
+  --radius-md:  0.3125rem;/* 5px */
+  --radius-lg:  0.375rem; /* 6px — inputs, buttons */
+  --radius-xl:  0.5rem;   /* 8px — small cards, dropdowns */
+  --radius-2xl: 0.75rem;  /* 12px — cards, panels */
+  --radius-3xl: 1rem;     /* 16px — hero shells only */
+
   /* Brand → amber (decision #2). All brand-* utilities become orange. */
   --color-brand-50:  #fffbeb;
   --color-brand-100: #fef3c7;
@@ -118,7 +128,7 @@ body {
   width: 2.25rem;
   height: 2.25rem;
   flex-shrink: 0;
-  border-radius: 0.6rem;
+  border-radius: 0.45rem;
   background: linear-gradient(135deg, #f59e0b 0%, #fb923c 60%, #f97316 100%);
   color: #1a1208;
   font-weight: 800;
@@ -136,6 +146,16 @@ body {
 */
 
 :root {
+  /* Fintech corner override — must live in :root AFTER tokens.css import,
+     because tokens.css (shared with marketing) also defines --radius-* and
+     would otherwise win the cascade (16px inputs — the 'dated' look). */
+  --radius-sm:  0.25rem;
+  --radius-md:  0.3125rem;
+  --radius-lg:  0.375rem;
+  --radius-xl:  0.5rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 1rem;
+
   /* Runtime-updated visible viewport height (set in app.ts) */
   --app-height: 100vh;
 

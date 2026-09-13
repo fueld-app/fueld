@@ -44,7 +44,7 @@ import {
       place-items: center;
       width: 3rem;
       height: 3rem;
-      border-radius: 0.8rem;
+      border-radius: 0.55rem;
       background: linear-gradient(135deg, #f59e0b 0%, #fb923c 60%, #f97316 100%);
       color: #1a1208;
       font-weight: 800;
