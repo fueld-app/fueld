@@ -2711,6 +2711,17 @@ img {
   border-radius: 999px;
   padding: 0.18rem 0.55rem;
 }
+/* SSO sign-in card (Microsoft scene) */
+.dk-sso__user {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: rgba(129, 140, 248, 0.10);
+  border: 1px solid rgba(129, 140, 248, 0.32);
+}
+.dk-sso__name { font-size: 0.92rem; font-weight: 600; color: #e8ecf4; }
+.dk-sso__domain { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.04em; color: #aab3c5; }
 .dk-qb__arrow { color: #aab3c5; }
 .dk-qb__pill {
   font-size: 0.62rem;
