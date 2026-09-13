@@ -1,0 +1,98 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const updated = 'September 9, 2026';
+
+const sections = [
+  {
+    title: '1. About these terms',
+    body: [
+      'These terms govern your use of this marketing website (www.fueld.app). They do not govern the Fueld product itself.',
+      'Use of the Fueld software is governed by the licence or services agreement signed between you and Fueld (which includes the applicable data processing agreement where relevant). If there is ever a conflict between those documents and these website terms, the signed agreement wins.',
+    ],
+  },
+  {
+    title: '2. Permitted use',
+    body: [
+      'You may browse this website and submit enquiries through the contact form for legitimate evaluation and business purposes.',
+      'You may not: attempt to breach or test the site\'s security without written permission; scrape or republish substantial parts of the content without attribution and prior consent; submit false, misleading, or unlawful information; or use the contact facilities for spam or unsolicited marketing to us.',
+    ],
+  },
+  {
+    title: '3. Intellectual property',
+    body: [
+      'The content, design, wordmarks, and graphics on this website belong to Fueld or its licensors. You may quote and link to these pages in the course of normal business activity (reviews, procurement comparisons, research); anything beyond that needs our written permission.',
+    ],
+  },
+  {
+    title: '4. Product information',
+    body: [
+      'We work hard to keep the product descriptions on this site accurate and current, but feature sets, roadmap items, and availability evolve. What you get is defined by your signed agreement — not by marketing pages. Nothing on this website forms a binding offer.',
+      'Demonstration interfaces, prices, and statistics shown on this website are illustrative.',
+    ],
+  },
+  {
+    title: '5. No warranty',
+    body: [
+      'This website is provided "as is". While we aim for accuracy and availability, we do not warrant that the site will be uninterrupted or error-free, and we disclaim implied warranties to the fullest extent permitted by law.',
+    ],
+  },
+  {
+    title: '6. Limitation of liability',
+    body: [
+      'To the fullest extent permitted by law, Fueld is not liable for indirect, incidental, or consequential damages arising from your use of this website. Nothing in these terms limits liability that cannot be limited under applicable law.',
+    ],
+  },
+  {
+    title: '7. Links',
+    body: [
+      'Pages on this site may reference third-party tools and services (for example email, calendar, and accounting integrations). We do not control third-party sites and are not responsible for their content or practices.',
+    ],
+  },
+  {
+    title: '8. Contact and changes',
+    body: [
+      `Questions about these terms: sales@fueld.app. We may update these terms from time to time; the date below reflects the current version. Last updated: ${updated}.`,
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="Terms of use"
+  description="Terms of use for the Fueld marketing website. Product use is governed by your signed Fueld agreement."
+  path="/terms/"
+>
+  <section class="content-band page-hero">
+    <div class="section-heading narrow">
+      <p class="eyebrow">Legal</p>
+      <h1>Terms of use.</h1>
+      <p>
+        The short version: use the site honestly, don't attack it, and remember that the Fueld product itself is
+        governed by your signed agreement — not this page.
+      </p>
+    </div>
+  </section>
+
+  <section class="content-band content-band--thin">
+    <div class="split-panel">
+      {sections.map((section) => (
+        <article class="panel-card">
+          <h2>{section.title}</h2>
+          {section.body.map((paragraph) => (
+            <p>{paragraph}</p>
+          ))}
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="content-band">
+    <div class="section-heading narrow">
+      <p>
+        See also our <a href="/privacy-policy/">privacy policy</a> and the
+        <a href="/privacy/">privacy &amp; sovereignty overview</a>.
+      </p>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,117 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const updated = 'September 9, 2026';
+
+const sections = [
+  {
+    title: '1. Who we are',
+    body: [
+      'Fueld ("Fueld", "we", "us") provides dedicated bunker trading and physical supply software. This privacy policy explains how we handle personal data collected through this marketing website (www.fueld.app).',
+      'For questions about this policy, or to exercise any right described below, contact us at sales@fueld.app.',
+    ],
+  },
+  {
+    title: '2. Scope',
+    body: [
+      'This policy covers the marketing website only — the pages that describe the product and let you request an introduction.',
+      'The Fueld product itself runs as a dedicated deployment under your control. Where you license the product, personal data processed inside your deployment is governed by your agreement with us — including our Data Processing Agreement where the managed offering is in scope — not by this policy.',
+    ],
+  },
+  {
+    title: '3. What we collect',
+    body: [
+      'Contact form. When you submit the "Book an intro call" form, we collect the details you provide: your name, work email address, company name, preferred hosting region, and your message. Submissions are processed by our hosting provider, Netlify, on our behalf.',
+      'Direct email. If you email us, we receive your email address and anything you choose to include.',
+      'Server logs. Like any hosted website, our hosting provider (Netlify) processes standard technical request data — IP address, user agent, and requested URL — for security and operational purposes.',
+      'Theme preference. The site stores your light/dark theme choice in your browser\'s local storage. This is a functional preference, not tracking, and it never leaves your device.',
+    ],
+  },
+  {
+    title: '4. What we do not collect',
+    body: [
+      'This website runs no advertising trackers, no third-party analytics scripts, no social media pixels, and no cross-site tracking cookies. We have nothing to sell about you, because we do not collect it.',
+    ],
+  },
+  {
+    title: '5. Why we use your data',
+    body: [
+      'To respond to your enquiry and prepare for the conversation you requested (lawful basis: legitimate interest, and contract preparation where an introduction leads to an agreement).',
+      'To keep the website secure and operating (lawful basis: legitimate interest) via standard hosting and security logs.',
+      'We do not use your data for automated decision-making or profiling, and we never sell it.',
+    ],
+  },
+  {
+    title: '6. Sharing',
+    body: [
+      'We share enquiry data only with: (a) Netlify, Inc., which hosts the website and processes form submissions on our behalf; and (b) anyone you explicitly introduce us to (for example, copying a colleague).',
+      'We may disclose data where required by law, and only to the extent required.',
+    ],
+  },
+  {
+    title: '7. Retention',
+    body: [
+      'Enquiry correspondence is kept for as long as it takes to handle your request and any resulting conversation. If we do not end up working together, you can ask us to delete it at any time — we will confirm when done.',
+      'Technical request logs are retained by our hosting provider for a limited operational window under Netlify\'s standard practices.',
+    ],
+  },
+  {
+    title: '8. Your rights',
+    body: [
+      'Depending on where you are, you have rights of access, rectification, erasure, restriction, objection, and portability, and the right to lodge a complaint with your local data protection authority.',
+      'To exercise any right, email sales@fueld.app. We will respond within the timeframes required by applicable law.',
+    ],
+  },
+  {
+    title: '9. International transfers',
+    body: [
+      'This website is hosted on Netlify\'s global infrastructure. Where your enquiry data is processed outside your region, appropriate safeguards (such as the EU Standard Contractual Clauses, where applicable) apply. Customers of the Fueld product choose their deployment region separately — see our deployment page.',
+    ],
+  },
+  {
+    title: '10. Changes',
+    body: [
+      `We may update this policy as the website evolves. The date at the top reflects the current version. Material changes will be highlighted on this page. Last updated: ${updated}.`,
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="Privacy policy"
+  description="How the Fueld marketing website collects, uses, and protects personal data — no trackers, no analytics, no data selling."
+  path="/privacy-policy/"
+>
+  <section class="content-band page-hero">
+    <div class="section-heading narrow">
+      <p class="eyebrow">Legal</p>
+      <h1>Privacy policy.</h1>
+      <p>
+        Short version: this website collects only what you type into the contact form. No trackers, no analytics
+        scripts, no advertising cookies, no data selling. The long version is below.
+      </p>
+    </div>
+  </section>
+
+  <section class="content-band content-band--thin">
+    <div class="split-panel">
+      {sections.map((section) => (
+        <article class="panel-card">
+          <h2>{section.title}</h2>
+          {section.body.map((paragraph) => (
+            <p>{paragraph}</p>
+          ))}
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="content-band">
+    <div class="section-heading narrow">
+      <p>
+        Looking for how the Fueld product handles GDPR, residency, and data processing agreements? That is covered on
+        our <a href="/privacy/">privacy &amp; sovereignty page</a>.
+      </p>
+    </div>
+  </section>
+</BaseLayout>

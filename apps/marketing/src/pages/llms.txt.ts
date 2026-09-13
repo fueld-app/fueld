@@ -16,6 +16,8 @@ Fueld is dedicated bunker trading software focused on data sovereignty, deployme
 - /features/ : product and workflow coverage
 - /deployment/ : deployment models and region control
 - /privacy/ : privacy and sovereignty framing
+- /privacy-policy/ : website privacy policy (legal)
+- /terms/ : website terms of use (legal)
 
 ## Contact
 - Email: ${siteConfig.contactEmail}

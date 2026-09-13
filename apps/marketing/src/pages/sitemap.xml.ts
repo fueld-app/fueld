@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 
-const pages = ['/', '/features/', '/deployment/', '/privacy/'];
+const pages = ['/', '/features/', '/deployment/', '/privacy/', '/privacy-policy/', '/terms/'];
 
 export const GET: APIRoute = ({ site }) => {
   const base = site ?? new URL('https://fueld.example.com');
