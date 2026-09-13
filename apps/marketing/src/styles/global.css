@@ -73,6 +73,7 @@ img {
   top: 0;
   z-index: 30;
   padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
 }
 
 .brand-row {
@@ -2494,7 +2495,7 @@ img {
    in both themes (same rule as ticker / sim panel). */
 .dk-int-scenes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.2rem;
   margin: 2.4rem 0 2.6rem;
 }
@@ -2762,3 +2763,17 @@ img {
 :root[data-theme='light'].has-js .dk-pipeline .dk-node.is-live.dk-node--cyan .dk-node__pill {
   color: #22d3ee; background: rgba(34, 211, 238, 0.1); border-color: rgba(34, 211, 238, 0.3);
 }
+
+/* Open banking (Enable Banking) scene */
+.dk-eb__account {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: rgba(79, 142, 247, 0.10);
+  border: 1px solid rgba(79, 142, 247, 0.32);
+  margin-bottom: 0.7rem;
+}
+.dk-eb__bank { font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: #93b4f5; font-weight: 600; }
+.dk-eb__iban { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; color: #aab3c5; }
+.dk-eb__balance { font-size: 1.3rem; font-weight: 600; color: #e8ecf4; margin-top: 0.2rem; }

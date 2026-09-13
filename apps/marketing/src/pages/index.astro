@@ -81,8 +81,8 @@ const alsoInBox = [
 ];
 
 // ─── Integrations marquee ─────────────────────────────────────────────
-const marqueeA = ['Microsoft 365 SSO', 'Outlook & Exchange', 'WhatsApp Business', 'Passkeys & 2FA', 'Live AIS vessel data', 'QuickBooks', 'Platts & Argus feeds', 'Push notifications'];
-const marqueeB = ['Entra ID / Azure AD', 'BDN generation', 'Credit engines', 'Formula pricing', 'Inventory & dips', 'Audit trails', 'Document versioning', 'Supplier portal'];
+const marqueeA = ['Microsoft 365 SSO', 'Outlook & Exchange', 'WhatsApp Business', 'Passkeys & 2FA', 'Live AIS vessel data', 'QuickBooks', 'Platts & Argus feeds', 'Open banking (PSD2)', 'Push notifications'];
+const marqueeB = ['Entra ID / Azure AD', 'BDN generation', 'Credit engines', 'Formula pricing', 'Inventory & dips', 'Sanctions screening', 'Audit trails', 'Document versioning', 'Supplier portal'];
 
 // ─── Sovereignty ──────────────────────────────────────────────────────
 const sovereigntyPoints = [
@@ -449,7 +449,7 @@ const schemas = [
     <div class="section-heading">
       <p class="eyebrow">Integrations</p>
       <h2 id="integrations-title">Plugged into the tools your teams already live in.</h2>
-      <p>Identity, communication, market data, accounting, and AI — connected out of the box, inside your deployment boundary.</p>
+      <p>Identity, communication, banking, market data, accounting, and AI — connected out of the box, inside your deployment boundary.</p>
     </div>
 
     <!-- Integration scenes: WhatsApp / Outlook / QuickBooks -->
@@ -524,6 +524,32 @@ const schemas = [
           <div class="dk-qb__row"><span>Payment received</span><span class="dk-qb__paid">$349,712 ✓</span></div>
           <div class="dk-intcard dk-intcard--flat">
             <span>Volumes reconcile from BDN to invoice to ledger — no re-keying, no Friday spreadsheets.</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Open banking (Enable Banking) -->
+      <article class="dk-intscene" role="img" aria-label="A connected bank account showing balance and transactions flowing into Fueld">
+        <header class="dk-intscene__head">
+          <span class="dk-intscene__badge" style="--badge:#4f8ef7">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
+            Open banking · PSD2
+          </span>
+          <span class="dk-intscene__meta">via Enable Banking</span>
+        </header>
+        <div class="dk-intscene__body">
+          <div class="dk-eb__account">
+            <div class="dk-eb__bank">Fleet Bank · Business</div>
+            <div class="dk-eb__iban">NL21 FLEB 0317 •••• 4102</div>
+            <div class="dk-eb__balance">€412,880.20</div>
+          </div>
+          <div class="dk-qb__row"><span>Bunker payment · MV Pacific Dawn</span><span>−$186,400.00</span></div>
+          <div class="dk-qb__row dk-qb__row--sync">
+            <span class="dk-qb__arrow" aria-hidden="true">→ matched to INV-2209</span>
+            <span class="dk-qb__pill">reconciled</span>
+          </div>
+          <div class="dk-intcard dk-intcard--flat">
+            <span>Bank balances and transactions flow straight into the ledger — payment status without chasing statements.</span>
           </div>
         </div>
       </article>
