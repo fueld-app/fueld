@@ -28,6 +28,13 @@ Thumbs.db
 apps/api/uploads/**
 uploads/**
 
+# Session / tooling artifacts
+.playwright-mcp/
+marketing-current-*.png
+docs/staging-*.png
+_check_pd.ts
+context.md
+
 # Local LLM binaries & models (large files, downloaded by scripts/llm/setup.sh)
 scripts/llm/bin/
 scripts/llm/models/
