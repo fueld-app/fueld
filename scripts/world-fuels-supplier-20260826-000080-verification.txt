@@ -1,0 +1,10 @@
+Production verification: supplier 'World Fuels' + 30 credit days on order 20260826-000080
+Source: moxie VPS (deploy@31.70.94.96), production DATABASE_URL from /opt/fueld/.env
+Date (UTC): 2026-08-26T19:32:06Z
+Command: psql "$DATABASE_URL" -c "SELECT ... FROM orders o JOIN order_suppliers os ... JOIN counterparties c ... WHERE o.order_number='20260826-000080';"
+
+  order_number   |  supplier   |   type   | payment_term_type | credit_days | is_primary | legacy_term | legacy_days 
+-----------------+-------------+----------+-------------------+-------------+------------+-------------+-------------
+ 20260826-000080 | World Fuels | SUPPLIER | CREDIT            |          30 | t          | CREDIT      |          30
+(1 row)
+
