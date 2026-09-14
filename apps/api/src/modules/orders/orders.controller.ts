@@ -45,7 +45,13 @@ import {
   setOrderBunkerBookingSent,
 } from './orders.service';
 import { logActivity } from '../activity/activity.service';
-import type { ApiResponse } from '@fueld/types';
+import {
+  SupplierCreditNoteError,
+  createSupplierCreditNote,
+  listSupplierCreditNotes,
+  updateSupplierCreditNote,
+} from './supplier-credit-notes.service';
+import type { ApiResponse, CreateSupplierCreditNoteDto, UpdateSupplierCreditNoteDto } from '@fueld/types';
 import { db } from '../../db';
 import { users, tenants, orders } from '../../db/schema';
 import { eq } from 'drizzle-orm';
@@ -378,6 +384,142 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Orders'],
         summary: 'Remove a supplier leg from an order',
+      },
+    },
+  )
+
+  // ─── Supplier Credit Notes (money back from a supplier on a leg) ──
+  .get(
+    '/:id/supplier-credit-notes',
+    async ({ params }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: [], message: 'Order not found' };
+        const credits = await listSupplierCreditNotes(orderId);
+        return { success: true, data: credits } satisfies ApiResponse<typeof credits>;
+      } catch (err) {
+        console.error('[Orders] Credit note list failed:', err);
+        const message = err instanceof Error ? err.message : 'Failed to list supplier credit notes';
+        return { success: false, data: [], message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'List supplier credit notes for an order',
+      },
+    },
+  )
+  .post(
+    '/:id/supplier-credit-notes',
+    async ({ params, body, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const order = await getOrderById(orderId);
+        if (!order) return { success: false, data: null, message: 'Order not found' };
+        const credit = await createSupplierCreditNote(
+          orderId,
+          auth.tenantId,
+          (order as { currency?: string | null }).currency ?? 'USD',
+          auth.sub,
+          body as CreateSupplierCreditNoteDto,
+        );
+        await logActivity({
+          userId: auth.sub,
+          action: 'CREATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: {
+            action: 'add_supplier_credit_note',
+            creditId: credit.id,
+            amount: credit.amount,
+            currency: credit.currency,
+            status: credit.status,
+          },
+        });
+        return { success: true, data: credit } satisfies ApiResponse<typeof credit>;
+      } catch (err) {
+        if (err instanceof SupplierCreditNoteError) {
+          return { success: false, data: null, message: err.message };
+        }
+        console.error('[Orders] Add credit note failed:', err);
+        const message = err instanceof Error ? err.message : 'Failed to add supplier credit note';
+        return { success: false, data: null, message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        orderSupplierId: t.String(),
+        orderLineId: t.Optional(t.Nullable(t.String())),
+        supplierReference: t.Optional(t.Nullable(t.String())),
+        amount: t.String(),
+        currency: t.Optional(t.String()),
+        fxRate: t.Optional(t.Nullable(t.String())),
+        amountInOrderCurrency: t.Optional(t.Nullable(t.String())),
+        creditDate: t.Optional(t.String()),
+        reason: t.Optional(t.String()),
+        note: t.Optional(t.Nullable(t.String())),
+        status: t.Optional(t.Union([t.Literal('EXPECTED'), t.Literal('RECEIVED')])),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Add a supplier credit note to an order',
+      },
+    },
+  )
+  .patch(
+    '/:id/supplier-credit-notes/:creditId',
+    async ({ params, body, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const credit = await updateSupplierCreditNote(
+          orderId,
+          params.creditId,
+          body as UpdateSupplierCreditNoteDto,
+        );
+        await logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: {
+            action: 'update_supplier_credit_note',
+            creditId: params.creditId,
+            status: credit.status,
+          },
+        });
+        return { success: true, data: credit } satisfies ApiResponse<typeof credit>;
+      } catch (err) {
+        if (err instanceof SupplierCreditNoteError) {
+          return { success: false, data: null, message: err.message };
+        }
+        console.error('[Orders] Update credit note failed:', err);
+        const message = err instanceof Error ? err.message : 'Failed to update supplier credit note';
+        return { success: false, data: null, message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), creditId: t.String() }),
+      body: t.Object({
+        supplierReference: t.Optional(t.Nullable(t.String())),
+        amount: t.Optional(t.String()),
+        currency: t.Optional(t.String()),
+        fxRate: t.Optional(t.Nullable(t.String())),
+        amountInOrderCurrency: t.Optional(t.Nullable(t.String())),
+        creditDate: t.Optional(t.String()),
+        reason: t.Optional(t.String()),
+        note: t.Optional(t.Nullable(t.String())),
+        status: t.Optional(
+          t.Union([t.Literal('EXPECTED'), t.Literal('RECEIVED'), t.Literal('CANCELLED')]),
+        ),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Update a supplier credit note (status lifecycle; received amounts immutable)',
       },
     },
   )

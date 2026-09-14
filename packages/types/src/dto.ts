@@ -628,6 +628,13 @@ export interface OrderDto {
   financingCostPerMt?: string | null;
   totalNetProfit?: string;
   netMarginPct?: string | null;
+  // ── Supplier credit notes (Phase 2 credit-note support) ──
+  /** Sum of RECEIVED supplier credits converted to order currency (positive). */
+  totalSupplierCredits?: string;
+  /** Sum of EXPECTED supplier credits (informational — never in margin math). */
+  expectedSupplierCredits?: string;
+  /** Net profit after received supplier credits = totalNetProfit − totalSupplierCredits. */
+  netProfitAfterCredits?: string;
   categoryKey?: string | null;
   isBrokerDeal?: boolean;
   commissionPerMt?: string | null;
@@ -757,6 +764,7 @@ export interface OrderDetailDto extends OrderDto {
   agent: CounterpartyDto | null;
   agentContact: CompanyContactDto | null;
   orderSuppliers: OrderSupplierDto[];
+  supplierCreditNotes?: SupplierCreditNoteDto[];
   items: OrderItemDto[];
   attachments?: OrderAttachmentDto[];
 }
@@ -780,6 +788,10 @@ export interface OrderListRowDto {
   totalFinancingCost?: number;
   totalNetProfit?: number;
   netMarginPct?: number | null;
+  /** Received supplier credits (positive) — subtract for net-after-credits. */
+  totalSupplierCredits?: number;
+  expectedSupplierCredits?: number;
+  netProfitAfterCredits?: number | null;
   /** Display currency for totals — matches item currencies when uniform, otherwise USD. */
   displayCurrency?: string;
   responseDeadlineAt?: string | null;
@@ -1436,6 +1448,73 @@ export interface CreateSupplierPaymentDto {
   paidAt?: string;
   method?: string | null;
   note?: string | null;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SUPPLIER CREDIT NOTES (money back from a supplier on a leg)
+// ═══════════════════════════════════════════════════════════════════
+
+export type SupplierCreditNoteStatus = 'EXPECTED' | 'RECEIVED' | 'CANCELLED';
+
+export type SupplierCreditNoteReason =
+  | 'PRICE_CORRECTION'
+  | 'QUANTITY_SHORTAGE'
+  | 'QUALITY_CLAIM'
+  | 'REBATE'
+  | 'OTHER';
+
+export interface SupplierCreditNoteDto {
+  id: string;
+  tenantId: string;
+  orderSupplierId: string;
+  orderId: string;
+  supplierId: string;
+  supplierName?: string | null;
+  orderLineId: string | null;
+  supplierReference: string | null;
+  /** Positive amount in `currency` — direction (money back) is implicit. */
+  amount: string;
+  currency: string;
+  fxRate: string | null;
+  amountInOrderCurrency: string | null;
+  creditDate: string;
+  receivedAt: string | null;
+  status: SupplierCreditNoteStatus;
+  reason: SupplierCreditNoteReason;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSupplierCreditNoteDto {
+  orderSupplierId: string;
+  orderLineId?: string | null;
+  supplierReference?: string | null;
+  /** Positive amount in `currency`. */
+  amount: string;
+  currency?: string;
+  /** Manual FX snapshot when credit currency ≠ order currency. */
+  fxRate?: string | null;
+  amountInOrderCurrency?: string | null;
+  creditDate?: string;
+  reason?: SupplierCreditNoteReason;
+  note?: string | null;
+  /** Allow recording a credit that was already received. Default EXPECTED. */
+  status?: 'EXPECTED' | 'RECEIVED';
+}
+
+export interface UpdateSupplierCreditNoteDto {
+  supplierReference?: string | null;
+  /** Only editable while EXPECTED; RECEIVED is amount-immutable. */
+  amount?: string;
+  currency?: string;
+  fxRate?: string | null;
+  amountInOrderCurrency?: string | null;
+  creditDate?: string;
+  reason?: SupplierCreditNoteReason;
+  note?: string | null;
+  status?: SupplierCreditNoteStatus;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

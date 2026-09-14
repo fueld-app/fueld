@@ -834,6 +834,13 @@
       "when": 1788856000000,
       "tag": "0118_refresh_token_grace",
       "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1789372800000,
+      "tag": "0119_supplier_credit_notes",
+      "breakpoints": true
     }
   ]
 }

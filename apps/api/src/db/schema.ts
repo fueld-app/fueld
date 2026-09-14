@@ -1490,6 +1490,63 @@ export const auditLogs = pgTable('audit_logs', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+//  14a. SUPPLIER CREDIT NOTES (money back from a supplier on a leg)
+// ═══════════════════════════════════════════════════════════════════════
+// Amounts are stored POSITIVE — the credit direction is implicit in the
+// record type (rendered with a minus sign where shown). Received credits
+// are amount-immutable: cancel + reissue instead of editing.
+
+export const supplierCreditNoteStatus = pgEnum('supplier_credit_note_status', [
+  'EXPECTED',   // promised/expected from supplier, money not yet confirmed
+  'RECEIVED',   // confirmed received (credit note received / offset applied)
+  'CANCELLED',  // issued in error — void, never delete
+]);
+
+export const supplierCreditNoteReason = pgEnum('supplier_credit_note_reason', [
+  'PRICE_CORRECTION',
+  'QUANTITY_SHORTAGE',
+  'QUALITY_CLAIM',
+  'REBATE',
+  'OTHER',
+]);
+
+export const supplierCreditNotes = pgTable('supplier_credit_notes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  orderSupplierId: uuid('order_supplier_id').notNull().references(() => orderSuppliers.id, { onDelete: 'cascade' }),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  supplierId: uuid('supplier_id').notNull().references(() => counterparties.id),
+  // Optional allocation to a single product line (multi-grade case).
+  // Null = credit against the leg as a whole. No allocation math.
+  orderLineId: uuid('order_line_id').references(() => orderItems.id, { onDelete: 'set null' }),
+  // Supplier's own credit-note reference (external string, NOT sequenced by us)
+  supplierReference: text('supplier_reference'),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  currency: text('currency').notNull().default('USD'),
+  // Manual FX snapshot when credit currency differs from order currency:
+  fxRate: numeric('fx_rate', { precision: 14, scale: 8 }),
+  amountInOrderCurrency: numeric('amount_in_order_currency', { precision: 14, scale: 2 }),
+  creditDate: timestamp('credit_date', { withTimezone: true }).notNull().defaultNow(),
+  receivedAt: timestamp('received_at', { withTimezone: true }),
+  status: supplierCreditNoteStatus('status').notNull().default('EXPECTED'),
+  reason: supplierCreditNoteReason('reason').notNull().default('OTHER'),
+  note: text('note'),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const supplierCreditNotesRelations = relations(supplierCreditNotes, ({ one }) => ({
+  tenant: one(tenants, { fields: [supplierCreditNotes.tenantId], references: [tenants.id] }),
+  orderSupplier: one(orderSuppliers, { fields: [supplierCreditNotes.orderSupplierId], references: [orderSuppliers.id] }),
+  order: one(orders, { fields: [supplierCreditNotes.orderId], references: [orders.id] }),
+  supplier: one(counterparties, { fields: [supplierCreditNotes.supplierId], references: [counterparties.id] }),
+  orderLine: one(orderItems, { fields: [supplierCreditNotes.orderLineId], references: [orderItems.id] }),
+  createdByUser: one(users, { fields: [supplierCreditNotes.createdBy], references: [users.id] }),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════
 //  14b. ACTIVITY LOGS (comprehensive user activity tracking)
 // ═══════════════════════════════════════════════════════════════════════
 
