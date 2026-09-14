@@ -120,6 +120,14 @@ const schemas = [
     name: siteConfig.name,
     url: siteConfig.siteUrl,
     email: siteConfig.contactEmail,
+    logo: `${siteConfig.siteUrl}/icon-512.png`,
+    image: `${siteConfig.siteUrl}${siteConfig.socialImage}`,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: siteConfig.address.line1,
+      addressLocality: 'Dubai',
+      addressCountry: 'AE',
+    },
     description: siteConfig.description,
   },
   {
@@ -129,7 +137,7 @@ const schemas = [
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
     description:
-      'Dedicated bunker trading software with data sovereignty, regional hosting control, and mobile-ready workflows.',
+      'Dedicated bunker trading software: RFQ to BDN with WhatsApp parsing, Outlook threading, open banking (PSD2), sanctions screening, Platts pricing, QuickBooks reconciliation, vessel intelligence, and a built-in private LLM — on dedicated infrastructure.',
     offers: {
       '@type': 'Offer',
       price: '0',
@@ -152,7 +160,7 @@ const schemas = [
 
 <BaseLayout
   title="Bunker trading & physical supply software"
-  description="One platform for bunker brokers, traders, and physical suppliers. RFQ to barge dispatch to BDN, with passkeys, Microsoft 365 SSO, Outlook, WhatsApp, live AIS, QuickBooks, and a built-in private LLM. Dedicated deployment, never a shared SaaS pool."
+  description="One platform for bunker brokers, traders, and physical suppliers. RFQ to BDN with WhatsApp, Outlook, open banking, sanctions screening, Platts pricing, QuickBooks, and a private LLM. Dedicated deployment, never a shared SaaS pool."
   path="/"
   schemas={schemas}
 >

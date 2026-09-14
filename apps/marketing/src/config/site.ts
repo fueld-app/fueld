@@ -6,7 +6,7 @@ export const siteConfig = {
   legalName: 'Fueld',
   titleSuffix: 'Dedicated bunker trading software',
   description:
-    'Dedicated bunker trading software for teams that need data sovereignty, regional hosting control, and mobile-ready workflows without multi-tenant compromise.',
+    'Dedicated bunker trading software: RFQ to BDN with WhatsApp parsing, open banking, sanctions screening, Platts pricing, QuickBooks reconciliation, and mobile workflows — on infrastructure you control, never a shared SaaS pool.',
   siteUrl,
   socialImage: '/og-card.png',
   nav: [
@@ -16,6 +16,10 @@ export const siteConfig = {
     { href: '/#contact', label: 'Book a demo' },
   ],
   contactEmail,
+  address: {
+    line1: 'Shoreline 13, Palm Jumeirah',
+    line2: 'Dubai, UAE',
+  },
 };
 
 export const regionOptions = [

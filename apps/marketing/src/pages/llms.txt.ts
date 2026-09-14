@@ -11,6 +11,17 @@ Fueld is dedicated bunker trading software focused on data sovereignty, deployme
 - Regional hosting choices aligned to policy and customer requirements.
 - Mobile-ready workflows spanning inquiry, documents, credit, risk, and reporting.
 
+## What Fueld does
+- RFQ to barge dispatch to BDN on one screen — quotes, credit checks, documents, delivery.
+- WhatsApp Business and Outlook/Exchange threads parsed into deals, attachments filed to the record.
+- Open banking (PSD2) via Enable Banking: bank balances and transactions reconciled to invoices.
+- Sanctions screening of counterparties and vessels across OpenSanctions, Seasearcher, and Companies House, with auto-hold and compliance override approval.
+- Platts price reports parsed into the price book; formula-priced quotes reprice automatically.
+- Vessel intelligence via Lloyd's List Intelligence: positions, characteristics, port calls feed stem planning.
+- QuickBooks reconciliation from delivered BDN to paid invoice, with a live bank feed.
+- Microsoft 365 SSO (Entra ID) and passkeys — no new passwords to manage.
+- Built-in private LLM inside the tenant boundary for drafting, summarising, and extraction.
+
 ## Key pages
 - / : homepage and primary positioning
 - /features/ : product and workflow coverage
@@ -21,7 +32,8 @@ Fueld is dedicated bunker trading software focused on data sovereignty, deployme
 
 ## Contact
 - Email: ${siteConfig.contactEmail}
-- Primary CTA: Netlify-hosted contact form on the homepage
+- Address: ${siteConfig.address.line1}, ${siteConfig.address.line2}
+- Primary CTA: contact form on the homepage
 `;
 
 export const GET: APIRoute = () =>

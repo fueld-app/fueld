@@ -24,17 +24,29 @@ const { id = 'contact' } = Astro.props;
     <p class="contact-fallback">
       Prefer email? Write to <a href={`mailto:${siteConfig.contactEmail}`}>{siteConfig.contactEmail}</a>.
     </p>
+    <p class="contact-fallback">Shoreline 13, Palm Jumeirah, Dubai, UAE.</p>
   </div>
 
   <form
     class="contact-form"
+    id="contact-form"
     name="marketing-contact"
     method="POST"
     action="/thanks/"
     data-netlify="true"
     netlify-honeypot="company-website"
+    novalidate
+    data-contact-email="sales@fueld.app"
   >
     <input type="hidden" name="form-name" value="marketing-contact" />
+    <p class="sr-only">
+      <label>
+        Leave this field empty if you are human
+        <input name="company-website" autocomplete="off" tabindex="-1" />
+      </label>
+    </p>
+
+    <div class="form-error-banner" id="contact-error-banner" role="alert" hidden></div>
     <p class="sr-only">
       <label>
         Leave this field empty if you are human
@@ -93,6 +105,93 @@ const { id = 'contact' } = Astro.props;
       ></textarea>
     </label>
 
-    <button type="submit">Request a meeting</button>
+    <button type="submit" id="contact-submit">
+      <span class="btn-label">Request a meeting</span>
+      <span class="btn-spinner" aria-hidden="true"></span>
+    </button>
   </form>
 </section>
+
+<script>
+  (function () {
+    var form = document.getElementById('contact-form');
+    if (!form) return;
+    var banner = document.getElementById('contact-error-banner');
+    var submitBtn = document.getElementById('contact-submit');
+    var label = submitBtn.querySelector('.btn-label');
+    var btnLabel = label.textContent;
+
+    function setError(input, message) {
+      input.setAttribute('aria-invalid', 'true');
+      var existing = input.closest('label').querySelector('.field-error');
+      if (!existing) {
+        existing = document.createElement('span');
+        existing.className = 'field-error';
+        input.closest('label').appendChild(existing);
+      }
+      existing.textContent = message;
+    }
+
+    function clearError(input) {
+      input.removeAttribute('aria-invalid');
+      var e = input.closest('label') && input.closest('label').querySelector('.field-error');
+      if (e) e.remove();
+    }
+
+    form.querySelectorAll('input, select, textarea').forEach(function (el) {
+      el.addEventListener('input', function () { clearError(el); });
+      el.addEventListener('change', function () { clearError(el); });
+    });
+
+    function validate() {
+      var bad = [];
+      form.querySelectorAll('[required]').forEach(function (el) {
+        var v = (el.value || '').trim();
+        if (!v) {
+          setError(el, 'This field is required.');
+          bad.push(el);
+        } else if (el.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+          setError(el, 'Enter a valid work email.');
+          bad.push(el);
+        }
+      });
+      if (bad.length) {
+        bad[0].focus();
+        banner.hidden = false;
+        banner.textContent = 'Please fix the highlighted fields below.';
+        return false;
+      }
+      return true;
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      banner.hidden = true;
+      if (!validate()) return;
+
+      setBusy(true);
+      var body = new URLSearchParams(new FormData(form)).toString();
+      fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body,
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          window.location.href = '/thanks/';
+        })
+        .catch(function () {
+          setBusy(false);
+          banner.hidden = false;
+          banner.textContent = 'Something went wrong sending the form. Please email ' + form.dataset.contactEmail + ' instead.';
+        });
+    });
+
+    function setBusy(busy) {
+      submitBtn.disabled = busy;
+      submitBtn.classList.toggle('is-busy', busy);
+      label.textContent = busy ? 'Sending…' : btnLabel;
+      submitBtn.setAttribute('aria-busy', String(busy));
+    }
+  })();
+</script>

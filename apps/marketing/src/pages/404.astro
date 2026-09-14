@@ -1,0 +1,80 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { siteConfig } from '../config/site';
+---
+
+<BaseLayout
+  title="Page not found"
+  description="This page does not exist. Head back to the Fueld home page, or explore features and deployment options."
+>
+  <section class="notfound-shell">
+    <p class="eyebrow">404</p>
+    <h1>That page isn't on the map.</h1>
+    <p class="notfound-copy">
+      The link may be old or mistyped. Everything you need lives one click away:
+    </p>
+    <div class="notfound-links">
+      <a class="button button-primary" href="/">Back to home</a>
+      <a class="button button-secondary" href="/features/">See features</a>
+      <a class="button button-secondary" href={`mailto:${siteConfig.contactEmail}`}>Email us</a>
+    </div>
+    <p class="notfound-mail">Or write to <a href={`mailto:${siteConfig.contactEmail}`}>{siteConfig.contactEmail}</a>.</p>
+  </section>
+</BaseLayout>
+
+<style>
+  .notfound-shell {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 3.5rem 2rem;
+    text-align: center;
+    margin-top: 1rem;
+  }
+  .notfound-shell h1 {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    letter-spacing: -0.02em;
+    margin: 0.4rem 0 0.8rem;
+  }
+  .notfound-shell .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    color: var(--accent);
+  }
+  .notfound-copy {
+    color: var(--muted);
+    max-width: 34rem;
+    margin: 0 auto 1.6rem;
+  }
+  .notfound-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 1.4rem;
+  }
+  .notfound-links a.button-primary { text-decoration: none; }
+  .notfound-links a:not(.button-primary) {
+    color: var(--ink-dim);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 0.55rem 1rem;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .notfound-links a:not(.button-primary):hover {
+    color: var(--ink);
+    background: var(--surface-tint);
+  }
+  .notfound-mail {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin: 0;
+  }
+  .notfound-mail a { color: var(--ink-dim); }
+</style>
