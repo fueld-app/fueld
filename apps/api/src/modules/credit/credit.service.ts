@@ -4,7 +4,7 @@
 //  Used amount is calculated from open orders automatically.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, sql, inArray, asc, desc, isNull } from 'drizzle-orm';
+import { eq, and, sql, inArray, asc, desc, isNull, ne } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   creditLines,
@@ -40,6 +40,7 @@ async function calcUsedAmountForSupplier(
   bufferDays: number = 0,
   autoReleaseCredit: boolean = true,
   currency?: string,
+  excludeOrderId?: string,
 ): Promise<string> {
   if (!counterpartyIds.length) return '0';
   const [row] = await db
@@ -65,6 +66,10 @@ async function calcUsedAmountForSupplier(
         // the line's own currency (costPrice is stored in the order's currency,
         // so a raw cross-currency sum would corrupt availableAmount).
         ...(currency ? [eq(orders.currency, currency)] : []),
+        // When validating a specific deal's own conversion, exclude that deal
+        // from its own usage — its exposure is what `required` already carries.
+        // Without this, converting a priced deal needs 2× its value in credit.
+        ...(excludeOrderId ? [ne(orderItems.orderId, excludeOrderId)] : []),
         // Credit is still "in use" when:
         // 1. Not manually marked paid (paidAt IS NULL), AND
         // 2. For broker deals (when autoReleaseCredit is enabled):
@@ -86,7 +91,7 @@ async function calcUsedAmountForSupplier(
   return row?.total ?? '0';
 }
 
-async function calcUsedAmountForCustomer(counterpartyIds: string[], currency?: string): Promise<string> {
+async function calcUsedAmountForCustomer(counterpartyIds: string[], currency?: string, excludeOrderId?: string): Promise<string> {
   if (!counterpartyIds.length) return '0';
   const [row] = await db
     .select({
@@ -99,6 +104,9 @@ async function calcUsedAmountForCustomer(counterpartyIds: string[], currency?: s
         inArray(orders.clientId, counterpartyIds),
         eq(orders.customerPaymentTermType, 'CREDIT'),
         inArray(orders.status, [...CUSTOMER_ACTIVE_STATUSES]),
+        // Exclude the deal being validated from its own usage — its exposure
+        // is what `required` already carries (otherwise conversion needs 2×).
+        ...(excludeOrderId ? [ne(orders.id, excludeOrderId)] : []),
         // Currency-scoped: only count exposure in the line's own currency.
         ...(currency ? [eq(orders.currency, currency)] : []),
       ),
@@ -174,7 +182,7 @@ interface RawCreditLine {
   updatedAt: Date;
 }
 
-async function enrichCreditLine(row: RawCreditLine): Promise<CreditLineDto> {
+async function enrichCreditLine(row: RawCreditLine, excludeOrderId?: string): Promise<CreditLineDto> {
   const sides = await fetchCreditLineSides(row.id);
 
   // Load tenant broker deal settings for auto-release config
@@ -189,8 +197,8 @@ async function enrichCreditLine(row: RawCreditLine): Promise<CreditLineDto> {
 
   const usedAmount =
     row.type === 'SUPPLIER'
-      ? await calcUsedAmountForSupplier(sides.counterpartyIds, row.isBrokerCreditLine, bufferDays, autoReleaseCredit, row.currency)
-      : await calcUsedAmountForCustomer(sides.counterpartyIds, row.currency);
+      ? await calcUsedAmountForSupplier(sides.counterpartyIds, row.isBrokerCreditLine, bufferDays, autoReleaseCredit, row.currency, excludeOrderId)
+      : await calcUsedAmountForCustomer(sides.counterpartyIds, row.currency, excludeOrderId);
 
   const creditNum = parseFloat(row.creditAmount) || 0;
   const usedNum = parseFloat(usedAmount) || 0;
@@ -230,6 +238,7 @@ async function enrichCreditLine(row: RawCreditLine): Promise<CreditLineDto> {
 export async function listCreditLines(query?: {
   type?: CreditLineType;
   counterpartyId?: string;
+  excludeOrderId?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   page?: number;
@@ -304,7 +313,7 @@ export async function listCreditLines(query?: {
     countQuery.where(where),
   ]);
 
-  const items = await Promise.all(rows.map((r) => enrichCreditLine(r)));
+  const items = await Promise.all(rows.map((r) => enrichCreditLine(r, query?.excludeOrderId)));
 
   return { items, total: countResult[0]?.count ?? 0 };
 }
@@ -337,11 +346,18 @@ export async function checkCreditAvailability(opts: {
   currency: string;
   isBrokerDeal: boolean;
   required: number;
+  /**
+   * The order being validated. Its own exposure is excluded from usage so it
+   * is not double-counted (it is already carried by `required`). Without this,
+   * converting a priced deal requires 2× its value in available credit.
+   */
+  excludeOrderId?: string;
   label: string; // e.g. 'Supplier credit' — used in the rejection message
 }): Promise<CreditAvailability> {
   const { items } = await listCreditLines({
     type: opts.type,
     counterpartyId: opts.counterpartyId,
+    excludeOrderId: opts.excludeOrderId,
     limit: 100,
   });
   const today = new Date().toISOString().slice(0, 10);

@@ -36,6 +36,10 @@ import {
   calculateOrderEconomics,
   getFinancingRateAnnual,
 } from './order-financing';
+import {
+  listSupplierCreditNotes,
+  summarizeSupplierCredits,
+} from './supplier-credit-notes.service';
 import { getFxRate } from '../prices/price.service';
 import { formatStoredDateOnlyLabel } from '../documents/inquiry.utils';
 
@@ -736,6 +740,7 @@ export async function addOrderSupplier(orderId: string, input: {
         currency: order.currency ?? 'USD',
         isBrokerDeal: order.isBrokerDeal === true,
         required: 0,
+        excludeOrderId: orderId,
         label: 'Supplier credit',
       });
       if (!result.ok) {
@@ -827,6 +832,7 @@ async function assertCreditTermsAllowed(input: {
       currency,
       isBrokerDeal,
       required,
+      excludeOrderId: input.orderId,
       label: 'Customer credit',
     });
     if (!result.ok) throw new Error(result.reason ?? 'Insufficient customer credit');
@@ -843,6 +849,7 @@ async function assertCreditTermsAllowed(input: {
       currency,
       isBrokerDeal,
       required,
+      excludeOrderId: input.orderId,
       label: 'Supplier credit',
     });
     if (!result.ok) {
@@ -865,6 +872,7 @@ async function assertCreditTermsAllowed(input: {
       currency,
       isBrokerDeal,
       required,
+      excludeOrderId: input.orderId,
       label: 'Supplier credit',
     });
     if (!result.ok) throw new Error(result.reason ?? 'Insufficient supplier credit');
@@ -888,6 +896,7 @@ async function assertCreditTermsAllowed(input: {
       currency,
       isBrokerDeal,
       required,
+      excludeOrderId: input.orderId,
       label: 'Supplier credit',
     });
     if (!result.ok) {
@@ -939,6 +948,7 @@ export async function updateOrderSupplierRecord(orderId: string, supplierRecordI
         currency: order.currency ?? 'USD',
         isBrokerDeal: order.isBrokerDeal === true,
         required,
+        excludeOrderId: orderId,
         label: 'Supplier credit',
       });
       if (!result.ok) {
@@ -1380,7 +1390,7 @@ export async function getOrderById(idOrNumber: string) {
   if (!row) return null;
 
   // Fetch relations in parallel
-  const [client, supplier, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, broker, brokerContact, agent, agentContact, tenant, orderSupplierRows] =
+  const [client, supplier, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, broker, brokerContact, agent, agentContact, tenant, orderSupplierRows, creditNoteList, creditSummary] =
     await Promise.all([
       getCounterpartyById(row.clientId),
       getCounterpartyById(row.supplierId),
@@ -1451,6 +1461,8 @@ export async function getOrderById(idOrNumber: string) {
         columns: { settings: true },
       }),
       listOrderSuppliers(row.id),
+      listSupplierCreditNotes(row.id),
+      summarizeSupplierCredits(row.id, row.currency ?? 'USD'),
     ]);
 
   const financingRateAnnual = getFinancingRateAnnual((tenant?.settings ?? {}) as TenantSettings);
@@ -1525,6 +1537,11 @@ export async function getOrderById(idOrNumber: string) {
     financingCostPerMt: orderEconomics.financingCostPerMt != null ? orderEconomics.financingCostPerMt.toFixed(4) : null,
     totalNetProfit: orderEconomics.totalNetProfit.toFixed(4),
     netMarginPct: orderEconomics.netMarginPct != null ? orderEconomics.netMarginPct.toFixed(4) : null,
+    // ── Supplier credit notes (panel rule: only RECEIVED credits hit margin) ──
+    totalSupplierCredits: creditSummary.received.toFixed(2),
+    expectedSupplierCredits: creditSummary.expected.toFixed(2),
+    netProfitAfterCredits: (orderEconomics.totalNetProfit - creditSummary.received).toFixed(4),
+    supplierCreditNotes: creditNoteList,
     client,
     supplier,
     vessel,
