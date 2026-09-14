@@ -1873,6 +1873,17 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
     if (!orderSupplierId && supplierRows.length > 1) {
       throw new Error('Each order item must specify a supplier when an order has multiple suppliers');
     }
+    // Supplier credit-note guardrail (Phase 1): CREDIT_NOTE lines are legacy
+    // placeholders for supplier credits. Reject negative-cost ones — they distort
+    // delivered quantities and margin math. Supplier credits become first-class
+    // records on the supplier leg in the credit-notes feature.
+    const isCreditNoteLine = (item.productType ?? '').toUpperCase() === 'CREDIT_NOTE';
+    const negativeCost = item.costPrice != null && Number(item.costPrice) < 0;
+    if (isCreditNoteLine && negativeCost) {
+      throw new Error(
+        'CREDIT_NOTE lines with a negative cost are no longer allowed — record supplier credit notes as a credit adjustment on the supplier leg instead.',
+      );
+    }
 
     const costCurrency = (item.costCurrency ?? orderCurrency).toUpperCase();
     const salesCurrency = (item.salesCurrency ?? orderCurrency).toUpperCase();

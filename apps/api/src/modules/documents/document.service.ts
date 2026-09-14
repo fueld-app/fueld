@@ -121,6 +121,45 @@ export function formatProductTypeLabel(productType: string): string {
   return productType.replace(/_/g, ' ');
 }
 
+/**
+ * True for legacy supplier credit-note placeholder lines: CREDIT_NOTE-type
+ * product lines carrying no sell price. These are buy-side financial
+ * adjustments, never customer-facing product rows.
+ * A CREDIT_NOTE line WITH a (negative) sell price is a customer credit and
+ * keeps rendering on documents until the credit-note document feature ships.
+ */
+export function isSupplierCreditPlaceholder<
+  T extends { productType: string; salesPrice?: string | number | null },
+>(item: T): boolean {
+  return (
+    (item.productType ?? '').toUpperCase() === 'CREDIT_NOTE' &&
+    (item.salesPrice == null || item.salesPrice === '')
+  );
+}
+
+/**
+ * Filter for items rendered on customer/broker-facing generated documents
+ * (CONFIRMATION, OFFER, NOMINATION, PFI, INVOICE, broker confirmation).
+ *
+ * Excludes:
+ *  - items flagged hideOnDocuments (e.g. broker commission line items)
+ *  - supplier credit-note placeholder lines (see isSupplierCreditPlaceholder):
+ *    they previously rendered as rows with a bare dash for the price.
+ *    Zero-priced legitimate lines (e.g. fees included in the price) are NOT
+ *    affected — only unpriced CREDIT_NOTE-type lines are excluded.
+ */
+export function customerFacingItems<
+  T extends {
+    productType: string;
+    hideOnDocuments?: boolean | null;
+    salesPrice?: string | number | null;
+  },
+>(items: T[]): T[] {
+  return items.filter(
+    (item) => !item.hideOnDocuments && !isSupplierCreditPlaceholder(item),
+  );
+}
+
 export function documentTypePrefix(documentType: DocumentType): string {
   switch (documentType) {
     case 'OFFER': return 'OFF';
@@ -1452,12 +1491,12 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items
-      .filter((item) => item.customerNote && !item.hideOnDocuments)
+      .filter((item) => item.customerNote && !item.hideOnDocuments && !isSupplierCreditPlaceholder(item))
       .map((item) => ({
         label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
-    items: order.items.filter(item => !item.hideOnDocuments).map((item) => ({
+    items: customerFacingItems(order.items).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.deliveredQuantity ?? item.quantity,
@@ -1604,12 +1643,12 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items
-      .filter((item) => item.customerNote && !item.hideOnDocuments)
+      .filter((item) => item.customerNote && !item.hideOnDocuments && !isSupplierCreditPlaceholder(item))
       .map((item) => ({
         label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
-    items: order.items.filter(item => !item.hideOnDocuments).map((item) => ({
+    items: customerFacingItems(order.items).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.deliveredQuantity ?? item.quantity,
@@ -2191,6 +2230,7 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
   revision: DocumentRevisionInfo;
 }> {
   const includeHidden = options?.includeHiddenItems ?? false;
+  void includeHidden; // kept for API compat: hideOnDocuments lines stay excluded everywhere; CREDIT_NOTE lines are now also unconditionally excluded
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings();
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
@@ -2280,13 +2320,13 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items
-      .filter((item) => item.customerNote && !item.hideOnDocuments)
+      .filter((item) => item.customerNote && !item.hideOnDocuments && !isSupplierCreditPlaceholder(item))
       .map((item) => ({
         label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
     currency: order.currency ?? 'USD',
-    items: (includeHidden ? order.items : order.items.filter(item => !item.hideOnDocuments)).map((item) => ({
+    items: customerFacingItems(order.items).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.quantity,
@@ -2521,7 +2561,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     companyLogoDataUrl,
     itemNotes: [],
     currency: order.currency ?? 'USD',
-    items: nominationContext.items.filter(item => !item.hideOnDocuments).map((item) => ({
+    items: customerFacingItems(nominationContext.items).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.quantity,
@@ -3128,12 +3168,12 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items
-      .filter((item) => item.customerNote && !item.hideOnDocuments)
+      .filter((item) => item.customerNote && !item.hideOnDocuments && !isSupplierCreditPlaceholder(item))
       .map((item) => ({
         label: formatProductTypeLabel(item.productType),
         note: String(item.customerNote),
       })),
-    items: order.items.filter(item => !item.hideOnDocuments).map((item) => ({
+    items: customerFacingItems(order.items).map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.quantity,
