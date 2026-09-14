@@ -779,7 +779,12 @@ export async function runScheduledChecks(): Promise<void> {
 
         const hasNewHits = results.some((r) => r.status === 'HIT');
         if (hasNewHits && settings.autoEnforceOnHit) {
-          // Revoke any active override
+          // Revoke active TEMPORARY overrides only. A permanent override
+          // (expiresAt IS NULL) is a deliberate standing human decision to
+          // accept the risk — and for carriers on sanctions/watch lists the
+          // hits recur on every re-check, so auto-revoking permanent
+          // overrides just re-freezes them on the next scheduled run.
+          // Manual revocation (revokeOverride) still works for both kinds.
           await db
             .update(riskOverrides)
             .set({ status: 'REVOKED', updatedAt: new Date() })
@@ -787,6 +792,7 @@ export async function runScheduledChecks(): Promise<void> {
               and(
                 eq(riskOverrides.counterpartyId, company.id),
                 eq(riskOverrides.status, 'APPROVED'),
+                sql`${riskOverrides.expiresAt} IS NOT NULL`,
               ),
             );
 
