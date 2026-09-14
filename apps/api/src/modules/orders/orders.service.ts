@@ -1538,9 +1538,10 @@ export async function getOrderById(idOrNumber: string) {
     totalNetProfit: orderEconomics.totalNetProfit.toFixed(4),
     netMarginPct: orderEconomics.netMarginPct != null ? orderEconomics.netMarginPct.toFixed(4) : null,
     // ── Supplier credit notes (panel rule: only RECEIVED credits hit margin) ──
+    // A supplier credit reduces cost → profit IMPROVES by the credit amount.
     totalSupplierCredits: creditSummary.received.toFixed(2),
     expectedSupplierCredits: creditSummary.expected.toFixed(2),
-    netProfitAfterCredits: (orderEconomics.totalNetProfit - creditSummary.received).toFixed(4),
+    netProfitAfterCredits: (orderEconomics.totalNetProfit + creditSummary.received).toFixed(4),
     supplierCreditNotes: creditNoteList,
     client,
     supplier,

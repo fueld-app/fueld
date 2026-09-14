@@ -633,7 +633,8 @@ export interface OrderDto {
   totalSupplierCredits?: string;
   /** Sum of EXPECTED supplier credits (informational — never in margin math). */
   expectedSupplierCredits?: string;
-  /** Net profit after received supplier credits = totalNetProfit − totalSupplierCredits. */
+  /** Net profit after received supplier credits = totalNetProfit + received credits
+   *  (a credit reduces cost → profit improves). */
   netProfitAfterCredits?: string;
   categoryKey?: string | null;
   isBrokerDeal?: boolean;
@@ -788,7 +789,7 @@ export interface OrderListRowDto {
   totalFinancingCost?: number;
   totalNetProfit?: number;
   netMarginPct?: number | null;
-  /** Received supplier credits (positive) — subtract for net-after-credits. */
+  /** Received supplier credits (positive) — ADD for net-after-credits. */
   totalSupplierCredits?: number;
   expectedSupplierCredits?: number;
   netProfitAfterCredits?: number | null;
