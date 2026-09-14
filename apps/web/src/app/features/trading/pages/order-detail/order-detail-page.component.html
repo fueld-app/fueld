@@ -310,6 +310,9 @@
       [economics]="itemEconomics()"
       [hasCommissions]="hasDealCommissions()"
       [tradingProfit]="itemEconomics().tradingProfit ?? null"
+      [totalSupplierCredits]="totalSupplierCredits()"
+      [expectedSupplierCredits]="expectedSupplierCredits()"
+      [netProfitAfterCredits]="netProfitAfterCredits()"
     />
   </div>
 }
@@ -419,6 +422,16 @@
         (deletePayment)="onSupplierPaymentDeleted($event)"
       />
     }
+} @placeholder { <div></div> }
+@defer (on idle) {
+    <app-supplier-credit-notes-card
+      [credits]="supplierCreditNotes()"
+      [orderCurrency]="order()?.currency ?? 'USD'"
+      [canEdit]="auth.canSeePrices()"
+      (addCredit)="openSupplierCreditNoteModal()"
+      (markReceived)="onSupplierCreditMarkedReceived($event)"
+      (cancelCredit)="onSupplierCreditCancelled($event)"
+    />
 } @placeholder { <div></div> }
 @defer (on idle) {
     <app-order-attachments-card
@@ -575,6 +588,17 @@
   [defaultCurrency]="order()?.currency ?? 'USD'"
   [todayLocal]="todayLocalDateString()"
   (saved)="onSupplierPaymentSaved()"
+/>
+} @placeholder { <div></div> }
+
+@defer (on idle) {
+<app-supplier-credit-note-modal
+  #supplierCreditNoteModal
+  [orderId]="orderId()"
+  [legOptions]="supplierLegOptions()"
+  [currencyOptions]="refData.configuredCurrencies()"
+  [defaultCurrency]="order()?.currency ?? 'USD'"
+  (saved)="onSupplierCreditNoteSaved()"
 />
 } @placeholder { <div></div> }
 

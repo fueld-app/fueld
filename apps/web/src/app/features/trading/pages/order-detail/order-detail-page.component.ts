@@ -29,6 +29,7 @@ import {
   type OwnCompanyDto,
   type OrderAttachmentDto,
   type CustomerPaymentDto,
+  type SupplierCreditNoteDto,
   type CompanyContactDto,
   type BankAccountDto,
   type CreditLineDto,
@@ -75,6 +76,8 @@ import { OrderSuppliersTabComponent } from './components/order-suppliers-tab/ord
 import { OrderCaptureTabComponent } from './components/order-capture-tab/order-capture-tab.component';
 import { OrderPaymentsCardComponent } from './components/order-payments-card/order-payments-card.component';
 import { SupplierPaymentsCardComponent } from './components/supplier-payments-card/supplier-payments-card.component';
+import { SupplierCreditNotesCardComponent } from './components/supplier-credit-notes-card/supplier-credit-notes-card.component';
+import { SupplierCreditNoteModalComponent } from './components/supplier-credit-note-modal/supplier-credit-note-modal.component';
 import { SupplierPaymentModalComponent } from './components/supplier-payment-modal/supplier-payment-modal.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
@@ -157,6 +160,8 @@ import type {
     OrderSuppliersTabComponent,
     OrderCaptureTabComponent,
     SupplierPaymentsCardComponent,
+    SupplierCreditNotesCardComponent,
+    SupplierCreditNoteModalComponent,
     SupplierPaymentModalComponent,
   ],
   templateUrl: 'order-detail-page.component.html',
@@ -334,6 +339,24 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
   readonly supplierPayments = computed(() => this.financialSvc.supplierPayments());
+  // Supplier credit notes come with the order detail payload (Phase 2).
+  readonly supplierCreditNotes = computed(
+    () => (this.order() as unknown as { supplierCreditNotes?: SupplierCreditNoteDto[] } | null)?.supplierCreditNotes ?? [],
+  );
+  /** Supplier leg dropdown for the credit-note modal. */
+  readonly supplierLegOptions = computed(() => {
+    const detail = this.order() as unknown as { orderSuppliers?: OrderSupplierDto[] } | null;
+    return (detail?.orderSuppliers ?? []).map((leg: OrderSupplierDto, i: number) => ({
+      value: leg.id,
+      label: `Supplier leg ${i + 1}${leg.isPrimary ? ' (primary)' : ''}`,
+    }));
+  });
+  readonly totalSupplierCredits = computed(() => parseFloat(this.order()?.totalSupplierCredits ?? '0') || 0);
+  readonly expectedSupplierCredits = computed(() => parseFloat(this.order()?.expectedSupplierCredits ?? '0') || 0);
+  readonly netProfitAfterCredits = computed(() => {
+    const v = this.order()?.netProfitAfterCredits;
+    return v == null ? null : parseFloat(v);
+  });
   readonly supplierPaymentsLoading = computed(() => this.financialSvc.supplierPaymentsLoading());
   readonly portDocumentationContext = computed(() => this.portDocSvc.portDocumentationContext());
   readonly portDocumentationLoading = computed(() => this.portDocSvc.portDocumentationLoading());
@@ -354,6 +377,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly showSupplierPaymentNote = signal(false);
   readonly paymentModalRef = viewChild(OrderPaymentModalComponent);
   readonly supplierPaymentModalRef = viewChild(SupplierPaymentModalComponent);
+  readonly supplierCreditNoteModalRef = viewChild(SupplierCreditNoteModalComponent);
   readonly todayLocalDateString = () => this.formatDateForInput(new Date(), this.placeTimezone());
   readonly convertModalRef = viewChild(OrderConvertModalComponent);
   readonly cancelModalRef = viewChild(OrderCancelModalComponent);
@@ -1422,6 +1446,57 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const modal = this.supplierPaymentModalRef();
     if (modal) { modal.openModal(); return; }
     setTimeout(() => this.supplierPaymentModalRef()?.openModal(), 200);
+  }
+
+  // ─── Supplier credit notes (Phase 2) ─────────────────────────────
+  openSupplierCreditNoteModal(): void {
+    const modal = this.supplierCreditNoteModalRef();
+    if (modal) { modal.openModal(); return; }
+    setTimeout(() => this.supplierCreditNoteModalRef()?.openModal(), 200);
+  }
+
+  onSupplierCreditNoteSaved(): void {
+    this.refreshOrderSilently();
+  }
+
+  async onSupplierCreditMarkedReceived(creditId: string): Promise<void> {
+    const orderId = this.orderId();
+    if (!orderId) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<SupplierCreditNoteDto>>(
+          `${API_URL}/orders/${orderId}/supplier-credit-notes/${creditId}`,
+          { status: 'RECEIVED' },
+        ),
+      );
+      if (res.success) {
+        this.refreshOrderSilently();
+      } else {
+        this.showToast('error', res.message ?? 'Failed to mark credit as received.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to mark credit as received.');
+    }
+  }
+
+  async onSupplierCreditCancelled(creditId: string): Promise<void> {
+    const orderId = this.orderId();
+    if (!orderId) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<SupplierCreditNoteDto>>(
+          `${API_URL}/orders/${orderId}/supplier-credit-notes/${creditId}`,
+          { status: 'CANCELLED' },
+        ),
+      );
+      if (res.success) {
+        this.refreshOrderSilently();
+      } else {
+        this.showToast('error', res.message ?? 'Failed to cancel credit note.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to cancel credit note.');
+    }
   }
 
   async loadSupplierPayments(): Promise<void> {

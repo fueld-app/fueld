@@ -63,6 +63,25 @@ import type { OrderItemsEconomics } from '../order-items/order-item.types';
         </div>
       </div>
 
+      <!-- Supplier credits adjustment row (only when credits exist) -->
+      @if ((totalSupplierCredits() ?? 0) > 0 || (expectedSupplierCredits() ?? 0) > 0) {
+        <div class="flex items-center justify-between border-t border-gray-100 dark:border-line px-4 py-2 text-xs">
+          <div class="flex items-center gap-4">
+            @if ((totalSupplierCredits() ?? 0) > 0) {
+              <span>Supplier credits (received) <strong class="text-emerald-600 dark:text-emerald-400">−{{ totalSupplierCredits() | number:'1.2-2' }}</strong></span>
+              <span class="text-gray-500 dark:text-muted">Net after credits
+                <strong [class.text-green-600]="(netProfitAfterCredits() ?? 0) > 0"
+                        [class.text-red-600]="(netProfitAfterCredits() ?? 0) < 0"
+                        class="tabular-nums">{{ netProfitAfterCredits() | number:'1.2-2' }}</strong>
+              </span>
+            }
+            @if ((expectedSupplierCredits() ?? 0) > 0) {
+              <span class="text-amber-600 dark:text-amber-400">Expected credits {{ expectedSupplierCredits() | number:'1.2-2' }} (not in margin)</span>
+            }
+          </div>
+        </div>
+      }
+
       <!-- Secondary metrics row -->
       <div class="flex items-center justify-between border-t border-gray-100 dark:border-line px-4 py-2">
         <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-muted">
@@ -83,6 +102,10 @@ export class OrderFinancingSummaryComponent {
   readonly financingRateAnnual = input(0.08);
   readonly financingDays = input(0);
   readonly financingDayCountConvention = input(365);
+  /** Received supplier credits (positive) — shown with the net-after-credits figure. */
+  readonly totalSupplierCredits = input<number | null>(null);
+  readonly expectedSupplierCredits = input<number | null>(null);
+  readonly netProfitAfterCredits = input<number | null>(null);
   readonly economics = input<OrderItemsEconomics>({
     totalQuantity: 0,
     totalCost: 0,
