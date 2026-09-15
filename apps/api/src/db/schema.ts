@@ -390,6 +390,14 @@ export interface TenantSettings {
     reportStatuses: string[];          // Which statuses to include in report (default: ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'])
     autoReleaseCredit: boolean;        // Auto-release supplier credit after credit period (default: true)
     autoReleaseBufferDays: number;     // Extra buffer days before auto-release (default: 0)
+    /**
+     * Skip the customer-side credit gate for broker deals (default false).
+     * For pure brokerages the counterparty risk on broker deals sits with
+     * the supplier leg, so the customer credit line tracks exposure for
+     * reporting but does not block converting broker deals. Regular
+     * (non-broker) trading orders are always gated.
+     */
+    skipCustomerCreditCheckOnBrokerDeals?: boolean;
   };
   // Follow-up settings
   followUpSettings?: {

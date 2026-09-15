@@ -786,6 +786,20 @@ async function creditEnforcementDisabled(tenantId: string): Promise<boolean> {
   return ((tenant?.settings as Record<string, unknown> | null)?.['credit'] as any)?.['enforceOnServer'] === false;
 }
 
+/**
+ * Whether broker deals skip the customer-side credit gate for this tenant
+ * (settings.brokerDeals.skipCustomerCreditCheckOnBrokerDeals). Default off:
+ * broker deals are gated like any other deal until the tenant opts in.
+ */
+async function brokerDealsSkipCustomerCreditCheck(tenantId: string): Promise<boolean> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  return ((tenant?.settings as Record<string, unknown> | null)?.['brokerDeals'] as any)?.['skipCustomerCreditCheckOnBrokerDeals'] === true;
+}
+
 /** Sum an order-items money column (optionally scoped to one supplier leg). */
 async function sumOrderItemsPrice(
   orderId: string,
@@ -824,7 +838,15 @@ async function assertCreditTermsAllowed(input: {
 
   // Only credit-backed terms are validated: a deal on COD/PREPAY doesn't
   // draw the customer's credit line, so its availability is irrelevant.
-  if (input.checkCustomer && order.customerPaymentTermType === 'CREDIT' && order.clientId) {
+  // Broker deals skip the customer gate when the tenant opts in — for pure
+  // brokerages the customer credit line tracks exposure for reporting but
+  // does not block conversions (regular trading orders stay gated).
+  const customerCheckApplies =
+    input.checkCustomer &&
+    order.customerPaymentTermType === 'CREDIT' &&
+    !!order.clientId &&
+    !(isBrokerDeal && (await brokerDealsSkipCustomerCreditCheck(order.tenantId)));
+  if (customerCheckApplies) {
     const required = await sumOrderItemsPrice(input.orderId, 'salesPrice');
     const result = await checkCreditAvailability({
       type: 'CUSTOMER',
