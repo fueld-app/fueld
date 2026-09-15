@@ -14,6 +14,7 @@ import {
   orderItems,
   creditLineCompanies,
   creditLineCounterparties,
+  customerPayments,
   tenants,
 } from '../../db/schema';
 import type { CreditLineDto, CreditLineType } from '@fueld/types';
@@ -93,12 +94,29 @@ async function calcUsedAmountForSupplier(
 
 async function calcUsedAmountForCustomer(counterpartyIds: string[], currency?: string, excludeOrderId?: string): Promise<string> {
   if (!counterpartyIds.length) return '0';
+  // Net exposure: committed value per order minus payments actually received
+  // on that order (parity with the supplier side, which nets paidAt).
+  // Without netting, recorded customer payments never released credit until
+  // someone manually marked the order PAID.
+  const paymentsTotals = db
+    .select({
+      orderId: customerPayments.orderId,
+      currency: customerPayments.currency,
+      paid: sql<string>`sum(${customerPayments.amount}::numeric)`.as('paid'),
+    })
+    .from(customerPayments)
+    .groupBy(customerPayments.orderId, customerPayments.currency)
+    .as('cp_totals');
   const [row] = await db
     .select({
-      total: sql<string>`coalesce(sum(${orderItems.salesPrice}::numeric * ${orderItems.quantity}::numeric), 0)::text`,
+      total: sql<string>`coalesce(sum(greatest(${orderItems.salesPrice}::numeric * ${orderItems.quantity}::numeric - coalesce(${paymentsTotals.paid}, 0), 0)), 0)::text`,
     })
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .leftJoin(
+      paymentsTotals,
+      and(eq(paymentsTotals.orderId, orders.id), eq(paymentsTotals.currency, orders.currency)),
+    )
     .where(
       and(
         inArray(orders.clientId, counterpartyIds),
