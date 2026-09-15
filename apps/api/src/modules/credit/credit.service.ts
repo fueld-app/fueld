@@ -98,6 +98,11 @@ async function calcUsedAmountForCustomer(counterpartyIds: string[], currency?: s
   // on that order (parity with the supplier side, which nets paidAt).
   // Without netting, recorded customer payments never released credit until
   // someone manually marked the order PAID.
+  //
+  // Panel fix: order values are aggregated to one row per order FIRST and
+  // payments are subtracted at the order level. Subtracting the per-order
+  // payment total from EACH item row over-nets multi-item orders (fail-open:
+  // inflates available credit).
   const paymentsTotals = db
     .select({
       orderId: customerPayments.orderId,
@@ -107,12 +112,20 @@ async function calcUsedAmountForCustomer(counterpartyIds: string[], currency?: s
     .from(customerPayments)
     .groupBy(customerPayments.orderId, customerPayments.currency)
     .as('cp_totals');
-  const [row] = await db
+  const orderValues = db
     .select({
-      total: sql<string>`coalesce(sum(greatest(${orderItems.salesPrice}::numeric * ${orderItems.quantity}::numeric - coalesce(${paymentsTotals.paid}, 0), 0)), 0)::text`,
+      orderId: orderItems.orderId,
+      value: sql<string>`sum(${orderItems.salesPrice}::numeric * ${orderItems.quantity}::numeric)`.as('value'),
     })
     .from(orderItems)
-    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .groupBy(orderItems.orderId)
+    .as('oi_totals');
+  const [row] = await db
+    .select({
+      total: sql<string>`coalesce(sum(greatest(${orderValues.value} - coalesce(${paymentsTotals.paid}, 0), 0)), 0)::text`,
+    })
+    .from(orderValues)
+    .innerJoin(orders, eq(orders.id, orderValues.orderId))
     .leftJoin(
       paymentsTotals,
       and(eq(paymentsTotals.orderId, orders.id), eq(paymentsTotals.currency, orders.currency)),
