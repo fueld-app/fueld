@@ -91,9 +91,9 @@ export class OrderLoaderService {
       // Riviera Marine — order 20260911-000522, 2026-09-16).
       orderSuppliers: d.orderSuppliers ?? [],
       supplierCreditNotes: d.supplierCreditNotes ?? [],
-      totalSupplierCredits: d.totalSupplierCredits ?? '0.00',
-      expectedSupplierCredits: d.expectedSupplierCredits ?? '0.00',
-      netProfitAfterCredits: d.netProfitAfterCredits ?? null,
+      totalSupplierCredits: d.totalSupplierCredits,
+      expectedSupplierCredits: d.expectedSupplierCredits,
+      netProfitAfterCredits: d.netProfitAfterCredits,
     };
 
     result.items = (d.items ?? []).map((item: any) => ({
