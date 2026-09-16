@@ -83,6 +83,17 @@ export class OrderLoaderService {
       createdAt: d.createdAt, updatedAt: d.updatedAt,
       isBrokerDeal: d.isBrokerDeal ?? false,
       commissionPerMt: d.commissionPerMt ?? null,
+      // ── Phase 2 supplier credit-note fields ──
+      // The credit-note modal's supplier-leg dropdown, the credit-notes card
+      // and the P&L-after-credits figures read these off `order()`. The loader
+      // previously dropped them from the order literal, so the dropdown was
+      // always empty ('Select a supplier leg.') for every order (Allan,
+      // Riviera Marine — order 20260911-000522, 2026-09-16).
+      orderSuppliers: d.orderSuppliers ?? [],
+      supplierCreditNotes: d.supplierCreditNotes ?? [],
+      totalSupplierCredits: d.totalSupplierCredits ?? '0.00',
+      expectedSupplierCredits: d.expectedSupplierCredits ?? '0.00',
+      netProfitAfterCredits: d.netProfitAfterCredits ?? null,
     };
 
     result.items = (d.items ?? []).map((item: any) => ({

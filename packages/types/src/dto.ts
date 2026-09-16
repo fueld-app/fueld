@@ -636,6 +636,10 @@ export interface OrderDto {
   /** Net profit after received supplier credits = totalNetProfit + received credits
    *  (a credit reduces cost → profit improves). */
   netProfitAfterCredits?: string;
+  // Present on the order-detail payload (order loader passes them through so
+  // the credit-note modal dropdown and card can read them off order()).
+  orderSuppliers?: OrderSupplierDto[];
+  supplierCreditNotes?: SupplierCreditNoteDto[];
   categoryKey?: string | null;
   isBrokerDeal?: boolean;
   commissionPerMt?: string | null;
