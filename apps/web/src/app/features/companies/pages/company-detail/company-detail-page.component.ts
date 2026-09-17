@@ -165,7 +165,7 @@ import { CompanyTabsNavComponent } from './company-tabs-nav.component';
            compiler quirk marked elements following inline <svg> markup with
            the SVG namespace in production builds, creating the router-outlet's
            child hosts as SVGElement (never lays out → 0×0 blank tabs). -->
-      @if (!store.loading()) {
+      @if (!store.loading() && store.company()) {
         <app-company-tabs-nav />
 
         <router-outlet />
