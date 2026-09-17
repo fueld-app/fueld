@@ -269,7 +269,11 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           cd apps/web
-          bunx ng build --configuration production
+          # MUST go through scripts/ng.sh (via bun run build) — `bunx ng` runs
+          # the Angular CLI under Bun's Node-compat runtime (reports Node
+          # v24.3.0, below Angular 22's minimum), which produces a broken
+          # bundle (0×0 router-outlet rendering in production builds).
+          CI=true NG_CLI_ANALYTICS=false bun run build
 
       - name: Setup SSH key
         run: |
