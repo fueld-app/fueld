@@ -82,37 +82,6 @@ import { CreditApplicationModalComponent } from '@app/features/credit/components
           (unlinkParentClick)="store.removeOwnParent()"
         />
 
-        <!-- Tab navigation -->
-        <div class="mb-6 -mx-4 px-4 md:mx-0 md:px-0">
-          <nav
-            class="flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-line pb-px scrollbar-hide"
-            aria-label="Company sections"
-          >
-            @for (tab of tabs; track tab.key) {
-              <a
-                [routerLink]="[tab.key]"
-                routerLinkActive
-                #rla="routerLinkActive"
-                role="tab"
-                [attr.aria-selected]="rla.isActive"
-                [attr.aria-controls]="'tab-panel-' + tab.key"
-                [id]="'tab-' + tab.key"
-                class="group inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none"
-                [class]="rla.isActive
-                  ? 'border-blue-600 text-blue-700 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path [attr.d]="tab.icon" />
-                </svg>
-                {{ tab.label }}
-              </a>
-            }
-          </nav>
-        </div>
-
-        <router-outlet />
-
         <!-- Delete confirmation modal -->
         @if (confirmDeleteOpen() && store.canDeleteEntity()) {
           <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="confirmDeleteOpen.set(false)">
@@ -192,6 +161,44 @@ import { CreditApplicationModalComponent } from '@app/features/credit/components
         />
       } @else {
         <div class="text-center py-20 text-gray-400 dark:text-muted">Company not found</div>
+      }
+
+      <!-- Tab navigation + router-outlet live OUTSIDE the loading/company @if
+           blocks. If the outlet is inside a signal-controlled block, any
+           loading/company flicker destroys and recreates it while the router
+           is mid-activation, orphaning the child component in the DOM with
+           0×0 dimensions (blank tabs bug). The tab components render their
+           own loading spinners until store.company() is available. -->
+      @if (!store.loading()) {
+        <div class="mb-6 -mx-4 px-4 md:mx-0 md:px-0">
+          <nav
+            class="flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-line pb-px scrollbar-hide"
+            aria-label="Company sections"
+          >
+            @for (tab of tabs; track tab.key) {
+              <a
+                [routerLink]="[tab.key]"
+                routerLinkActive
+                #rla="routerLinkActive"
+                role="tab"
+                [attr.aria-selected]="rla.isActive"
+                [attr.aria-controls]="'tab-panel-' + tab.key"
+                [id]="'tab-' + tab.key"
+                class="group inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none"
+                [class]="rla.isActive
+                  ? 'border-blue-600 text-blue-700 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path [attr.d]="tab.icon" />
+                </svg>
+                {{ tab.label }}
+              </a>
+            }
+          </nav>
+        </div>
+
+        <router-outlet />
       }
     </div>
   `,

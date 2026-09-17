@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -243,7 +243,7 @@ interface NetPosition {
     </div>
   `,
 })
-export class PaymentsTabComponent implements OnInit {
+export class PaymentsTabComponent {
   private readonly http = inject(HttpClient);
   readonly store = inject(CompanyDetailStore);
 
@@ -286,9 +286,16 @@ export class PaymentsTabComponent implements OnInit {
   private customerOffset = 0;
   private supplierOffset = 0;
 
-  ngOnInit(): void {
-    this.loadBoth(true);
-  }
+  // The router-outlet activates this tab before the company is loaded, so
+  // load via effect() — fires as soon as store.company() becomes available.
+  private loadedForCompanyId: string | null = null;
+  private readonly loadOnCompany = effect(() => {
+    const company = this.store.company();
+    if (company && company.id !== this.loadedForCompanyId) {
+      this.loadedForCompanyId = company.id;
+      void this.loadBoth(true);
+    }
+  });
 
   async loadBoth(reset: boolean): Promise<void> {
     const company = this.store.company();
