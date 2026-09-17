@@ -67,7 +67,7 @@ function toNumber(value: string | number | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function toFixedString(n: number, scale = 3): string {
+function toFixedString(n: number, scale = 6): string {
   return n.toFixed(scale);
 }
 

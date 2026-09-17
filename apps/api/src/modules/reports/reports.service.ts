@@ -139,7 +139,7 @@ function formatMoney(value: number): string {
 }
 
 function formatQuantity(value: number): string {
-  return value.toFixed(3);
+  return value.toFixed(6);
 }
 
 function formatPercentValue(numerator: number, denominator: number): number {
@@ -2467,13 +2467,13 @@ export async function buildBrokerCommissionReport(
       existing.orders.push(order);
       existing.orderCount++;
       existing.totalCommission = (parseFloat(existing.totalCommission) + commissionAmount).toFixed(2);
-      existing.totalQuantity = (parseFloat(existing.totalQuantity) + qty).toFixed(3);
+      existing.totalQuantity = (parseFloat(existing.totalQuantity) + qty).toFixed(6);
     } else {
       byCustomerMap.set(key, {
         customerId: r.customerId,
         customerName: r.customerName,
         orderCount: 1,
-        totalQuantity: qty.toFixed(3),
+        totalQuantity: qty.toFixed(6),
         totalCommission: commissionAmount.toFixed(2),
         orders: [order],
       });

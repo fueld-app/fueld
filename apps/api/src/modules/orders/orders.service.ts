@@ -2723,7 +2723,7 @@ async function applyInventoryEffectsForStatusChange(args: {
         await inv.createReplenishmentPlan({
           warehouseId: transfer.destinationWarehouseId,
           skuId: item.inventorySkuId,
-          quantity: qty.toFixed(3),
+          quantity: qty.toFixed(6),
           unit: item.unit,
           expectedAt: (transfer.plannedArrivalAt ?? order.eta ?? eventTime(item, null)).toISOString(),
           orderId,

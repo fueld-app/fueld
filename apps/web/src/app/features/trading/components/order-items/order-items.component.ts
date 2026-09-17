@@ -161,7 +161,7 @@ import type {
                     @if (rangeLabel(row)) {
                       {{ rangeLabel(row) }}
                     } @else {
-                      {{ row.quantity | number:'1.0-3' }}
+                      {{ row.quantity | number:'1.0-6' }}
                     }
                     {{ row.unit }}
                   </span>
@@ -626,7 +626,7 @@ import type {
                   @if (rangeLabel(row)) {
                     {{ rangeLabel(row) }}
                   } @else {
-                    {{ row.quantity | number:'1.0-3' }}
+                    {{ row.quantity | number:'1.0-6' }}
                   }
                   {{ row.unit }}
                 </span>
@@ -1404,7 +1404,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
    * the ordered quantity, otherwise quantity itself). Empty string otherwise.
    */
   rangeLabel(row: OrderItemRow): string {
-    const fmt = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(n);
+    const fmt = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(n);
     const max = row.quantityMax != null && row.quantityMax > (row.quantity ?? 0)
       ? row.quantityMax
       : row.quantity;

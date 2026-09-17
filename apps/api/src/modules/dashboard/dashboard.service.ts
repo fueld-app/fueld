@@ -280,7 +280,7 @@ export async function getTeamStats(
     traderName: s.traderName,
     traderEmail: s.traderEmail,
     orderCount: s.orderCount,
-    totalVolume: s.totalVolume.toFixed(3),
+    totalVolume: s.totalVolume.toFixed(6),
     totalRevenue: s.totalRevenue.toFixed(2),
     totalCost: s.totalCost.toFixed(2),
     totalProfit: s.totalProfit.toFixed(2),

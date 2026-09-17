@@ -256,11 +256,11 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
         data: {
           warehouseId: params.id,
           skuId: params.skuId,
-          onHand: bal.onHand.toFixed(3),
-          reserved: bal.reserved.toFixed(3),
-          availableNow: bal.availableNow.toFixed(3),
-          plannedInbound: bal.plannedInbound.toFixed(3),
-          plannedOutbound: bal.plannedOutbound.toFixed(3),
+          onHand: bal.onHand.toFixed(6),
+          reserved: bal.reserved.toFixed(6),
+          availableNow: bal.availableNow.toFixed(6),
+          plannedInbound: bal.plannedInbound.toFixed(6),
+          plannedOutbound: bal.plannedOutbound.toFixed(6),
           earliestAvailableAt: bal.earliestAvailableAt
             ? bal.earliestAvailableAt.toISOString()
             : null,
