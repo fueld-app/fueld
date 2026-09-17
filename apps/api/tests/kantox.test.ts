@@ -232,3 +232,95 @@ describe('entryRef — scheme verified live (TEST-A + TEST-A#C1 netted to 0.0)',
     expect(entryRef('20260911-000522', 'SO', undefined, 'REISSUE', 2)).toBe('20260911-000522#SR2');
   });
 });
+// ── buildHedgePlan — scope filter + two-leg plan (17/09 meeting decisions) ──
+
+import { buildHedgePlan, type KantoxOrderSnapshot } from '../src/modules/kantox/kantox.service';
+
+function snapshot(overrides: Partial<KantoxOrderSnapshot> = {}): KantoxOrderSnapshot {
+  return {
+    tenantId: 't1',
+    orderId: 'o1',
+    orderNumber: '20260911-000522',
+    dueDate: '2026-09-16',
+    customerPaymentTermType: 'CREDIT',
+    customerCreditDays: 30,
+    items: [
+      { id: 'i1', orderSupplierId: 'leg-a', quantity: '720', quantityMin: '480', salesPrice: '600', costPrice: '550', salesCurrency: 'USD', costCurrency: 'USD' },
+      { id: 'i2', orderSupplierId: 'leg-a', quantity: '240', quantityMin: '240', salesPrice: '610', costPrice: '590', salesCurrency: 'USD', costCurrency: 'USD' },
+    ],
+    ...overrides,
+  };
+}
+
+const SETTINGS = {
+  marginHedgePercent: 100,
+  paymentDateBufferDays: 7,
+  valueDateRounding: 'WEEKLY_MONDAY' as const,
+  hedgeCurrency: 'USD',
+  hedgeCounterCurrency: 'EUR',
+};
+
+describe('buildHedgePlan — tenant scope decisions (17/09 call)', () => {
+  it('plans SO SELL + PO BUY at FULL exposure (no client-side scaling — platform rule)', () => {
+    const plan = buildHedgePlan(snapshot(), SETTINGS);
+    expect(plan.skipped).toBeUndefined();
+    expect(plan.entries).toHaveLength(2);
+    const so = plan.entries.find((e) => e.leg === 'SO')!;
+    expect(so.direction).toBe('SELL');
+    // FULL exposure (no scaling) at the MINIMUM-QUANTITY basis (decision 8)
+    expect(Number(so.amount)).toBe(480 * 600 + 240 * 610);
+    const po = plan.entries.find((e) => e.leg === 'PO:1')!;
+    expect(po.direction).toBe('BUY');
+    expect(Number(po.amount)).toBe(480 * 550 + 240 * 590); // min-qty × cost, both items on leg-a
+    expect(so.valueDate).toBe(po.valueDate); // same value date both legs
+  });
+
+  it('excludes non-USD (EUR) orders entirely', () => {
+    const plan = buildHedgePlan(snapshot({
+      items: [{ id: 'i1', orderSupplierId: 'leg-a', quantity: '720', quantityMin: '480', salesPrice: '600', costPrice: '500', salesCurrency: 'EUR', costCurrency: 'EUR' }],
+    }), SETTINGS);
+    expect(plan.entries).toHaveLength(0);
+    expect(plan.skipped).toContain('no USD sell exposure');
+  });
+
+  it('excludes EUR-invoiced PO legs but keeps the USD SO leg', () => {
+    const plan = buildHedgePlan(snapshot({
+      items: [
+        { id: 'i1', orderSupplierId: 'leg-eur', quantity: '720', quantityMin: '480', salesPrice: '600', costPrice: '500', salesCurrency: 'USD', costCurrency: 'EUR' },
+      ],
+    }), SETTINGS);
+    expect(plan.entries).toHaveLength(1);
+    expect(plan.entries[0].leg).toBe('SO'); // EUR PO excluded per Marin, 17/09
+  });
+
+  it('skips negative-margin deals entirely (never net-BUY)', () => {
+    const plan = buildHedgePlan(snapshot({
+      items: [{ id: 'i1', orderSupplierId: 'leg-a', quantity: '720', quantityMin: '720', salesPrice: '600', costPrice: '650', salesCurrency: 'USD', costCurrency: 'USD' }],
+    }), SETTINGS);
+    expect(plan.entries).toHaveLength(0);
+    expect(plan.skipped).toContain('negative margin');
+  });
+
+  it('uses minimum quantity (pre-invoice basis) when set — one amount per deal', () => {
+    const plan = buildHedgePlan(snapshot({
+      items: [{ id: 'i1', orderSupplierId: 'leg-a', quantity: '720', quantityMin: '480', salesPrice: '600', costPrice: '500', salesCurrency: 'USD', costCurrency: 'USD' }],
+    }), SETTINGS);
+    expect(Number(plan.entries.find((e) => e.leg === 'SO')!.amount)).toBe(480 * 600);
+  });
+
+  it('numbers multiple USD PO legs distinctly (PO:1, PO:2)', () => {
+    const plan = buildHedgePlan(snapshot({
+      items: [
+        { id: 'i1', orderSupplierId: 'leg-a', quantity: '720', quantityMin: '480', salesPrice: '600', costPrice: '500', salesCurrency: 'USD', costCurrency: 'USD' },
+        { id: 'i2', orderSupplierId: 'leg-b', quantity: '240', quantityMin: '240', salesPrice: '600', costPrice: '580', salesCurrency: 'USD', costCurrency: 'USD' },
+      ],
+    }), SETTINGS);
+    const legs = plan.entries.filter((e) => e.leg.startsWith('PO')).map((e) => e.leg).sort();
+    expect(legs).toEqual(['PO:1', 'PO:2']);
+  });
+
+  it('derives entry refs from the order number', () => {
+    const plan = buildHedgePlan(snapshot(), SETTINGS);
+    expect(plan.entries[0].entryRef).toBe('20260911-000522#S');
+  });
+});

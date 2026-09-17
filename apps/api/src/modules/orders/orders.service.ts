@@ -41,6 +41,11 @@ import {
   summarizeSupplierCredits,
 } from './supplier-credit-notes.service';
 import { getFxRate } from '../prices/price.service';
+import {
+  onOrderConfirmedForKantox,
+  onOrderCancelledForKantox,
+  onCustomerPaymentForKantox,
+} from '../kantox/kantox.service';
 import { formatStoredDateOnlyLabel } from '../documents/inquiry.utils';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -2265,6 +2270,10 @@ export async function createOrderPayment(orderId: string, input: {
     await updateInvoiceAmountPaid(orderId);
   }
 
+  // Kantox: USD customer payment closes the sell-leg hedge (tenant-gated,
+  // fire-and-forget — never blocks payment recording).
+  void onCustomerPaymentForKantox(orderRow.tenantId, orderId, Number(input.amount), input.currency || 'USD');
+
   return created ? mapPaymentRow(created) : null;
 }
 
@@ -2510,6 +2519,31 @@ export async function updateOrderStatus(
       entityId: id,
       metadata: { newStatus, lossReason },
     });
+  }
+
+  // Kantox Dynamic Hedging (tenant-gated, fire-and-forget, never blocks the
+  // status change — all errors are swallowed inside the hook).
+  if (updated && (newStatus === 'CONFIRMED' || newStatus === 'CANCELLED' || newStatus === 'LOST')) {
+    const [kantoxOrder] = await db
+      .select({
+        id: orders.id, tenantId: orders.tenantId, orderNumber: orders.orderNumber,
+        dueDate: orders.dueDate, deliveredAt: orders.deliveredAt, eta: orders.eta,
+        customerPaymentTermType: orders.customerPaymentTermType, customerCreditDays: orders.customerCreditDays,
+      })
+      .from(orders)
+      .where(eq(orders.id, id))
+      .limit(1);
+    if (kantoxOrder) {
+      if (newStatus === 'CONFIRMED') {
+        const kantoxItems: any[] = await db
+          .select()
+          .from(orderItems)
+          .where(eq(orderItems.orderId, id));
+        void onOrderConfirmedForKantox(kantoxOrder, null, kantoxItems);
+      } else {
+        void onOrderCancelledForKantox(kantoxOrder.tenantId, id);
+      }
+    }
   }
 
   // WhatsApp group notifications for status changes

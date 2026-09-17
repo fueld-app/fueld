@@ -12,12 +12,13 @@
 //  the confirmed contract (margin basis, value date, delta close).
 // ═══════════════════════════════════════════════════════════════════════
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   integrationCredentials,
   kantoxHedgeEntries,
   orders,
+  tenants,
   type TenantSettings,
 } from '../../db/schema';
 import {
@@ -234,3 +235,529 @@ export async function listHedgesForOrder(tenantId: string, orderId: string) {
 }
 
 export type { KantoxEntry, KantoxPosition };
+// ═══════════════════════════════════════════════════════════════════════
+//  Event hooks — tenant-isolated, fire-and-forget.
+//
+//  PRIME DIRECTIVE (Patrick, 17/09): this module serves ALL tenants. Every
+//  hook (a) resolves THAT tenant's own settings, (b) no-ops immediately
+//  when Kantox is not enabled (zero overhead for ChannelTX/Moxie/etc),
+//  (c) NEVER throws into the deal-confirmation / payment path, (d) fails
+//  per-tenant only. Sandbox creds live only on the staging tenant; prod
+//  creds only on Riviera Marine.
+// ═══════════════════════════════════════════════════════════════════════
+
+import { logActivity } from '../activity/activity.service';
+
+const USD = 'USD';
+
+export interface KantoxOrderSnapshotItem {
+  id: string;
+  orderSupplierId: string | null;
+  quantity: string | number | null;
+  quantityMin: string | number | null;
+  salesPrice: string | number | null;
+  costPrice: string | number | null;
+  salesCurrency: string | null;
+  costCurrency: string | null;
+}
+
+export interface KantoxOrderSnapshot {
+  tenantId: string;
+  orderId: string;
+  orderNumber: string | null;
+  dueDate?: Date | string | null;
+  deliveredAt?: Date | string | null;
+  eta?: Date | string | null;
+  customerPaymentTermType?: string | null;
+  customerCreditDays?: number | null;
+  items: KantoxOrderSnapshotItem[];
+}
+
+export interface PlannedHedgeEntry {
+  leg: string;                       // 'SO' | 'PO:1' | 'PO:2' …
+  direction: 'SELL' | 'BUY';
+  amount: string;
+  amountBasis: string;
+  valueDate?: string;                // undefined → dateless bucket (rare; cancels MUST repeat the original's date)
+  entryRef: string;
+}
+
+export interface HedgePlan {
+  entries: PlannedHedgeEntry[];
+  skipped?: string;                  // set when the order is out of scope
+}
+
+/** Line-item exposure basis: minimum quantity (pre-invoice) — decision 17/09:
+ *  ONE amount per deal, minimum quantity, no delta flow for now. Falls back
+ *  to full quantity when quantity_min is unset. */
+function itemBasisQty(item: KantoxOrderSnapshotItem): number {
+  const min = Number(item.quantityMin ?? 0);
+  if (Number.isFinite(min) && min > 0) return min;
+  const full = Number(item.quantity ?? 0);
+  return Number.isFinite(full) && full > 0 ? full : 0;
+}
+
+/**
+ * Scope filter + two-leg entry plan (17/09 meeting decisions):
+ *  - USD-only scope: non-USD orders and EUR/non-USD PO legs are excluded
+ *  - negative-margin deals are skipped ENTIRELY (never send a net-BUY
+ *    position — Kantox would auto-execute the opposite trade at maturity)
+ *  - amounts are FULL exposure (hedge ratio is a Kantox platform rule)
+ *  - one amount per leg: minimum pre-invoice quantity × price
+ */
+export function buildHedgePlan(
+  snap: KantoxOrderSnapshot,
+  settings: Pick<KantoxSettingsResolved, 'marginHedgePercent' | 'paymentDateBufferDays' | 'valueDateRounding' | 'hedgeCurrency' | 'hedgeCounterCurrency'>,
+): HedgePlan {
+  const valueDate = deriveValueDate({
+    dueDate: snap.dueDate ?? null,
+    deliveredAt: snap.deliveredAt ?? null,
+    eta: snap.eta ?? null,
+    customerPaymentTermType: snap.customerPaymentTermType ?? null,
+    customerCreditDays: snap.customerCreditDays ?? null,
+    bufferDays: settings.paymentDateBufferDays,
+    rounding: settings.valueDateRounding,
+  });
+
+  // SO (sell) leg: USD sales exposure. Order is out of scope when its items
+  // do not settle in USD (17/09: EUR deals excluded).
+  let soAmount = 0;
+  for (const item of snap.items) {
+    if ((item.salesCurrency ?? '').toUpperCase() !== USD) continue;
+    const qty = Number(item.quantityMin ?? item.quantity ?? 0);
+    soAmount += qty * Number(item.salesPrice ?? 0);
+  }
+  soAmount = Math.round(soAmount * 100) / 100;
+  if (soAmount <= 0) return { entries: [], skipped: 'no USD sell exposure' };
+
+  // PO (buy) legs: group USD-cost items per supplier leg.
+  const buyByLeg = new Map<string, number>();
+  const legIndexOfSupplier = new Map<string, number>();
+  const usdLegs = [...new Set(
+    snap.items.map((i) => i.orderSupplierId).filter((v): v is string => !!v),
+  )];
+  usdLegs.forEach((legId, i) => legIndexOfSupplier.set(legId, i + 1));
+
+  let totalBuy = 0;
+  const poEntries: Array<{ leg: string; amount: number }> = [];
+  for (const item of snap.items) {
+    const legId = item.orderSupplierId;
+    if (!legId) continue;
+    if ((item.costCurrency ?? '').toUpperCase() !== USD) continue; // EUR PO → excluded
+    const qty = Number(item.quantityMin ?? item.quantity ?? 0);
+    const poAmount = qty * Number(item.costPrice ?? 0);
+    if (poAmount <= 0) continue;
+    const legKey = `PO:${legIndexOfSupplier.get(legId) ?? 1}`;
+    buyByLeg.set(legKey, (buyByLeg.get(legKey) ?? 0) + poAmount);
+    totalBuy += poAmount;
+  }
+  for (const [legKey, amount] of buyByLeg) {
+    poEntries.push({ leg: legKey, amount: Math.round(amount * 100) / 100 });
+  }
+  totalBuy = Math.round(totalBuy * 100) / 100;
+
+  // Negative-margin deal → net BUY exposure → skip the whole deal
+  // (17/09: never send a net-buy position — Kantox would auto-execute the
+  // opposite trade at maturity).
+  if (totalBuy > soAmount) {
+    return { entries: [], skipped: 'negative margin (net BUY exposure) — skipped' };
+  }
+
+  const orderRef = snap.orderNumber ?? snap.orderId;
+  const entries: PlannedHedgeEntry[] = [
+    {
+      leg: 'SO',
+      direction: 'SELL',
+      amount: soAmount.toFixed(2),
+      amountBasis: soAmount.toFixed(2),
+      valueDate,
+      entryRef: entryRef(orderNumberSafe(orderRef), 'SO', undefined, 'INITIAL', 0),
+    },
+    ...poEntries.map((po, i) => ({
+      leg: po.leg,
+      direction: 'BUY' as const,
+      amount: po.amount.toFixed(2),
+      amountBasis: po.amount.toFixed(2),
+      valueDate,
+      entryRef: entryRef(orderNumberSafe(orderRef), 'PO', i + 1, 'INITIAL', 0),
+    })),
+  ];
+  return { entries };
+}
+
+function orderNumberSafe(orderNumber: string | null): string {
+  return orderNumber ?? 'order';
+}
+
+// ── push orchestration (insert-claim-CAS-send, never blocks the caller) ──
+
+async function pushPlannedEntry(
+  tenantId: string,
+  resolved: KantoxSettingsResolved,
+  planned: PlannedHedgeEntry,
+  ctx: { orderId: string; orderItemId?: string | null; orderSupplierId?: string | null; kind: 'INITIAL' | 'CANCEL' | 'AMEND' | 'REISSUE'; notes: string; retryCount?: number },
+): Promise<void> {
+  // Claim: insert before send — the partial unique index fences double-pushes.
+  let rowId: string;
+  try {
+    const [row] = await db
+      .insert(kantoxHedgeEntries)
+      .values({
+        tenantId,
+        orderId: ctx.orderId,
+        orderItemId: ctx.orderItemId ?? null,
+        orderSupplierId: ctx.orderSupplierId ?? null,
+        leg: planned.leg,
+        direction: planned.direction,
+        amount: planned.amount,
+        amountBasis: planned.amountBasis,
+        currency: resolved.hedgeCurrency,
+        counterCurrency: resolved.hedgeCounterCurrency,
+        valueDate: planned.valueDate,
+        entryRef: planned.entryRef,
+        kind: ctx.kind,
+        status: 'PENDING_SEND',
+        notes: ctx.notes,
+      })
+      .returning({ id: kantoxHedgeEntries.id });
+    rowId = row.id;
+  } catch (err: any) {
+    if (/duplicate key|unique/i.test(String(err?.message ?? err))) {
+      console.error(`[Kantox] ${planned.entryRef} already claimed — skipping`);
+      return;
+    }
+    throw err;
+  }
+
+  // CAS: PENDING_SEND → SENDING (atomic claim)
+  const claimed = await db
+    .update(kantoxHedgeEntries)
+    .set({ status: 'SENDING', updatedAt: new Date() })
+    .where(and(eq(kantoxHedgeEntries.id, rowId), eq(kantoxHedgeEntries.status, 'PENDING_SEND')))
+    .returning({ id: kantoxHedgeEntries.id });
+  if (claimed.length === 0) return;
+
+  const client = makeClient(resolved);
+  try {
+    const entry = await client.submitEntry({
+      companyRef: resolved.companyRef,
+      entryRef: planned.entryRef,
+      marketDirection: planned.direction === 'SELL' ? 'sell' : 'buy',
+      currency: resolved.hedgeCurrency,
+      counterCurrency: resolved.hedgeCounterCurrency,
+      amount: planned.amount,
+      valueDate: planned.valueDate,
+      notes: ctx.notes,
+    });
+    await db
+      .update(kantoxHedgeEntries)
+      .set({
+        status: 'SENT',
+        kantoxEntryId: entry.reference,
+        kantoxPositionRef: entry.positionRef,
+        updatedAt: new Date(),
+      })
+      .where(eq(kantoxHedgeEntries.id, rowId));
+  } catch (err: any) {
+    // Duplicate ref = the entry already exists on Kantox (retry after a
+    // timeout where we can't know) → it's effectively SENT — reconcile via
+    // the sync loop, do NOT strand the row as FAILED.
+    if (err instanceof KantoxDuplicateRefError) {
+      await db
+        .update(kantoxHedgeEntries)
+        .set({ status: 'SENT', errorMessage: 'dedup hit — reconciling via GET entries', updatedAt: new Date() })
+        .where(eq(kantoxHedgeEntries.id, rowId));
+      return;
+    }
+    const isRateRejection = err instanceof KantoxRateRejectionError;
+    await db
+      .update(kantoxHedgeEntries)
+      .set({
+        status: 'FAILED',
+        errorMessage: String(err?.message ?? err).slice(0, 500),
+        updatedAt: new Date(),
+      })
+      .where(eq(kantoxHedgeEntries.id, rowId));
+    if (!isRateRejection) throw err; // rate rejections keep the ref reusable (verified live); others go to the retry loop
+  }
+}
+
+/** Fire-and-forget hook — order reached CONFIRMED. Never throws. */
+export async function onOrderConfirmedForKantox(order: {
+  id: string; tenantId: string; orderNumber: string | null;
+  dueDate?: Date | string | null; deliveredAt?: Date | string | null; eta?: Date | string | null;
+  customerPaymentTermType?: string | null; customerCreditDays?: number | null;
+}, settings: TenantSettings | null, items: KantoxOrderSnapshotItem[]): Promise<void> {
+  try {
+    const resolved = await resolveKantoxSettings(order.tenantId, settings);
+    if (!resolved) return; // tenant has no Kantox — fast no-op
+    const snap: KantoxOrderSnapshot = { ...order, orderId: order.id, items };
+    const plan = buildHedgePlan(snap, resolved);
+    if (plan.skipped || plan.entries.length === 0) {
+      console.log(`[Kantox] order ${order.orderNumber ?? order.id} not hedged: ${plan.skipped}`);
+      return;
+    }
+    for (const planned of plan.entries) {
+      await pushPlannedEntry(order.tenantId, resolved, planned, {
+        orderId: order.id,
+        kind: 'INITIAL',
+        notes: `Fueld order ${order.orderNumber ?? order.id}`,
+      });
+    }
+    await logActivity({
+      userId: 'kantox-system',
+      tenantId: order.tenantId,
+      action: 'KANTOX_PUSH',
+      entityType: 'kantox_hedge_entry',
+      entityId: order.id,
+      metadata: { entryCount: plan.entries.length, orderNumber: order.orderNumber },
+    });
+  } catch (err) {
+    console.error(`[Kantox] onOrderConfirmed failed for order ${order.id} (tenant ${order.tenantId}) — non-fatal:`, err);
+  }
+}
+
+/** Fire-and-forget — order CANCELLED/LOST → negative entries for open legs. */
+export async function onOrderCancelledForKantox(tenantId: string, orderId: string): Promise<void> {
+  try {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    const resolved = await resolveKantoxSettings(tenantId, (tenant?.settings as any) ?? null);
+    if (!resolved) return;
+    const rows = await listHedgesForOrder(tenantId, orderId);
+    const client = makeClient(resolved);
+    for (const row of rows) {
+      if (row.status === 'CANCELLED' || row.status === 'CLOSED') continue;
+      const remaining = Number(row.amount) - Number(row.cancelledAmount);
+      if (remaining <= 0) continue;
+      const planned: PlannedHedgeEntry = {
+        leg: row.leg,
+        direction: row.direction as 'BUY' | 'SELL',
+        amount: (-remaining).toFixed(2),
+        amountBasis: '0.00',
+        valueDate: row.valueDate ?? undefined,
+        entryRef: `${row.entryRef}C${row.retryCount + 1}`,
+      };
+      await pushLifecycleEntry(tenantId, resolved, planned, { orderId, kind: 'CANCEL', parentRowId: row.id, notes: `Fueld cancel ${row.entryRef}` });
+    }
+  } catch (err) {
+    console.error(`[Kantox] onOrderCancelled failed for order ${orderId} — non-fatal:`, err);
+  }
+}
+
+/** Fire-and-forget — USD customer payment received → close delta on the SO leg.
+ *  Non-USD payments are ignored (they don't extinguish the USD exposure). */
+export async function onCustomerPaymentForKantox(
+  tenantId: string, orderId: string, paymentAmount: number, paymentCurrency: string,
+): Promise<void> {
+  try {
+    if ((paymentCurrency ?? '').toUpperCase() !== USD) return; // non-USD payment ≠ USD exposure relief
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    const resolved = await resolveKantoxSettings(tenantId, (tenant?.settings as any) ?? null);
+    if (!resolved) return;
+    const rows = await listHedgesForOrder(tenantId, orderId);
+    const sellRows = rows.filter((r) => r.direction === 'SELL' && (r.status === 'SENT' || r.status === 'HEDGED'));
+    if (sellRows.length === 0) return; // nothing open (e.g. payment before push)
+    const client = makeClient(resolved);
+    for (const row of sellRows) {
+      const delta = closeDeltaForPayment(Number(row.amount), Number(row.cancelledAmount), paymentAmount);
+      if (delta === 0) continue;
+      const planned: PlannedHedgeEntry = {
+        leg: row.leg,
+        direction: 'SELL',
+        amount: delta.toFixed(2),
+        amountBasis: '0.00',
+        valueDate: row.valueDate ?? undefined,
+        entryRef: `${row.entryRef}C${row.retryCount + 1}`,
+      };
+      await pushLifecycleEntry(tenantId, resolved, planned, { orderId, kind: 'CANCEL', parentRowId: row.id, notes: `Fueld payment close ${row.entryRef}` });
+      const newCancelled = Number(row.cancelledAmount) + Math.abs(delta);
+      const fullyClosed = newCancelled >= Number(row.amount);
+      await db
+        .update(kantoxHedgeEntries)
+        .set({
+          cancelledAmount: newCancelled.toFixed(2),
+          ...(fullyClosed ? { status: 'CLOSED' as const } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(kantoxHedgeEntries.id, row.id));
+    }
+  } catch (err) {
+    console.error(`[Kantox] onCustomerPayment failed for order ${orderId} — non-fatal:`, err);
+  }
+}
+
+/** AMEND/CANCEL/REISSUE push — no INITIAL uniqueness fence, but same
+ *  claim-CAS-send lifecycle. */
+async function pushLifecycleEntry(
+  tenantId: string,
+  resolved: KantoxSettingsResolved,
+  planned: PlannedHedgeEntry,
+  ctx: { orderId: string; kind: 'CANCEL' | 'AMEND' | 'REISSUE'; parentRowId?: string; notes: string },
+): Promise<void> {
+  const [row] = await db
+    .insert(kantoxHedgeEntries)
+    .values({
+      tenantId,
+      orderId: ctx.orderId,
+      leg: planned.leg,
+      direction: planned.direction,
+      amount: planned.amount,
+      amountBasis: planned.amountBasis,
+      currency: resolved.hedgeCurrency,
+      counterCurrency: resolved.hedgeCounterCurrency,
+      valueDate: planned.valueDate,
+      entryRef: planned.entryRef,
+      kind: ctx.kind,
+      status: 'PENDING_SEND',
+      notes: ctx.notes,
+    })
+    .returning({ id: kantoxHedgeEntries.id });
+  try {
+    const entry = await makeClient(resolved).submitEntry({
+      companyRef: resolved.companyRef,
+      entryRef: planned.entryRef,
+      marketDirection: planned.direction === 'SELL' ? 'sell' : 'buy',
+      currency: resolved.hedgeCurrency,
+      counterCurrency: resolved.hedgeCounterCurrency,
+      amount: planned.amount,
+      valueDate: planned.valueDate,
+      notes: ctx.notes,
+    });
+    await db
+      .update(kantoxHedgeEntries)
+      .set({ status: 'SENT', kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef, updatedAt: new Date() })
+      .where(eq(kantoxHedgeEntries.id, row.id));
+    if (ctx.parentRowId) {
+      await db
+        .update(kantoxHedgeEntries)
+        .set({ cancelledAmount: sql`${kantoxHedgeEntries.cancelledAmount} + ${Math.abs(Number(planned.amount))}`, updatedAt: new Date() })
+        .where(eq(kantoxHedgeEntries.id, ctx.parentRowId));
+    }
+  } catch (err: any) {
+    await db
+      .update(kantoxHedgeEntries)
+      .set({ status: 'FAILED', errorMessage: String(err?.message ?? err).slice(0, 500), updatedAt: new Date() })
+      .where(eq(kantoxHedgeEntries.id, row.id));
+    throw err;
+  }
+}
+
+// ── sync loop (15 min): retries + status reconciliation ──────────────
+
+const SYNC_INTERVAL_MS = 15 * 60 * 1000;
+const MAX_RETRIES = 5;
+
+/** Map Kantox entryStatus → our row status. Enums incomplete (meeting Q3) —
+ *  mapping stays lenient; unknown values leave the row untouched. */
+function mapKantoxStatus(entryStatus: string | null): 'SENT' | 'HEDGED' | null {
+  if (!entryStatus) return null;
+  const s = entryStatus.toLowerCase();
+  if (s.includes('hedg') || s.includes('execut')) return 'HEDGED';
+  return null; // 'in_position', 'accumulating', etc. stay SENT
+}
+
+async function syncTenant(tenantId: string, settings: TenantSettings | null): Promise<void> {
+  const resolved = await resolveKantoxSettings(tenantId, settings);
+  if (!resolved) return;
+  const client = makeClient(resolved);
+
+  // 1. Retry FAILED rows (max 5) and push stale PENDING_SEND rows (>5 min).
+  const staleCutoff = new Date(Date.now() - 5 * 60 * 1000);
+  const candidates = await db
+    .select()
+    .from(kantoxHedgeEntries)
+    .where(eq(kantoxHedgeEntries.tenantId, tenantId));
+  for (const row of candidates) {
+    try {
+      if (row.status === 'PENDING_SEND' && row.createdAt < staleCutoff) {
+        const entry = await client.submitEntry({
+          companyRef: resolved.companyRef,
+          entryRef: row.entryRef,
+          marketDirection: row.direction === 'SELL' ? 'sell' : 'buy',
+          currency: row.currency,
+          counterCurrency: row.counterCurrency,
+          amount: row.amount,
+          valueDate: row.valueDate ?? undefined,
+          notes: row.notes ?? undefined,
+        });
+        await db.update(kantoxHedgeEntries)
+          .set({ status: 'SENT', kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef, updatedAt: new Date() })
+          .where(eq(kantoxHedgeEntries.id, row.id));
+      } else if (row.status === 'FAILED' && row.retryCount < MAX_RETRIES && row.entryRef && row.amount && row.direction && row.currency) {
+        // Rejected-entry refs are reusable (verified live); dedup-safe because
+        // KantoxDuplicateRefError in submit marks SENT instead of FAILED.
+        const entry = await client.submitEntry({
+          companyRef: resolved.companyRef,
+          entryRef: row.entryRef,
+          marketDirection: row.direction === 'SELL' ? 'sell' : 'buy',
+          currency: row.currency,
+          counterCurrency: row.counterCurrency,
+          amount: row.amount,
+          valueDate: row.valueDate ?? undefined,
+          notes: row.notes ?? undefined,
+        });
+        await db.update(kantoxHedgeEntries)
+          .set({ status: 'SENT', kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef, errorMessage: null, updatedAt: new Date() })
+          .where(eq(kantoxHedgeEntries.id, row.id));
+      }
+    } catch (err: any) {
+      const bump = { retryCount: (row.retryCount ?? 0) + 1, errorMessage: String(err?.message ?? err).slice(0, 500), updatedAt: new Date() };
+      if (row.retryCount + 1 >= MAX_RETRIES) await db.update(kantoxHedgeEntries).set({ ...bump, status: 'FAILED' }).where(eq(kantoxHedgeEntries.id, row.id));
+      else if (row.status === 'PENDING_SEND') await db.update(kantoxHedgeEntries).set(bump).where(eq(kantoxHedgeEntries.id, row.id));
+    }
+  }
+
+  // 2. Reconcile statuses from GET entries (per-entry hedgedRate etc).
+  try {
+    const remote = await client.listEntries();
+    const byRef = new Map(remote.map((e) => [e.entryRef, e]));
+    for (const row of candidates) {
+      if (row.status !== 'SENT' && row.status !== 'HEDGED') continue;
+      const remoteEntry = byRef.get(row.entryRef);
+      if (!remoteEntry) continue;
+      const mapped = mapKantoxStatus(remoteEntry.entryStatus);
+      const updates: Record<string, unknown> = {};
+      if (mapped && mapped !== row.status) updates.status = mapped;
+      if (remoteEntry.hedgedRate != null && Number(row.hedgedRate ?? 0) !== remoteEntry.hedgedRate) updates.hedgedRate = String(remoteEntry.hedgedRate);
+      if (remoteEntry.executionRate != null && Number(row.executionRate ?? 0) !== remoteEntry.executionRate) updates.executionRate = String(remoteEntry.executionRate);
+      if (Object.keys(updates).length > 0) {
+        updates.updatedAt = new Date();
+        await db.update(kantoxHedgeEntries).set(updates).where(eq(kantoxHedgeEntries.id, row.id));
+      }
+    }
+  } catch (err: any) {
+    console.error(`[Kantox] status reconciliation failed for tenant ${tenantId}: ${err?.message ?? err}`);
+  }
+}
+
+/** Boot-time registration — call once from index.ts. Per-tenant try/catch:
+ *  one tenant's Kantox outage never blocks the others (panel K-Missing). */
+export function startKantoxSync(): void {
+  const tick = async () => {
+    try {
+      const all = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants);
+      for (const tenant of all) {
+        const cfg = (tenant.settings as any)?.kantoxSettings;
+        if (!cfg?.enabled) continue; // fast skip for non-Kantox tenants
+        try {
+          await syncTenant(tenant.id, tenant.settings as TenantSettings);
+        } catch (err: any) {
+          console.error(`[Kantox] sync failed for tenant ${tenant.id} — isolated: ${err?.message ?? err}`);
+        }
+      }
+    } catch (err) {
+      console.error('[Kantox] sync tick failed:', err);
+    }
+  };
+  setInterval(tick, SYNC_INTERVAL_MS).unref();
+  console.log('[Kantox] sync loop started (every 15 min)');
+}
+
+/** Enabled-tenant SQL helper for future use (admin listing). */
+export async function listEnabledTenants(): Promise<string[]> {
+  const rows = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(sql`settings->'kantoxSettings'->>'enabled' = 'true'`);
+  return rows.map((r) => r.id);
+}

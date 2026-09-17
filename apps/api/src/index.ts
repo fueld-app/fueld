@@ -25,6 +25,7 @@ import { adminController, inviteController } from './modules/admin/admin.control
 import { backupController } from './modules/admin/backup.controller';
 import { settingsController, quickbooksOAuthController } from './modules/admin/settings.controller';
 import { kantoxController, kantoxOrderHedgeController } from './modules/kantox/kantox.controller';
+import { startKantoxSync } from './modules/kantox/kantox.service';
 import { securityController } from './modules/admin/security.controller';
 import { llmController } from './modules/admin/llm.controller';
 import { activityController, adminActivityController } from './modules/activity/activity.controller';
@@ -520,6 +521,11 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(quickbooksOAuthController)
     .use(kantoxController)
     .use(kantoxOrderHedgeController)
+    // Kantox Dynamic Hedging background sync (retries + status reconciliation,
+    // per-tenant isolated — no-op for tenants without kantoxSettings.enabled)
+    .onStart(() => {
+      startKantoxSync();
+    })
     .use(settingsController)
     .use(inviteController)
     .use(activityController)
