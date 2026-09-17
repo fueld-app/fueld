@@ -6,6 +6,7 @@ import {
 } from '@angular/core';
 import { PreloadAllModules, provideRouter, withComponentInputBinding, withPreloading, TitleStrategy } from '@angular/router';
 import { provideHttpClient, withInterceptors, withFetch } from '@angular/common/http';
+import { provideServiceWorker } from '@angular/service-worker';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
@@ -17,9 +18,10 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideHttpClient(withInterceptors([authInterceptor]), withFetch()),
     provideRouter(routes, withComponentInputBinding(), withPreloading(PreloadAllModules)),
-    // Service worker disabled — causes blank-page issues after deploys when
-    // the old SW serves stale cached chunks. A B2B trading platform doesn't
-    // need offline support; the SW causes more problems than it solves.
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
     { provide: TitleStrategy, useClass: FueldTitleStrategy },
   ],
 };
