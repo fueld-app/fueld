@@ -10,7 +10,6 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { counterparties, orderItems, orders, orderSuppliers, tenants } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
-import type { creditService } from '../src/modules/credit/credit.service';
 
 type OrdersService = typeof import('../src/modules/orders/orders.service');
 

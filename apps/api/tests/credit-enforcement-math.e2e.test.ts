@@ -15,7 +15,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { customerPayments, orders, orderItems } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
-import type { creditService } from '../src/modules/credit/credit.service';
 
 type CreditService = typeof import('../src/modules/credit/credit.service');
 

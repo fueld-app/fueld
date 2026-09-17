@@ -11,7 +11,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { counterparties, riskChecks, riskHits, riskOverrides } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
-import type { creditService } from '../src/modules/credit/credit.service';
 
 type RiskService = typeof import('../src/modules/risk-monitoring/risk-monitoring.service');
 
