@@ -265,7 +265,8 @@ export interface TenantSettings {
     companyRef?: string;                   // e.g. 'api_company_131804'
     hedgeCurrency?: string;                // default 'USD'
     hedgeCounterCurrency?: string;         // default 'EUR'
-    marginHedgePercent?: number;           // default 10 to start, ramping to 100 (Pierre, 2026-09)
+    marginHedgePercent?: number;           // default 100 — send FULL exposure; the hedge
+                                           // ratio ramp is a Kantox platform business rule (17/09 call)
     paymentDateBufferDays?: number;        // default 7
     dailyHedgeLimitUsd?: number;           // default 200000 (FDDR, warn-and-proceed)
     valueDateRounding?: 'NONE' | 'WEEKLY_MONDAY' | 'TWICE_MONTHLY' | 'MONTHLY';  // default 'WEEKLY_MONDAY' (pending Pierre)

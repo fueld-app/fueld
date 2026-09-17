@@ -50,7 +50,10 @@ const DEFAULTS = {
   apiBaseUrl: 'https://kantox-preprod.com/api',
   hedgeCurrency: 'USD',
   hedgeCounterCurrency: 'EUR',
-  marginHedgePercent: 10,          // Pierre: start ~10%, ramp to 100
+  marginHedgePercent: 100,         // 17/09 call: WE SEND FULL exposure — the hedge
+                                   // ratio is a Kantox PLATFORM business rule that
+                                   // Pierre configures (10%→100% ramp, no client
+                                   // re-development needed when it changes).
   paymentDateBufferDays: 7,
   dailyHedgeLimitUsd: 200_000,
   valueDateRounding: 'WEEKLY_MONDAY' as const,
@@ -124,8 +127,11 @@ export function computeUsdMargin(
   return Math.round(sum * 100) / 100;
 }
 
-/** Hedge amount = margin × marginHedgePercent, rounded to cents.
- *  Returns 0 when there is nothing to hedge (client gates the send). */
+/** Hedge amount = exposure × marginHedgePercent, rounded to cents.
+ *  DEFAULT IS 100%: per the 17/09 Kantox call we send the FULL exposure and
+ *  the hedge ratio is applied by the Kantox platform business rules (Pierre
+ *  configures the ramp there). The percent knob is kept only as a
+ *  safety override — do not scale client-side by default. */
 export function computeHedgeAmount(usdMargin: number, marginHedgePercent: number): number {
   if (!Number.isFinite(usdMargin) || !Number.isFinite(marginHedgePercent)) return 0;
   if (usdMargin <= 0 || marginHedgePercent <= 0) return 0;
