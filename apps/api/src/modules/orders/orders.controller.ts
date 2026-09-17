@@ -1133,6 +1133,12 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             taxRate: t.Optional(t.Nullable(t.String())),
             commissionPerUnit: t.Optional(t.Nullable(t.String())),
             hideOnDocuments: t.Optional(t.Boolean()),
+            // Inventory linkage — the frontend payload includes these; without
+            // declaring them Elysia strips the keys and every items save
+            // re-inserts rows with the linkage nulled out (silent wipe).
+            inventorySkuId: t.Optional(t.Nullable(t.String())),
+            warehouseId: t.Optional(t.Nullable(t.String())),
+            plannedInventoryAt: t.Optional(t.Nullable(t.String())),
           }),
         ),
       }),

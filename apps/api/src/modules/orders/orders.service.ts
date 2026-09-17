@@ -1913,8 +1913,9 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
   // coerce to the integer the DB column expects (null when unset/invalid).
   const coerceCreditDays = (value: number | string | null | undefined): number | null => {
     if (value == null || value === '') return null;
-    const n = Number(value);
-    return Number.isFinite(n) ? Math.trunc(n) : null;
+    const n = Number(typeof value === 'string' ? value.trim() : value);
+    // Reject non-finite and negative values — credit days are a count.
+    return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
   };
 
   // Insert new items with profit calculation (base currency)
