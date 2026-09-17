@@ -6,6 +6,7 @@ import { GroupStructureCardComponent } from '../components/group-structure-card/
   selector: 'app-group-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [GroupStructureCardComponent],
+  styles: [':host { display: block }'],
   template: `
     <app-group-structure-card
       [company]="store.company()!"

@@ -50,6 +50,7 @@ interface NetPosition {
   selector: 'app-payments-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DatePipe, DecimalPipe, RouterLink],
+  styles: [':host { display: block }'],
   template: `
     <div class="space-y-6">
       @if (loading()) {

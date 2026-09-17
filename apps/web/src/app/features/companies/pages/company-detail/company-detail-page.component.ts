@@ -17,6 +17,7 @@ import { CreditApplicationModalComponent } from '@app/features/credit/components
   ],
   providers: [CompanyDetailStore],
   styles: [`
+    :host { display: block; }
     :host ::ng-deep .leaflet-container { font-family: inherit; }
     .fleet-map-fullscreen {
       position: fixed !important;

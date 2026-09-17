@@ -6,6 +6,7 @@ import { CompanyDetailStore } from '../../company-detail.store';
   selector: 'app-company-activity-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ActivityTimelineComponent],
+  styles: [':host { display: block }'],
   template: `
     <app-activity-timeline entityType="company" [entityId]="store.company()!.id" />
   `,

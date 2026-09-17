@@ -12,6 +12,7 @@ import { RiskComplianceCardComponent } from '../components/risk-compliance-card/
     NameHistoryCardComponent,
     RiskComplianceCardComponent,
   ],
+  styles: [':host { display: block }'],
   template: `
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       @if (store.enrichmentLoading()) {

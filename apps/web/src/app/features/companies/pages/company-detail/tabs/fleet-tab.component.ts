@@ -7,6 +7,7 @@ import { FleetTableCardComponent } from '../components/fleet-table-card/fleet-ta
   selector: 'app-fleet-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FleetMapCardComponent, FleetTableCardComponent],
+  styles: [':host { display: block }'],
   template: `
     <div class="grid grid-cols-1 gap-6">
       <app-fleet-map-card

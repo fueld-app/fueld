@@ -6,6 +6,7 @@ import { CompanyDetailStore } from '../../company-detail.store';
   selector: 'app-company-comments-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommentsCardComponent],
+  styles: [':host { display: block }'],
   template: `
     <app-comments-card entityType="company" [entityId]="store.company()!.id" />
   `,
