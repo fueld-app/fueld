@@ -1529,20 +1529,34 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     return (fromMass && toVol) || (fromVol && toMass) ? 'density' : 'conversion';
   }
 
-  /** Look up a default conversion factor from admin settings (product-specific first, then generic fallback). */
+  /** Look up a default conversion factor from admin settings (product-specific first, then generic fallback).
+   *  If the exact from→to direction is not configured, tries the inverse
+   *  (to→from) and returns 1/factor, so a single CBM→MT setting also
+   *  resolves MT→CBM lookups. */
   private lookupConversionFactor(productType: string, fromUnit: string, toUnit: string): number {
     if (fromUnit === toUnit) return 1;
     const conversions = this.unitConversionsInput();
-    // Try product-specific match first
+    // Try product-specific match first (exact direction)
     const productMatch = productType
       ? conversions.find((c) => c.productType === productType && c.fromUnit === fromUnit && c.toUnit === toUnit)
       : undefined;
     if (productMatch) return productMatch.factor;
-    // Fall back to generic (no product) match
+    // Fall back to generic (no product) match (exact direction)
     const genericMatch = conversions.find(
       (c) => !c.productType && c.fromUnit === fromUnit && c.toUnit === toUnit,
     );
-    return genericMatch?.factor ?? 1;
+    if (genericMatch) return genericMatch.factor;
+    // Try the inverse direction (toUnit → fromUnit) and return the reciprocal.
+    // This lets a single MT→CBM setting also resolve CBM→MT lookups.
+    const productInverse = productType
+      ? conversions.find((c) => c.productType === productType && c.fromUnit === toUnit && c.toUnit === fromUnit)
+      : undefined;
+    if (productInverse && productInverse.factor !== 0) return 1 / productInverse.factor;
+    const genericInverse = conversions.find(
+      (c) => !c.productType && c.fromUnit === toUnit && c.toUnit === fromUnit,
+    );
+    if (genericInverse && genericInverse.factor !== 0) return 1 / genericInverse.factor;
+    return 1;
   }
 
   financingCostForRow(row: OrderItemRow): number {

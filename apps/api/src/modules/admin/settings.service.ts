@@ -1011,6 +1011,11 @@ const DEFAULT_UNIT_CONVERSIONS: UnitConversion[] = [
   { fromUnit: 'CBM', toUnit: 'MT', factor: 0.85 },
   { fromUnit: 'MT', toUnit: 'BBL', factor: 7.33 },
   { fromUnit: 'BBL', toUnit: 'MT', factor: 0.1364 },
+  // US gallon conversions (1 US gal = 0.00378541 m³ = 1/42 bbl)
+  { fromUnit: 'GAL', toUnit: 'CBM', factor: 0.00378541 },
+  { fromUnit: 'CBM', toUnit: 'GAL', factor: 264.172 },
+  { fromUnit: 'GAL', toUnit: 'BBL', factor: 0.0238095 },
+  { fromUnit: 'BBL', toUnit: 'GAL', factor: 42 },
 ];
 
 export async function getUnitConversionSettings(): Promise<{ conversions: UnitConversion[] }> {
