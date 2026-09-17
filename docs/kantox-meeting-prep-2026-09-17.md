@@ -81,12 +81,13 @@
 4. **Generic API mailbox + SMS-capable phone** for prod credentials
 5. **COD/PREPAY deals** — hedge or exclude (we can configure per-tenant either way; default: include with buffer)
 
-## 4. Deployment topology (decided, Patrick 17/09)
+## 4. Deployment topology (decided, Patrick 17/09 — confirmed)
 
 - Kantox settings are **per-tenant** (`TenantSettings.kantoxSettings`, default disabled) — already in the plan.
-- **Sandbox/preprod credentials will only ever be configured on the staging environment tenant.** No prod tenant ever points at `kantox-preprod.com`.
-- **Production credentials get enabled per tenant, one at a time** (start tenant per Patrick's call — Riviera first presumably), flip is a settings change (base URL + companyRef + API credentials), zero code change.
-- Implementation can start immediately behind the tenant flag; staging tenant is the only one that can send entries until go-live.
+- **Sandbox/preprod credentials live ONLY on the staging instance** (`staging.fueld.app` tenant). No other tenant ever points at `kantox-preprod.com`.
+- **Production credentials go to the Riviera Marine instance** (`riviera-marine.fueld.app`) when issued — flip is a settings change (base URL + companyRef + API credentials), zero code change.
+- Implementation can start immediately behind the tenant flag; the staging tenant is the only one that can send entries (to the Kantox sandbox) until the Riviera prod cutover.
+- Never mix: a tenant is either sandbox (`kantox-preprod.com`) or production (`kantox.com/api`) — the base URL is part of the tenant's settings, so an accidental cross-pointing is impossible by construction.
 
 ## 5. What we can build NOW (post-panel correction)
 
