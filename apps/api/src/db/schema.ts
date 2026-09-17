@@ -1168,9 +1168,9 @@ export const orderItems = pgTable('order_items', {
   sortOrder: integer('sort_order').notNull().default(0),
 
   productType: text('product_type').notNull(),
-  quantity: numeric('quantity', { precision: 12, scale: 3 }).notNull(),
-  quantityMin: numeric('quantity_min', { precision: 12, scale: 3 }),
-  quantityMax: numeric('quantity_max', { precision: 12, scale: 3 }),
+  quantity: numeric('quantity', { precision: 14, scale: 6 }).notNull(),
+  quantityMin: numeric('quantity_min', { precision: 14, scale: 6 }),
+  quantityMax: numeric('quantity_max', { precision: 14, scale: 6 }),
   unit: text('unit').notNull().default('MT'),
   costUnit: text('cost_unit').notNull().default('MT'),
   salesUnit: text('sales_unit').notNull().default('MT'),
@@ -1210,7 +1210,7 @@ export const orderItems = pgTable('order_items', {
   salesCreditDays: integer('sales_credit_days'),
   salesPriceFinalized: boolean('sales_price_finalized').notNull().default(false),
 
-  deliveredQuantity: numeric('delivered_quantity', { precision: 12, scale: 3 }),
+  deliveredQuantity: numeric('delivered_quantity', { precision: 14, scale: 6 }),
 
   paymentTerms: paymentTermsEnum('payment_terms'),
 
@@ -2744,7 +2744,7 @@ export const inventoryMovements = pgTable('inventory_movements', {
   warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id, { onDelete: 'cascade' }),
   skuId: uuid('sku_id').notNull().references(() => inventorySkus.id, { onDelete: 'restrict' }),
   // signed quantity in the SKU's base unit: positive for inbound, negative for outbound.
-  quantity: numeric('quantity', { precision: 14, scale: 3 }).notNull(),
+  quantity: numeric('quantity', { precision: 14, scale: 6 }).notNull(),
   unit: text('unit').notNull().default('MT'),
   movementType: inventoryMovementTypeEnum('movement_type').notNull(),
   occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
@@ -2768,7 +2768,7 @@ export const inventoryReservations = pgTable('inventory_reservations', {
   warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id, { onDelete: 'cascade' }),
   skuId: uuid('sku_id').notNull().references(() => inventorySkus.id, { onDelete: 'restrict' }),
   // unsigned reserved quantity in the SKU's base unit.
-  quantity: numeric('quantity', { precision: 14, scale: 3 }).notNull(),
+  quantity: numeric('quantity', { precision: 14, scale: 6 }).notNull(),
   unit: text('unit').notNull().default('MT'),
   reservedFor: timestamp('reserved_for', { withTimezone: true }).notNull(),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
@@ -2789,7 +2789,7 @@ export const inventoryReplenishmentPlans = pgTable('inventory_replenishment_plan
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id, { onDelete: 'cascade' }),
   skuId: uuid('sku_id').notNull().references(() => inventorySkus.id, { onDelete: 'restrict' }),
-  quantity: numeric('quantity', { precision: 14, scale: 3 }).notNull(),
+  quantity: numeric('quantity', { precision: 14, scale: 6 }).notNull(),
   unit: text('unit').notNull().default('MT'),
   expectedAt: timestamp('expected_at', { withTimezone: true }).notNull(),
   status: replenishmentStatusEnum('status').notNull().default('PLANNED'),

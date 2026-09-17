@@ -169,7 +169,7 @@ import type {
                   <div class="flex items-center gap-1">
                     @if (spreadEnabled().has(row.id)) {
                       <input
-                        type="number" step="0.001" min="0"
+                        type="number" step="0.000001" min="0"
                         [ngModel]="row.quantityMin"
                         (ngModelChange)="updateQuantityMin(i, $event)"
                         placeholder="Min"
@@ -178,7 +178,7 @@ import type {
                       <span class="text-gray-400 dark:text-muted text-xs">–</span>
                     }
                     <input
-                      type="number" step="0.001" min="0"
+                      type="number" step="0.000001" min="0"
                       [ngModel]="row.quantity"
                       (ngModelChange)="updateQuantity(i, $event)"
                       [attr.min]="spreadEnabled().has(row.id) && row.quantityMin !== null ? row.quantityMin : 0"
@@ -224,7 +224,7 @@ import type {
               @if (allowDeliveredEdit()) {
                 <td class="px-4 py-2">
                   <input
-                    type="number" step="0.001" min="0"
+                    type="number" step="0.000001" min="0"
                     [ngModel]="row.deliveredQuantity ?? row.quantity"
                     (ngModelChange)="updateField(i, 'deliveredQuantity', parseDecimalInput($event))"
                     class="w-24 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
@@ -633,7 +633,7 @@ import type {
               } @else {
                 <div class="space-y-1">
                   @if (spreadEnabled().has(row.id)) {
-                    <input type="number" step="0.001" min="0"
+                    <input type="number" step="0.000001" min="0"
                       [ngModel]="row.quantityMin"
                       (ngModelChange)="updateQuantityMin(i, $event)"
                       placeholder="Min qty"
@@ -641,7 +641,7 @@ import type {
                     />
                   }
                   <div class="flex items-center gap-2">
-                    <input type="number" step="0.001" min="0"
+                    <input type="number" step="0.000001" min="0"
                       [ngModel]="row.quantity"
                       (ngModelChange)="updateQuantity(i, $event)"
                       [attr.min]="spreadEnabled().has(row.id) && row.quantityMin !== null ? row.quantityMin : 0"
@@ -859,7 +859,7 @@ import type {
             @if (allowDeliveredEdit()) {
               <div>
                 <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Delivered Qty</label>
-                <input type="number" step="0.001" min="0"
+                <input type="number" step="0.000001" min="0"
                   [ngModel]="row.deliveredQuantity ?? row.quantity"
                   (ngModelChange)="updateField(i, 'deliveredQuantity', parseDecimalInput($event))"
                   class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
