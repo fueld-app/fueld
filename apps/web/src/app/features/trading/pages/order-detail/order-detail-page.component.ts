@@ -2873,6 +2873,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         itemRows: () => this.itemRows(),
         hasMultipleOrderSuppliers: () => this.hasMultipleOrderSuppliers(),
         buildItemPayload: (rows, opts) => this.buildItemPayload(rows, opts),
+        // Surface autosave failures — a silent failure here means the user's
+        // edits never reach the server and vanish on refresh (data loss that
+        // only shows up later, e.g. at convert-to-order time).
         syncSupplierRecords: (oid) => this.syncOrderSupplierRecords(oid),
         clearSavedDraftIds: (rows) => this.saveSvc.clearSavedDraftItemIds(rows),
         loadCustomerCreditLines: (cid) => this.financialSvc.loadCustomerCreditLines(cid),
@@ -2881,7 +2884,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         onDealFieldsSaved: (fields) => {
           this.order.update((o) => (o ? { ...o, dealType: fields.dealType, traderCommissionPct: fields.traderCommissionPct } as any : o));
         },
-      });
+      }, (msg) => this.showToast('error', msg));
       if (success) this.lastSaved.set(new Date());
     } finally {
       this.autoSaving.set(false);

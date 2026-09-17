@@ -182,7 +182,7 @@ interface SaveItemInput {
   costPremium?: string | null;
   costBarging?: string | null;
   costBargingUnit?: string | null;
-  costCreditDays?: number | null;
+  costCreditDays?: number | string | null;
   costPriceFinalized?: boolean | null;
   // Formula pricing (sell side)
   salesPricingModel?: string | null;
@@ -191,7 +191,7 @@ interface SaveItemInput {
   salesPremium?: string | null;
   salesBarging?: string | null;
   salesBargingUnit?: string | null;
-  salesCreditDays?: number | null;
+  salesCreditDays?: number | string | null;
   salesPriceFinalized?: boolean | null;
   // Tax
   taxRate?: string | null;
@@ -1909,6 +1909,14 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
     return value;
   };
 
+  // Credit days arrive as number or string depending on the client build —
+  // coerce to the integer the DB column expects (null when unset/invalid).
+  const coerceCreditDays = (value: number | string | null | undefined): number | null => {
+    if (value == null || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.trunc(n) : null;
+  };
+
   // Insert new items with profit calculation (base currency)
   const values = items.map((item, index) => {
     const orderSupplierId = item.orderSupplierId ?? defaultOrderSupplierId;
@@ -1982,7 +1990,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       costPremium: sanitizeNumeric(item.costPremium),
       costBarging: sanitizeNumeric(item.costBarging),
       costBargingUnit: item.costBargingUnit ?? null,
-      costCreditDays: item.costCreditDays ?? null,
+      costCreditDays: coerceCreditDays(item.costCreditDays),
       costPriceFinalized: item.costPriceFinalized ?? false,
       // Formula pricing (sell side)
       salesPricingModel: (item.salesPricingModel as any) ?? 'FIXED',
@@ -1991,7 +1999,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       salesPremium: sanitizeNumeric(item.salesPremium),
       salesBarging: sanitizeNumeric(item.salesBarging),
       salesBargingUnit: item.salesBargingUnit ?? null,
-      salesCreditDays: item.salesCreditDays ?? null,
+      salesCreditDays: coerceCreditDays(item.salesCreditDays),
       salesPriceFinalized: item.salesPriceFinalized ?? false,
       // Tax
       taxRate: sanitizeNumeric(item.taxRate),

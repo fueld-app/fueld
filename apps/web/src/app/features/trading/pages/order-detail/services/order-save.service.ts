@@ -107,7 +107,7 @@ export class OrderSaveService {
     options: {
       itemRows: () => OrderItemRow[];
       hasMultipleOrderSuppliers: () => boolean;
-      buildItemPayload: (rows: OrderItemRow[], opts?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | boolean | null>[];
+      buildItemPayload: (rows: OrderItemRow[], opts?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | number | boolean | null>[];
       syncSupplierRecords: (orderId: string) => Promise<void>;
       clearSavedDraftIds: (rows: OrderItemRow[]) => void;
       loadCustomerCreditLines: (clientId: string) => Promise<void>;
@@ -120,6 +120,13 @@ export class OrderSaveService {
   ): Promise<boolean> {
     const rows = options.itemRows();
     const autoSaveRows = this.getAutoSaveRows(rows, options.hasMultipleOrderSuppliers);
+
+    // Never push an empty items payload while the UI still has rows — the
+    // PUT /items endpoint REPLACES all items, so an all-drafts autosave would
+    // wipe previously-saved line items server-side (silent data loss).
+    if (autoSaveRows.length === 0 && rows.length > 0) {
+      // Fall through to the order-fields PUT below, but skip the items PUT.
+    }
 
     try {
       const orderRes = await firstValueFrom(
@@ -173,18 +180,23 @@ export class OrderSaveService {
 
       await options.syncSupplierRecords(id);
 
-      const itemPayload = options.buildItemPayload(autoSaveRows).map((item: Record<string, string | boolean | null>) => ({
-        ...item,
-        costCurrency: item['costCurrency'] ?? o.currency,
-        salesCurrency: item['salesCurrency'] ?? o.currency,
-      }));
+      // Skip the items PUT when every row is an incomplete draft — an empty
+      // payload would REPLACE (wipe) the order's persisted line items.
+      if (autoSaveRows.length > 0) {
+        const itemPayload = options.buildItemPayload(autoSaveRows).map((item: Record<string, string | number | boolean | null>) => ({
+          ...item,
+          costCurrency: item['costCurrency'] ?? o.currency,
+          salesCurrency: item['salesCurrency'] ?? o.currency,
+        }));
 
-      const itemsRes = await firstValueFrom(
-        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
-      );
-      if (!itemsRes.success) { onError?.('Failed to save items.'); return false; }
+        const itemsRes = await firstValueFrom(
+          this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
+        );
+        if (!itemsRes.success) { onError?.('Failed to save items.'); return false; }
 
-      options.clearSavedDraftIds(autoSaveRows);
+        options.clearSavedDraftIds(autoSaveRows);
+      }
+
       await options.loadCustomerCreditLines(o.clientId);
       await options.loadSupplierCreditLines(options.activeSupplierCompanyId() ?? o.supplierId);
       return true;

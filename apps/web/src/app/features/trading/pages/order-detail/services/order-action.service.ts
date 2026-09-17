@@ -41,7 +41,7 @@ export interface OrderActionContext {
   availableInquiryCancelReasons: () => string[];
   deliveryDocumentationSettings: () => DeliveryDocumentationSettingsDto;
   getEffectiveDeliveredQuantity: (row: OrderItemRow) => number | null;
-  buildItemPayload: (rows: OrderItemRow[], options?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | boolean | null>[];
+  buildItemPayload: (rows: OrderItemRow[], options?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | number | boolean | null>[];
   pdfModal: () => { showLoading: (title: string) => void; setBlob: (blob: Blob, fileName: string, verifyUrl: string | null) => void; showError: () => void } | null;
   convertModalRef: () => { show: () => void; close: () => void } | null;
   cancelModalRef: () => { show: () => void; close: () => void } | null;
@@ -338,7 +338,7 @@ export class OrderActionService {
 
       await ctx.syncOrderSupplierRecords(id);
       const itemRows = ctx.itemRows();
-      const itemPayload = ctx.buildItemPayload(itemRows).map((item: Record<string, string | boolean | null>) => ({
+      const itemPayload = ctx.buildItemPayload(itemRows).map((item: Record<string, string | number | boolean | null>) => ({
         ...item,
         costCurrency: item['costCurrency'] ?? o.currency,
         salesCurrency: item['salesCurrency'] ?? o.currency,

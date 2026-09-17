@@ -1115,7 +1115,11 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             costPremium: t.Optional(t.Nullable(t.String())),
             costBarging: t.Optional(t.Nullable(t.String())),
             costBargingUnit: t.Optional(t.Nullable(t.String())),
-            costCreditDays: t.Optional(t.Nullable(t.Number())),
+            // Accept string too — older frontend builds serialize credit days as
+            // strings in the item payload; a strict Number here 422s the whole
+            // items save and silently loses every line item (see save_items
+            // activity logs with itemCount: 0 + missing items after refresh).
+            costCreditDays: t.Optional(t.Nullable(t.Union([t.Number(), t.String()]))),
             costPriceFinalized: t.Optional(t.Nullable(t.Boolean())),
             // Formula pricing (sell side)
             salesPricingModel: t.Optional(t.Nullable(t.String())),
@@ -1124,7 +1128,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             salesPremium: t.Optional(t.Nullable(t.String())),
             salesBarging: t.Optional(t.Nullable(t.String())),
             salesBargingUnit: t.Optional(t.Nullable(t.String())),
-            salesCreditDays: t.Optional(t.Nullable(t.Number())),
+            salesCreditDays: t.Optional(t.Nullable(t.Union([t.Number(), t.String()]))),
             salesPriceFinalized: t.Optional(t.Nullable(t.Boolean())),
             taxRate: t.Optional(t.Nullable(t.String())),
             commissionPerUnit: t.Optional(t.Nullable(t.String())),
