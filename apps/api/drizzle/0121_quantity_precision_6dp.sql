@@ -16,5 +16,5 @@ ALTER TABLE inventory_movements ALTER COLUMN quantity TYPE numeric(14, 6);
 -- inventory_reservations
 ALTER TABLE inventory_reservations ALTER COLUMN quantity TYPE numeric(14, 6);
 
--- inventory_replenishment_plans
+-- Also updates the step on quantity inputs from 0.001 to 0.000001.
 ALTER TABLE inventory_replenishment_plans ALTER COLUMN quantity TYPE numeric(14, 6);
