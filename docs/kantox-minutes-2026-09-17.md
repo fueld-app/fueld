@@ -25,23 +25,20 @@
 ## Production todolist
 
 ### A. Fueld — code (Patrick, this week)
-1. **Simplify amount logic per decision 7/8**: send FULL minimum-quantity exposure (no 10% scaling client-side) — set `marginHedgePercent` default to 100 and mark it "managed on Kantox platform side"; drop the planned two-phase pre-invoice/exact delta flow (v2 if needed).
-2. **Scope filter**: only USD-sales orders/legs are pushed; EUR POs excluded. Skip negative-margin deals entirely (never net-BUY).
-3. **Wire event hooks** (now unblocked):
-   - Order → CONFIRMED: push SO (SELL) + each USD PO (BUY), same value date, full minimum-quantity amount, entryRefs `{orderNumber}#S` / `#P{n}`
-   - Customer payment received (USD): close delta (negative, same value date, capped at remaining exposure)
-   - Order CANCELLED/LOST: negative entries for both legs
-   - Late payment: flag for Pierre (activity log + order card note) — he rolls manually on the platform
-4. **Value-date rounding**: keep `WEEKLY_MONDAY` default; flip when Pierre decides (config knob).
-5. **Reconciliation sync**: poll GET entries/positions (15 min) for `HEDGED` status + `hedgedRate`; they will send the full GET endpoint list — integrate when received.
-6. **UI**: order-card FX hedging block; admin Kantox settings form (base URL, apiUser, companyRef + password in integrations).
-7. **Tests**: extend unit tests for the no-floor/no-scaling change; keep 19 existing green.
+1. ✅ Amount logic simplified (full exposure, platform-side ratio) — 5788f568
+2. ✅ Scope filter: USD-only, EUR POs excluded, negative-margin skipped (a74d975e)
+3. ✅ Event hooks wired: CONFIRMED → SO+PO push; payment → close delta; CANCELLED/LOST → negatives; late payment → flag (a74d975e)
+4. ✅ Value-date rounding: WEEKLY_MONDAY default, config knob ready
+5. ✅ Reconciliation sync loop live (15 min; will extend when Kantox sends the GET list)
+6. ⬜ UI: order-card FX hedging block; admin Kantox settings form
+7. ✅ Tests: 26 green (client contract, scope filter, two-leg plan, close-delta math)
+8. ✅ Route fix: /orders/:id/hedge param conflict caught by blue-green startup gate (3359e5b9)
 
 ### B. Fueld — ops (Patrick, before Wednesday)
-8. **Request sandbox reset** (email Clément) so we start clean when production data flows.
-9. **Deploy the module to staging + Riviera** instances (API + web this time).
-10. **Configure the Riviera tenant** `kantoxSettings`: enabled, base URL = preprod, apiUser + companyRef (same sandbox creds), password in integrations — this is the "production connected to preprod" phase.
-11. **Seed real Riviera orders** through the confirm flow → verify entries in Kantox preprod UI with Marin.
+8. ✅ Sandbox reset requested (email to Clément 17/09, cc Marin+Pierre) — awaiting confirmation
+9. ✅ Deployed to all 4 instances (sha 3359e5b9, migration 0120 applied, blue-green verified)
+10. ✅ Riviera tenant configured: kantoxSettings (preprod base URL, apiUser, companyRef) + encrypted apiPassword in integration_credentials — **enabled=false until Clément confirms the sandbox reset**, then flip enabled=true
+11. ⬜ After reset confirm + enable: real Riviera orders flow → verify entries in Kantox preprod UI with Marin
 
 ### C. Riviera / Pierre (parallel)
 12. Decide **value-date rounding** with top management (weekly / 2×month / monthly) → one-line answer flips our config.
