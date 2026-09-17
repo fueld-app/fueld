@@ -644,6 +644,10 @@ body {
    Popups, tooltips, zoom/attribution controls, and the map container are
    skinned via semantic tokens so maps follow the app theme. Tile-layer
    swapping (voyager ↔ dark_all) is handled per-component via ThemeService. */
+/* Contain Leaflet's internal pane z-indexes (400–1000: tiles, controls,
+   popups) inside the map container. Without this they escape and stack
+   above the command palette (z-200) and other overlays. */
+.leaflet-container { position: relative; z-index: 0; }
 [data-theme='dark'] .leaflet-container { background: var(--bg-2); }
 /* Keyless OSM fallback: invert tiles for a dark basemap (CARTO needs an API
    key; see shared/utils/leaflet-theme.ts). Only applied via .map-osm-dark. */
