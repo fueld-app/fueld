@@ -127,16 +127,20 @@ export class OrderFinancialService {
     }
   }
 
-  customerCreditSummary(currency: string): CreditSummary | null {
-    const lines = this.customerCreditLines().filter((line) => line.currency === currency);
+  customerCreditSummary(currency: string, isBrokerDeal: boolean = false): CreditSummary | null {
+    const lines = this.customerCreditLines().filter(
+      (line) => line.currency === currency && (line.isBrokerCreditLine ?? false) === isBrokerDeal,
+    );
     if (!lines.length) return null;
     const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
     const maxDays = Math.max(...lines.map((line) => line.periodDays));
     return { currency, available, maxDays };
   }
 
-  supplierCreditSummary(currency: string): CreditSummary | null {
-    const lines = this.supplierCreditLines().filter((line) => line.currency === currency);
+  supplierCreditSummary(currency: string, isBrokerDeal: boolean = false): CreditSummary | null {
+    const lines = this.supplierCreditLines().filter(
+      (line) => line.currency === currency && (line.isBrokerCreditLine ?? false) === isBrokerDeal,
+    );
     if (!lines.length) return null;
     const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
     const maxDays = Math.max(...lines.map((line) => line.periodDays));

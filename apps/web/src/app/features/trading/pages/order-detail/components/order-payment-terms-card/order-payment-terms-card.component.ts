@@ -78,6 +78,12 @@ export type PaymentSide = 'customer' | 'supplier';
             }
             <button (click)="requestCredit.emit()"
               class="ml-2 inline-flex items-center rounded-md px-2 py-1.5 -my-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request Increase</button>
+          } @else if (brokerTypeMismatch(); as bm) {
+            <span class="text-amber-600 dark:text-amber-400">
+              Regular credit line: {{ bm.available | number:'1.2-2' }} {{ bm.currency }} — broker deal needs a broker credit line.
+            </span>
+            <button (click)="requestCredit.emit()"
+              class="ml-2 inline-flex items-center rounded-md px-2 py-1.5 -my-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request broker line</button>
           } @else {
             <span>No credit line on file.</span>
             <button (click)="requestCredit.emit()"
@@ -96,6 +102,10 @@ export type PaymentSide = 'customer' | 'supplier';
           } @else if (creditMismatch()) {
             <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
               <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span> No {{ dealCurrency() }} credit line
+            </span>
+          } @else if (brokerTypeMismatch()) {
+            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+              <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span> No broker credit line
             </span>
           } @else if (creditSummary()) {
             <span class="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
@@ -152,6 +162,11 @@ export class OrderPaymentTermsCardComponent {
   readonly dealCurrency = input('USD');
   /** Set when a credit line exists but in a different currency than the deal. */
   readonly creditMismatch = input<{ currency: string; available: number | null } | null>(null);
+  /**
+   * Set when a broker deal has a regular (non-broker) credit line in the deal
+   * currency but no broker credit line — explains why Credit is blocked.
+   */
+  readonly brokerTypeMismatch = input<{ currency: string; available: number } | null>(null);
   /** When false (LIGHT users), hide credit amounts/lines and show only a status badge. */
   readonly showCreditDetails = input(true);
   readonly note = input<string | null>(null);

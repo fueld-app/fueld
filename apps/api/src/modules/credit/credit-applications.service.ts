@@ -403,6 +403,21 @@ export async function submitReview(
 // ═══════════════════════════════════════════════════════════════════════
 
 async function autoApplyCreditLine(app: typeof creditApplications.$inferSelect) {
+  // Determine whether this should be a broker credit line. When the
+  // application was initiated from an order, inherit the order's broker flag
+  // so the created line matches the deal type the trader was working on.
+  // Without this, every auto-applied line defaults to isBrokerCreditLine=false
+  // and broker deals reject it ("…for a broker deal is required — none found").
+  let isBrokerCreditLine = false;
+  if (app.orderId) {
+    const [order] = await db
+      .select({ isBrokerDeal: orders.isBrokerDeal })
+      .from(orders)
+      .where(eq(orders.id, app.orderId))
+      .limit(1);
+    isBrokerCreditLine = order?.isBrokerDeal === true;
+  }
+
   if (app.creditLineId) {
     // Increase existing credit line
     await db
@@ -416,9 +431,10 @@ async function autoApplyCreditLine(app: typeof creditApplications.$inferSelect) 
       .where(eq(creditLines.id, app.creditLineId));
   } else {
     // Dedupe: an identical line (same tenant/type/currency/amount/counterparty,
-    // not expired) can be created twice when the same request is submitted or
-    // approved twice (e.g. duplicate applications minutes apart). Link to the
-    // existing line instead of creating a duplicate that double-counts credit.
+    // not expired, same broker flag) can be created twice when the same request
+    // is submitted or approved twice (e.g. duplicate applications minutes apart).
+    // Link to the existing line instead of creating a duplicate that
+    // double-counts credit.
     const now = new Date().toISOString().slice(0, 10);
     const [duplicate] = await db
       .select({ id: creditLines.id })
@@ -430,6 +446,7 @@ async function autoApplyCreditLine(app: typeof creditApplications.$inferSelect) 
           eq(creditLines.type, app.type),
           eq(creditLines.currency, app.requestedCurrency),
           eq(creditLines.creditAmount, app.requestedAmount),
+          eq(creditLines.isBrokerCreditLine, isBrokerCreditLine),
           eq(creditLineCounterparties.counterpartyId, app.counterpartyId),
           or(isNull(creditLines.expires), gte(creditLines.expires, now)),
         ),
@@ -451,6 +468,7 @@ async function autoApplyCreditLine(app: typeof creditApplications.$inferSelect) 
           creditAmount: app.requestedAmount,
           currency: app.requestedCurrency,
           periodDays: app.requestedDays ?? 30,
+          isBrokerCreditLine,
         })
         .returning();
 
