@@ -19,7 +19,7 @@ import { PlaceTrafficCardComponent } from '../../components/place-traffic-card/p
         <app-place-traffic-card />
       </div>
     }
-  `,\n
+  `,
 })
 export class PlaceTrafficTabComponent {
   readonly store = inject(PlaceDetailStore);
