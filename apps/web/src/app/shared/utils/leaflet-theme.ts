@@ -1,19 +1,52 @@
 /**
  * Leaflet tile-layer theming helpers.
  *
- * Light theme uses CARTO Voyager; dark theme uses CARTO Dark Matter. Components
- * call {@link swapLeafletTileLayer} from a `ThemeService.resolved()` effect to
- * re-theme the base tiles when the app theme changes.
+ * Preferred: CARTO Voyager (light) / Dark Matter (dark). Since mid-2026 CARTO
+ * requires a free API key for raster basemaps (https://carto.com/basemaps/apikey)
+ * — requests without a key get an "API KEY REQUIRED" watermark. The key is
+ * passed as ?key=… on the tile URL.
+ *
+ * Key resolution order:
+ *   1. localStorage["cartoApiKey"] (handy for local dev overrides)
+ *   2. window.__FUELD_CARTO_KEY (injectable at runtime if ever needed)
+ *   3. DEFAULT_CARTO_API_KEY constant below
+ * If no key is configured, falls back to keyless OpenStreetMap tiles; the dark
+ * theme then uses an inverted-tile CSS filter (see styles.css .map-osm-dark).
  */
 
-export const LEAFLET_TILE_LIGHT =
+const CARTO_LIGHT_URL =
   'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-export const LEAFLET_TILE_DARK =
+const CARTO_DARK_URL =
   'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png';
+const OSM_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+// Free key from https://carto.com/basemaps/apikey — fair-use limits apply.
+const DEFAULT_CARTO_API_KEY = 'cb1_3obk_1_ccb4db208610b2ae07dd4504';
+
+export function getCartoApiKey(): string {
+  try {
+    const fromStorage =
+      typeof localStorage !== 'undefined' ? localStorage.getItem('cartoApiKey') : null;
+    if (fromStorage) return fromStorage;
+  } catch {
+    // localStorage unavailable (SSR/privacy mode) — fall through
+  }
+  const injected = (globalThis as Record<string, unknown>)['__FUELD_CARTO_KEY'];
+  if (typeof injected === 'string' && injected) return injected;
+  return DEFAULT_CARTO_API_KEY;
+}
 
 export function leafletTileUrl(theme: 'light' | 'dark'): string {
-  return theme === 'dark' ? LEAFLET_TILE_DARK : LEAFLET_TILE_LIGHT;
+  const key = getCartoApiKey();
+  if (key) {
+    const base = theme === 'dark' ? CARTO_DARK_URL : CARTO_LIGHT_URL;
+    return `${base}?key=${encodeURIComponent(key)}`;
+  }
+  return OSM_TILE_URL;
 }
+
+const OSM_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 /**
  * Replace the base tile layer on a Leaflet map with the theme-appropriate one.
@@ -43,8 +76,20 @@ export function swapLeafletTileLayer(
       // ignore — stale layer ref
     }
   }
-  const layer = L.tileLayer(url, options);
+  // When falling back to OSM tiles (no CARTO key), fix up the attribution and
+  // flag the container so styles.css can invert tiles for the dark theme.
+  const opts =
+    url === OSM_TILE_URL
+      ? { ...options, attribution: OSM_ATTRIBUTION }
+      : options;
+  const layer = L.tileLayer(url, opts);
   layer.addTo(map);
+  try {
+    const container: HTMLElement = map.getContainer();
+    container.classList.toggle('map-osm-dark', url === OSM_TILE_URL && theme === 'dark');
+  } catch {
+    // ignore — container classing is cosmetic
+  }
   // Keep the tile layer beneath markers/overlays (Leaflet panes: tilePane = 200).
   layer.bringToBack?.();
   return layer;

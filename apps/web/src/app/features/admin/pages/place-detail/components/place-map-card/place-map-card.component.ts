@@ -45,6 +45,25 @@ import { PlaceDetailStore } from '../../place-detail.store';
         </div>
         <div class="flex-1 min-h-0 relative" [class]="store.mapFullscreen() ? 'h-[calc(100dvh-49px)]' : ''" #mapContainer></div>
       </div>
+    } @else {
+      <div class="app-panel h-[420px] flex flex-col items-center justify-center text-center px-6">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-300 dark:text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+        </svg>
+        <p class="mt-3 text-sm font-medium text-gray-600 dark:text-ink-dim">No location set</p>
+        <p class="mt-1 max-w-xs text-sm text-gray-400 dark:text-muted">
+          Add latitude and longitude to see this place on the map.
+        </p>
+        @if (store.isManualPlace()) {
+          <button
+            (click)="store.startEditPlace()"
+            class="mt-4 rounded-lg border border-gray-200 dark:border-line px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
+          >
+            Add location
+          </button>
+        }
+      </div>
     }
   `,
 })

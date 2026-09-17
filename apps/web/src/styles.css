@@ -645,6 +645,11 @@ body {
    skinned via semantic tokens so maps follow the app theme. Tile-layer
    swapping (voyager ↔ dark_all) is handled per-component via ThemeService. */
 [data-theme='dark'] .leaflet-container { background: var(--bg-2); }
+/* Keyless OSM fallback: invert tiles for a dark basemap (CARTO needs an API
+   key; see shared/utils/leaflet-theme.ts). Only applied via .map-osm-dark. */
+.map-osm-dark .leaflet-tile-pane .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) saturate(0.7) brightness(0.92) contrast(0.95);
+}
 [data-theme='dark'] .leaflet-popup-content-wrapper,
 [data-theme='dark'] .leaflet-popup-tip {
   background: var(--surface-2);

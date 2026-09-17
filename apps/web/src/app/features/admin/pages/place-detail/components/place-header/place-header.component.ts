@@ -19,6 +19,12 @@ import { PlaceDetailStore } from '../../place-detail.store';
             {{ store.placeTypeLabel(store.place()!.placeType!) }}
           </span>
         }
+        @if (store.isManualPlace()) {
+          <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400"
+                title="Manual entry — not linked to Seasearcher">
+            Manual
+          </span>
+        }
         @if (store.syncing()) {
           <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
             <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -74,7 +80,9 @@ import { PlaceDetailStore } from '../../place-detail.store';
             Synced {{ store.place()!.lliLastUpdated | date:'short' }}
           </span>
         }
-        <span class="text-gray-300 dark:text-muted">|</span>
+        @if (store.localTime() || store.place()!.lliLastUpdated) {
+          <span class="text-gray-300 dark:text-muted">|</span>
+        }
         <span class="text-xs text-gray-500 dark:text-muted">Responsible:</span>
         <select
           [ngModel]="store.responsibleUserId() ?? ''"

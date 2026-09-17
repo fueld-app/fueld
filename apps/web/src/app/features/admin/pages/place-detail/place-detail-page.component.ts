@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { PlaceDetailStore } from './place-detail.store';
@@ -41,7 +41,7 @@ import { PlaceHeaderComponent } from './components/place-header/place-header.com
 
         <div class="mb-6 -mx-4 px-4 md:mx-0 md:px-0">
           <nav class="flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-line pb-px scrollbar-hide" aria-label="Place sections">
-            @for (tab of tabs; track tab.key) {
+            @for (tab of tabs(); track tab.key) {
               <a
                 [routerLink]="[tab.key]"
                 routerLinkActive
@@ -102,14 +102,23 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   readonly store = inject(PlaceDetailStore);
 
-  readonly tabs = [
+  // Tabs backed purely by Seasearcher data (traffic, structure) are hidden for
+  // manual places that have no Seasearcher integration/sync — otherwise they
+  // render permanently-empty panels that look like broken data.
+  readonly tabs = computed(() => {
+    const all = [
     { key: 'overview', label: 'Overview', icon: 'M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z' },
     { key: 'traffic', label: 'Traffic', icon: 'M6.75 2.994a.75.75 0 01.75-.75h3a.75.75 0 010 1.5h-3a.75.75 0 01-.75-.75zM4.094 6.75A3.094 3.094 0 017.188 3.656H9.75a.75.75 0 010 1.5H7.188a1.594 1.594 0 00-1.594 1.594v.469a.75.75 0 01-1.5 0v-.469zM2.25 10.5a.75.75 0 01.75-.75h6a.75.75 0 010 1.5H3a.75.75 0 01-.75-.75zM2.25 13.5a.75.75 0 01.75-.75h6a.75.75 0 010 1.5H3a.75.75 0 01-.75-.75zM2.25 16.5a.75.75 0 01.75-.75h6a.75.75 0 010 1.5H3a.75.75 0 01-.75-.75zM13.5 6.75a.75.75 0 01.75-.75h3a.75.75 0 010 1.5h-3a.75.75 0 01-.75-.75zM13.5 9.75a.75.75 0 01.75-.75h3a.75.75 0 010 1.5h-3a.75.75 0 01-.75-.75zM13.5 12.75a.75.75 0 01.75-.75h3a.75.75 0 010 1.5h-3a.75.75 0 01-.75-.75zM13.5 15.75a.75.75 0 01.75-.75h3a.75.75 0 010 1.5h-3a.75.75 0 01-.75-.75z' },
     { key: 'structure', label: 'Structure', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.072M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z' },
     { key: 'commercial', label: 'Commercial', icon: 'M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941' },
     { key: 'comments', label: 'Comments', icon: 'M7.5 8.25h9m-9 3H12m-9.75 1.5h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375A1.125 1.125 0 002.25 4.875v10.5c0 .621.504 1.125 1.125 1.125z' },
     { key: 'activity', label: 'Activity', icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z' },
-  ] as const;
+    ] as const;
+    if (this.store.isManualPlace()) {
+      return all.filter((t) => t.key !== 'traffic' && t.key !== 'structure');
+    }
+    return all;
+  });
 
   private routeSub: Subscription | null = null;
   private loadedId: string | null = null;
