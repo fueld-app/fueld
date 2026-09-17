@@ -4,7 +4,7 @@
 //  GET  /kantox/status             (ADMIN, FINANCE) — config/health snapshot
 //  POST /kantox/test-connection    (ADMIN)          — preprod/sandbox roundtrip
 //  GET  /kantox/hedges             (ADMIN, FINANCE) — recent hedge rows
-//  GET  /orders/:orderId/hedge     (order-scoped; ADMIN, FINANCE, TEAMLEAD)
+//  GET  /orders/:id/hedge     (order-scoped; ADMIN, FINANCE, TEAMLEAD)
 //
 //  Feature-gated on reads: returns empty/disabled unless the tenant's
 //  kantoxSettings.enabled is true AND credentials resolve (read-side gate,
@@ -102,19 +102,19 @@ export const kantoxController = new Elysia({ prefix: '/kantox' })
 // Order-scoped read — mounted under /orders (matches plan §7)
 export const kantoxOrderHedgeController = new Elysia()
   .use(authGuard)
-  .get('/orders/:orderId/hedge', async ({ auth, params }) => {
+  .get('/orders/:id/hedge', async ({ auth, params }) => {
     const denied = requireRoles(auth, ['ADMIN', 'FINANCE', 'TEAMLEAD']);
     if (denied) return denied satisfies ApiResponse<null>;
     const settings = await tenantSettingsFor(auth!.tenantId);
     const resolved = await resolveKantoxSettings(auth!.tenantId, settings);
     if (!resolved) return { success: true, data: { enabled: false, hedges: [], positions: [] } } as ApiResponse<unknown>;
-    const hedges = await listHedgesForOrder(auth!.tenantId, params.orderId);
+    const hedges = await listHedgesForOrder(auth!.tenantId, params.id);
     // Position reads are best-effort — order page must render even if Kantox is down.
     let positions: unknown[] = [];
     try {
       positions = await makeClient(resolved).listPositions();
     } catch (err: any) {
-      console.error(`[Kantox] position read failed for order ${params.orderId}: ${err?.message ?? err}`);
+      console.error(`[Kantox] position read failed for order ${params.id}: ${err?.message ?? err}`);
     }
     return { success: true, data: { enabled: true, hedges, positions } } as ApiResponse<unknown>;
   });
