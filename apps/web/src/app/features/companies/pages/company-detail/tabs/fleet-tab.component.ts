@@ -9,6 +9,7 @@ import { FleetTableCardComponent } from '../components/fleet-table-card/fleet-ta
   imports: [FleetMapCardComponent, FleetTableCardComponent],
   styles: [':host { display: block }'],
   template: `
+    @if (store.company(); as company) {
     <div class="grid grid-cols-1 gap-6">
       <app-fleet-map-card
         [vessels]="store.fleetVesselsWithPosition()"
@@ -20,7 +21,7 @@ import { FleetTableCardComponent } from '../components/fleet-table-card/fleet-ta
       />
 
       <app-fleet-table-card
-        [companyId]="store.company()!.id"
+        [companyId]="company.id"
         [isParent]="store.isParent()"
         [contacts]="store.contacts()"
         [contactsLoading]="store.contactsLoading()"
@@ -39,13 +40,21 @@ import { FleetTableCardComponent } from '../components/fleet-table-card/fleet-ta
         [limitNotice]="store.groupFleetLimitNotice()"
         [navigatingVesselId]="store.navigatingVesselId()"
         (modeToggle)="store.toggleFleetMode()"
-        (mutated)="store.loadCompanyVessels(store.company()!.id)"
+        (mutated)="store.loadCompanyVessels(company.id)"
         (fleetRoleChange)="store.onFleetRoleChange($event.vessel, $event.role)"
         (navigateToVessel)="store.navigateToVessel($event)"
         (openGroupVessel)="store.openGroupVessel($event)"
         (deleteVesselAssoc)="store.confirmDeleteVesselAssoc.set($event)"
       />
     </div>
+    } @else {
+      <div class="flex items-center justify-center py-12">
+        <svg class="h-6 w-6 animate-spin text-gray-400 dark:text-muted" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+      </div>
+    }
   `,
 })
 export class FleetTabComponent {

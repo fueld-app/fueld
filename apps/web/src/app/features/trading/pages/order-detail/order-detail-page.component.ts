@@ -841,38 +841,25 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly supplierPaidAt = computed(() => this.activeOrderSupplier()?.paidAt ?? null);
 
-  /**
-   * Filters credit lines to those whose broker flag matches the deal's
-   * broker status — same split as the back-end `checkCreditAvailability`.
-   * Without this, the UI shows a regular credit line as available on a
-   * broker deal, but the API rejects it ("…for a broker deal is required —
-   * none found").
-   */
-  private brokerMatchingLines(lines: CreditLineDto[]): CreditLineDto[] {
-    const isBroker = this.isBrokerDeal();
-    return lines.filter((line) => (line.isBrokerCreditLine ?? false) === isBroker);
-  }
-
   readonly customerCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
-    return this.summarizeLines(this.brokerMatchingLines(this.customerCreditLines()), currency);
+    return this.summarizeLines(this.customerCreditLines(), currency);
   });
 
   readonly canUseCustomerCredit = computed(() => !!this.customerCreditSummary() && !this.customerCreditFrozen());
 
   readonly supplierCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
-    return this.summarizeLines(this.brokerMatchingLines(this.supplierCreditLines()), currency);
+    return this.summarizeLines(this.supplierCreditLines(), currency);
   });
 
   readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());
 
   /** Aggregates same-currency lines for a side into a CreditSummary. */
   private summarizeLines(lines: CreditLineDto[], currency: string) {
-    const matching = lines.filter((line) => line.currency === currency);
-    if (!matching.length) return null;
-    const available = matching.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
-    const maxDays = Math.max(...matching.map((line) => line.periodDays));
+    if (!lines.length) return null;
+    const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
+    const maxDays = Math.max(...lines.map((line) => line.periodDays));
     return { currency, available, maxDays };
   }
 
@@ -894,42 +881,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly customerCreditMismatch = computed(() => {
     if (this.customerCreditSummary()) return null;
-    return this.creditMismatchFor(() => this.brokerMatchingLines(this.customerCreditLines()));
+    return this.creditMismatchFor(() => this.customerCreditLines());
   });
 
   readonly supplierCreditMismatch = computed(() => {
     if (this.supplierCreditSummary()) return null;
-    return this.creditMismatchFor(() => this.brokerMatchingLines(this.supplierCreditLines()));
-  });
-
-  /**
-   * Set when a broker deal has regular (non-broker) credit lines in the deal
-   * currency but no broker credit line — the most common cause of the
-   * "…for a broker deal is required — none found" error. Shows a hint so the
-   * trader understands WHY credit is blocked even though a line exists.
-   */
-  readonly supplierBrokerTypeMismatch = computed(() => {
-    if (!this.isBrokerDeal()) return null;
-    if (this.supplierCreditSummary()) return null; // broker line exists, no mismatch
-    const currency = this.order()?.currency ?? 'USD';
-    const regularLines = this.supplierCreditLines().filter(
-      (line) => line.currency === currency && !(line.isBrokerCreditLine ?? false),
-    );
-    if (!regularLines.length) return null;
-    const available = regularLines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
-    return { currency, available };
-  });
-
-  readonly customerBrokerTypeMismatch = computed(() => {
-    if (!this.isBrokerDeal()) return null;
-    if (this.customerCreditSummary()) return null;
-    const currency = this.order()?.currency ?? 'USD';
-    const regularLines = this.customerCreditLines().filter(
-      (line) => line.currency === currency && !(line.isBrokerCreditLine ?? false),
-    );
-    if (!regularLines.length) return null;
-    const available = regularLines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
-    return { currency, available };
+    return this.creditMismatchFor(() => this.supplierCreditLines());
   });
 
   /** Which side the shared credit-application modal is opened for. */
@@ -1625,8 +1582,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       return;
     }
     if (value === 'CREDIT' && !this.canUseCustomerCredit()) {
-      const brokerNote = this.isBrokerDeal() ? 'broker ' : '';
-      this.showToast('error', `No ${brokerNote}customer credit line is available.`);
+      this.showToast('error', 'No customer credit line is available.');
       return;
     }
     this.order.update((o) => {
@@ -1683,12 +1639,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const ptt = value as any;
     if (ptt === 'CREDIT' && !this.canUseSupplierCredit()) {
       const mismatch = this.supplierCreditMismatch();
-      const brokerNote = this.isBrokerDeal() ? 'broker ' : '';
       this.showToast(
         'error',
         mismatch
-          ? `Supplier credit line is in ${mismatch.currency} — this deal is ${this.order()?.currency ?? 'USD'}. Request a ${this.order()?.currency ?? 'USD'} ${brokerNote}line.`
-          : `No ${brokerNote}supplier credit line is available.`,
+          ? `Supplier credit line is in ${mismatch.currency} — this deal is ${this.order()?.currency ?? 'USD'}. Request a ${this.order()?.currency ?? 'USD'} line.`
+          : 'No supplier credit line is available.',
       );
       return;
     }

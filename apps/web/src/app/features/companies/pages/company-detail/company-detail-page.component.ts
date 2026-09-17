@@ -216,15 +216,24 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     { key: 'payments', label: 'Payments', icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3.75h6a4.5 4.5 0 004.5-4.5V5.25A2.25 2.25 0 0015 3H6a2.25 2.25 0 00-2.25 2.25v11.25A4.5 4.5 0 004.5 21h6z' },
   ] as const;
 
+  private loadedCompanyId: string | null = null;
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
+      this.loadedCompanyId = id;
       void this.store.loadCompany(id);
     }
 
     this.routeSub = this.route.paramMap.subscribe((params) => {
       const newId = params.get('id');
-      if (newId) {
+      // Skip the initial emission — ngOnInit already handled it from the
+      // snapshot. Calling loadCompany twice for the same id races two HTTP
+      // requests whose resetState()/loading flips tear down the @if block
+      // (and the router-outlet inside it) mid-activation, leaving the child
+      // route component in the DOM with 0×0 dimensions.
+      if (newId && newId !== this.loadedCompanyId) {
+        this.loadedCompanyId = newId;
         void this.store.loadCompany(newId);
       }
     });

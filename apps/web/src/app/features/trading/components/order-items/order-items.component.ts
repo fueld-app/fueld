@@ -161,7 +161,7 @@ import type {
                     @if (rangeLabel(row)) {
                       {{ rangeLabel(row) }}
                     } @else {
-                      {{ row.quantity | number:'1.0-6' }}
+                      {{ row.quantity | number:'1.0-3' }}
                     }
                     {{ row.unit }}
                   </span>
@@ -169,7 +169,7 @@ import type {
                   <div class="flex items-center gap-1">
                     @if (spreadEnabled().has(row.id)) {
                       <input
-                        type="number" step="0.000001" min="0"
+                        type="number" step="0.001" min="0"
                         [ngModel]="row.quantityMin"
                         (ngModelChange)="updateQuantityMin(i, $event)"
                         placeholder="Min"
@@ -178,7 +178,7 @@ import type {
                       <span class="text-gray-400 dark:text-muted text-xs">–</span>
                     }
                     <input
-                      type="number" step="0.000001" min="0"
+                      type="number" step="0.001" min="0"
                       [ngModel]="row.quantity"
                       (ngModelChange)="updateQuantity(i, $event)"
                       [attr.min]="spreadEnabled().has(row.id) && row.quantityMin !== null ? row.quantityMin : 0"
@@ -224,7 +224,7 @@ import type {
               @if (allowDeliveredEdit()) {
                 <td class="px-4 py-2">
                   <input
-                    type="number" step="0.000001" min="0"
+                    type="number" step="0.001" min="0"
                     [ngModel]="row.deliveredQuantity ?? row.quantity"
                     (ngModelChange)="updateField(i, 'deliveredQuantity', parseDecimalInput($event))"
                     class="w-24 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
@@ -626,14 +626,14 @@ import type {
                   @if (rangeLabel(row)) {
                     {{ rangeLabel(row) }}
                   } @else {
-                    {{ row.quantity | number:'1.0-6' }}
+                    {{ row.quantity | number:'1.0-3' }}
                   }
                   {{ row.unit }}
                 </span>
               } @else {
                 <div class="space-y-1">
                   @if (spreadEnabled().has(row.id)) {
-                    <input type="number" step="0.000001" min="0"
+                    <input type="number" step="0.001" min="0"
                       [ngModel]="row.quantityMin"
                       (ngModelChange)="updateQuantityMin(i, $event)"
                       placeholder="Min qty"
@@ -641,7 +641,7 @@ import type {
                     />
                   }
                   <div class="flex items-center gap-2">
-                    <input type="number" step="0.000001" min="0"
+                    <input type="number" step="0.001" min="0"
                       [ngModel]="row.quantity"
                       (ngModelChange)="updateQuantity(i, $event)"
                       [attr.min]="spreadEnabled().has(row.id) && row.quantityMin !== null ? row.quantityMin : 0"
@@ -859,7 +859,7 @@ import type {
             @if (allowDeliveredEdit()) {
               <div>
                 <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Delivered Qty</label>
-                <input type="number" step="0.000001" min="0"
+                <input type="number" step="0.001" min="0"
                   [ngModel]="row.deliveredQuantity ?? row.quantity"
                   (ngModelChange)="updateField(i, 'deliveredQuantity', parseDecimalInput($event))"
                   class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
@@ -1404,7 +1404,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
    * the ordered quantity, otherwise quantity itself). Empty string otherwise.
    */
   rangeLabel(row: OrderItemRow): string {
-    const fmt = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(n);
+    const fmt = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 }).format(n);
     const max = row.quantityMax != null && row.quantityMax > (row.quantity ?? 0)
       ? row.quantityMax
       : row.quantity;
@@ -1529,34 +1529,20 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     return (fromMass && toVol) || (fromVol && toMass) ? 'density' : 'conversion';
   }
 
-  /** Look up a default conversion factor from admin settings (product-specific first, then generic fallback).
-   *  If the exact from→to direction is not configured, tries the inverse
-   *  (to→from) and returns 1/factor, so a single CBM→MT setting also
-   *  resolves MT→CBM lookups. */
+  /** Look up a default conversion factor from admin settings (product-specific first, then generic fallback). */
   private lookupConversionFactor(productType: string, fromUnit: string, toUnit: string): number {
     if (fromUnit === toUnit) return 1;
     const conversions = this.unitConversionsInput();
-    // Try product-specific match first (exact direction)
+    // Try product-specific match first
     const productMatch = productType
       ? conversions.find((c) => c.productType === productType && c.fromUnit === fromUnit && c.toUnit === toUnit)
       : undefined;
     if (productMatch) return productMatch.factor;
-    // Fall back to generic (no product) match (exact direction)
+    // Fall back to generic (no product) match
     const genericMatch = conversions.find(
       (c) => !c.productType && c.fromUnit === fromUnit && c.toUnit === toUnit,
     );
-    if (genericMatch) return genericMatch.factor;
-    // Try the inverse direction (toUnit → fromUnit) and return the reciprocal.
-    // This lets a single MT→CBM setting also resolve CBM→MT lookups.
-    const productInverse = productType
-      ? conversions.find((c) => c.productType === productType && c.fromUnit === toUnit && c.toUnit === fromUnit)
-      : undefined;
-    if (productInverse && productInverse.factor !== 0) return 1 / productInverse.factor;
-    const genericInverse = conversions.find(
-      (c) => !c.productType && c.fromUnit === toUnit && c.toUnit === fromUnit,
-    );
-    if (genericInverse && genericInverse.factor !== 0) return 1 / genericInverse.factor;
-    return 1;
+    return genericMatch?.factor ?? 1;
   }
 
   financingCostForRow(row: OrderItemRow): number {
