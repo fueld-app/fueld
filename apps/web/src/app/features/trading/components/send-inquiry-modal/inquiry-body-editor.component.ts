@@ -36,7 +36,7 @@ import { FormsModule } from '@angular/forms';
       <div
         #bodyEditor
         contenteditable="true"
-        class="inquiry-email-canvas min-h-[200px] max-h-[300px] overflow-y-auto px-4 py-3 text-sm text-gray-900 dark:text-ink focus:outline-none"
+        class="inquiry-email-canvas min-h-[200px] max-h-[300px] overflow-y-auto px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none"
         (input)="onBodyInput()"
       ></div>
     </div>

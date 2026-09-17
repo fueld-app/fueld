@@ -318,7 +318,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
               <div
                 #bodyEditor
                 contenteditable="true"
-                class="rounded-b-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface p-4 text-sm text-gray-700 dark:text-ink-dim min-h-[200px] max-h-[350px] overflow-y-auto focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+                class="rounded-b-lg border border-gray-300 dark:border-line-strong bg-white p-4 text-sm text-gray-800 min-h-[200px] max-h-[350px] overflow-y-auto focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                 (input)="onBodyInput()"
               ></div>
             </div>
