@@ -24,6 +24,7 @@ import { creditApplicationsController } from './modules/credit/credit-applicatio
 import { adminController, inviteController } from './modules/admin/admin.controller';
 import { backupController } from './modules/admin/backup.controller';
 import { settingsController, quickbooksOAuthController } from './modules/admin/settings.controller';
+import { kantoxController, kantoxOrderHedgeController } from './modules/kantox/kantox.controller';
 import { securityController } from './modules/admin/security.controller';
 import { llmController } from './modules/admin/llm.controller';
 import { activityController, adminActivityController } from './modules/activity/activity.controller';
@@ -517,6 +518,8 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(adminController)
     .use(backupController)
     .use(quickbooksOAuthController)
+    .use(kantoxController)
+    .use(kantoxOrderHedgeController)
     .use(settingsController)
     .use(inviteController)
     .use(activityController)

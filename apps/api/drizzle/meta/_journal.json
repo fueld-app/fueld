@@ -841,6 +841,13 @@
       "when": 1789372800000,
       "tag": "0119_supplier_credit_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "120",
+      "when": 1789619695734,
+      "tag": "0120_kantox_hedge_entries",
+      "breakpoints": true
     }
   ]
 }

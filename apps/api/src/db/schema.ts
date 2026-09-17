@@ -14,7 +14,7 @@ import {
   uniqueIndex,
   primaryKey,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  JSONB TYPES
@@ -255,6 +255,23 @@ export interface TenantSettings {
   deliveryMethods?: string[];
   defaultDeliveryMethod?: string;
   // Bunker Booking email behaviour
+  // Kantox Dynamic Hedging (USD→EUR margin hedging) — per-tenant, default off.
+  // Sandbox credentials live ONLY on the staging tenant; production
+  // credentials go on the Riviera Marine tenant at cutover (settings-only flip).
+  kantoxSettings?: {
+    enabled?: boolean;                     // default false
+    apiBaseUrl?: string;                   // sandbox: https://kantox-preprod.com/api — prod: https://kantox.com/api
+    apiUser?: string;                      // e.g. 'rivieramarine.api@kantox.com' (password lives in integrationCredentials)
+    companyRef?: string;                   // e.g. 'api_company_131804'
+    hedgeCurrency?: string;                // default 'USD'
+    hedgeCounterCurrency?: string;         // default 'EUR'
+    marginHedgePercent?: number;           // default 10 to start, ramping to 100 (Pierre, 2026-09)
+    paymentDateBufferDays?: number;        // default 7
+    dailyHedgeLimitUsd?: number;           // default 200000 (FDDR, warn-and-proceed)
+    valueDateRounding?: 'NONE' | 'WEEKLY_MONDAY' | 'TWICE_MONTHLY' | 'MONTHLY';  // default 'WEEKLY_MONDAY' (pending Pierre)
+    hedgeCodPrepay?: boolean;              // default true — hedge near-term deals (pending Pierre)
+    amountBasis?: 'MINIMUM' | 'EXACT_AT_INVOICE';  // floating-quantity basis (pending Pierre)
+  };
   bookingEmail?: {
     autoSendOnConvert?: boolean;
     brokerDealCcEmail?: string | null;  // CC email always included on broker deal booking emails (e.g. operations@ocean7projects.com)
@@ -1552,6 +1569,58 @@ export const supplierCreditNotesRelations = relations(supplierCreditNotes, ({ on
   supplier: one(counterparties, { fields: [supplierCreditNotes.supplierId], references: [counterparties.id] }),
   orderLine: one(orderItems, { fields: [supplierCreditNotes.orderLineId], references: [orderItems.id] }),
   createdByUser: one(users, { fields: [supplierCreditNotes.createdBy], references: [users.id] }),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════
+//  14a-b. KANTOX HEDGE ENTRIES (Dynamic Hedging integration, USD→EUR)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const kantoxHedgeEntryStatus = pgEnum('kantox_hedge_entry_status', [
+  'PENDING_SEND', 'SENDING', 'SENT', 'HEDGED', 'CLOSED', 'FAILED', 'CANCELLED',
+]);
+export const kantoxHedgeEntryKind = pgEnum('kantox_hedge_entry_kind', [
+  'INITIAL', 'AMEND', 'CANCEL', 'REISSUE',
+]);
+export const kantoxHedgeDirection = pgEnum('kantox_hedge_direction', ['BUY', 'SELL']);
+
+export const kantoxHedgeEntries = pgTable('kantox_hedge_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  orderItemId: uuid('order_item_id').references(() => orderItems.id, { onDelete: 'set null' }),
+  orderSupplierId: uuid('order_supplier_id').references(() => orderSuppliers.id, { onDelete: 'set null' }),
+  leg: text('leg').notNull().default('SO'),          // 'SO' (sell leg) | 'PO' (buy leg)
+  direction: kantoxHedgeDirection('direction').notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  amountBasis: numeric('amount_basis', { precision: 14, scale: 2 }),  // gross exposure before marginHedgePercent
+  currency: text('currency').notNull().default('USD'),
+  counterCurrency: text('counter_currency').notNull().default('EUR'),
+  valueDate: date('value_date'),
+  entryRef: text('entry_ref').notNull(),
+  kantoxEntryId: text('kantox_entry_id'),            // Kantox `reference` (E-XXX)
+  kantoxPositionRef: text('kantox_position_ref'),    // Kantox `positionRef` (PS-XXX)
+  kind: kantoxHedgeEntryKind('kind').notNull().default('INITIAL'),
+  status: kantoxHedgeEntryStatus('status').notNull().default('PENDING_SEND'),
+  // running total already cancelled for the parent entry — close logic
+  // sends only the delta (mirrors live amountAfterCancellations)
+  cancelledAmount: numeric('cancelled_amount', { precision: 14, scale: 2 }).notNull().default('0'),
+  entryRate: numeric('entry_rate', { precision: 14, scale: 8 }),
+  entryRatePair: text('entry_rate_pair'),
+  hedgedRate: numeric('hedged_rate', { precision: 14, scale: 8 }),
+  executionRate: numeric('execution_rate', { precision: 14, scale: 8 }),
+  errorMessage: text('error_message'),
+  retryCount: integer('retry_count').notNull().default(0),
+  notes: text('notes'),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  // One INITIAL row per order+leg (two-leg flow: SO leg + one per PO leg).
+  // AMEND/CANCEL/REISSUE rows are legitimately multi-row.
+  initialUniq: uniqueIndex('kantox_hedge_entries_initial_uniq')
+    .on(table.tenantId, table.orderId, table.leg)
+    .where(sql`kind = 'INITIAL'`),
 }));
 
 // ═══════════════════════════════════════════════════════════════════════
