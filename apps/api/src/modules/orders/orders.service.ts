@@ -654,6 +654,7 @@ export async function syncPrimaryOrderSupplierFromLegacy(order: {
     contactId: payload.contactId,
     paymentTermType: payload.paymentTermType,
     creditDays: payload.creditDays,
+    supplierDueDate: payload.supplierDueDate,
     note: payload.note,
     deliveredAt: payload.deliveredAt,
     sortOrder: 0,
@@ -772,6 +773,19 @@ export async function addOrderSupplier(orderId: string, input: {
     }
   }
 
+  // When creating the FIRST leg, inherit an order-level due-date override so
+  // the leg→order mirror below doesn't null it out (the override was set on
+  // the order before any supplier leg existed).
+  let supplierDueDate = input.supplierDueDate;
+  if (existing.length === 0 && input.supplierDueDate === undefined) {
+    const [orderRow] = await db
+      .select({ supplierDueDate: orders.supplierDueDate })
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .limit(1);
+    supplierDueDate = orderRow?.supplierDueDate ?? null;
+  }
+
   const [created] = await db
     .insert(orderSuppliers)
     .values({
@@ -781,7 +795,7 @@ export async function addOrderSupplier(orderId: string, input: {
       paymentTermType: input.paymentTermType ?? null,
       creditDays: input.creditDays ?? null,
       note: input.note ?? null,
-      supplierDueDate: normalizeOptionalDateOnly(input.supplierDueDate),
+      supplierDueDate: normalizeOptionalDateOnly(supplierDueDate),
       deliveredAt: normalizeOptionalTimestamp(input.deliveredAt),
       sortOrder: (existing[0]?.sortOrder ?? -1) + 1,
       isPrimary: existing.length === 0 || input.isPrimary === true,
@@ -1741,6 +1755,7 @@ export async function createOrder(input: CreateOrderInput) {
     supplierId: input.supplierId ?? null,
     supplierPaymentTermType: input.supplierPaymentTermType ?? null,
     supplierCreditDays: input.supplierCreditDays ?? null,
+    supplierDueDate: normalizeOptionalDateOnly(input.supplierDueDate),
     supplierNote: input.supplierNote ?? null,
     supplierContactId: input.supplierContactId ?? null,
     termsAndConditions: input.termsAndConditions ?? null,

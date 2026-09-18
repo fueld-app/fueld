@@ -111,46 +111,6 @@ export class OrderSupplierService {
     return [...merged.values()];
   }
 
-  async syncRecords(orderId: string): Promise<void> {
-    const suppliers = this.orderSuppliers();
-    if (suppliers.length === 0) return;
-
-    for (const supplier of suppliers) {
-      if (!supplier.companyId) continue;
-
-      const endpoint = this.isTemporaryOrderSupplierId(supplier.id)
-        ? `${API_URL}/orders/${orderId}/suppliers`
-        : `${API_URL}/orders/${orderId}/suppliers/${supplier.id}`;
-      const request$ = this.isTemporaryOrderSupplierId(supplier.id)
-        ? this.http.post<ApiResponse<OrderSupplierDto>>(endpoint, {
-            companyId: supplier.companyId,
-            contactId: supplier.contactId ?? null,
-            paymentTermType: supplier.paymentTermType ?? null,
-            creditDays: supplier.creditDays ?? null,
-            note: supplier.note ?? null,
-            supplierDueDate: supplier.supplierDueDate ?? null,
-            deliveredAt: supplier.deliveredAt ?? null,
-            isPrimary: supplier.isPrimary,
-          })
-        : this.http.put<ApiResponse<OrderSupplierDto>>(endpoint, {
-            companyId: supplier.companyId,
-            contactId: supplier.contactId ?? null,
-            paymentTermType: supplier.paymentTermType ?? null,
-            creditDays: supplier.creditDays ?? null,
-            note: supplier.note ?? null,
-            supplierDueDate: supplier.supplierDueDate ?? null,
-            deliveredAt: supplier.deliveredAt ?? null,
-            sortOrder: supplier.sortOrder,
-            isPrimary: supplier.isPrimary,
-          });
-
-      const res = await firstValueFrom(request$);
-      if (!res.success || !res.data) {
-        throw new Error(res.message ?? 'Failed to save supplier details');
-      }
-    }
-  }
-
   async reload(orderId: string, preferredCompanyId?: string | null): Promise<void> {
     const res = await firstValueFrom(
       this.http.get<ApiResponse<OrderSupplierDto[]>>(`${API_URL}/orders/${orderId}/suppliers`),

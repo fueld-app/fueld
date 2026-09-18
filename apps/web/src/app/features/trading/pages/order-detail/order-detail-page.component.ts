@@ -473,7 +473,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly activeSupplierPaymentTermType = computed(() => this.activeOrderSupplier()?.paymentTermType ?? this.order()?.supplierPaymentTermType ?? null);
   readonly activeSupplierCreditDays = computed(() => this.activeOrderSupplier()?.creditDays ?? this.order()?.supplierCreditDays ?? null);
   readonly activeSupplierNote = computed(() => this.activeOrderSupplier()?.note ?? this.order()?.supplierNote ?? null);
-  readonly activeSupplierDueDate = computed(() => this.activeOrderSupplier()?.supplierDueDate ?? this.order()?.supplierDueDate ?? null);
+  readonly activeSupplierDueDate = computed(() => {
+    // With supplier legs, the override is a per-leg fact — never inherit the
+    // (primary leg's) order-level mirror onto a different leg.
+    if (this.orderSuppliers().length > 0) return this.activeOrderSupplier()?.supplierDueDate ?? null;
+    return this.order()?.supplierDueDate ?? null;
+  });
   /** Default (delivery + credit days) due date for the active supplier leg, for context next to the override. */
   readonly defaultSupplierDueDate = computed(() => {
     const type = this.activeSupplierPaymentTermType();
@@ -2137,6 +2142,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             paymentTermType: supplier.paymentTermType ?? null,
             creditDays: supplier.creditDays ?? null,
             note: supplier.note ?? null,
+            supplierDueDate: supplier.supplierDueDate ?? null,
             deliveredAt: supplier.deliveredAt ?? null,
             isPrimary: supplier.isPrimary,
           })
@@ -2146,6 +2152,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             paymentTermType: supplier.paymentTermType ?? null,
             creditDays: supplier.creditDays ?? null,
             note: supplier.note ?? null,
+            supplierDueDate: supplier.supplierDueDate ?? null,
             deliveredAt: supplier.deliveredAt ?? null,
             sortOrder: supplier.sortOrder,
             isPrimary: supplier.isPrimary,
@@ -2207,6 +2214,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             supplierContactId: null,
             supplierPaymentTermType: null,
             supplierCreditDays: null,
+            supplierDueDate: null,
             supplierNote: null,
             deliveredAt: null,
           }

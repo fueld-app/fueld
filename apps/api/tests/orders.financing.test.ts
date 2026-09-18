@@ -181,4 +181,34 @@ describe('orders financing', () => {
     const invalid = await updateOrderSupplierRecord(order2.id, leg!.id, { supplierDueDate: '15/10/2026' });
     expect(invalid?.supplierDueDate).toBeNull();
   });
+
+  // Regression (panel finding): createOrder dropped supplierDueDate even though
+  // the input type and controller schema declared it.
+  it('persists supplierDueDate through createOrder and the legacy→leg insert path', async () => {
+    const seeded = await seedBasics();
+    const { createOrder, addOrderSupplier, getOrderById, getOrderSuppliers } = await loadOrdersService();
+
+    const order = await createOrder({
+      tenantId: seeded.tenant.id,
+      clientId: seeded.client.id,
+      vesselId: seeded.vessel.id,
+      placeId: seeded.place.id,
+      supplierPaymentTermType: 'CREDIT',
+      supplierCreditDays: 30,
+      supplierDueDate: '2026-10-20',
+    });
+
+    expect(order.supplierDueDate).toBe('2026-10-20');
+    const detail = await getOrderById(order.id);
+    expect(detail?.supplierDueDate).toBe('2026-10-20');
+
+    // Adding the first supplier leg must carry the order-level override into
+    // the new leg (and not get nulled out by the sync round-trip).
+    await addOrderSupplier(order.id, { companyId: seeded.client.id, isPrimary: true });
+    const legs = await getOrderSuppliers(order.id);
+    expect(legs[0]?.supplierDueDate).toBe('2026-10-20');
+
+    const after = await getOrderById(order.id);
+    expect(after?.supplierDueDate).toBe('2026-10-20');
+  });
 });
