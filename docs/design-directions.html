@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fueld — UI/UX Directions (A · B · C · D)</title>
+<!--
+  Self-contained, dependency-free demo of FOUR modern UI/UX directions for the
+  Fueld shell. Same dashboard content in all four so you can compare fairly.
+
+    A · MIDNIGHT DECK  — dark, glassy, amber glow. Marketing tokens taken further.
+    B · SWISS LIGHT    — editorial, flat, hairlines, typographic. Calm & premium.
+    C · TERMINAL PRO   — Bloomberg-style density. Mono numerics, edge status ticks.
+    D · SOFT STUDIO    — Linear/Attio-style: big radii, soft shadows, pastel tints.
+
+  Also demos concrete UX upgrades: ⌘K command palette (press it!), density toggle,
+  hover row actions, live sparkline, skeleton shimmer.
+
+  Open by double-clicking — no server needed.
+-->
+<style>
+  /* ================= BASE LAYOUT (shared by all directions) ================= */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Inter, sans-serif;
+    background: #e5e7eb; color: #111827;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; }
+
+  .controls {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    padding: 0.75rem 1.25rem;
+    background: #0b0d12; color: #f9fafb;
+    border-bottom: 1px solid #000;
+    box-shadow: 0 6px 20px -8px rgba(0,0,0,0.5);
+  }
+  .controls h1 { font-size: 0.95rem; font-weight: 700; margin: 0 0.75rem 0 0; }
+  .controls .modes { display: inline-flex; gap: 0.25rem; background: #1c212b; padding: 0.25rem; border-radius: 0.6rem; }
+  .controls button {
+    appearance: none; border: 0; cursor: pointer;
+    padding: 0.45rem 0.8rem; border-radius: 0.45rem;
+    font-size: 0.8rem; font-weight: 600; color: #9ca3af; background: transparent;
+    transition: all .15s;
+  }
+  .controls button:hover { color: #e5e7eb; }
+  .controls button.active { background: #fff; color: #0b0d12; }
+  .controls .hint { margin-left: auto; font-size: 0.72rem; color: #6b7280; }
+  .controls .hint kbd {
+    font-family: ui-monospace, Menlo, monospace; font-size: 0.68rem;
+    background: #262b36; border: 1px solid #3a4150; border-bottom-width: 2px;
+    border-radius: 4px; padding: 0.05rem 0.35rem; color: #d1d5db;
+  }
+
+  .stage { display: flex; min-height: calc(100vh - 49px); }
+
+  /* ---- sidebar ---- */
+  .sidebar {
+    width: 236px; flex-shrink: 0; display: flex; flex-direction: column;
+    position: sticky; top: 49px; height: calc(100vh - 49px);
+    transition: background .2s;
+  }
+  .brand-row { display: flex; align-items: center; gap: 0.6rem; height: 60px; padding: 0 0.9rem; flex-shrink: 0; }
+  .brand-glyph { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; font-weight: 800; }
+  .brand-name { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; }
+  .nav { margin-top: 0.9rem; flex: 1; overflow-y: auto; padding: 0 0.6rem; }
+  .nav-item {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.5rem 0.65rem; border-radius: 8px;
+    font-size: 0.85rem; font-weight: 500; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .nav-item .ico { width: 19px; height: 19px; flex-shrink: 0; }
+  .nav-item .caret { margin-left: auto; opacity: 0.45; font-size: 0.65rem; }
+  .nav-children { padding-left: 1.6rem; margin: 0.1rem 0 0.35rem; }
+  .nav-child { display: block; padding: 0.35rem 0.6rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+  .sidebar-footer { border-top: 1px solid transparent; padding: 0.65rem 0.9rem; flex-shrink: 0; font-size: 0.7rem; display: flex; justify-content: space-between; align-items: center; }
+  .ai-dot { display: inline-flex; align-items: center; gap: 0.35rem; text-decoration: none; }
+  .ai-dot .dot { width: 7px; height: 7px; border-radius: 999px; background: #34d399; box-shadow: 0 0 8px #34d399; }
+
+  /* ---- main ---- */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    position: sticky; top: 49px; z-index: 20; height: 60px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 0.9rem; padding: 0 1rem 0 1.15rem;
+    backdrop-filter: blur(12px);
+  }
+  .cmdk-btn {
+    display: flex; align-items: center; gap: 0.5rem; flex: 1; max-width: 420px;
+    padding: 0.5rem 0.7rem; border-radius: 9px; cursor: pointer;
+    font-size: 0.82rem; border: 1px solid transparent; background: transparent; text-align: left;
+  }
+  .cmdk-btn .spacer { flex: 1; }
+  .cmdk-btn kbd {
+    font-family: ui-monospace, Menlo, monospace; font-size: 0.65rem;
+    padding: 0.1rem 0.35rem; border-radius: 4px; border: 1px solid transparent;
+  }
+  .prices { display: flex; align-items: center; gap: 1rem; font-size: 0.72rem; }
+  .price-block { display: flex; flex-direction: column; line-height: 1.2; }
+  .price-block .lbl { font-weight: 500; }
+  .price-block .val { font-weight: 650; font-variant-numeric: tabular-nums; }
+  .price-block .chg { font-size: 0.65rem; font-weight: 600; }
+  .price-block .chg.up { color: #10b981; }
+  .price-block .chg.down { color: #f87171; }
+  .divider-v { width: 1px; height: 24px; background: rgba(128,128,128,0.3); }
+  .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 0.55rem; }
+  .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.9rem; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; text-decoration: none; transition: all .15s; }
+  .icon-btn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; position: relative; border: 1px solid transparent; background: transparent; }
+  .icon-btn .ico { width: 19px; height: 19px; }
+  .badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; font-size: 0.6rem; font-weight: 700; display: grid; place-items: center; }
+  .avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+
+  .content { padding: 1.4rem 1.6rem 2rem; max-width: 1320px; }
+  .page-head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.1rem; }
+  .page-title { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.025em; margin: 0; }
+  .page-sub { font-size: 0.8rem; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 0.9rem; margin-bottom: 1.2rem; }
+  .kpi { position: relative; padding: 1rem 1.1rem; border-radius: 14px; border: 1px solid transparent; overflow: hidden; }
+  .kpi-label { font-size: 0.68rem; letter-spacing: 0.09em; text-transform: uppercase; margin: 0; font-weight: 600; }
+  .kpi-value { font-size: 1.65rem; font-weight: 700; letter-spacing: -0.02em; margin: 0.25rem 0 0; font-variant-numeric: tabular-nums; }
+  .kpi-foot { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; }
+  .kpi-delta { font-size: 0.72rem; font-weight: 600; }
+  .kpi-delta.up { color: #10b981; } .kpi-delta.down { color: #ef4444; }
+  .spark { margin-left: auto; opacity: 0.85; }
+
+  .panel { border: 1px solid transparent; border-radius: 14px; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1.05rem; border-bottom: 1px solid transparent; }
+  .panel-head h2 { font-size: 0.95rem; font-weight: 650; margin: 0; }
+  .panel-head .actions { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+  .select { padding: 0.4rem 0.65rem; border-radius: 7px; font-size: 0.78rem; border: 1px solid transparent; cursor: pointer; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th { text-align: left; font-size: 0.66rem; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 600; padding: 0.6rem 0.9rem; border-bottom: 1px solid transparent; }
+  tbody td { padding: 0.66rem 0.9rem; border-bottom: 1px solid transparent; white-space: nowrap; }
+  .mono, .ordno { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .ordno { font-weight: 600; }
+  .pill { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.14rem 0.55rem; border-radius: 999px; font-size: 0.67rem; font-weight: 600; border: 1px solid transparent; }
+  .pill .p-dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; }
+  .row-actions { display: flex; gap: 0.35rem; opacity: 0; transition: opacity .12s; }
+  tr:hover .row-actions { opacity: 1; }
+  .row-btn { font-size: 0.7rem; padding: 0.28rem 0.55rem; border-radius: 6px; cursor: pointer; border: 1px solid transparent; font-weight: 550; }
+  .footer-note { padding: 1.4rem; font-size: 0.72rem; text-align: center; }
+
+  /* skeleton shimmer demo row */
+  .skel { display: inline-block; border-radius: 4px; background: currentColor; opacity: 0.12; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 0.08; } 50% { opacity: 0.18; } }
+
+  /* ========================= ⌘K COMMAND PALETTE ========================= */
+  .palette-backdrop {
+    position: fixed; inset: 0; z-index: 300; display: none;
+    align-items: flex-start; justify-content: center; padding-top: 14vh;
+    background: rgba(0,0,0,0.5); backdrop-filter: blur(3px);
+  }
+  .palette-backdrop.open { display: flex; }
+  .palette {
+    width: min(560px, 92vw); border-radius: 16px; overflow: hidden;
+    box-shadow: 0 40px 90px -20px rgba(0,0,0,0.65);
+    border: 1px solid rgba(128,128,128,0.35);
+    background: #161b26; color: #e5e7eb;
+    animation: pop .12s ease-out;
+  }
+  @keyframes pop { from { transform: scale(0.98) translateY(-6px); opacity: 0; } }
+  .palette input {
+    width: 100%; border: 0; outline: 0; background: transparent; color: inherit;
+    padding: 0.95rem 1.1rem; font-size: 0.95rem; font-family: inherit;
+    border-bottom: 1px solid rgba(128,128,128,0.25);
+  }
+  .palette .group-label { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.7rem 1.1rem 0.3rem; color: #8a93a6; }
+  .palette .opt { display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 1.1rem; font-size: 0.85rem; cursor: pointer; }
+  .palette .opt:hover, .palette .opt.sel { background: rgba(245,158,11,0.12); }
+  .palette .opt .k { margin-left: auto; font-size: 0.65rem; color: #8a93a6; font-family: ui-monospace, Menlo, monospace; }
+  .palette .foot { padding: 0.55rem 1.1rem; font-size: 0.68rem; color: #8a93a6; border-top: 1px solid rgba(128,128,128,0.2); }
+
+  /* ================= UX NOTES CARD (bottom overlay) ================= */
+  .notes-toggle {
+    position: fixed; right: 18px; bottom: 18px; z-index: 200;
+    border: 0; cursor: pointer; border-radius: 999px; padding: 0.6rem 1.1rem;
+    font-size: 0.8rem; font-weight: 700; color: #0b0d12;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    box-shadow: 0 12px 30px -8px rgba(245,158,11,0.6);
+  }
+  .notes {
+    position: fixed; right: 18px; bottom: 64px; z-index: 200;
+    width: min(420px, calc(100vw - 36px)); max-height: min(70vh, 560px); overflow-y: auto;
+    display: none; border-radius: 16px; padding: 1.1rem 1.25rem;
+    background: #10141d; color: #d7dce6; border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7); font-size: 0.8rem; line-height: 1.55;
+  }
+  .notes.open { display: block; }
+  .notes h3 { margin: 0 0 0.5rem; font-size: 0.9rem; color: #fff; }
+  .notes h4 { margin: 0.9rem 0 0.3rem; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: #fbbf24; }
+  .notes ul { margin: 0.2rem 0; padding-left: 1.1rem; }
+  .notes li { margin: 0.25rem 0; }
+  .notes .muted-note { color: #8a93a6; font-size: 0.72rem; margin-top: 0.8rem; }
+
+  /* ======================================================================
+     DIRECTION A · MIDNIGHT DECK — dark glass + amber glow (evolved marketing)
+     ====================================================================== */
+  .stage.dir-a {
+    --bg: #06080d; --surface: #0e1320; --surface-2: #121828;
+    --line: rgba(255,255,255,0.08); --line-strong: rgba(255,255,255,0.16);
+    --ink: #f3f5fa; --ink-dim: #c3cbda; --muted: #828b9e;
+    --accent: #f59e0b; --on-accent: #1a1208;
+    --tint: rgba(255,255,255,0.04); --tint-strong: rgba(255,255,255,0.07);
+    background:
+      radial-gradient(900px 400px at 85% -10%, rgba(245,158,11,0.09), transparent 60%),
+      radial-gradient(700px 380px at -10% 110%, rgba(34,211,238,0.06), transparent 60%),
+      var(--bg);
+    color: var(--ink);
+  }
+  .dir-a .sidebar { background: rgba(14,19,32,0.75); border-right: 1px solid var(--line); backdrop-filter: blur(14px); }
+  .dir-a .brand-glyph { background: linear-gradient(135deg,#f59e0b,#f97316); color: var(--on-accent); box-shadow: 0 8px 22px -6px rgba(245,158,11,0.55); }
+  .dir-a .brand-name { color: var(--ink); }
+  .dir-a .nav-item { color: var(--ink-dim); }
+  .dir-a .nav-item:hover { background: var(--tint); color: var(--ink); }
+  .dir-a .nav-item.active { background: linear-gradient(90deg, rgba(245,158,11,0.14), rgba(245,158,11,0.03)); color: #fff; box-shadow: inset 2px 0 0 var(--accent); }
+  .dir-a .nav-child { color: var(--muted); }
+  .dir-a .nav-child:hover, .dir-a .nav-child.active { color: var(--ink); background: var(--tint); }
+  .dir-a .sidebar-footer { border-color: var(--line); color: var(--muted); }
+  .dir-a .topbar { background: rgba(6,8,13,0.66); border-bottom: 1px solid var(--line); box-shadow: 0 12px 34px -14px rgba(0,0,0,0.7); }
+  .dir-a .cmdk-btn { background: rgba(255,255,255,0.045); border-color: var(--line); color: var(--muted); }
+  .dir-a .cmdk-btn:hover { border-color: var(--line-strong); color: var(--ink-dim); }
+  .dir-a .cmdk-btn kbd { background: rgba(255,255,255,0.06); border-color: var(--line); color: var(--muted); }
+  .dir-a .price-block .lbl, .dir-a .price-block .timestamp { color: var(--muted); }
+  .dir-a .btn-primary { background: linear-gradient(135deg,#fbbf24,#f59e0b 60%,#f97316); color: var(--on-accent); box-shadow: 0 10px 24px -10px rgba(245,158,11,0.55); }
+  .dir-a .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 30px -10px rgba(245,158,11,0.7); }
+  .dir-a .btn-ghost { background: var(--tint); border-color: var(--line-strong); color: var(--ink); }
+  .dir-a .icon-btn { color: var(--muted); }
+  .dir-a .icon-btn:hover { background: var(--tint); color: var(--ink); }
+  .dir-a .badge { background: var(--accent); color: var(--on-accent); }
+  .dir-a .avatar { background: linear-gradient(135deg,#f59e0b,#f97316); color: var(--on-accent); }
+  .dir-a .page-title { background: linear-gradient(180deg,#fff,#c9d2e3); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .dir-a .page-sub { color: var(--muted); }
+  .dir-a .kpi { background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)); border-color: var(--line); box-shadow: 0 18px 44px -22px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05); }
+  .dir-a .kpi-label { color: var(--muted); }
+  .dir-a .kpi-value { color: var(--ink); }
+  .dir-a .panel { background: rgba(14,19,32,0.7); border-color: var(--line); backdrop-filter: blur(10px); box-shadow: 0 24px 60px -30px rgba(0,0,0,0.8); }
+  .dir-a .panel-head { border-color: var(--line); }
+  .dir-a .panel-head h2 { color: var(--ink); }
+  .dir-a .select { background: rgba(255,255,255,0.05); border-color: var(--line-strong); color: var(--ink-dim); }
+  .dir-a thead th { color: var(--muted); border-color: var(--line); background: rgba(255,255,255,0.02); }
+  .dir-a tbody td { color: var(--ink-dim); border-color: rgba(255,255,255,0.05); }
+  .dir-a tbody tr { transition: background .12s; }
+  .dir-a tbody tr:hover { background: var(--tint); }
+  .dir-a .row-btn { background: rgba(255,255,255,0.06); border-color: var(--line-strong); color: var(--ink-dim); }
+  .dir-a .row-btn:hover { color: #fff; border-color: rgba(245,158,11,0.5); }
+  .dir-a .row-btn.primary { background: linear-gradient(135deg,#fbbf24,#f59e0b); color: var(--on-accent); }
+  .dir-a .footer-note { color: var(--muted); }
+  .dir-a .pill[data-status="inquiry"]  { background: rgba(245,158,11,0.12); color: #fbbf24; border-color: rgba(245,158,11,0.3); }
+  .dir-a .pill[data-status="offer"]    { background: rgba(249,115,22,0.14); color: #fb923c; border-color: rgba(249,115,22,0.32); }
+  .dir-a .pill[data-status="confirmed"]{ background: rgba(34,211,238,0.12); color: #22d3ee; border-color: rgba(34,211,238,0.3); }
+  .dir-a .pill[data-status="delivered"]{ background: rgba(139,92,246,0.14); color: #a78bfa; border-color: rgba(139,92,246,0.32); }
+  .dir-a .pill[data-status="invoiced"]{ background: rgba(99,102,241,0.14); color: #818cf8; border-color: rgba(99,102,241,0.32); }
+  .dir-a .pill[data-status="paid"]    { background: rgba(52,211,153,0.12); color: #34d399; border-color: rgba(52,211,153,0.3); }
+  .dir-a .pill[data-status="cancelled"]{ background: rgba(239,68,68,0.12); color: #f87171; border-color: rgba(239,68,68,0.3); }
+  .dir-a .pill[data-status="overdue"] { background: rgba(220,38,38,0.16); color: #fca5a5; border-color: rgba(220,38,38,0.34); }
+
+  /* ======================================================================
+     DIRECTION B · SWISS LIGHT — editorial, flat, hairline, typographic
+     ====================================================================== */
+  .stage.dir-b {
+    --bg: #fafaf7; --surface: #ffffff;
+    --line: rgba(15,18,25,0.10); --line-soft: rgba(15,18,25,0.06);
+    --ink: #14161c; --ink-dim: #3c4150; --muted: #797f8e;
+    --accent: #1d4ed8; --on-accent: #fff;
+    --tint: rgba(15,18,25,0.03);
+    background: var(--bg); color: var(--ink);
+  }
+  .dir-b .sidebar { background: var(--bg); border-right: 1px solid var(--line); }
+  .dir-b .brand-glyph { background: var(--ink); color: #fff; border-radius: 4px; }
+  .dir-b .brand-name { color: var(--ink); letter-spacing: 0.14em; font-size: 0.9rem; }
+  .dir-b .nav-item { color: var(--ink-dim); border-radius: 6px; }
+  .dir-b .nav-item:hover { background: var(--tint); color: var(--ink); }
+  .dir-b .nav-item.active { color: var(--ink); font-weight: 650; box-shadow: inset 2px 0 0 var(--accent); background: var(--tint); }
+  .dir-b .nav-child { color: var(--muted); }
+  .dir-b .nav-child:hover, .dir-b .nav-child.active { color: var(--ink); }
+  .dir-b .sidebar-footer { border-color: var(--line); color: var(--muted); }
+  .dir-b .topbar { background: rgba(250,250,247,0.85); border-bottom: 1px solid var(--line); }
+  .dir-b .cmdk-btn { background: #fff; border-color: var(--line); color: var(--muted); border-radius: 6px; }
+  .dir-b .cmdk-btn kbd { background: var(--bg); border-color: var(--line); color: var(--muted); }
+  .dir-b .price-block .lbl, .dir-b .price-block .timestamp { color: var(--muted); }
+  .dir-b .btn-primary { background: var(--ink); color: #fff; border-radius: 6px; }
+  .dir-b .btn-primary:hover { background: #000; }
+  .dir-b .btn-ghost { background: #fff; border-color: var(--line); color: var(--ink); border-radius: 6px; }
+  .dir-b .icon-btn { color: var(--muted); border-radius: 6px; }
+  .dir-b .icon-btn:hover { background: var(--tint); color: var(--ink); }
+  .dir-b .badge { background: #dc2626; color: #fff; }
+  .dir-b .avatar { background: var(--ink); color: #fff; border-radius: 6px; }
+  .dir-b .page-title { font-weight: 800; letter-spacing: -0.04em; }
+  .dir-b .page-sub { color: var(--muted); }
+  .dir-b .kpi { background: #fff; border: 1px solid var(--line); border-radius: 4px; box-shadow: none; padding: 1.1rem 1.15rem; }
+  .dir-b .kpi:first-child { border-left: 3px solid var(--accent); }
+  .dir-b .kpi-label { color: var(--muted); }
+  .dir-b .panel { background: #fff; border: 1px solid var(--line); border-radius: 4px; box-shadow: none; }
+  .dir-b .panel-head { border-color: var(--line); }
+  .dir-b .select { background: #fff; border-color: var(--line); color: var(--ink); border-radius: 4px; }
+  .dir-b thead th { border-color: var(--ink); color: var(--ink); background: #fff; border-bottom-width: 2px; }
+  .dir-b tbody td { color: var(--ink-dim); border-color: var(--line-soft); }
+  .dir-b tbody tr:hover { background: var(--tint); }
+  .dir-b .row-btn { background: #fff; border-color: var(--line); color: var(--ink-dim); border-radius: 4px; }
+  .dir-b .row-btn:hover { border-color: var(--ink); color: var(--ink); }
+  .dir-b .row-btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .dir-b .footer-note { color: var(--muted); }
+  .dir-b .pill { border-radius: 2px; background: #fff !important; }
+  .dir-b .pill[data-status="inquiry"]  { color: #a16207; border-color: #a16207; }
+  .dir-b .pill[data-status="offer"]    { color: #c2410c; border-color: #c2410c; }
+  .dir-b .pill[data-status="confirmed"]{ color: #1d4ed8; border-color: #1d4ed8; }
+  .dir-b .pill[data-status="delivered"]{ color: #6d28d9; border-color: #6d28d9; }
+  .dir-b .pill[data-status="invoiced"]{ color: #4338ca; border-color: #4338ca; }
+  .dir-b .pill[data-status="paid"]    { color: #15803d; border-color: #15803d; }
+  .dir-b .pill[data-status="cancelled"]{ color: #b91c1c; border-color: #b91c1c; }
+  .dir-b .pill[data-status="overdue"] { color: #991b1b; border-color: #991b1b; }
+
+  /* ======================================================================
+     DIRECTION C · TERMINAL PRO — density-first, graphite, mono numerics
+     ====================================================================== */
+  .stage.dir-c {
+    --bg: #101215; --surface: #16191e; --surface-2: #1b1f26;
+    --line: #262b33; --line-strong: #343b46;
+    --ink: #e8ecf2; --ink-dim: #b9c2ce; --muted: #737d8c;
+    --accent: #ffb020; --on-accent: #16130a;
+    --tint: rgba(255,255,255,0.03); --tint-strong: rgba(255,255,255,0.06);
+    background: var(--bg); color: var(--ink);
+    font-size: 13px;
+  }
+  .dir-c .sidebar { background: var(--surface); border-right: 1px solid var(--line); width: 208px; }
+  .dir-c .brand-glyph { background: var(--accent); color: var(--on-accent); border-radius: 3px; font-family: ui-monospace, Menlo, monospace; }
+  .dir-c .brand-name { color: var(--ink); font-family: ui-monospace, Menlo, monospace; font-size: 0.88rem; letter-spacing: 0.1em; }
+  .dir-c .nav-item { color: var(--ink-dim); border-radius: 3px; padding: 0.42rem 0.6rem; font-size: 0.8rem; }
+  .dir-c .nav-item:hover { background: var(--tint-strong); }
+  .dir-c .nav-item.active { background: rgba(255,176,32,0.1); color: var(--accent); }
+  .dir-c .nav-child { color: var(--muted); font-size: 0.75rem; border-radius: 3px; }
+  .dir-c .nav-child:hover, .dir-c .nav-child.active { color: var(--ink); background: var(--tint-strong); }
+  .dir-c .sidebar-footer { border-color: var(--line); color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+  .dir-c .topbar { background: var(--surface); border-bottom: 1px solid var(--line); height: 52px; }
+  .dir-c .cmdk-btn { background: var(--surface-2); border-color: var(--line); color: var(--muted); border-radius: 4px; font-family: ui-monospace, Menlo, monospace; font-size: 0.75rem; }
+  .dir-c .cmdk-btn kbd { background: var(--surface); border-color: var(--line-strong); color: var(--muted); }
+  .dir-c .price-block .val, .dir-c .price-block .chg { font-family: ui-monospace, Menlo, monospace; }
+  .dir-c .price-block .lbl, .dir-c .price-block .timestamp { color: var(--muted); }
+  .dir-c .btn-primary { background: var(--accent); color: var(--on-accent); border-radius: 4px; }
+  .dir-c .btn-ghost { background: var(--surface-2); border-color: var(--line-strong); color: var(--ink); border-radius: 4px; }
+  .dir-c .icon-btn { color: var(--muted); border-radius: 4px; }
+  .dir-c .icon-btn:hover { background: var(--tint-strong); color: var(--ink); }
+  .dir-c .badge { background: #ef4444; color: #fff; }
+  .dir-c .avatar { background: var(--surface-2); color: var(--accent); border: 1px solid var(--line-strong); border-radius: 4px; }
+  .dir-c .page-title { font-family: ui-monospace, Menlo, monospace; font-size: 1.15rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .dir-c .page-sub { color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+  .dir-c .kpi-row { gap: 2px; margin-bottom: 2px; background: var(--line); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .dir-c .kpi { background: var(--surface); border-radius: 0; border: 0; padding: 0.7rem 0.9rem; }
+  .dir-c .kpi-label { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 0.62rem; }
+  .dir-c .kpi-value { font-family: ui-monospace, Menlo, monospace; font-size: 1.3rem; }
+  .dir-c .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+  .dir-c .panel-head { border-color: var(--line); padding: 0.6rem 0.9rem; background: var(--surface-2); }
+  .dir-c .panel-head h2 { font-family: ui-monospace, Menlo, monospace; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; color: var(--ink-dim); }
+  .dir-c .select { background: var(--surface); border-color: var(--line-strong); color: var(--ink); border-radius: 3px; }
+  .dir-c thead th { border-color: var(--line-strong); color: var(--muted); background: var(--surface-2); font-family: ui-monospace, Menlo, monospace; }
+  .dir-c tbody td { color: var(--ink-dim); border-color: var(--line); padding: 0.42rem 0.9rem; font-family: ui-monospace, Menlo, monospace; font-size: 0.75rem; }
+  .dir-c tbody td.client, .dir-c tbody td.vessel { font-family: inherit; }
+  .dir-c tbody tr { border-left: 2px solid transparent; transition: background .1s; }
+  .dir-c tbody tr:hover { background: var(--tint-strong); }
+  .dir-c tr[data-status="inquiry"]   { box-shadow: inset 2px 0 0 #ffb020; }
+  .dir-c tr[data-status="offer"]     { box-shadow: inset 2px 0 0 #fb923c; }
+  .dir-c tr[data-status="confirmed"] { box-shadow: inset 2px 0 0 #22d3ee; }
+  .dir-c tr[data-status="delivered"] { box-shadow: inset 2px 0 0 #a78bfa; }
+  .dir-c tr[data-status="invoiced"]  { box-shadow: inset 2px 0 0 #818cf8; }
+  .dir-c tr[data-status="paid"]      { box-shadow: inset 2px 0 0 #34d399; }
+  .dir-c tr[data-status="cancelled"] { box-shadow: inset 2px 0 0 #6b7280; }
+  .dir-c tr[data-status="overdue"]   { box-shadow: inset 2px 0 0 #ef4444; }
+  .dir-c .pill { background: transparent !important; border: 0; padding: 0; font-family: ui-monospace, Menlo, monospace; text-transform: uppercase; }
+  .dir-c .pill .p-dot { display: inline-block; }
+  .dir-c .pill[data-status="inquiry"]  { color: #ffb020; }
+  .dir-c .pill[data-status="offer"]    { color: #fb923c; }
+  .dir-c .pill[data-status="confirmed"]{ color: #22d3ee; }
+  .dir-c .pill[data-status="delivered"]{ color: #a78bfa; }
+  .dir-c .pill[data-status="invoiced"]{ color: #818cf8; }
+  .dir-c .pill[data-status="paid"]    { color: #34d399; }
+  .dir-c .pill[data-status="cancelled"]{ color: #9ca3af; }
+  .dir-c .pill[data-status="overdue"] { color: #f87171; }
+  .dir-c .row-btn { background: transparent; border-color: var(--line-strong); color: var(--ink-dim); border-radius: 3px; font-family: ui-monospace, Menlo, monospace; }
+  .dir-c .row-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .dir-c .row-btn.primary { border-color: var(--accent); color: var(--accent); }
+  .dir-c .footer-note { color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+
+  /* ======================================================================
+     DIRECTION D · SOFT STUDIO — Linear/Attio-style: soft, rounded, tinted
+     ====================================================================== */
+  .stage.dir-d {
+    --bg: #f7f8fa; --surface: #ffffff; --surface-2: #fbfcfd;
+    --line: rgba(18,22,33,0.08); --line-strong: rgba(18,22,33,0.14);
+    --ink: #171a21; --ink-dim: #414856; --muted: #8a8f9c;
+    --accent: #5b5bd6; --on-accent: #fff;
+    --tint: rgba(18,22,33,0.03); --tint-strong: rgba(18,22,33,0.06);
+    background: var(--bg); color: var(--ink);
+  }
+  .dir-d .sidebar { background: var(--surface-2); border-right: 1px solid transparent; }
+  .dir-d .brand-glyph { background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; border-radius: 10px; box-shadow: 0 8px 18px -6px rgba(99,102,241,0.5); }
+  .dir-d .brand-name { color: var(--ink); }
+  .dir-d .nav-item { color: var(--ink-dim); border-radius: 10px; }
+  .dir-d .nav-item:hover { background: var(--tint); color: var(--ink); }
+  .dir-d .nav-item.active { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(18,22,33,0.06), 0 0 0 1px var(--line); }
+  .dir-d .nav-child { color: var(--muted); }
+  .dir-d .nav-child:hover, .dir-d .nav-child.active { color: var(--ink); background: var(--tint); }
+  .dir-d .sidebar-footer { border-color: var(--line); color: var(--muted); }
+  .dir-d .topbar { background: rgba(247,248,250,0.8); border-bottom: 1px solid transparent; box-shadow: 0 1px 0 var(--line); }
+  .dir-d .cmdk-btn { background: #fff; border-color: var(--line); color: var(--muted); border-radius: 10px; box-shadow: 0 1px 2px rgba(18,22,33,0.04); }
+  .dir-d .cmdk-btn kbd { background: var(--bg); border-color: var(--line); color: var(--muted); }
+  .dir-d .price-block .lbl, .dir-d .price-block .timestamp { color: var(--muted); }
+  .dir-d .btn-primary { background: var(--accent); color: var(--on-accent); border-radius: 10px; box-shadow: 0 6px 16px -6px rgba(91,91,214,0.5), inset 0 1px 0 rgba(255,255,255,0.2); }
+  .dir-d .btn-primary:hover { filter: brightness(1.06); }
+  .dir-d .btn-ghost { background: #fff; border-color: var(--line); color: var(--ink); border-radius: 10px; box-shadow: 0 1px 2px rgba(18,22,33,0.04); }
+  .dir-d .icon-btn { color: var(--muted); border-radius: 10px; }
+  .dir-d .icon-btn:hover { background: var(--tint); color: var(--ink); }
+  .dir-d .badge { background: #ef4444; color: #fff; }
+  .dir-d .avatar { background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; }
+  .dir-d .page-title { letter-spacing: -0.03em; }
+  .dir-d .page-sub { color: var(--muted); }
+  .dir-d .kpi { background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 2px rgba(18,22,33,0.04), 0 12px 32px -20px rgba(18,22,33,0.12); }
+  .dir-d .kpi-label { color: var(--muted); }
+  .dir-d .kpi-value { color: var(--ink); }
+  .dir-d .panel { background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 2px rgba(18,22,33,0.04), 0 12px 32px -20px rgba(18,22,33,0.10); }
+  .dir-d .panel-head { border-color: var(--line); }
+  .dir-d .select { background: var(--bg); border-color: var(--line); color: var(--ink); border-radius: 8px; }
+  .dir-d thead th { color: var(--muted); border-color: var(--line); background: transparent; }
+  .dir-d tbody td { color: var(--ink-dim); border-color: var(--line); }
+  .dir-d tbody tr:hover { background: var(--tint); }
+  .dir-d .row-btn { background: var(--bg); border-color: var(--line); color: var(--ink-dim); border-radius: 8px; }
+  .dir-d .row-btn:hover { border-color: var(--line-strong); color: var(--ink); }
+  .dir-d .row-btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  .dir-d .footer-note { color: var(--muted); }
+  .dir-d .pill[data-status="inquiry"]  { background: #fef3c7; color: #92400e; }
+  .dir-d .pill[data-status="offer"]    { background: #ffedd5; color: #c2410c; }
+  .dir-d .pill[data-status="confirmed"]{ background: #cffafe; color: #0e7490; }
+  .dir-d .pill[data-status="delivered"]{ background: #ede9fe; color: #6d28d9; }
+  .dir-d .pill[data-status="invoiced"]{ background: #e0e7ff; color: #4338ca; }
+  .dir-d .pill[data-status="paid"]    { background: #d1fae5; color: #047857; }
+  .dir-d .pill[data-status="cancelled"]{ background: #fee2e2; color: #b91c1c; }
+  .dir-d .pill[data-status="overdue"] { background: #fee2e2; color: #991b1b; }
+
+  /* density toggle (C gets compact by default; others allow compact) */
+  .stage.dense tbody td { padding-top: 0.32rem; padding-bottom: 0.32rem; }
+  .stage.dense .kpi { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+  .stage.dense .kpi-value { font-size: 1.3rem; }
+
+  @media (max-width: 1100px) { .kpi-row { grid-template-columns: repeat(2, minmax(0,1fr)); } .prices { display: none; } }
+  @media (max-width: 760px)  { .sidebar { display: none; } .kpi-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>Fueld — UI/UX Directions</h1>
+  <div class="modes" id="modes">
+    <button data-dir="dir-a" class="active">A · Midnight Deck</button>
+    <button data-dir="dir-b">B · Swiss Light</button>
+    <button data-dir="dir-c">C · Terminal Pro</button>
+    <button data-dir="dir-d">D · Soft Studio</button>
+  </div>
+  <button id="densityBtn" style="margin-left:0.4rem" title="Toggle row density">Density: Normal</button>
+  <span class="hint">Press <kbd>⌘</kbd><kbd>K</kbd> for the command palette · <button id="notesBtn" style="padding:0.1rem 0.4rem;font-size:0.72rem">UX ideas ↗</button></span>
+</div>
+
+<div class="stage dir-a" id="stage">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand-row">
+      <div class="brand-glyph">F</div>
+      <span class="brand-name">FUELD</span>
+    </div>
+    <nav class="nav">
+      <a class="nav-item active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3"/></svg> Dashboard</a>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v18H3V3zm4 12h2V9H7v6z"/></svg> Reports</a>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2z"/></svg> Trading <span class="caret">▾</span></a>
+      <div class="nav-children">
+        <a class="nav-child active">Active Orders</a>
+        <a class="nav-child">Inquiries</a>
+        <a class="nav-child">Completed</a>
+      </div>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg> Credit <span class="caret">▾</span></a>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h10"/></svg> Operations <span class="caret">▾</span></a>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16"/></svg> Companies</a>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19h16M5 19l1-9h12l1 9"/></svg> Vessels</a>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37"/></svg> Admin <span class="caret">▾</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <span>v2.4.1 · staging</span>
+      <a class="ai-dot"><span class="dot"></span> AI</a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <button class="cmdk-btn" id="cmdkBtn">
+        <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor" opacity="0.7"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg>
+        <span>Search or jump to…</span>
+        <span class="spacer"></span>
+        <kbd>⌘K</kbd>
+      </button>
+
+      <div class="prices">
+        <div class="price-block"><div><span class="lbl">Brent</span> <span class="val">82.40</span></div><div><span class="chg up">+0.35 (+0.43%)</span></div></div>
+        <div class="price-block"><div><span class="lbl">VLSFO 3.5S</span> <span class="val">612.50</span></div><div><span class="chg up">+2.10 (+0.34%)</span></div></div>
+        <div class="price-block"><div><span class="lbl">USD/EUR</span> <span class="val">0.92</span></div><div><span class="chg down">−0.43%</span></div></div>
+      </div>
+      <div class="divider-v"></div>
+
+      <div class="topbar-actions">
+        <button class="btn btn-primary">＋ New Inquiry</button>
+        <button class="icon-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31"/></svg><span class="badge">3</span></button>
+        <div class="avatar">PP</div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="page-head">
+        <h1 class="page-title">Dashboard</h1>
+        <span class="page-sub">Friday, 6 Mar · prices updated 2m ago</span>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi">
+          <p class="kpi-label">Active Orders</p>
+          <p class="kpi-value">42</p>
+          <div class="kpi-foot"><span class="kpi-delta up">▲ 5 this week</span>
+            <svg class="spark" width="72" height="22" viewBox="0 0 72 22" fill="none"><path d="M1 18 L11 16 L21 17 L31 12 L41 13 L51 8 L61 9 L71 4" stroke="#10b981" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <div class="kpi">
+          <p class="kpi-label">Open Inquiries</p>
+          <p class="kpi-value">18</p>
+          <div class="kpi-foot"><span class="kpi-delta up">▲ 3 today</span>
+            <svg class="spark" width="72" height="22" viewBox="0 0 72 22" fill="none"><path d="M1 14 L11 15 L21 11 L31 13 L41 10 L51 11 L61 7 L71 6" stroke="#10b981" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <div class="kpi">
+          <p class="kpi-label">Pending Offers</p>
+          <p class="kpi-value">7</p>
+          <div class="kpi-foot"><span class="kpi-delta down">▼ 2 vs avg</span>
+            <svg class="spark" width="72" height="22" viewBox="0 0 72 22" fill="none"><path d="M1 6 L11 8 L21 7 L31 10 L41 9 L51 13 L61 12 L71 16" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <div class="kpi">
+          <p class="kpi-label">Overdue Invoices</p>
+          <p class="kpi-value">€12.4k</p>
+          <div class="kpi-foot"><span class="kpi-delta down">▲ 1 new</span>
+            <svg class="spark" width="72" height="22" viewBox="0 0 72 22" fill="none"><path d="M1 16 L11 14 L21 15 L31 12 L41 13 L51 10 L61 11 L71 7" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Active Orders</h2>
+          <div class="actions">
+            <select class="select"><option>All statuses</option><option>Inquiry</option><option>Offer</option><option>Confirmed</option></select>
+            <button class="btn btn-ghost">Export</button>
+            <button class="btn btn-primary">＋ New Inquiry</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Order #</th><th>Client</th><th>Vessel</th><th>Port</th><th>Product</th><th>Qty</th><th>Status</th><th>Updated</th><th></th>
+            </tr></thead>
+            <tbody>
+              <tr data-status="inquiry"><td class="ordno">FU-26-0421</td><td class="client">Riviera Marine</td><td class="vessel">MV Pacific Voyager</td><td>Fujairah</td><td>VLSFO</td><td>500 MT</td><td><span class="pill" data-status="inquiry"><span class="p-dot"></span>Inquiry</span></td><td>2m ago</td>
+                <td><span class="row-actions"><button class="row-btn primary">Open</button><button class="row-btn">⋯</button></span></td></tr>
+              <tr data-status="offer"><td class="ordno">FU-26-0418</td><td class="client">ChannelTX</td><td class="vessel">MV Stella Polaris</td><td>Rotterdam</td><td>LSMGO</td><td>320 MT</td><td><span class="pill" data-status="offer"><span class="p-dot"></span>Offer</span></td><td>14m ago</td>
+                <td><span class="row-actions"><button class="row-btn primary">Open</button><button class="row-btn">⋯</button></span></td></tr>
+              <tr data-status="confirmed"><td class="ordno">FU-26-0412</td><td class="client">Moxie Brokerage</td><td class="vessel">MV Nordic Star</td><td>Singapore</td><td>VLSFO</td><td>1,200 MT</td><td><span class="pill" data-status="confirmed"><span class="p-dot"></span>Confirmed</span></td><td>1h ago</td>
+                <td><span class="row-actions"><button class="row-btn primary">Open</button><button class="row-btn">⋯</button></span></td></tr>
+              <tr data-status="delivered"><td class="ordno">FU-26-0407</td><td class="client">Riviera Marine</td><td class="vessel">MV Atlantic Breeze</td><td>Gibraltar</td><td>HSFO 380</td><td>850 MT</td><td><span class="pill" data-status="delivered"><span class="p-dot"></span>Delivered</span></td><td>3h ago</td>
+                <td><span class="row-actions"><button class="row-btn">View</button><button class="row-btn">⋯</button></span></td></tr>
+              <tr data-status="invoiced"><td class="ordno">FU-26-0399</td><td class="client">ChannelTX</td><td class="vessel">MV Harmony Sea</td><td>Hong Kong</td><td>LSMGO</td><td>240 MT</td><td><span class="pill" data-status="invoiced"><span class="p-dot"></span>Invoiced</span></td><td>5h ago</td>
+                <td><span class="row-actions"><button class="row-btn">Invoice</button><button class="row-btn">⋯</button></span></td></tr>
+              <tr><td class="ordno"><span class="skel" style="width:86px;height:12px"></span></td><td><span class="skel" style="width:110px;height:12px"></span></td><td><span class="skel" style="width:130px;height:12px"></span></td><td><span class="skel" style="width:70px;height:12px"></span></td><td><span class="skel" style="width:50px;height:12px"></span></td><td><span class="skel" style="width:56px;height:12px"></span></td><td><span class="skel" style="width:64px;height:14px"></span></td><td><span class="skel" style="width:44px;height:12px"></span></td><td></td></tr>
+              <tr data-status="overdue"><td class="ordno">FU-26-0384</td><td class="client">Riviera Marine</td><td class="vessel">MV Ocean Pride</td><td>Port Said</td><td>LSMGO</td><td>410 MT</td><td><span class="pill" data-status="overdue"><span class="p-dot"></span>Overdue</span></td><td>2d ago</td>
+                <td><span class="row-actions"><button class="row-btn">Chase</button><button class="row-btn">⋯</button></span></td></tr>
+              <tr data-status="cancelled"><td class="ordno">FU-26-0377</td><td class="client">ChannelTX</td><td class="vessel">MV Silver Wave</td><td>Busan</td><td>VLSFO</td><td>560 MT</td><td><span class="pill" data-status="cancelled"><span class="p-dot"></span>Cancelled</span></td><td>3d ago</td>
+                <td><span class="row-actions"><button class="row-btn">Archive</button><button class="row-btn">⋯</button></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="footer-note">Fueld · Bunker Trading — static design-direction demo · not a live page</p>
+    </main>
+  </div>
+</div>
+
+<!-- ⌘K COMMAND PALETTE -->
+<div class="palette-backdrop" id="palette">
+  <div class="palette">
+    <input id="paletteInput" placeholder="Search orders, vessels, companies, actions…" autofocus />
+    <div class="group-label">Actions</div>
+    <div class="opt"><span>＋</span> New Inquiry <span class="k">N</span></div>
+    <div class="opt"><span>⇄</span> Toggle density <span class="k">D</span></div>
+    <div class="opt"><span>◐</span> Switch theme <span class="k">T</span></div>
+    <div class="group-label">Jump to</div>
+    <div class="opt"><span>▦</span> Dashboard <span class="k">G D</span></div>
+    <div class="opt"><span>▤</span> Active Orders <span class="k">G O</span></div>
+    <div class="opt"><span>◉</span> Credit · Applications <span class="k">G C</span></div>
+    <div class="group-label">Recent</div>
+    <div class="opt"><span class="mono" style="color:#fbbf24">FU-26-0421</span> Riviera Marine · Fujairah <span class="k">2m</span></div>
+    <div class="opt"><span class="mono" style="color:#fbbf24">FU-26-0418</span> ChannelTX · Rotterdam <span class="k">14m</span></div>
+    <div class="foot">↑↓ navigate · ↵ open · esc close</div>
+  </div>
+</div>
+
+<!-- UX NOTES -->
+<button class="notes-toggle" id="notesFab">UX ideas</button>
+<div class="notes" id="notesPanel">
+  <h3>UX upgrades in this demo (beyond color)</h3>
+  <h4>Works right now</h4>
+  <ul>
+    <li><strong>⌘K command palette</strong> — keyboard-first navigation (press ⌘K / Ctrl+K). Biggest single power-user win.</li>
+    <li><strong>Hover row actions</strong> — Open/⋯ buttons appear on hover; less visual noise, faster scanning.</li>
+    <li><strong>Density toggle</strong> — try the Density button; traders want compact, admins want airy.</li>
+    <li><strong>Sparklines in KPIs</strong> — trend context without a chart page.</li>
+    <li><strong>Skeleton shimmer row</strong> — how loading should look instead of spinners.</li>
+  </ul>
+  <h4>Direction A · Midnight Deck</h4>
+  <ul>
+    <li>Dark glass + amber glow; ambient gradients give depth without noise.</li>
+    <li>Active nav = gradient wash + left accent bar; clear "you are here".</li>
+    <li>Best match with the existing marketing tokens — cheapest migration.</li>
+  </ul>
+  <h4>Direction B · Swiss Light</h4>
+  <ul>
+    <li>Flat, hairline, typographic. Status = outlined mono-color pills.</li>
+    <li>Feels premium/calm; great for print-like exports and reports.</li>
+  </ul>
+  <h4>Direction C · Terminal Pro</h4>
+  <ul>
+    <li>Maximum density: mono numerics everywhere, colored row edge-ticks.</li>
+    <li>Bloomberg energy — ideal for the trading desk audience.</li>
+  </ul>
+  <h4>Direction D · Soft Studio</h4>
+  <ul>
+    <li>Linear/Attio-style: elevated cards, tinted sidebar, pastel pills.</li>
+    <li>Friendliest; good if onboarding smaller/broker clients.</li>
+  </ul>
+  <h4>Next-level ideas (not in mock yet)</h4>
+  <ul>
+    <li>Split-view order detail (list + inspector pane) instead of full page nav.</li>
+    <li>Optimistic inline status changes (drag between columns / dropdown in row).</li>
+    <li>Saved views per user (filters + columns) with shareable URLs.</li>
+    <li>Toast + undo for destructive actions; empty states with one-click setup.</li>
+    <li>Real-time price cells with subtle flash-on-change animation (WS already exists).</li>
+  </ul>
+  <p class="muted-note">Recommendation: A for the shell + D's KPI cards + C's row density as a toggle. All four share one token layer, so a hybrid is cheap.</p>
+</div>
+
+<script>
+  const stage = document.getElementById('stage');
+  const modeButtons = document.querySelectorAll('#modes button');
+  const densityBtn = document.getElementById('densityBtn');
+  const palette = document.getElementById('palette');
+  const paletteInput = document.getElementById('paletteInput');
+
+  modeButtons.forEach(b => b.addEventListener('click', () => {
+    modeButtons.forEach(x => x.classList.toggle('active', x === b));
+    stage.className = 'stage ' + b.dataset.dir + (stage.classList.contains('dense') ? ' dense' : '');
+  }));
+
+  densityBtn.addEventListener('click', () => {
+    const dense = stage.classList.toggle('dense');
+    densityBtn.textContent = 'Density: ' + (dense ? 'Compact' : 'Normal');
+  });
+
+  const openPalette = () => { palette.classList.add('open'); paletteInput.value = ''; paletteInput.focus(); };
+  const closePalette = () => palette.classList.remove('open');
+  document.getElementById('cmdkBtn').addEventListener('click', openPalette);
+  palette.addEventListener('click', e => { if (e.target === palette) closePalette(); });
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); palette.classList.contains('open') ? closePalette() : openPalette(); }
+    if (e.key === 'Escape') closePalette();
+  });
+
+  const notesPanel = document.getElementById('notesPanel');
+  document.getElementById('notesBtn').addEventListener('click', () => notesPanel.classList.toggle('open'));
+  document.getElementById('notesFab').addEventListener('click', () => notesPanel.classList.toggle('open'));
+</script>
+</body>
+</html>

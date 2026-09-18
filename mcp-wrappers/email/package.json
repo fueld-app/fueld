@@ -1,0 +1,9 @@
+{
+  "name": "fueld-email-mcp",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "nodemailer": "^9.0.0",
+    "imapflow": "^1.0.226"
+  }
+}
