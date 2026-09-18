@@ -354,6 +354,12 @@ export function buildHedgePlan(
   for (const [legKey, amount] of buyByLeg) {
     poEntries.push({ leg: legKey, amount: Math.round(amount * 100) / 100 });
   }
+  // TODO(supplier-due-date): PO legs currently share the customer-anchored
+  // valueDate. When a supplier leg pins an invoice due-date override
+  // (order_suppliers.supplierDueDate), the PO value date should derive from
+  // the effective supplier due date instead — needs per-leg HedgePlan entries
+  // + an AMEND/re-push path when the override is set after CONFIRMED. See
+  // effectiveSupplierDays() in orders/order-financing.ts.
   totalBuy = Math.round(totalBuy * 100) / 100;
 
   // Negative-margin deal → net BUY exposure → skip the whole deal

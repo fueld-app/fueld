@@ -381,6 +381,7 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
     supplierPaymentTermType: 'Supplier payment term',
     supplierCreditDays: 'Supplier credit days',
     supplierNote: 'Supplier note',
+    supplierDueDate: 'Supplier due date',
     supplierContactId: 'Supplier contact',
     brokerId: 'Broker',
     brokerContactId: 'Broker contact',

@@ -111,4 +111,74 @@ describe('orders financing', () => {
     expect(listItem?.totalNetProfit).toBeCloseTo(Number(detail?.totalNetProfit ?? 0), 3);
     expect(listItem?.netMarginPct).toBeCloseTo(Number(detail?.netMarginPct ?? 0), 3);
   });
+
+  // Supplier-invoice due-date override (Riviera Marine): some suppliers grant
+  // credit from invoice receipt, not delivery. When the primary supplier leg
+  // pins an exact due date, financing days derive from it and the order-level
+  // mirror is kept in sync.
+  it('derives supplier effective days from a due-date override on the primary leg', async () => {
+    const { effectiveSupplierDays, getFinancingDays } = await import('../src/modules/orders/order-financing');
+
+    // No override → null (caller falls back to credit days)
+    expect(effectiveSupplierDays({ supplierDueDate: null, deliveredAt: '2026-09-01', supplierPaymentTermType: 'CREDIT' })).toBeNull();
+    // Non-CREDIT terms never produce an override
+    expect(effectiveSupplierDays({ supplierDueDate: '2026-10-01', deliveredAt: '2026-09-01', supplierPaymentTermType: 'COD' })).toBeNull();
+    // Delivery 2026-09-01 → override 2026-10-01 = 30 days
+    expect(effectiveSupplierDays({ supplierDueDate: '2026-10-01', deliveredAt: '2026-09-01', supplierPaymentTermType: 'CREDIT' })).toBe(30);
+    // Falls back to eta when no delivery date
+    expect(effectiveSupplierDays({ supplierDueDate: '2026-09-16', eta: '2026-09-01', supplierPaymentTermType: 'CREDIT' })).toBe(15);
+
+    // Financing uses the effective days when present (40 customer − 60 supplier → clamped to 0)
+    expect(getFinancingDays({
+      customerPaymentTermType: 'CREDIT', customerCreditDays: 40,
+      supplierPaymentTermType: 'CREDIT', supplierCreditDays: 30,
+      supplierEffectiveDays: 60,
+    })).toBe(0);
+    // And shortens financing when the override pushes payment out beyond credit days
+    expect(getFinancingDays({
+      customerPaymentTermType: 'CREDIT', customerCreditDays: 40,
+      supplierPaymentTermType: 'CREDIT', supplierCreditDays: 30,
+      supplierEffectiveDays: 50,
+    })).toBe(0);
+    // Override earlier than delivery clamps at 0 supplier days
+    expect(getFinancingDays({
+      customerPaymentTermType: 'CREDIT', customerCreditDays: 40,
+      supplierPaymentTermType: 'CREDIT', supplierCreditDays: 30,
+      supplierEffectiveDays: -5,
+    })).toBe(40);
+  });
+
+  it('persists a supplier due-date override and mirrors it to the order', async () => {
+    const seeded = await seedBasics();
+    const { createOrder, updateOrderSupplierRecord, getOrderById, getOrderSuppliers } = await loadOrdersService();
+
+    const order2 = await createOrder({
+      tenantId: seeded.tenant.id,
+      clientId: seeded.client.id,
+      vesselId: seeded.vessel.id,
+      placeId: seeded.place.id,
+      supplierId: seeded.client.id,
+      supplierPaymentTermType: 'CREDIT',
+      supplierCreditDays: 30,
+    });
+
+    // createOrder syncs the legacy order-level supplier into a primary leg
+    const legs = await getOrderSuppliers(order2.id);
+    const leg = legs[0];
+    expect(leg).toBeDefined();
+    const updated = await updateOrderSupplierRecord(order2.id, leg!.id, { supplierDueDate: '2026-10-15' });
+    expect(updated?.supplierDueDate).toBe('2026-10-15');
+
+    const detail = await getOrderById(order2.id);
+    expect(detail?.supplierDueDate).toBe('2026-10-15');
+    expect(detail?.orderSuppliers?.find((s: { id: string }) => s.id === leg!.id)?.supplierDueDate).toBe('2026-10-15');
+
+    // Clearing works
+    const cleared = await updateOrderSupplierRecord(order2.id, leg!.id, { supplierDueDate: null });
+    expect(cleared?.supplierDueDate).toBeNull();
+
+    // Invalid date strings are rejected (stored as null), not corrupted
+    const invalid = await updateOrderSupplierRecord(order2.id, leg!.id, { supplierDueDate: '15/10/2026' });
+    expect(invalid?.supplierDueDate).toBeNull();
+  });
 });

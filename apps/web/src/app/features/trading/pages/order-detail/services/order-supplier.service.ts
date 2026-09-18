@@ -63,6 +63,7 @@ export class OrderSupplierService {
       paymentTermType: null,
       creditDays: null,
       note: null,
+      supplierDueDate: null,
       sortOrder: nextSortOrder,
       isPrimary: false,
       deliveredAt: null,
@@ -127,6 +128,7 @@ export class OrderSupplierService {
             paymentTermType: supplier.paymentTermType ?? null,
             creditDays: supplier.creditDays ?? null,
             note: supplier.note ?? null,
+            supplierDueDate: supplier.supplierDueDate ?? null,
             deliveredAt: supplier.deliveredAt ?? null,
             isPrimary: supplier.isPrimary,
           })
@@ -136,6 +138,7 @@ export class OrderSupplierService {
             paymentTermType: supplier.paymentTermType ?? null,
             creditDays: supplier.creditDays ?? null,
             note: supplier.note ?? null,
+            supplierDueDate: supplier.supplierDueDate ?? null,
             deliveredAt: supplier.deliveredAt ?? null,
             sortOrder: supplier.sortOrder,
             isPrimary: supplier.isPrimary,

@@ -308,6 +308,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         paymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
         creditDays: t.Optional(t.Nullable(t.Number())),
         note: t.Optional(t.Nullable(t.String())),
+        supplierDueDate: t.Optional(t.Nullable(t.String())),
         deliveredAt: t.Optional(t.Nullable(t.String())),
         isPrimary: t.Optional(t.Boolean()),
       }),
@@ -323,14 +324,24 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       try {
         const orderId = await resolveOrderId(params.id);
         if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        // Capture the previous due-date override so the activity log can show the change
+        const legsBefore = await getOrderSuppliers(orderId);
+        const previousDueDate = legsBefore.find((s) => s.id === params.supplierRecordId)?.supplierDueDate ?? null;
         const supplier = await updateOrderSupplierRecord(orderId, params.supplierRecordId, body);
         if (!supplier) return { success: false, data: null, message: 'Order supplier not found' };
+        const dueDateChanged = body.supplierDueDate !== undefined && (previousDueDate ?? null) !== (supplier.supplierDueDate ?? null);
         await logActivity({
           userId: auth.sub,
           action: 'UPDATE',
           entityType: 'order',
           entityId: orderId,
-          metadata: { action: 'update_supplier_leg', supplierRecordId: params.supplierRecordId },
+          metadata: {
+            action: 'update_supplier_leg',
+            supplierRecordId: params.supplierRecordId,
+            ...(dueDateChanged
+              ? { changes: [{ field: 'supplierDueDate', from: previousDueDate, to: supplier.supplierDueDate }] }
+              : {}),
+          },
         });
         return { success: true, data: supplier } satisfies ApiResponse<typeof supplier>;
       } catch (err) {
@@ -347,6 +358,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         paymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
         creditDays: t.Optional(t.Nullable(t.Number())),
         note: t.Optional(t.Nullable(t.String())),
+        supplierDueDate: t.Optional(t.Nullable(t.String())),
         deliveredAt: t.Optional(t.Nullable(t.String())),
         sortOrder: t.Optional(t.Number()),
         isPrimary: t.Optional(t.Boolean()),
@@ -736,6 +748,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           supplierId: body.supplierId ?? null,
           supplierPaymentTermType: body.supplierPaymentTermType ?? null,
           supplierCreditDays: body.supplierCreditDays ?? null,
+          supplierDueDate: body.supplierDueDate ?? null,
           supplierNote: body.supplierNote ?? null,
           customerContactId: body.customerContactId ?? null,
           supplierContactId: body.supplierContactId ?? null,
@@ -787,6 +800,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         supplierId: t.Optional(t.Nullable(t.String())),
         supplierPaymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
         supplierCreditDays: t.Optional(t.Nullable(t.Number())),
+        supplierDueDate: t.Optional(t.Nullable(t.String())),
         supplierNote: t.Optional(t.Nullable(t.String())),
         supplierContactId: t.Optional(t.Nullable(t.String())),
         brokerId: t.Optional(t.Nullable(t.String())),
@@ -858,6 +872,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         supplierId: t.Optional(t.Nullable(t.String())),
         supplierPaymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
         supplierCreditDays: t.Optional(t.Nullable(t.Number())),
+        supplierDueDate: t.Optional(t.Nullable(t.String())),
         supplierNote: t.Optional(t.Nullable(t.String())),
         supplierContactId: t.Optional(t.Nullable(t.String())),
         brokerId: t.Optional(t.Nullable(t.String())),

@@ -473,6 +473,18 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly activeSupplierPaymentTermType = computed(() => this.activeOrderSupplier()?.paymentTermType ?? this.order()?.supplierPaymentTermType ?? null);
   readonly activeSupplierCreditDays = computed(() => this.activeOrderSupplier()?.creditDays ?? this.order()?.supplierCreditDays ?? null);
   readonly activeSupplierNote = computed(() => this.activeOrderSupplier()?.note ?? this.order()?.supplierNote ?? null);
+  readonly activeSupplierDueDate = computed(() => this.activeOrderSupplier()?.supplierDueDate ?? this.order()?.supplierDueDate ?? null);
+  /** Default (delivery + credit days) due date for the active supplier leg, for context next to the override. */
+  readonly defaultSupplierDueDate = computed(() => {
+    const type = this.activeSupplierPaymentTermType();
+    if (type !== 'CREDIT') return null;
+    const anchorRaw = this.activeSupplierDeliveredAt() ?? this.order()?.eta ?? null;
+    if (!anchorRaw) return null;
+    const anchor = new Date(anchorRaw);
+    if (Number.isNaN(anchor.getTime())) return null;
+    anchor.setUTCDate(anchor.getUTCDate() + (this.activeSupplierCreditDays() ?? 0));
+    return anchor.toISOString().slice(0, 10);
+  });
   readonly activeSupplierDeliveredAt = computed(() => this.activeOrderSupplier()?.deliveredAt ?? this.order()?.deliveredAt ?? null);
   readonly nominationOrderSupplierId = computed(() => {
     const activeSupplier = this.activeOrderSupplier();
@@ -1653,6 +1665,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             ...order,
             supplierPaymentTermType: ptt || null,
             supplierCreditDays: ptt === 'CREDIT' ? order.supplierCreditDays ?? null : null,
+            supplierDueDate: ptt === 'CREDIT' ? order.supplierDueDate ?? null : null,
           }
         : order);
       return;
@@ -1661,6 +1674,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       ...supplier,
       paymentTermType: ptt || null,
       creditDays: ptt === 'CREDIT' ? supplier.creditDays ?? null : null,
+      supplierDueDate: ptt === 'CREDIT' ? supplier.supplierDueDate ?? null : null,
     }));
   }
 
@@ -1683,6 +1697,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     } else {
       this.updateActiveOrderSupplier((supplier) => ({ ...supplier, creditDays: nextDays }));
     }
+  }
+
+  onSupplierDueDateChange(value: string | null): void {
+    if (this.orderSuppliers().length === 0) {
+      this.order.update((order) => order ? { ...order, supplierDueDate: value } : order);
+      return;
+    }
+    this.updateActiveOrderSupplier((supplier) => ({ ...supplier, supplierDueDate: value }));
   }
 
   onSupplierNoteChange(value: string): void {
@@ -2586,6 +2608,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       paymentTermType: null,
       creditDays: null,
       note: null,
+      supplierDueDate: null,
       sortOrder: nextSortOrder,
       isPrimary: false,
       deliveredAt: null,
@@ -2630,6 +2653,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             supplierContactId: updatedSupplier.contactId ?? null,
             supplierPaymentTermType: updatedSupplier.paymentTermType ?? null,
             supplierCreditDays: updatedSupplier.creditDays ?? null,
+            supplierDueDate: updatedSupplier.supplierDueDate ?? null,
             supplierNote: updatedSupplier.note ?? null,
             deliveredAt: updatedSupplier.deliveredAt ?? order.deliveredAt ?? null,
           }

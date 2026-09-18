@@ -1054,6 +1054,8 @@ export const orders = pgTable('orders', {
   supplierId: uuid('supplier_id').references(() => counterparties.id),
   supplierPaymentTermType: paymentTermTypeEnum('supplier_payment_term_type'),
   supplierCreditDays: integer('supplier_credit_days'),
+  // Mirror of the primary supplier leg's due-date override (see order_suppliers.supplierDueDate)
+  supplierDueDate: date('supplier_due_date'),
   supplierNote: text('supplier_note'),
 
   // Contact persons
@@ -1143,6 +1145,11 @@ export const orderSuppliers = pgTable('order_suppliers', {
   paymentTermType: paymentTermTypeEnum('payment_term_type'),
   creditDays: integer('credit_days'),
   note: text('note'),
+  // Supplier-invoice due-date override (Riviera Marine): when set, the
+  // effective supplier payment due date is this exact date (some suppliers
+  // grant credit from invoice receipt, not delivery). Mirrored to orders
+  // for the primary leg like the other supplier payment-term columns.
+  supplierDueDate: date('supplier_due_date'),
   sortOrder: integer('sort_order').notNull().default(0),
   isPrimary: boolean('is_primary').notNull().default(false),
   deliveredAt: timestamp('delivered_at', { withTimezone: true }),

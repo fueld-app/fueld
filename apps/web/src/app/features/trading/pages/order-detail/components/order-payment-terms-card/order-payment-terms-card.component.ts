@@ -27,6 +27,11 @@ export type PaymentSide = 'customer' | 'supplier';
 
       @if (readonly()) {
         <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ formattedTerms() }}</p>
+        @if (side() === 'supplier' && paymentTermType() === 'CREDIT' && supplierDueDate()) {
+          <p class="mt-0.5 text-xs text-gray-500 dark:text-muted">
+            Due {{ supplierDueDate() }} <span class="text-amber-600 dark:text-amber-400">(override)</span>
+          </p>
+        }
       } @else {
         <div class="flex items-center gap-2">
           <select
@@ -56,6 +61,26 @@ export type PaymentSide = 'customer' | 'supplier';
             />
           }
         </div>
+
+        @if (side() === 'supplier' && paymentTermType() === 'CREDIT') {
+          <div class="mt-2 flex items-center gap-2">
+            <label
+              class="text-xs text-gray-400 dark:text-muted whitespace-nowrap"
+              title="Some suppliers grant credit from invoice receipt rather than delivery — pin the exact due date printed on their invoice"
+            >Due date override</label>
+            <input
+              type="date"
+              [ngModel]="supplierDueDate()"
+              (ngModelChange)="onSupplierDueDateChange($event)"
+              class="rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+            />
+          </div>
+          @if (supplierDueDate() && defaultDueDate()) {
+            <p class="mt-1 text-[11px] text-gray-400 dark:text-muted">
+              Default would be {{ defaultDueDate() }} — invoice due date takes precedence
+            </p>
+          }
+        }
 
         @if (showCreditDetails()) {
         <div class="mt-2 text-xs text-gray-500 dark:text-muted">
@@ -157,9 +182,14 @@ export class OrderPaymentTermsCardComponent {
   readonly note = input<string | null>(null);
   readonly showNote = input(false);
   readonly paymentTermOptions = input<DropdownOption[]>([]);
+  /** Supplier-invoice due-date override (exact date from the supplier's invoice). */
+  readonly supplierDueDate = input<string | null>(null);
+  /** The default (delivery + credit days) due date, for context next to the override. */
+  readonly defaultDueDate = input<string | null>(null);
 
   readonly paymentTermTypeChange = output<string | ''>();
   readonly creditDaysChange = output<number>();
+  readonly supplierDueDateChange = output<string | null>();
   readonly noteChange = output<string>();
   readonly showNoteChange = output<boolean>();
   readonly requestCredit = output<void>();
@@ -183,6 +213,11 @@ export class OrderPaymentTermsCardComponent {
   protected onCreditDaysChange(value: number | string): void {
     const num = typeof value === 'string' ? parseFloat(value) : value;
     this.creditDaysChange.emit(Number.isFinite(num) ? num : 0);
+  }
+
+  protected onSupplierDueDateChange(value: string | null): void {
+    const trimmed = typeof value === 'string' ? value.trim() : '';
+    this.supplierDueDateChange.emit(trimmed ? trimmed : null);
   }
 
   protected onNoteChange(value: string): void {

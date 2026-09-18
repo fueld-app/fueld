@@ -142,6 +142,7 @@ export class OrderSaveService {
           supplierId: o.supplierId ?? null,
           supplierPaymentTermType: o.supplierPaymentTermType ?? null,
           supplierCreditDays: o.supplierCreditDays ?? null,
+          supplierDueDate: o.supplierDueDate ?? null,
           supplierNote: o.supplierNote ?? null,
           supplierContactId: o.supplierContactId ?? null,
           brokerId: o.brokerId ?? null, brokerContactId: o.brokerContactId ?? null,

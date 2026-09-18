@@ -12,7 +12,7 @@ import {
   entityComments,
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
-import { calculateOrderEconomics, calculateRevenueBase, getFinancingRateAnnual } from '../orders/order-financing';
+import { calculateOrderEconomics, calculateRevenueBase, effectiveSupplierDays, getFinancingRateAnnual } from '../orders/order-financing';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Service — Smart Aggregations
@@ -184,6 +184,9 @@ export async function getTeamStats(
       customerCreditDays: orders.customerCreditDays,
       supplierPaymentTermType: orders.supplierPaymentTermType,
       supplierCreditDays: orders.supplierCreditDays,
+      supplierDueDate: orders.supplierDueDate,
+      deliveredAt: orders.deliveredAt,
+      eta: orders.eta,
       isBrokerDeal: orders.isBrokerDeal,
       commissionPerMt: orders.commissionPerMt,
     })
@@ -245,6 +248,12 @@ export async function getTeamStats(
         customerCreditDays: row.customerCreditDays,
         supplierPaymentTermType: row.supplierPaymentTermType,
         supplierCreditDays: row.supplierCreditDays,
+        supplierEffectiveDays: effectiveSupplierDays({
+          supplierDueDate: row.supplierDueDate,
+          deliveredAt: row.deliveredAt,
+          eta: row.eta,
+          supplierPaymentTermType: row.supplierPaymentTermType,
+        }),
       },
       itemsByOrder.get(row.orderId) ?? [],
       financingRateAnnual,

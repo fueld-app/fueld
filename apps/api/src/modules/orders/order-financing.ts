@@ -9,6 +9,9 @@ export interface FinancingTermsInput {
   customerCreditDays?: number | null;
   supplierPaymentTermType?: string | null;
   supplierCreditDays?: number | null;
+  /** Pre-computed effective supplier days from a due-date override (order-financing
+   *  callers pass this when the primary supplier leg pins an invoice due date). */
+  supplierEffectiveDays?: number | null;
 }
 
 export interface FinancingItemInput {
@@ -97,9 +100,49 @@ export function getPaymentTermDays(type?: string | null, creditDays?: number | n
   return Math.max(0, Math.round(parseNumber(creditDays)));
 }
 
+/**
+ * Supplier-invoice due-date override (Riviera Marine, 2026-09): some suppliers
+ * grant credit from INVOICE RECEIPT rather than delivery, and the system never
+ * knows when the supplier invoice was sent. When the trader pins the exact due
+ * date printed on the supplier's invoice, financing days derive from it.
+ *
+ * Returns the effective supplier day count implied by the override, or null
+ * when there is no override (caller falls back to credit days). Non-CREDIT
+ * terms never produce an effective override.
+ */
+export function effectiveSupplierDays(input: {
+  supplierDueDate?: string | null;
+  deliveredAt?: Date | string | null;
+  eta?: Date | string | null;
+  supplierPaymentTermType?: string | null;
+}): number | null {
+  if (!input.supplierDueDate) return null;
+  if ((input.supplierPaymentTermType ?? '').toUpperCase() !== 'CREDIT') return null;
+  const anchor = asDay(input.deliveredAt) ?? asDay(input.eta);
+  if (!anchor) return null;
+  const due = asDay(input.supplierDueDate);
+  if (!due) return null;
+  const days = Math.round((due.getTime() - anchor.getTime()) / 86_400_000);
+  return Number.isFinite(days) ? days : null;
+}
+
+function asDay(value: Date | string | null | undefined): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/\d{4}-\d{2}-\d{2}/.test(trimmed)) return null;
+  // Use the date portion only (anchor/due dates are day-granular concepts)
+  const day = trimmed.slice(0, 10);
+  const d = new Date(`${day}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function getFinancingDays(input: FinancingTermsInput): number {
   const customerDays = getPaymentTermDays(input.customerPaymentTermType, input.customerCreditDays);
-  const supplierDays = getPaymentTermDays(input.supplierPaymentTermType, input.supplierCreditDays);
+  const supplierDays = input.supplierEffectiveDays != null
+    ? Math.max(0, Math.round(input.supplierEffectiveDays))
+    : getPaymentTermDays(input.supplierPaymentTermType, input.supplierCreditDays);
   return Math.max(customerDays - supplierDays, 0);
 }
 

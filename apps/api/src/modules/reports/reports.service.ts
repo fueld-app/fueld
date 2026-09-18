@@ -57,7 +57,7 @@ import {
 } from '../../db/schema';
 import { sendNotificationEmail } from '../../lib/email';
 import { logActivity } from '../activity/activity.service';
-import { calculateOrderEconomics, calculateRevenueBase, getFinancingRateAnnual } from '../orders/order-financing';
+import { calculateOrderEconomics, calculateRevenueBase, effectiveSupplierDays, getFinancingRateAnnual } from '../orders/order-financing';
 import { generateOrderNumber, syncPrimaryOrderSupplierFromLegacy } from '../orders/orders.service';
 
 const MANAGE_SHARED_REPORT_ROLES: Role[] = [
@@ -87,6 +87,9 @@ type ScopedOrderRow = {
   customerCreditDays: number | null;
   supplierPaymentTermType: string | null;
   supplierCreditDays: number | null;
+  supplierDueDate: string | null;
+  deliveredAt: Date | null;
+  eta: Date | null;
 };
 
 type ScopedItemRow = {
@@ -582,6 +585,9 @@ async function fetchScopedDataset(
       customerCreditDays: orders.customerCreditDays,
       supplierPaymentTermType: orders.supplierPaymentTermType,
       supplierCreditDays: orders.supplierCreditDays,
+      supplierDueDate: orders.supplierDueDate,
+      deliveredAt: orders.deliveredAt,
+      eta: orders.eta,
     })
     .from(orders)
     .innerJoin(users, eq(orders.salesRepId, users.id))
@@ -670,6 +676,12 @@ function buildEconomicsByOrder(dataset: ScopedDataset) {
         customerCreditDays: order.customerCreditDays,
         supplierPaymentTermType: order.supplierPaymentTermType,
         supplierCreditDays: order.supplierCreditDays,
+        supplierEffectiveDays: effectiveSupplierDays({
+          supplierDueDate: order.supplierDueDate,
+          deliveredAt: order.deliveredAt,
+          eta: order.eta,
+          supplierPaymentTermType: order.supplierPaymentTermType,
+        }),
       },
       dataset.itemsByOrder.get(order.orderId) ?? [],
       dataset.financingRateAnnual,

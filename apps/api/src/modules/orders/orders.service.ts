@@ -34,6 +34,7 @@ import { sendTemplatedGroupMessage, buildProductTemplateVariables } from '../wha
 import {
   calculateGrossProfitBase,
   calculateOrderEconomics,
+  effectiveSupplierDays,
   getFinancingRateAnnual,
 } from './order-financing';
 import {
@@ -90,6 +91,7 @@ interface CreateOrderInput {
   supplierId?: string | null;
   supplierPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   supplierCreditDays?: number | null;
+  supplierDueDate?: string | null;
   supplierNote?: string | null;
   supplierContactId?: string | null;
   termsAndConditions?: string | null;
@@ -132,6 +134,7 @@ interface UpdateOrderInput {
   supplierId?: string | null;
   supplierPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   supplierCreditDays?: number | null;
+  supplierDueDate?: string | null;
   supplierNote?: string | null;
   supplierContactId?: string | null;
   termsAndConditions?: string | null;
@@ -437,6 +440,7 @@ const ORDER_UPDATE_ACTIVITY_FIELDS: Array<{
   { key: 'supplierId', resolver: 'counterparty' },
   { key: 'supplierPaymentTermType' },
   { key: 'supplierCreditDays' },
+  { key: 'supplierDueDate' },
   { key: 'supplierNote' },
   { key: 'supplierContactId', resolver: 'contact' },
   { key: 'brokerId', resolver: 'counterparty' },
@@ -545,6 +549,14 @@ function normalizeOptionalTimestamp(value: string | Date | null | undefined): Da
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+// Date-only column (drizzle `date` mode string): keep 'YYYY-MM-DD' strings,
+// reject anything else rather than silently corrupting the calendar date.
+function normalizeOptionalDateOnly(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const s = typeof value === 'string' ? value.trim() : '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
 async function listOrderSuppliers(orderId: string) {
   const rows = await db
     .select()
@@ -560,6 +572,7 @@ async function listOrderSuppliers(orderId: string) {
     paymentTermType: row.paymentTermType ?? null,
     creditDays: row.creditDays ?? null,
     note: row.note ?? null,
+    supplierDueDate: row.supplierDueDate ?? null,
     sortOrder: row.sortOrder,
     isPrimary: row.isPrimary,
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
@@ -593,6 +606,7 @@ export async function syncPrimaryOrderSupplierFromLegacy(order: {
   supplierContactId: string | null;
   supplierPaymentTermType: 'CREDIT' | 'COD' | 'PREPAY' | null;
   supplierCreditDays: number | null;
+  supplierDueDate?: string | null;
   supplierNote: string | null;
   deliveredAt: Date | null;
 }) {
@@ -620,6 +634,7 @@ export async function syncPrimaryOrderSupplierFromLegacy(order: {
     contactId: order.supplierContactId ?? null,
     paymentTermType: order.supplierPaymentTermType ?? null,
     creditDays: order.supplierCreditDays ?? null,
+    supplierDueDate: order.supplierDueDate ?? null,
     note: order.supplierNote ?? null,
     deliveredAt: normalizeOptionalTimestamp(order.deliveredAt),
     updatedAt: new Date(),
@@ -666,6 +681,7 @@ async function syncLegacyOrderFieldsFromPrimary(orderId: string) {
       supplierContactId: primary?.contactId ?? null,
       supplierPaymentTermType: primary?.paymentTermType ?? null,
       supplierCreditDays: primary?.creditDays ?? null,
+      supplierDueDate: primary?.supplierDueDate ?? null,
       supplierNote: primary?.note ?? null,
       deliveredAt: latestDeliveredAt,
       updatedAt: new Date(),
@@ -723,6 +739,7 @@ export async function addOrderSupplier(orderId: string, input: {
   paymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   creditDays?: number | null;
   note?: string | null;
+  supplierDueDate?: string | null;
   deliveredAt?: string | null;
   isPrimary?: boolean;
 }) {
@@ -764,6 +781,7 @@ export async function addOrderSupplier(orderId: string, input: {
       paymentTermType: input.paymentTermType ?? null,
       creditDays: input.creditDays ?? null,
       note: input.note ?? null,
+      supplierDueDate: normalizeOptionalDateOnly(input.supplierDueDate),
       deliveredAt: normalizeOptionalTimestamp(input.deliveredAt),
       sortOrder: (existing[0]?.sortOrder ?? -1) + 1,
       isPrimary: existing.length === 0 || input.isPrimary === true,
@@ -946,6 +964,7 @@ export async function updateOrderSupplierRecord(orderId: string, supplierRecordI
   paymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   creditDays?: number | null;
   note?: string | null;
+  supplierDueDate?: string | null;
   deliveredAt?: string | null;
   sortOrder?: number;
   isPrimary?: boolean;
@@ -995,6 +1014,7 @@ export async function updateOrderSupplierRecord(orderId: string, supplierRecordI
   if (input.paymentTermType !== undefined) setData.paymentTermType = input.paymentTermType;
   if (input.creditDays !== undefined) setData.creditDays = input.creditDays;
   if (input.note !== undefined) setData.note = input.note;
+  if (input.supplierDueDate !== undefined) setData.supplierDueDate = normalizeOptionalDateOnly(input.supplierDueDate);
   if (input.deliveredAt !== undefined) setData.deliveredAt = normalizeOptionalTimestamp(input.deliveredAt);
   if (input.sortOrder !== undefined) setData.sortOrder = input.sortOrder;
   if (input.isPrimary !== undefined) setData.isPrimary = input.isPrimary;
@@ -1226,6 +1246,8 @@ export async function listOrders(query?: ListOrdersQuery) {
         customerCreditDays: orders.customerCreditDays,
         supplierPaymentTermType: orders.supplierPaymentTermType,
         supplierCreditDays: orders.supplierCreditDays,
+        supplierDueDate: orders.supplierDueDate,
+        deliveredAt: orders.deliveredAt,
         eta: orders.eta,
         dueDate: orders.dueDate,
         responseDeadlineAt: orders.responseDeadlineAt,
@@ -1299,6 +1321,12 @@ export async function listOrders(query?: ListOrdersQuery) {
           customerCreditDays: row.customerCreditDays,
           supplierPaymentTermType: row.supplierPaymentTermType,
           supplierCreditDays: row.supplierCreditDays,
+          supplierEffectiveDays: effectiveSupplierDays({
+            supplierDueDate: row.supplierDueDate,
+            deliveredAt: row.deliveredAt,
+            eta: row.eta,
+            supplierPaymentTermType: row.supplierPaymentTermType,
+          }),
         },
         orderItemList,
         financingRateByTenant.get(row.tenantId) ?? getFinancingRateAnnual(),
@@ -1499,6 +1527,12 @@ export async function getOrderById(idOrNumber: string) {
       customerCreditDays: row.customerCreditDays,
       supplierPaymentTermType: row.supplierPaymentTermType,
       supplierCreditDays: row.supplierCreditDays,
+      supplierEffectiveDays: effectiveSupplierDays({
+        supplierDueDate: row.supplierDueDate,
+        deliveredAt: row.deliveredAt,
+        eta: row.eta,
+        supplierPaymentTermType: row.supplierPaymentTermType,
+      }),
     },
     items,
     financingRateAnnual,
@@ -1545,6 +1579,7 @@ export async function getOrderById(idOrNumber: string) {
     supplierId: row.supplierId ?? null,
     supplierPaymentTermType: row.supplierPaymentTermType ?? null,
     supplierCreditDays: row.supplierCreditDays ?? null,
+    supplierDueDate: row.supplierDueDate ?? null,
     supplierNote: row.supplierNote ?? null,
     supplierContactId: row.supplierContactId ?? null,
     brokerId: row.brokerId ?? null,
@@ -1819,6 +1854,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
   if (input.supplierCreditDays !== undefined) {
     setData.supplierCreditDays = input.supplierCreditDays;
   }
+  if (input.supplierDueDate !== undefined) setData.supplierDueDate = normalizeOptionalDateOnly(input.supplierDueDate);
   if (input.supplierNote !== undefined) setData.supplierNote = input.supplierNote;
   if (input.supplierContactId !== undefined) setData.supplierContactId = input.supplierContactId;
   if (input.termsAndConditions !== undefined) setData.termsAndConditions = input.termsAndConditions;

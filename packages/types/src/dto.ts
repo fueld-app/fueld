@@ -609,6 +609,7 @@ export interface OrderDto {
   supplierId?: string | null;
   supplierPaymentTermType?: PaymentTermType | null;
   supplierCreditDays?: number | null;
+  supplierDueDate?: string | null;
   supplierNote?: string | null;
   supplierContactId?: string | null;
   brokerId?: string | null;
@@ -661,6 +662,8 @@ export interface OrderSupplierDto {
   paymentTermType: PaymentTermType | null;
   creditDays: number | null;
   note: string | null;
+  /** Supplier-invoice due-date override (exact calendar date from the supplier's invoice). */
+  supplierDueDate: string | null;
   sortOrder: number;
   isPrimary: boolean;
   deliveredAt: string | null;
@@ -680,6 +683,7 @@ export interface CreateOrderSupplierDto {
   paymentTermType?: PaymentTermType | null;
   creditDays?: number | null;
   note?: string | null;
+  supplierDueDate?: string | null;
   deliveredAt?: string | null;
   isPrimary?: boolean;
 }
@@ -690,6 +694,7 @@ export interface UpdateOrderSupplierDto {
   paymentTermType?: PaymentTermType | null;
   creditDays?: number | null;
   note?: string | null;
+  supplierDueDate?: string | null;
   deliveredAt?: string | null;
   sortOrder?: number;
   isPrimary?: boolean;
@@ -743,6 +748,7 @@ export interface UpdateOrderDto {
   supplierId?: string | null;
   supplierPaymentTermType?: PaymentTermType | null;
   supplierCreditDays?: number | null;
+  supplierDueDate?: string | null;
   supplierNote?: string | null;
   supplierContactId?: string | null;
   brokerId?: string | null;

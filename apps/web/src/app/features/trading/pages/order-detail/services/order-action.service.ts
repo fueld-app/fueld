@@ -325,7 +325,7 @@ export class OrderActionService {
         customerNote: o.customerNote ?? null, purchaseOrderNumber: o.purchaseOrderNumber ?? null,
         customerContactId: o.customerContactId ?? null, supplierId: o.supplierId ?? null,
         supplierPaymentTermType: o.supplierPaymentTermType ?? null, supplierCreditDays: o.supplierCreditDays ?? null,
-        supplierNote: o.supplierNote ?? null, supplierContactId: o.supplierContactId ?? null,
+        supplierDueDate: o.supplierDueDate ?? null, supplierNote: o.supplierNote ?? null, supplierContactId: o.supplierContactId ?? null,
         brokerId: o.brokerId ?? null, brokerContactId: o.brokerContactId ?? null,
         brokerGetsAll: o.brokerGetsAll ?? false, agentId: o.agentId ?? null,
         agentContactId: o.agentContactId ?? null, termsAndConditions: o.termsAndConditions ?? null,
