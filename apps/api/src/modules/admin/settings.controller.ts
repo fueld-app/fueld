@@ -2860,7 +2860,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     body: t.Object({
-      precision: t.Number({ minimum: 0, maximum: 10 }),
+      precision: t.Number({ minimum: 0, maximum: 7 }),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update cost/sales decimal precision' },
   })

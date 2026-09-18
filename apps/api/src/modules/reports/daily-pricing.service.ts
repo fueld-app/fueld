@@ -220,8 +220,8 @@ function buildPricingEmailHtml(
   const rows = prices
     .map((p) => {
       const priceStr = p.currency === 'USD'
-        ? `$${p.price.toFixed(4)}`
-        : `${p.price.toFixed(4)} ${p.currency}`;
+        ? `$${p.price.toFixed(7)}`
+        : `${p.price.toFixed(7)} ${p.currency}`;
       return `<tr>
         <td style="padding:8px 16px;border-bottom:1px solid #e5e7eb;font-weight:500;color:#111827;">${escHtml(p.productType)}</td>
         <td style="padding:8px 16px;border-bottom:1px solid #e5e7eb;text-align:right;color:#111827;">${priceStr}</td>
@@ -271,7 +271,7 @@ function buildPricingEmailText(
   ];
 
   for (const p of prices) {
-    const priceStr = p.currency === 'USD' ? `$${p.price.toFixed(4)}` : `${p.price.toFixed(4)} ${p.currency}`;
+    const priceStr = p.currency === 'USD' ? `$${p.price.toFixed(7)}` : `${p.price.toFixed(7)} ${p.currency}`;
     lines.push(`${p.productType.padEnd(16)} ${priceStr.padEnd(14)} per ${p.unit}`);
   }
 

@@ -211,7 +211,7 @@ describe('orders: inquiries flow', () => {
     const [item] = items;
     expect(item.costCurrency).toBe('USD');
     expect(item.salesCurrency).toBe('USD');
-    expect(item.profit).toBe('200.0000');
+    expect(item.profit).toBe('200.0000000');
 
     const fetched = await getOrderById(created.id);
     expect(fetched?.items?.length).toBe(1);
@@ -562,8 +562,8 @@ describe('orders: item aggregates', () => {
     ]);
 
     expect(items).toHaveLength(2);
-    // The "null" quantity should be sanitized to '0' (NOT NULL column)
-    expect(items[1]?.quantity).toBe('0.000');
+    // The "null" quantity should be sanitized to '0' (NOT NULL column, numeric(14,6))
+    expect(items[1]?.quantity).toBe('0.000000');
     // Nullable numeric fields should be actual null, not the string "null"
     expect(items[1]?.costPrice).toBeNull();
     expect(items[1]?.salesPrice).toBeNull();

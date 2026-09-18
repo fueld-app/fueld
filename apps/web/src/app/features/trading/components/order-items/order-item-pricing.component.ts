@@ -86,7 +86,7 @@ type PricingSide = 'cost' | 'sales';
             }
             <div class="flex items-center gap-1">
               <span class="text-[10px] text-gray-500 dark:text-muted shrink-0">+</span>
-              <input type="number" step="0.01"
+              <input type="number" step="0.0000001"
                 [ngModel]="premium() ?? 0"
                 (ngModelChange)="onChange('premium', +$event)"
                 placeholder="Premium"
@@ -94,7 +94,7 @@ type PricingSide = 'cost' | 'sales';
               />
               <span class="text-[10px] text-gray-400 dark:text-muted shrink-0">/{{ row().costUnit }}</span>
               <span class="text-[10px] text-gray-500 dark:text-muted shrink-0">barg.</span>
-              <input type="number" step="0.01"
+              <input type="number" step="0.0000001"
                 [ngModel]="barging() ?? 0"
                 (ngModelChange)="onChange('barging', +$event)"
                 class="w-16 rounded border border-gray-200 dark:border-line px-1.5 py-1 text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600/20"
@@ -104,7 +104,7 @@ type PricingSide = 'cost' | 'sales';
           </div>
         } @else {
           <div class="flex items-center gap-1">
-            <input type="number" step="0.01" min="0"
+            <input type="number" step="0.0000001" min="0"
               [ngModel]="price()"
               (ngModelChange)="onChange('price', $event)"
               class="w-full min-w-[80px] rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
@@ -192,7 +192,7 @@ type PricingSide = 'cost' | 'sales';
             }
             <div class="flex items-center gap-1">
               <span class="text-[10px] text-gray-500 dark:text-muted shrink-0">+</span>
-              <input type="number" step="0.01"
+              <input type="number" step="0.0000001"
                 [ngModel]="premium() ?? 0"
                 (ngModelChange)="onChange('premium', +$event)"
                 placeholder="Premium"
@@ -200,7 +200,7 @@ type PricingSide = 'cost' | 'sales';
               />
               <span class="text-[10px] text-gray-400 dark:text-muted shrink-0">/{{ row().salesUnit }}</span>
               <span class="text-[10px] text-gray-500 dark:text-muted shrink-0">barg.</span>
-              <input type="number" step="0.01"
+              <input type="number" step="0.0000001"
                 [ngModel]="barging() ?? 0"
                 (ngModelChange)="onChange('barging', +$event)"
                 class="w-16 rounded border border-gray-200 dark:border-line px-1.5 py-1 text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600/20"
@@ -210,7 +210,7 @@ type PricingSide = 'cost' | 'sales';
           </div>
         } @else {
           <div class="flex items-center gap-1">
-            <input type="number" step="0.01" min="0"
+            <input type="number" step="0.0000001" min="0"
               [ngModel]="price()"
               (ngModelChange)="onChange('price', $event)"
               class="w-full min-w-[80px] rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
@@ -292,7 +292,8 @@ export class OrderItemPricingComponent {
   readonly plattsSelect = output<string>();
 
   /** Number pipe format string derived from the configurable precision (capped at 4 — sales_price is numeric(12,4)). */
-  protected priceFormat = computed(() => `1.2-${Math.min(this.decimalPrecision(), 4)}`);
+  // Cap 7 = numeric(14,7) column scale; anything beyond is display-only fiction.
+  protected priceFormat = computed(() => `1.2-${Math.min(this.decimalPrecision(), 7)}`);
 
   /** Derive which pricing model is active based on side. */
   protected pricingModel = computed(() => {

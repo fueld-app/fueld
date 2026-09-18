@@ -1187,11 +1187,11 @@ export const orderItems = pgTable('order_items', {
   description: text('description'),
 
   // ── Fixed pricing ─────────────────────────────────────────────────
-  costPrice: numeric('cost_price', { precision: 12, scale: 4 }),
+  costPrice: numeric('cost_price', { precision: 14, scale: 7 }),
   costCurrency: text('cost_currency').notNull().default('USD'),
-  salesPrice: numeric('sales_price', { precision: 12, scale: 4 }),
+  salesPrice: numeric('sales_price', { precision: 14, scale: 7 }),
   salesCurrency: text('sales_currency').notNull().default('USD'),
-  profit: numeric('profit', { precision: 12, scale: 4 }),
+  profit: numeric('profit', { precision: 14, scale: 7 }),
 
   // ── Tax ───────────────────────────────────────────────────────────
   taxRate: numeric('tax_rate', { precision: 5, scale: 4 }),
@@ -1201,8 +1201,8 @@ export const orderItems = pgTable('order_items', {
   costPricingModel: pricingModelEnum('cost_pricing_model').notNull().default('FIXED'),
   costReferenceId: uuid('cost_reference_id').references(() => priceReferences.id, { onDelete: 'set null' }),
   costPlattsEntryId: uuid('cost_platts_entry_id').references(() => plattsReportEntries.id, { onDelete: 'set null' }),
-  costPremium: numeric('cost_premium', { precision: 12, scale: 4 }),
-  costBarging: numeric('cost_barging', { precision: 12, scale: 4 }),
+  costPremium: numeric('cost_premium', { precision: 14, scale: 7 }),
+  costBarging: numeric('cost_barging', { precision: 14, scale: 7 }),
   costBargingUnit: text('cost_barging_unit'),
   costCreditDays: integer('cost_credit_days'),
   costPriceFinalized: boolean('cost_price_finalized').notNull().default(false),
@@ -1211,8 +1211,8 @@ export const orderItems = pgTable('order_items', {
   salesPricingModel: pricingModelEnum('sales_pricing_model').notNull().default('FIXED'),
   salesReferenceId: uuid('sales_reference_id').references(() => priceReferences.id, { onDelete: 'set null' }),
   salesPlattsEntryId: uuid('sales_platts_entry_id').references(() => plattsReportEntries.id, { onDelete: 'set null' }),
-  salesPremium: numeric('sales_premium', { precision: 12, scale: 4 }),
-  salesBarging: numeric('sales_barging', { precision: 12, scale: 4 }),
+  salesPremium: numeric('sales_premium', { precision: 14, scale: 7 }),
+  salesBarging: numeric('sales_barging', { precision: 14, scale: 7 }),
   salesBargingUnit: text('sales_barging_unit'),
   salesCreditDays: integer('sales_credit_days'),
   salesPriceFinalized: boolean('sales_price_finalized').notNull().default(false),
@@ -1229,7 +1229,7 @@ export const orderItems = pgTable('order_items', {
   hideOnDocuments: boolean('hide_on_documents').notNull().default(false),
 
   // Broker deal — per-line-item commission rate (e.g., 3.00 for $3/unit)
-  commissionPerUnit: numeric('commission_per_unit', { precision: 12, scale: 4 }),
+  commissionPerUnit: numeric('commission_per_unit', { precision: 14, scale: 7 }),
 
   // ── Inventory linkage (optional; only set for tracked SKUs) ───────
   // When set, this line participates in inventory rules: stock checks at

@@ -2031,7 +2031,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       costCurrency,
       salesPrice: sanitizeNumeric(item.salesPrice),
       salesCurrency,
-      profit: profit.toFixed(4),
+      profit: profit.toFixed(7),
       paymentTerms: item.paymentTerms as any ?? null,
       customerNote: item.customerNote ?? null,
       deliveredQuantity: sanitizeNumeric(item.deliveredQuantity),
@@ -2123,7 +2123,7 @@ export async function finalizeItemPrice(
       salesCurrency: item.salesCurrency,
       unitConversionFactor: item.unitConversionFactor,
     });
-    setData.profit = profit.toFixed(4);
+    setData.profit = profit.toFixed(7);
   }
 
   const [updated] = await db

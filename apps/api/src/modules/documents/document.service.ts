@@ -643,7 +643,9 @@ function computeMaxDecimalPlaces(items: Array<Record<string, unknown>>, field: s
   for (const item of items) {
     const val = item[field];
     if (!val) continue;
-    const s = String(val);
+    // numeric(14,7) columns always serialize with 7 fraction digits (e.g. "610.0000000").
+    // Strip padding zeros so the column type doesn't force every document to 7dp.
+    const s = String(parseFloat(String(val)));
     const dot = s.indexOf('.');
     if (dot === -1) continue;
     const dp = s.length - dot - 1;

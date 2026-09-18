@@ -214,7 +214,7 @@ import { ViewsSettingsCardComponent } from './views-settings-card.component';
                   (ngModelChange)="costSalesPrecision.set(+$event)"
                   class="app-input w-full max-w-xs bg-white dark:bg-surface"
                 >
-                  @for (p of [0, 1, 2, 3, 4, 5, 6, 7, 8]; track p) {
+                  @for (p of [0, 1, 2, 3, 4, 5, 6, 7]; track p) {
                     <option [value]="p">{{ p }} ({{ p === 5 ? 'default' : p === 0 ? 'integer' : p + ' dp' }})</option>
                   }
                 </select>
