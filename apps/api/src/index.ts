@@ -20,6 +20,7 @@ import { lloydsController } from './modules/lloyds';
 import { companiesController } from './modules/companies/companies.controller';
 import { vesselsController } from './modules/vessels/vessels.controller';
 import { creditController } from './modules/credit/credit.controller';
+import { atradiusController } from './modules/atradius/atradius.controller';
 import { creditApplicationsController } from './modules/credit/credit-applications.controller';
 import { adminController, inviteController } from './modules/admin/admin.controller';
 import { backupController } from './modules/admin/backup.controller';
@@ -515,6 +516,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(companiesController)
     .use(vesselsController)
     .use(creditController)
+    .use(atradiusController)
     .use(creditApplicationsController)
     .use(adminController)
     .use(backupController)
