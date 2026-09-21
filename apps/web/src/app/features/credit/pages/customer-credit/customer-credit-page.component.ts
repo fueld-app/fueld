@@ -1,6 +1,7 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  computed,
   signal,
   inject,
   OnInit,
@@ -13,6 +14,7 @@ import { PaginationComponent, SortHeaderComponent } from '../../../../shared/com
 import type { SortChangeEvent } from '../../../../shared/components';
 import { firstValueFrom } from 'rxjs';
 import type {
+  AtradiusCoverDto,
   CreditLineDto,
   CreateCreditLineDto,
   ApiResponse,
@@ -26,6 +28,7 @@ import { API } from '@app/core/config/api';
 import { AuthService } from '@app/core/auth/auth.service';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 import { CustomerCreditModalComponent } from './customer-credit-modal.component';
+import { AtradiusImportModalComponent } from './atradius-import-modal.component';
 import { emptyCreditLineForm, type CreditLineForm, type CounterpartyOption } from './customer-credit.types';
 
 interface CompanySearchResult {
@@ -48,7 +51,7 @@ interface CompanySearchResultOption {
 @Component({
   selector: 'app-customer-credit-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, PaginationComponent, SortHeaderComponent, CustomerCreditModalComponent],
+  imports: [FormsModule, RouterLink, PaginationComponent, SortHeaderComponent, CustomerCreditModalComponent, AtradiusImportModalComponent],
   template: `
     <div>
       <!-- Header -->
@@ -59,15 +62,33 @@ interface CompanySearchResultOption {
             Credit lines given to customers. Performance shows average days to pay.
           </p>
         </div>
-        <button
-          (click)="openCreateModal()"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-          </svg>
-          Add Credit Line
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+          @if (canUploadAtradius()) {
+            <div class="flex flex-col items-end">
+              <button
+                (click)="atradiusUploading.set(true)"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim shadow-sm hover:bg-gray-50 dark:hover:bg-surface-2 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 9.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 7.414V13a1 1 0 11-2 0V7.414L8.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                Upload Atradius file
+              </button>
+              @if (atradiusLastImport(); as last) {
+                <span class="mt-1 text-[10px] text-gray-400 dark:text-muted">
+                  Cover updated {{ formatDate(last.createdAt) }} by {{ last.uploadedByName ?? '—' }}
+                </span>
+              }
+            </div>
+          }
+          <button
+            (click)="openCreateModal()"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+            </svg>
+            Add Credit Line
+          </button>
+        </div>
       </div>
 
       @if (canManageCreditOverrides() && (pendingOverrides().length || pendingOverridesLoading() || pendingOverridesError())) {
@@ -325,6 +346,9 @@ interface CompanySearchResultOption {
                 <th app-sort-header field="expires" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Expires</th>
                 <th app-sort-header field="periodDays" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Period</th>
                 <th app-sort-header field="creditAmount" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Credit</th>
+                @if (atradiusEnabled()) {
+                  <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Atradius Cover</th>
+                }
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Used</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Available</th>
                 <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Performance</th>
@@ -377,6 +401,17 @@ interface CompanySearchResultOption {
                   </td>
                   <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ line.periodDays }} days</td>
                   <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-ink">{{ formatAmount(line.creditAmount, line.currency) }}</td>
+                  @if (atradiusEnabled()) {
+                    <td class="px-4 py-3 text-right">
+                      @for (cpId of line.counterpartyIds; track cpId; let first = $first) {
+                        @if (atradiusCoverFor(cpId); as cover) {
+                          <span class="text-sm tabular-nums" [class.text-gray-400]="cover.amount === '0.00' || cover.amount === '0'">
+                            {{ cover.currency === 'EUR' ? '€' : cover.currency + ' ' }}{{ cover.amount === '0.00' || cover.amount === '0' ? '0' : formatAmount(cover.amount, cover.currency) }}{{ $last ? '' : ', ' }}
+                          </span>
+                        }
+                      }
+                    </td>
+                  }
                   <td class="px-4 py-3 text-right">
                     <span [class]="parseFloat(line.usedAmount) > 0 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400 dark:text-muted'">
                       {{ formatAmount(line.usedAmount, line.currency) }}
@@ -447,6 +482,9 @@ interface CompanySearchResultOption {
       }
 
       <!-- Create / Edit modal -->
+      @if (atradiusUploading()) {
+        <app-atradius-import-modal (close)="atradiusUploading.set(false)" (imported)="onAtradiusImported()" />
+      }
       <app-customer-credit-modal
         [open]="showModal()"
         [editing]="!!editingId()"
@@ -500,6 +538,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   readonly parseFloat = parseFloat;
   readonly pageSize = 25;
   readonly canManageCreditOverrides = this.authService.canAccessCredit;
+  readonly canUploadAtradius = computed(() => this.atradiusEnabled() && (this.authService.canAccessCredit() || this.authService.isFinance()));
 
   // State
   readonly creditLines = signal<CreditLineDto[]>([]);
@@ -548,6 +587,12 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   readonly deleteTarget = signal<CreditLineDto | null>(null);
   readonly deleting = signal(false);
 
+  // Atradius insurance cover (tenant-gated feature)
+  readonly atradiusEnabled = signal(false);
+  readonly atradiusCover = signal<Record<string, { amount: string; currency: string }>>({});
+  readonly atradiusLastImport = signal<AtradiusCoverDto['lastImport']>(null);
+  readonly atradiusUploading = signal(false);
+
   // Configured currencies
   readonly configuredCurrencies = signal<string[]>(['USD', 'EUR', 'DKK', 'AED']);
 
@@ -556,6 +601,34 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
     const page = Number(params.get('page'));
     if (page > 0) this.currentPage.set(page);
     this.loadData();
+    void this.loadAtradiusState();
+  }
+
+  private async loadAtradiusState(): Promise<void> {
+    try {
+      const flagRes = await firstValueFrom(
+        this.http.get<ApiResponse<{ enabled: boolean }>>(`${API}/admin/settings/my-atradius-settings`),
+      );
+      if (!flagRes.success || !flagRes.data?.enabled) return;
+      this.atradiusEnabled.set(true);
+      const coverRes = await firstValueFrom(
+        this.http.get<ApiResponse<AtradiusCoverDto>>(`${API}/atradius/cover`),
+      );
+      if (coverRes.success && coverRes.data) {
+        this.atradiusCover.set(coverRes.data.covers);
+        this.atradiusLastImport.set(coverRes.data.lastImport);
+      }
+    } catch {
+      // feature stays hidden on any failure
+    }
+  }
+
+  async onAtradiusImported(): Promise<void> {
+    await this.loadAtradiusState();
+  }
+
+  atradiusCoverFor(counterpartyId: string): { amount: string; currency: string } | null {
+    return this.atradiusCover()[counterpartyId] ?? null;
   }
 
   ngOnDestroy(): void {

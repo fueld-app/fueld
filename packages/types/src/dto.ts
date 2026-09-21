@@ -2192,6 +2192,49 @@ export interface CreditLineDto {
   updatedAt: string;
 }
 
+// ── Atradius insurance cover (tenant-gated feature) ──────────────────
+export interface AtradiusImportSummaryDto {
+  importId: string;
+  rowCount: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  replaced: boolean;
+  unmatched: AtradiusUnmatchedBuyerDto[];
+}
+
+export interface AtradiusUnmatchedBuyerDto {
+  id: string;
+  buyerNumber: string;
+  buyerName: string;
+  coverAmount: string;
+  statusRaw: string;
+  suggestedCounterpartyId: string | null;
+}
+
+export interface AtradiusBuyerDto {
+  id: string;
+  buyerNumber: string;
+  buyerName: string;
+  coverAmount: string;
+  statusRaw: string;
+}
+
+export interface AtradiusCoverDto {
+  covers: Record<string, { amount: string; currency: string }>;
+  lastImport: {
+    fileName: string;
+    uploadedByName: string | null;
+    createdAt: string;
+    rowCount: number;
+    matchedCount: number;
+    unmatchedCount: number;
+  } | null;
+}
+
+export interface AtradiusSettingsDto {
+  enabled: boolean;
+}
+
 export interface CreateCreditLineDto {
   counterpartyIds: string[];
   type: CreditLineType;

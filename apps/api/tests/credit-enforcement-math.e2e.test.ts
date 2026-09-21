@@ -102,6 +102,7 @@ describe('credit enforcement math fixes', () => {
     // Old broken behavior (no exclusion): used includes the deal itself,
     // so the deal could never fit its own line.
     const before = await svc.checkCreditAvailability({
+      tenantId: seeded.tenant.id,
       type: 'CUSTOMER',
       counterpartyId: seeded.client.id,
       currency: 'USD',
@@ -114,6 +115,7 @@ describe('credit enforcement math fixes', () => {
 
     // With self-exclusion: no other exposure, the line covers the deal.
     const result = await svc.checkCreditAvailability({
+      tenantId: seeded.tenant.id,
       type: 'CUSTOMER',
       counterpartyId: seeded.client.id,
       currency: 'USD',
@@ -254,6 +256,7 @@ describe('credit enforcement math fixes', () => {
     });
 
     const result = await svc.checkCreditAvailability({
+      tenantId: seeded.tenant.id,
       type: 'CUSTOMER',
       counterpartyId: seeded.client.id,
       currency: 'USD',

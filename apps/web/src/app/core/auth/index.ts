@@ -4,3 +4,4 @@ export { authGuard } from './auth.guard';
 export { lightGuard } from './light.guard';
 export { adminGuard } from './admin.guard';
 export { financeGuard } from './finance.guard';
+export { customerCreditGuard } from './credit.guard';

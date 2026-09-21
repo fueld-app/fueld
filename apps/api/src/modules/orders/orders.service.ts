@@ -758,6 +758,7 @@ export async function addOrderSupplier(orderId: string, input: {
     const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (order && order.orderKind !== 'INTERNAL_TRANSFER' && !(await creditEnforcementDisabled(order.tenantId))) {
       const result = await checkCreditAvailability({
+        tenantId: order.tenantId,
         type: 'SUPPLIER',
         counterpartyId: input.companyId,
         currency: order.currency ?? 'USD',
@@ -886,6 +887,7 @@ async function assertCreditTermsAllowed(input: {
   if (customerCheckApplies) {
     const required = await sumOrderItemsPrice(input.orderId, 'salesPrice');
     const result = await checkCreditAvailability({
+      tenantId: order.tenantId,
       type: 'CUSTOMER',
       counterpartyId: order.clientId,
       currency,
@@ -903,6 +905,7 @@ async function assertCreditTermsAllowed(input: {
   if (input.orderLevelSupplierToCredit) {
     const required = await sumOrderItemsPrice(input.orderId, 'costPrice');
     const result = await checkCreditAvailability({
+      tenantId: order.tenantId,
       type: 'SUPPLIER',
       counterpartyId: input.orderLevelSupplierToCredit.companyId,
       currency,
@@ -926,6 +929,7 @@ async function assertCreditTermsAllowed(input: {
   if (!usableLegs.length && !legs.length && order.supplierId && order.supplierPaymentTermType === 'CREDIT') {
     const required = await sumOrderItemsPrice(input.orderId, 'costPrice');
     const result = await checkCreditAvailability({
+      tenantId: order.tenantId,
       type: 'SUPPLIER',
       counterpartyId: order.supplierId,
       currency,
@@ -950,6 +954,7 @@ async function assertCreditTermsAllowed(input: {
   }
   for (const [companyId, required] of requiredByCompany) {
     const result = await checkCreditAvailability({
+      tenantId: order.tenantId,
       type: 'SUPPLIER',
       counterpartyId: companyId,
       currency,
@@ -1003,6 +1008,7 @@ export async function updateOrderSupplierRecord(orderId: string, supplierRecordI
         ? await sumOrderItemsPrice(orderId, 'costPrice')
         : await sumOrderItemsPrice(orderId, 'costPrice', existing.id);
       const result = await checkCreditAvailability({
+        tenantId: order.tenantId,
         type: 'SUPPLIER',
         counterpartyId: existing.companyId,
         currency: order.currency ?? 'USD',

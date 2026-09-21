@@ -13,3 +13,15 @@ export const creditGuard: CanActivateFn = () => {
 
   return true;
 };
+
+/** Customer Credit page: ADMIN, CREDITMANAGER and FINANCE (read-only credit data + Atradius uploads). */
+export const customerCreditGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  if (!auth.canAccessCustomerCredit()) {
+    return router.createUrlTree(['/']);
+  }
+
+  return true;
+};

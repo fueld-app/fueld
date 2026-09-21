@@ -876,6 +876,13 @@
       "when": 1789868400000,
       "tag": "0124_price_precision_7dp",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1789954800000,
+      "tag": "0125_atradius_cover",
+      "breakpoints": true
     }
   ]
 }

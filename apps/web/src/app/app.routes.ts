@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { adminGuard } from './core/auth/admin.guard';
 import { financeGuard } from './core/auth/finance.guard';
-import { creditGuard } from './core/auth/credit.guard';
+import { creditGuard, customerCreditGuard } from './core/auth/credit.guard';
 import { lightGuard } from './core/auth/light.guard';
 
 export const routes: Routes = [
@@ -376,7 +376,7 @@ export const routes: Routes = [
           },
           {
             path: 'customers',
-            canActivate: [creditGuard],
+            canActivate: [customerCreditGuard],
             loadComponent: () =>
               import('./features/credit/pages/customer-credit/customer-credit-page.component').then(
                 (m) => m.CustomerCreditPageComponent,

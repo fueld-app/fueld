@@ -25,8 +25,9 @@ export const creditController = new Elysia({ prefix: '/credit' })
   // ─── List Credit Lines ──────────────────────────────────────────
   .get(
     '/lines',
-    async ({ query }) => {
+    async ({ auth, query }) => {
       const results = await listCreditLines({
+        tenantId: auth.tenantId,
         type: query.type as 'SUPPLIER' | 'CUSTOMER' | undefined,
         counterpartyId: query.counterpartyId,
         sortBy: query.sortBy,

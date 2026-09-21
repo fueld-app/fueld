@@ -321,6 +321,10 @@ export interface TenantSettings {
     photoCategories?: string[];  // e.g. ['BEFORE', 'AFTER', 'TANK_SEAL', 'OTHER']
     maxFileSizeMb?: number;      // default 10
   };
+  // Atradius insurance cover feature (Riviera Marine) — tenant-gated
+  atradiusSettings?: {
+    enabled?: boolean;
+  };
   // Throughput / Sales report feature settings (Feature 1: Sales Reporting by Product)
   throughputReport?: {
     enabled?: boolean;
@@ -1665,6 +1669,36 @@ export const creditLineTypeEnum = pgEnum('credit_line_type', [
   'SUPPLIER',
   'CUSTOMER',
 ]);
+
+// ── Atradius insurance cover (tenant-gated feature, monthly Excel upload) ──
+export const atradiusImports = pgTable('atradius_imports', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  uploadedBy: uuid('uploaded_by').notNull().references(() => users.id),
+  fileName: text('file_name').notNull(),
+  rowCount: integer('row_count').notNull().default(0),
+  matchedCount: integer('matched_count').notNull().default(0),
+  unmatchedCount: integer('unmatched_count').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const atradiusBuyers = pgTable('atradius_buyers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  importId: uuid('import_id').notNull().references(() => atradiusImports.id),
+  buyerNumber: text('buyer_number').notNull(),
+  buyerName: text('buyer_name').notNull(),
+  coverAmount: numeric('cover_amount', { precision: 14, scale: 2 }).notNull().default('0'),
+  currency: text('currency').notNull().default('EUR'),
+  statusRaw: text('status_raw').notNull(),
+  statusNormalized: text('status_normalized').notNull(),
+  isActive: boolean('is_active').notNull().default(false),
+  decisionDate: date('decision_date'),
+  endDate: date('end_date'),
+  matchedCounterpartyId: uuid('matched_counterparty_id').references(() => counterparties.id),
+  matchSource: text('match_source'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const creditLines = pgTable('credit_lines', {
   id: uuid('id').defaultRandom().primaryKey(),

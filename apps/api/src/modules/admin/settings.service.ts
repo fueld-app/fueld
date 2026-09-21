@@ -1418,6 +1418,35 @@ export async function getPhotoGallerySettings(): Promise<{
   };
 }
 
+//  ATRADIUS INSURANCE COVER SETTINGS (tenant-gated feature)
+
+export async function getAtradiusSettings(tenantId: string): Promise<{ enabled: boolean }> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!tenant) throw new Error('Tenant not found');
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { enabled: settings.atradiusSettings?.enabled ?? false };
+}
+
+export async function updateAtradiusSettings(
+  tenantId: string,
+  data: { enabled: boolean },
+): Promise<{ enabled: boolean }> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!tenant) throw new Error('Tenant not found');
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const next = { ...settings, atradiusSettings: { enabled: data.enabled } };
+  await db.update(tenants).set({ settings: next }).where(eq(tenants.id, tenantId));
+  return { enabled: data.enabled };
+}
+
 //  THROUGHPUT REPORT SETTINGS
 
 export async function getThroughputReportSettings(): Promise<{

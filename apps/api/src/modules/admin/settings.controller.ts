@@ -46,6 +46,8 @@ import {
   updateCompanyTypeSettings,
   getAttachmentTypeSettings,
   updateAttachmentTypeSettings,
+  getAtradiusSettings,
+  updateAtradiusSettings,
   getPhotoGallerySettings,
   getThroughputReportSettings,
   getVesselTypeSettings,
@@ -619,6 +621,32 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get photo gallery settings for current tenant' },
+  })
+
+  .get('/my-atradius-settings', async ({ auth }) => {
+    try {
+      const data = await getAtradiusSettings(auth.tenantId);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get Atradius cover feature flag for current tenant (any authenticated user)' },
+  })
+
+  .put('/atradius', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateAtradiusSettings(auth.tenantId, body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({ enabled: t.Boolean() }),
+    detail: { tags: ['Admin Settings'], summary: 'Enable/disable the Atradius cover feature (ADMIN)' },
   })
 
   .put('/photo-gallery', async ({ auth, body }) => {

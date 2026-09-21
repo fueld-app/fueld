@@ -63,6 +63,9 @@ export class AuthService {
   readonly isCreditManager = computed(() => this.user()?.role === Role.CreditManager);
   readonly isLight = computed(() => this.user()?.role === Role.Light);
   readonly canAccessCredit = computed(() => this.isAdmin() || this.isCreditManager());
+  // Customer Credit page is open to FINANCE (read-only credit data + Atradius
+  // uploads); Suppliers stays ADMIN|CREDITMANAGER.
+  readonly canAccessCustomerCredit = computed(() => this.canAccessCredit() || this.isFinance());
   readonly canAccessReports = computed(() => this.isAuthenticated());
   readonly canSeePrices = computed(() => !this.isLight());
   readonly userPhone = computed(() => this.user()?.phone ?? '');

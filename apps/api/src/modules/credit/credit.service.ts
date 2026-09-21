@@ -270,12 +270,16 @@ export async function listCreditLines(query?: {
   type?: CreditLineType;
   counterpartyId?: string;
   excludeOrderId?: string;
+  tenantId?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   page?: number;
   limit?: number;
 }) {
   const conditions = [];
+  // Tenant scoping is mandatory — credit lines are tenant data and this list
+  // used to be cross-tenant readable (panel finding, 2026-09-20).
+  if (query?.tenantId) conditions.push(eq(creditLines.tenantId, query.tenantId));
   if (query?.type) conditions.push(eq(creditLines.type, query.type));
   if (query?.counterpartyId) {
     conditions.push(eq(creditLineCounterparties.counterpartyId, query.counterpartyId));
@@ -376,6 +380,7 @@ export async function checkCreditAvailability(opts: {
   counterpartyId: string;
   currency: string;
   isBrokerDeal: boolean;
+  tenantId: string;
   required: number;
   /**
    * The order being validated. Its own exposure is excluded from usage so it
@@ -386,6 +391,7 @@ export async function checkCreditAvailability(opts: {
   label: string; // e.g. 'Supplier credit' — used in the rejection message
 }): Promise<CreditAvailability> {
   const { items } = await listCreditLines({
+    tenantId: opts.tenantId,
     type: opts.type,
     counterpartyId: opts.counterpartyId,
     excludeOrderId: opts.excludeOrderId,

@@ -37,6 +37,29 @@ import { ThroughputReportService } from '@app/core/services/throughput-report.se
       } @else {
         <div class="space-y-6 max-w-2xl">
 
+          <!-- Atradius insurance cover -->
+          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">🛡️ Atradius Cover</h3>
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
+                  Insurance cover column on the Customer Credit page, fed by a monthly Atradius Excel upload. Hidden from tenants where disabled.
+                </p>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer ml-4">
+                <input
+                  type="checkbox"
+                  [ngModel]="atradiusEnabled()"
+                  (ngModelChange)="atradiusEnabled.set($event)"
+                  class="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span class="text-sm font-medium text-gray-700 dark:text-ink-dim">
+                  {{ atradiusEnabled() ? 'Enabled' : 'Disabled' }}
+                </span>
+              </label>
+            </div>
+          </div>
+
           <!-- Photo Gallery -->
           <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
             <div class="flex items-start justify-between">
@@ -426,6 +449,9 @@ export class FeaturesSettingsPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly saving = signal(false);
 
+  // Atradius insurance cover feature (Riviera Marine)
+  readonly atradiusEnabled = signal(false);
+
   // Photo Gallery settings
   readonly photoGalleryEnabled = signal(false);
   readonly photoCategoriesStr = signal('BEFORE, AFTER, TANK_SEAL, OTHER');
@@ -499,6 +525,10 @@ export class FeaturesSettingsPageComponent implements OnInit {
 
       if (photoRes.success && photoRes.data) {
         this.photoGalleryEnabled.set(photoRes.data.enabled);
+      const atradiusRes = await firstValueFrom(
+        this.http.get<ApiResponse<{ enabled: boolean }>>(`${API}/admin/settings/my-atradius-settings`),
+      );
+      this.atradiusEnabled.set(atradiusRes?.success ? !!atradiusRes.data?.enabled : false);
         this.photoCategoriesStr.set(photoRes.data.photoCategories.join(', '));
         this.photoMaxFileSizeMb.set(photoRes.data.maxFileSizeMb);
       }
@@ -548,7 +578,7 @@ export class FeaturesSettingsPageComponent implements OnInit {
         .map((c) => c.trim().toUpperCase())
         .filter((c) => c.length > 0);
 
-      const [photoRes, throughputRes, digestRes, pricingRes, qbRes] = await Promise.all([
+      const [photoRes, throughputRes, digestRes, pricingRes, qbRes, atradiusRes] = await Promise.all([
         firstValueFrom(this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/photo-gallery`, {
           enabled: this.photoGalleryEnabled(),
           photoCategories: photoCategories.length ? photoCategories : ['BEFORE', 'AFTER', 'TANK_SEAL', 'OTHER'],
@@ -581,9 +611,12 @@ export class FeaturesSettingsPageComponent implements OnInit {
           autoSyncInvoices: this.qbAutoSync(),
           productMappings: this.qbProductMappings(),
         })),
+        firstValueFrom(this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/atradius`, {
+          enabled: this.atradiusEnabled(),
+        })),
       ]);
 
-      if (photoRes.success && throughputRes.success && digestRes.success && pricingRes.success && qbRes.success) {
+      if (photoRes.success && throughputRes.success && digestRes.success && pricingRes.success && qbRes.success && atradiusRes.success) {
         this.toastSvc.show('success', 'Feature settings saved.');
         // Invalidate cached services so nav menu updates
         this.brokerDealSvc.invalidateCache();
