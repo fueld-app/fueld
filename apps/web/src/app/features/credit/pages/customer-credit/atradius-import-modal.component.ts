@@ -215,11 +215,6 @@ export class AtradiusImportModalComponent {
     this.busy.set(true);
     this.error.set('');
     try {
-      // Row ids from the import summary are deduped placeholders; resolve
-      // real row ids (one row per decision) from the unmatched endpoint.
-      const real = await firstValueFrom(
-        this.http.get<ApiResponse<AtradiusUnmatchedBuyerDto[]>>(`${API}/atradius/unmatched`),
-      );
       for (const row of this.unmatched()) {
         const counterpartyId = this.selections()[row.id] || null;
         await firstValueFrom(

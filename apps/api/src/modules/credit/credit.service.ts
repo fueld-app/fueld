@@ -266,26 +266,24 @@ async function enrichCreditLine(row: RawCreditLine, excludeOrderId?: string): Pr
 //  LIST CREDIT LINES (paginated, filtered by type)
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function listCreditLines(query?: {
+export async function listCreditLines(query: {
+  /** REQUIRED — tenant scoping is mandatory (panel finding, 2026-09-20). */
+  tenantId: string;
   type?: CreditLineType;
   counterpartyId?: string;
   excludeOrderId?: string;
-  tenantId?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   page?: number;
   limit?: number;
 }) {
-  const conditions = [];
-  // Tenant scoping is mandatory — credit lines are tenant data and this list
-  // used to be cross-tenant readable (panel finding, 2026-09-20).
-  if (query?.tenantId) conditions.push(eq(creditLines.tenantId, query.tenantId));
+  const conditions = [eq(creditLines.tenantId, query.tenantId)];
   if (query?.type) conditions.push(eq(creditLines.type, query.type));
   if (query?.counterpartyId) {
     conditions.push(eq(creditLineCounterparties.counterpartyId, query.counterpartyId));
   }
 
-  const where = conditions.length === 1 ? conditions[0] : conditions.length > 1 ? and(...conditions) : undefined;
+  const where = conditions.length === 1 ? conditions[0] : and(...conditions);
 
   const limit = query?.limit ?? 25;
   const page = query?.page ?? 1;
@@ -583,6 +581,6 @@ export async function deleteCreditLine(id: string) {
   const [deleted] = await db
     .delete(creditLines)
     .where(eq(creditLines.id, id))
-    .returning({ id: creditLines.id });
+    .returning({ id: creditLines.id, tenantId: creditLines.tenantId });
   return deleted ?? null;
 }

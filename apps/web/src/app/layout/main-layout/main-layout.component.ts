@@ -238,7 +238,7 @@ const NAVIGATION: NavItem[] = [
     children: [
       { label: 'Applications', route: '/credit/applications' },
       { label: 'Suppliers', route: '/credit/suppliers', allowedRoles: ['ADMIN', 'CREDITMANAGER'] },
-      { label: 'Customers', route: '/credit/customers', allowedRoles: ['ADMIN', 'CREDITMANAGER'] },
+      { label: 'Customers', route: '/credit/customers', allowedRoles: ['ADMIN', 'CREDITMANAGER', 'FINANCE'] },
     ],
   },
   {

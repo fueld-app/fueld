@@ -7,7 +7,7 @@
  * by stable Atradius buyer number (persisted mapping), then exact name.
  */
 import * as XLSX from 'xlsx';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   atradiusBuyers,
@@ -62,19 +62,8 @@ function resolveColumns(headerRow: Record<string, unknown>): Record<string, stri
   const resolved: Record<string, string> = {};
   for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
     let letter = aliases.map((a) => byNormalized.get(normalizeHeader(a))).find(Boolean);
-    if (!letter) {
-      // Letter-position fallback, verified against partial header text.
-      const fallbackVerification: Record<string, string[]> = {
-        buyerNumber: ['acheteur', 'buyer'],
-        buyerName: ['acheteur', 'buyer'],
-        coverAmount: ['montant', 'amount'],
-        status: ['statut', 'status'],
-        decisionDate: ['décision', 'decision'],
-        endDate: ['fin', 'end'],
-        currency: ['devise', 'currency'],
-      };
-      letter = undefined;
-    }
+    // Letter-position fallback deliberately NOT implemented: a missing header
+    // should fail the import loudly (clear error) rather than guess columns.
     if (letter) resolved[field] = letter;
   }
   return resolved;
@@ -200,11 +189,19 @@ export async function importAtradiusFile(opts: {
     if (!buyerNumber || !buyerName) continue; // blank/summary rows
 
     const statusRaw = String(get('status') ?? '').trim();
-    const statusInfo = STATUS_MAP[statusRaw.toLowerCase()] ?? { normalized: 'UNKNOWN', active: false };
+    // Exports may use typographic (\u2019) or ASCII (') apostrophes.
+    const statusKey = statusRaw.toLowerCase().replace(/\u2019/g, "'");
+    const statusInfo = STATUS_MAP[statusKey] ?? { normalized: 'UNKNOWN', active: false };
     const decisionDate = toIsoDate(get('decisionDate'));
     const endDate = toIsoDate(get('endDate'));
     const amountRaw = get('coverAmount');
-    const coverAmount = String(parseFloat(String(amountRaw ?? '0').toString().replace(/[^0-9.\-]/g, '')) || 0);
+    // Numeric cells come through as numbers; TEXT cells may be French-locale
+    // ("1 234,56") — normalize before stripping, don't silently mangle.
+    let amountText = String(amountRaw ?? '0');
+    if (typeof amountRaw === 'string' && amountRaw.includes(',')) {
+      amountText = amountRaw.replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+    }
+    const coverAmount = String(parseFloat(amountText.replace(/[^0-9.\-]/g, '')) || 0);
     const currency = String(get('currency') ?? 'EUR').trim() || 'EUR';
 
     // End date passed → inactive regardless of status.
@@ -269,32 +266,39 @@ export async function importAtradiusFile(opts: {
     await tx.insert(atradiusBuyers).values(parsed);
 
     const matched = parsed.filter((p) => p.matchedCounterpartyId).length;
+    // Store the DEDUPED unmatched count (one per buyer_number) so the DB
+    // agrees with the summary the modal shows.
+    const unmatchedBuyerNumbers = new Set(parsed.filter((p) => !p.matchedCounterpartyId).map((p) => p.buyerNumber));
     await tx
       .update(atradiusImports)
-      .set({ matchedCount: matched, unmatchedCount: parsed.length - matched })
+      .set({ matchedCount: matched, unmatchedCount: unmatchedBuyerNumbers.size })
       .where(eq(atradiusImports.id, importRow!.id));
 
     return { importRow, parsed, matched, replaced };
   });
 
-  const unmatchedRows = result.parsed
-    .filter((p) => !p.matchedCounterpartyId)
-    .map((p) => ({
-      id: '',
-      buyerNumber: p.buyerNumber,
-      buyerName: p.buyerName,
-      coverAmount: p.coverAmount,
-      statusRaw: p.statusRaw,
-      suggestedCounterpartyId: normalizedByName.get(stripLegal(p.buyerName)) ?? null,
-    }));
-
-  // Dedup unmatched by buyer_number (multiple decisions per buyer).
+  // Unmatched rows of the NEW import, with REAL atradius_buyers.id values
+  // (the mapping modal uses row.id as its selection/track key — all ids must
+  // be distinct, not placeholder ''). Deduped to one row per buyer_number.
+  const unmatchedRows = await db
+    .select({
+      id: atradiusBuyers.id,
+      buyerNumber: atradiusBuyers.buyerNumber,
+      buyerName: atradiusBuyers.buyerName,
+      coverAmount: atradiusBuyers.coverAmount,
+      statusRaw: atradiusBuyers.statusRaw,
+    })
+    .from(atradiusBuyers)
+    .where(
+      and(
+        eq(atradiusBuyers.importId, result.importRow!.id),
+        isNull(atradiusBuyers.matchedCounterpartyId),
+      ),
+    );
   const seen = new Set<string>();
-  const unmatched = unmatchedRows.filter((r) => {
-    if (seen.has(r.buyerNumber)) return false;
-    seen.add(r.buyerNumber);
-    return true;
-  });
+  const unmatched = unmatchedRows
+    .filter((r) => (seen.has(r.buyerNumber) ? false : (seen.add(r.buyerNumber), true)))
+    .map((r) => ({ ...r, suggestedCounterpartyId: normalizedByName.get(stripLegal(r.buyerName)) ?? null }));
 
   return {
     importId: result.importRow!.id,
@@ -376,7 +380,9 @@ export async function getAtradiusCover(tenantId: string): Promise<CoverResponse>
     })
     .from(atradiusBuyers)
     .where(eq(atradiusBuyers.tenantId, tenantId))
-    .orderBy(desc(atradiusBuyers.decisionDate), desc(atradiusBuyers.createdAt));
+    // NULLS LAST: a row with an unparseable decision date must not beat
+    // dated rows for the same buyer_number (Postgres DESC is NULLS FIRST).
+    .orderBy(sql`${atradiusBuyers.decisionDate} DESC NULLS LAST`, desc(atradiusBuyers.createdAt));
 
   const winning = new Map<string, (typeof rows)[number]>();
   for (const row of rows) {

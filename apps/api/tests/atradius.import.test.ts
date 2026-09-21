@@ -136,7 +136,15 @@ describe('atradius import', () => {
     expect(cover.lastImport!.matchedCount).toBeGreaterThan(0);
   });
 
-  test('unmatched list dedupes by buyer number', async () => {
+  test('unmatched list dedupes by buyer number with REAL ids (B2 regression)', async () => {
+    const summary = await importAtradiusFile({ tenantId: TENANT, userId, ...makeUpload() });
+    // Regression (panel B2): placeholder ids made every modal select share the
+    // same key — mapping every buyer to the last-chosen counterparty.
+    const ids = summary.unmatched.map((u) => u.id);
+    expect(ids.length).toBe(summary.unmatchedCount);
+    expect(ids.every((id) => id && id !== '')).toBeTrue();
+    expect(new Set(ids).size).toBe(ids.length);
+
     const unmatched = await listUnmatchedBuyers(TENANT);
     const numbers = unmatched.map((u) => u.buyerNumber);
     expect(new Set(numbers).size).toBe(numbers.length);

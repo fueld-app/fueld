@@ -18,6 +18,7 @@ beforeEach(async () => {
 describe('credit.service', () => {
   it('creates, gets, lists, updates, and deletes a credit line', async () => {
     const { tenant, client } = await seedBasics();
+    const seeded = { tenant };
     const db = await getDb();
     const { createCreditLine, getCreditLineById, listCreditLines, updateCreditLine, deleteCreditLine } = await loadCreditService();
 
@@ -52,10 +53,10 @@ describe('credit.service', () => {
     const fetched = await getCreditLineById(created!.id);
     expect(fetched?.id).toBe(created?.id);
 
-    const byType = await listCreditLines({ type: 'CUSTOMER' });
+    const byType = await listCreditLines({ tenantId: seeded.tenant.id, type: 'CUSTOMER' });
     expect(byType.total).toBe(1);
 
-    const byCounterparty = await listCreditLines({ counterpartyId: client.id });
+    const byCounterparty = await listCreditLines({ tenantId: seeded.tenant.id, counterpartyId: client.id });
     expect(byCounterparty.total).toBe(1);
 
     const [client2] = await db
