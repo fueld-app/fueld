@@ -18,6 +18,7 @@
  */
 
 import nodemailer from "nodemailer";
+import MailComposer from "nodemailer/lib/mail-composer";
 import { ImapFlow } from "imapflow";
 import { execSync } from "child_process";
 
@@ -115,7 +116,7 @@ async function sendEmail(args) {
     secure: true,
     auth: { user: MAIL_USER, pass: mailPassword },
   });
-  const info = await transporter.sendMail({
+  const mail = {
     from: `"Patrick Pereira" <${MAIL_USER}>`,
     to,
     ...(cc ? { cc } : {}),
@@ -124,8 +125,44 @@ async function sendEmail(args) {
     text: body,
     ...(html ? { html } : {}),
     ...(inReplyTo ? { inReplyTo, references: inReplyTo } : {}),
+  };
+  // Compile the exact RFC822 source we're going to send, so the same bytes can
+  // be filed into the Sent mailbox afterwards (SMTP alone doesn't file a copy).
+  const composer = new MailComposer(mail);
+  const raw = await new Promise((resolve, reject) => {
+    composer.compile().build((err, msg) => (err ? reject(err) : resolve(msg)));
   });
-  return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected };
+  const info = await transporter.sendMail({ ...mail, raw });
+
+  // Failure to file the Sent copy must not fail the send itself.
+  let filedToSent = false;
+  try {
+    await withImap(async (client) => {
+      const sentBox = await findSentMailbox(client);
+      if (!sentBox) {
+        process.stderr.write("[email] no Sent mailbox found — sent copy not filed\n");
+        return;
+      }
+      await client.append(sentBox, raw, ["\\Seen"], new Date());
+      filedToSent = true;
+    });
+  } catch (err) {
+    process.stderr.write(`[email] sent-copy filing failed (email WAS sent): ${err?.message ?? err}\n`);
+  }
+
+  return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected, filedToSent };
+}
+
+/** Locate the Sent mailbox (RFC 6154 \Sent attribute first, then name match). */
+async function findSentMailbox(client) {
+  const boxes = await client.list();
+  for (const box of boxes) {
+    if (box.specialUse === "\\Sent" || box.flags?.has?.("\\Sent")) return box.path;
+  }
+  for (const box of boxes) {
+    if (/^sent$/i.test(box.path.split("/").pop() ?? "")) return box.path;
+  }
+  return null;
 }
 
 async function withImap(fn) {
@@ -151,22 +188,26 @@ async function listRecent(args) {
   return withImap(async (client) => {
     const lock = await client.getMailboxLock(mailbox);
     try {
+      const status = await client.status(mailbox, { messages: true });
+      const total = status.messages ?? 0;
+      if (total === 0) return [];
       const messages = [];
-      const seqs = [];
-      for await (const m of client.fetch({ all: true }, { uid: true, seq: true })) seqs.push(m.seq);
-      const wanted = seqs.slice(-limit).reverse();
-      for (const seq of wanted) {
-        const m = await client.fetchOne(seq, { uid: true, envelope: true, flags: true }, { uid: false });
-        if (!m) continue;
+      const fromSeq = Math.max(1, total - limit + 1);
+      const msgs = [];
+      for await (const m of client.fetch({ seq: `${fromSeq}:*` }, { uid: true, envelope: true, flags: true })) {
+        msgs.push(m);
+      }
+      msgs.reverse(); // newest first
+      for (const m of msgs) {
+        if (args.unreadOnly && m.flags?.has("\\Seen")) continue;
         messages.push({
           uid: m.uid,
-          seq,
+          seq: m.seq,
           from: m.envelope?.from?.map((a) => `${a.name ?? ""} <${a.address ?? ""}>`).join(", ") ?? null,
           subject: m.envelope?.subject ?? null,
           date: m.envelope?.date ?? null,
           seen: m.flags?.has("\\Seen") ?? false,
         });
-        if (args.unreadOnly && m.flags?.has("\\Seen")) { messages.pop(); }
       }
       return messages;
     } finally {
@@ -203,7 +244,7 @@ async function readEmail(args) {
         to: m.envelope?.to?.map((a) => a.address ?? "").join(", ") ?? null,
         subject: m.envelope?.subject ?? null,
         date: m.envelope?.date ?? null,
-        text: (text ?? m.source?.toString("utf8") ?? "").slice(0, 20000),
+        text: (text ?? m.source?.toString("utf8") ?? "").slice(0, 400000),
       };
     } finally {
       lock.release();
@@ -256,6 +297,7 @@ async function handle(method, params) {
 }
 
 let buffer = "";
+let stdinEnded = false;
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", async (chunk) => {
   buffer += chunk;
@@ -276,8 +318,9 @@ process.stdin.on("data", async (chunk) => {
       process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result: {} }) + "\n");
       continue;
     }
+    pending++;
     try {
-      const result = await handle(method, params);
+      const result = await origHandle(method, params);
       if (result === null) {
         replyError(id, -32601, `Method not found: ${method}`);
       } else {
@@ -285,8 +328,12 @@ process.stdin.on("data", async (chunk) => {
       }
     } catch (err) {
       replyError(id, -32603, String(err?.message ?? err));
+    } finally {
+      pending--;
+      if (pending === 0 && stdinEnded) setTimeout(() => process.exit(0), 250);
     }
   }
 });
-process.stdin.on("end", () => process.exit(0));
+let pending = 0;
+const origHandle = handle;
 process.stderr.write(`[fueld-email-mcp] ready as ${MAIL_USER}\n`);
