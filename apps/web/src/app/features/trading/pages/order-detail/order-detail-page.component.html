@@ -619,6 +619,7 @@
 <app-order-convert-modal
   #convertModal
   [saving]="convertingToOrder()"
+  [error]="convertError()"
   (confirmed)="confirmConvertToOrder()"
 />
 } @placeholder { <div></div> }
@@ -629,6 +630,7 @@
   [saving]="cancellingInquiry()"
   [targetLabel]="cancellationTargetLabel()"
   [reasons]="availableInquiryCancelReasons()"
+  [error]="cancelError()"
   (confirmed)="confirmCancelInquiry($event)"
 />
 } @placeholder { <div></div> }

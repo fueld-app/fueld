@@ -44,7 +44,9 @@ export interface OrderActionContext {
   buildItemPayload: (rows: OrderItemRow[], options?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | number | boolean | null>[];
   pdfModal: () => { showLoading: (title: string) => void; setBlob: (blob: Blob, fileName: string, verifyUrl: string | null) => void; showError: () => void } | null;
   convertModalRef: () => { show: () => void; close: () => void } | null;
+  setConvertError: (message: string | null) => void;
   cancelModalRef: () => { show: () => void; close: () => void } | null;
+  setCancelError: (message: string | null) => void;
   openPaymentModal: () => void;
   openSendEmailModal: (docType: string) => void;
   openSendInquiryModal: () => void;
@@ -179,6 +181,7 @@ export class OrderActionService {
 
   openConvertToOrderModal(ctx: OrderActionContext): void {
     if (!ctx.hasLineItems()) { ctx.showToast('error', 'Add at least one line item before converting to order.'); return; }
+    ctx.setConvertError(null);
     ctx.convertModalRef()?.show();
   }
 
@@ -187,6 +190,7 @@ export class OrderActionService {
     const canCancel = status === 'INQUIRY' || status === 'OFFER' || status === 'CONFIRMED' || status === 'DELIVERED' || status === 'INVOICED';
     if (!canCancel) { ctx.showToast('error', 'This record cannot be cancelled from this action.'); return; }
     if (!ctx.availableInquiryCancelReasons().length) { ctx.showToast('error', 'No cancellation reasons configured.'); return; }
+    ctx.setCancelError(null);
     ctx.cancelModalRef()?.show();
   }
 
@@ -199,6 +203,7 @@ export class OrderActionService {
       return;
     }
 
+    ctx.setConvertError(null);
     ctx.setConvertingToOrder(true);
     try {
       const res = await firstValueFrom(this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, { status: 'CONFIRMED' }));
@@ -208,10 +213,12 @@ export class OrderActionService {
         ctx.showToast('success', 'Inquiry converted to order.');
         await this.router.navigate(['/trading/orders', id]);
       } else {
-        ctx.showToast('error', res.message ?? 'Failed to convert inquiry.');
+        // The dialog stays open on failure and shares its z-index with the page
+        // toast, so the toast would render behind it. Show the reason inline.
+        ctx.setConvertError(res.message ?? 'Failed to convert inquiry.');
       }
     } catch {
-      ctx.showToast('error', 'Failed to convert inquiry.');
+      ctx.setConvertError('Failed to convert inquiry.');
     } finally {
       ctx.setConvertingToOrder(false);
     }
@@ -226,6 +233,7 @@ export class OrderActionService {
     const lossReason = reason === 'Other' ? `Other: ${(event.reasonOther ?? '').trim()}` : reason;
     if (reason === 'Other' && !event.reasonOther?.trim()) return;
 
+    ctx.setCancelError(null);
     ctx.setCancellingInquiry(true);
     try {
       const res = await firstValueFrom(this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, { status: 'CANCELLED', lossReason }));
@@ -240,10 +248,10 @@ export class OrderActionService {
         ctx.showToast('success', `${isInquiry ? 'Inquiry' : 'Order'} cancelled.`);
         await ctx.normalizeDetailRoute(newStatus, id);
       } else {
-        ctx.showToast('error', res.message ?? `Failed to cancel ${isInquiry ? 'inquiry' : 'order'}.`);
+        ctx.setCancelError(res.message ?? `Failed to cancel ${isInquiry ? 'inquiry' : 'order'}.`);
       }
     } catch {
-      ctx.showToast('error', `Failed to cancel ${isInquiry ? 'inquiry' : 'order'}.`);
+      ctx.setCancelError(`Failed to cancel ${isInquiry ? 'inquiry' : 'order'}.`);
     } finally {
       ctx.setCancellingInquiry(false);
     }

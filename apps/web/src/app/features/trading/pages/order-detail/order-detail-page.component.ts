@@ -391,6 +391,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly supplierCreditNoteModalRef = viewChild(SupplierCreditNoteModalComponent);
   readonly todayLocalDateString = () => this.formatDateForInput(new Date(), this.placeTimezone());
   readonly convertModalRef = viewChild(OrderConvertModalComponent);
+  /** Reason a conversion failed, shown inside the (still-open) dialog. */
+  readonly convertError = signal<string | null>(null);
+  /** Reason a cancellation failed, shown inside the (still-open) dialog. */
+  readonly cancelError = signal<string | null>(null);
   readonly cancelModalRef = viewChild(OrderCancelModalComponent);
   readonly remarkPromptRef = viewChild(OrderPlaceRemarkPromptComponent);
   readonly activeDetailTab = signal('comments');
@@ -3016,6 +3020,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       buildItemPayload: (rows, opts) => self.buildItemPayload(rows, opts),
       pdfModal: () => self.pdfModal() ?? null,
       convertModalRef: () => self.convertModalRef() ?? null,
+      setConvertError: (m) => self.convertError.set(m),
+      setCancelError: (m) => self.cancelError.set(m),
       cancelModalRef: () => self.cancelModalRef() ?? null,
       openPaymentModal: () => self.openPaymentModal(),
       openSendEmailModal: (dt: string) => self.openSendEmailModal(dt as any),

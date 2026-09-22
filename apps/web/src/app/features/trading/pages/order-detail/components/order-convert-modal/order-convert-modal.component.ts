@@ -18,6 +18,11 @@ import {
             <button type="button" (click)="close()" class="text-gray-400 dark:text-muted hover:text-gray-600">✕</button>
           </div>
           <p class="mt-3 text-sm text-gray-600 dark:text-ink-dim">This will change the status from inquiry to confirmed order.</p>
+          @if (error()) {
+            <div class="mt-3 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-3 py-2">
+              <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ error() }}</p>
+            </div>
+          }
           <div class="mt-5 flex items-center justify-end gap-3">
             <button type="button" (click)="close()"
               class="rounded-lg border border-gray-200 dark:border-line px-4 py-2 text-sm font-semibold text-gray-600 dark:text-ink-dim">Cancel</button>
@@ -33,6 +38,10 @@ import {
 })
 export class OrderConvertModalComponent {
   readonly saving = input(false);
+  /** Shown inside the modal. The page toast renders at the same z-index as
+   *  this dialog, so when a conversion fails with the modal still open the
+   *  toast is hidden behind it — the reason never reaches the user. */
+  readonly error = input<string | null>(null);
   readonly open = signal(false);
   readonly confirmed = output<void>();
   readonly closed = output<void>();
