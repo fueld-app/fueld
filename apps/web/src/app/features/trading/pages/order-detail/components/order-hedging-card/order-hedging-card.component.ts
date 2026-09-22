@@ -97,14 +97,30 @@ export class OrderHedgingCardComponent {
     () => this.hedges().filter((h) => h.status === 'SENT' || h.status === 'HEDGED').length,
   );
 
-  /** Net position rate across all buckets. Null when Kantox reported none —
-   *  the card then falls back to a descriptive subtitle rather than "0". */
+  /** Amount-weighted net rate across value-date buckets.
+   *
+   *  Kantox weights each bucket's rate by its amount, so a plain mean of the
+   *  buckets would misreport the blended rate whenever bucket sizes differ
+   *  (e.g. 100k @ 0.92 + 1k @ 0.85 averages to 0.885, not the true 0.9197).
+   *  Falls back to a plain mean only when no bucket reports an amount. */
   readonly netRate = computed(() => {
-    const rates = this.positions()
-      .map((p) => (p.weightedAverageRate == null ? null : Number(p.weightedAverageRate)))
-      .filter((r): r is number => r !== null && Number.isFinite(r) && r > 0);
-    if (rates.length === 0) return null;
-    return rates.reduce((sum, r) => sum + r, 0) / rates.length;
+    const buckets = this.positions()
+      .map((p) => ({
+        rate: p.weightedAverageRate == null ? null : Number(p.weightedAverageRate),
+        amount: p.amount == null ? null : Math.abs(Number(p.amount)),
+      }))
+      .filter(
+        (b): b is { rate: number; amount: number | null } =>
+          b.rate !== null && Number.isFinite(b.rate) && b.rate > 0,
+      );
+    if (buckets.length === 0) return null;
+
+    const weighted = buckets.filter((b) => b.amount !== null && Number.isFinite(b.amount) && b.amount > 0);
+    if (weighted.length === 0) {
+      return buckets.reduce((sum, b) => sum + b.rate, 0) / buckets.length;
+    }
+    const totalAmount = weighted.reduce((sum, b) => sum + (b.amount as number), 0);
+    return weighted.reduce((sum, b) => sum + b.rate * (b.amount as number), 0) / totalAmount;
   });
 
   /** Past-due with exposure still open. Mirrors the server's late-payment

@@ -12,7 +12,7 @@
 //  the confirmed contract (margin basis, value date, delta close).
 // ═══════════════════════════════════════════════════════════════════════
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   activityLogs,
@@ -778,25 +778,30 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
 
   // 3. Late-payment flag (decision 1): rolls are handled manually by Pierre on
   //    the Kantox platform, so our only job is to surface past-due open legs.
-  //    Logged at most once per entry — the sync runs every 15 min and an
-  //    un-deduped flag would drown the activity feed.
+  //    Deduped on (entry, value date) and read only for entries still late
+  //    today — an un-deduped flag would drown the activity feed every 15 min,
+  //    while keying on the entry alone would go silent forever after Pierre
+  //    rolls it once (the leg becomes late again against its new value date).
   try {
     const today = new Date().toISOString().slice(0, 10);
     const lateIds = findLateHedgeEntries(candidates, today);
     if (lateIds.length > 0) {
       const alreadyFlagged = await db
-        .select({ entityId: activityLogs.entityId })
+        .select({ entityId: activityLogs.entityId, metadata: activityLogs.metadata })
         .from(activityLogs)
         .where(
           and(
             eq(activityLogs.tenantId, tenantId),
             eq(activityLogs.action, 'KANTOX_LATE_PAYMENT'),
+            inArray(activityLogs.entityId, lateIds),
           ),
         );
-      const flagged = new Set(alreadyFlagged.map((r) => r.entityId));
+      const flagged = new Set(
+        alreadyFlagged.map((r) => `${r.entityId}|${(r.metadata as { valueDate?: string } | null)?.valueDate ?? ''}`),
+      );
       for (const id of lateIds) {
-        if (flagged.has(id)) continue;
         const row = candidates.find((c) => c.id === id);
+        if (flagged.has(`${id}|${row?.valueDate ?? ''}`)) continue;
         await logActivity({
           userId: null,
           tenantId,
@@ -847,6 +852,24 @@ export async function listEnabledTenants(): Promise<string[]> {
     .from(tenants)
     .where(sql`settings->'kantoxSettings'->>'enabled' = 'true'`);
   return rows.map((r) => r.id);
+}
+
+/** The API base URL is where we send the tenant's vaulted Kantox password, so
+ *  it must not be freely pointable at an arbitrary host: a tenant ADMIN can
+ *  never read the password back, but could otherwise redirect it to a server
+ *  they control (and use our API as an SSRF pivot with credentials attached).
+ *  Allowlist the two Kantox hosts; anything else is rejected, not silently
+ *  accepted. */
+export function isAllowedKantoxBaseUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:') return false;
+  const host = url.hostname.toLowerCase();
+  return host === 'kantox.com' || host === 'kantox-preprod.com';
 }
 
 // ── admin settings (config UI) ────────────────────────────────────────
@@ -926,7 +949,13 @@ export async function updateKantoxSettings(
   const current = { ...(settings.kantoxSettings ?? {}) };
 
   if (input.enabled !== undefined) current.enabled = input.enabled;
-  if (input.apiBaseUrl !== undefined) current.apiBaseUrl = input.apiBaseUrl.trim() || DEFAULTS.apiBaseUrl;
+  if (input.apiBaseUrl !== undefined) {
+    const next = input.apiBaseUrl.trim() || DEFAULTS.apiBaseUrl;
+    if (!isAllowedKantoxBaseUrl(next)) {
+      throw new Error('API base URL must be an https URL on kantox.com or kantox-preprod.com');
+    }
+    current.apiBaseUrl = next;
+  }
   if (input.apiUser !== undefined) current.apiUser = input.apiUser.trim();
   if (input.companyRef !== undefined) current.companyRef = input.companyRef.trim();
   if (input.hedgeCurrency !== undefined) current.hedgeCurrency = input.hedgeCurrency.trim().toUpperCase() || DEFAULTS.hedgeCurrency;

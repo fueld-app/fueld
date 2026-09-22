@@ -42,6 +42,20 @@ import { SettingsToastService } from './settings-toast.service';
         </div>
       } @else {
         <div class="space-y-6 max-w-2xl">
+          @if (loadFailed()) {
+            <div class="rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-500/15 px-4 py-3">
+              <p class="text-sm font-semibold text-rose-800 dark:text-rose-300">Settings could not be loaded</p>
+              <p class="mt-1 text-xs text-rose-700 dark:text-rose-400">
+                The form below shows blank defaults, not your saved configuration. Saving is disabled —
+                reload to avoid overwriting your settings.
+              </p>
+              <button type="button" (click)="load()"
+                class="mt-2 rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-800 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/20">
+                Reload
+              </button>
+            </div>
+          }
+
           <!-- Enable toggle -->
           <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
             <label class="flex items-center gap-3 cursor-pointer">
@@ -89,7 +103,7 @@ import { SettingsToastService } from './settings-toast.service';
                   placeholder="api_company_131804" />
               </div>
               <div class="flex items-center gap-3">
-                <button type="button" (click)="testConnection()" [disabled]="testing()"
+                <button type="button" (click)="testConnection()" [disabled]="testing() || loadFailed()"
                   class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50 inline-flex items-center gap-2">
                   @if (testing()) {
                     <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -145,6 +159,16 @@ import { SettingsToastService } from './settings-toast.service';
             <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
               <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim mb-4">Amount &amp; Value Date</h3>
               <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Margin hedge percent</label>
+                  <input type="number" min="0" max="100" [ngModel]="marginHedgePercent()" (ngModelChange)="marginHedgePercent.set(+$event)"
+                    class="w-24 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
+                  <p class="text-xs text-gray-500 dark:text-muted mt-1">
+                    We send the FULL exposure — this scales it before sending. Normally 100: the
+                    hedge-ratio ramp is a Kantox platform business rule, so leave this alone unless
+                    Kantox asks otherwise.
+                  </p>
+                </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Amount basis (floating quantities)</label>
                   <select [ngModel]="amountBasis()" (ngModelChange)="amountBasis.set($event)"
@@ -202,7 +226,7 @@ import { SettingsToastService } from './settings-toast.service';
 
           <!-- Save -->
           <div class="flex justify-end">
-            <button (click)="save()" [disabled]="saving()"
+            <button (click)="save()" [disabled]="saving() || loadFailed()"
               class="rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50 inline-flex items-center gap-2">
               @if (saving()) {
                 <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -228,6 +252,10 @@ export class KantoxSettingsPageComponent implements OnInit {
   readonly saving = signal(false);
   readonly testing = signal(false);
   readonly testResult = signal<string>('');
+  /** Set when the initial load failed. The form then holds construction-time
+   *  defaults, and saving would write those over the tenant's real config —
+   *  so Save/Test are disabled until a successful reload. */
+  readonly loadFailed = signal(false);
 
   readonly enabled = signal(false);
   readonly configured = signal(false);
@@ -238,6 +266,7 @@ export class KantoxSettingsPageComponent implements OnInit {
   readonly hedgeCurrency = signal('USD');
   readonly hedgeCounterCurrency = signal('EUR');
   readonly amountBasis = signal<KantoxSettingsDto['amountBasis']>('MINIMUM');
+  readonly marginHedgePercent = signal(100);
   readonly paymentDateBufferDays = signal(7);
   readonly valueDateRounding = signal<KantoxSettingsDto['valueDateRounding']>('WEEKLY_MONDAY');
   readonly hedgeCodPrepay = signal(true);
@@ -263,20 +292,31 @@ export class KantoxSettingsPageComponent implements OnInit {
         this.hedgeCurrency.set(d.hedgeCurrency);
         this.hedgeCounterCurrency.set(d.hedgeCounterCurrency);
         this.amountBasis.set(d.amountBasis);
+        this.marginHedgePercent.set(d.marginHedgePercent);
         this.paymentDateBufferDays.set(d.paymentDateBufferDays);
         this.valueDateRounding.set(d.valueDateRounding);
         this.hedgeCodPrepay.set(d.hedgeCodPrepay);
         this.dailyHedgeLimitUsd.set(d.dailyHedgeLimitUsd);
         this.configured.set(!!d.apiUser && !!d.companyRef && d.hasPassword);
+        this.loadFailed.set(false);
+      } else {
+        this.loadFailed.set(true);
+        this.toastSvc.show('error', res.message ?? 'Failed to load Kantox settings.');
       }
     } catch {
+      this.loadFailed.set(true);
       this.toastSvc.show('error', 'Failed to load Kantox settings.');
     } finally {
       this.loading.set(false);
     }
   }
 
-  async save(): Promise<void> {
+  /** Returns whether the write succeeded, so callers can abort follow-up work. */
+  async save(): Promise<boolean> {
+    if (this.loadFailed()) {
+      this.toastSvc.show('error', 'Settings could not be loaded — saving would overwrite them with blanks.');
+      return false;
+    }
     this.saving.set(true);
     try {
       const res = await firstValueFrom(
@@ -288,6 +328,7 @@ export class KantoxSettingsPageComponent implements OnInit {
           hedgeCurrency: this.hedgeCurrency(),
           hedgeCounterCurrency: this.hedgeCounterCurrency(),
           amountBasis: this.amountBasis(),
+          marginHedgePercent: this.marginHedgePercent(),
           paymentDateBufferDays: this.paymentDateBufferDays(),
           valueDateRounding: this.valueDateRounding(),
           hedgeCodPrepay: this.hedgeCodPrepay(),
@@ -298,22 +339,29 @@ export class KantoxSettingsPageComponent implements OnInit {
         this.hasPassword.set(res.data.hasPassword);
         this.configured.set(!!res.data.apiUser && !!res.data.companyRef && res.data.hasPassword);
         this.toastSvc.show('success', 'Kantox settings saved.');
-      } else {
-        this.toastSvc.show('error', res.message ?? 'Failed to save settings.');
+        return true;
       }
+      this.toastSvc.show('error', res.message ?? 'Failed to save settings.');
+      return false;
     } catch {
       this.toastSvc.show('error', 'Failed to save settings.');
+      return false;
     } finally {
       this.saving.set(false);
     }
   }
 
-  /** Saves first so the roundtrip tests what the operator is looking at. */
+  /** Saves first so the roundtrip tests what the operator is looking at.
+   *  Aborts if the save failed — otherwise we'd report on the *stored* config
+   *  while the operator believes they tested the values on screen. */
   async testConnection(): Promise<void> {
     this.testing.set(true);
     this.testResult.set('');
     try {
-      await this.save();
+      if (!(await this.save())) {
+        this.testResult.set('Not tested — settings could not be saved.');
+        return;
+      }
       const res = await firstValueFrom(
         this.http.post<ApiResponse<KantoxConnectionResultDto>>(`${API}/kantox/test-connection`, {}),
       );

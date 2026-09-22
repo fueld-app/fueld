@@ -172,3 +172,45 @@ describe('kantox controller e2e', () => {
     expect(res.data.message).toBe('Order not found');
   });
 });
+
+describe('kantox settings — apiBaseUrl allowlist', () => {
+  beforeEach(async () => {
+    await truncateAll();
+  });
+
+  it('rejects an arbitrary host so the vaulted password cannot be redirected', async () => {
+    const { token } = await seededAdmin(true);
+
+    const res = await requestJson('/kantox/settings', {
+      method: 'PUT',
+      token,
+      body: { apiBaseUrl: 'https://attacker.example/api' },
+    });
+    expect(res.status).toBe(200);
+    expect(res.data.success).toBe(false);
+    expect(res.data.message).toContain('kantox.com');
+  });
+
+  it('rejects a suffix-lookalike host (no naive endsWith match)', async () => {
+    const { token } = await seededAdmin(true);
+
+    const res = await requestJson('/kantox/settings', {
+      method: 'PUT',
+      token,
+      body: { apiBaseUrl: 'https://kantox.com.attacker.example/api' },
+    });
+    expect(res.data.success).toBe(false);
+  });
+
+  it('accepts the preprod host and persists it', async () => {
+    const { token } = await seededAdmin(true);
+
+    const res = await requestJson('/kantox/settings', {
+      method: 'PUT',
+      token,
+      body: { apiBaseUrl: 'https://kantox.com/api' },
+    });
+    expect(res.data.success).toBe(true);
+    expect(res.data.data.apiBaseUrl).toBe('https://kantox.com/api');
+  });
+});

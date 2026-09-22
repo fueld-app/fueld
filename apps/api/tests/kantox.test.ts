@@ -11,6 +11,7 @@ import {
   deriveValueDate,
   entryRef,
   findLateHedgeEntries,
+  isAllowedKantoxBaseUrl,
 } from '../src/modules/kantox/kantox.service';
 
 /**
@@ -365,5 +366,29 @@ describe('findLateHedgeEntries — past-due open legs (decision 1: Pierre rolls 
 
   it('ignores dateless entries — they have no value date to be late against', () => {
     expect(findLateHedgeEntries([entry({ valueDate: null })], '2026-09-22')).toEqual([]);
+  });
+});
+
+describe('isAllowedKantoxBaseUrl — the vaulted password only goes to Kantox', () => {
+  it('accepts the two Kantox hosts over https', () => {
+    expect(isAllowedKantoxBaseUrl('https://kantox-preprod.com/api')).toBe(true);
+    expect(isAllowedKantoxBaseUrl('https://kantox.com/api')).toBe(true);
+  });
+
+  it('rejects an arbitrary host, so the password cannot be redirected to someone else', () => {
+    expect(isAllowedKantoxBaseUrl('https://attacker.example/api')).toBe(false);
+    // Suffix lookalikes must not pass a naive endsWith('kantox.com') check.
+    expect(isAllowedKantoxBaseUrl('https://evil-kantox.com/api')).toBe(false);
+    expect(isAllowedKantoxBaseUrl('https://kantox.com.attacker.example/api')).toBe(false);
+  });
+
+  it('rejects plain http and non-URL input', () => {
+    expect(isAllowedKantoxBaseUrl('http://kantox.com/api')).toBe(false);
+    expect(isAllowedKantoxBaseUrl('not a url')).toBe(false);
+    expect(isAllowedKantoxBaseUrl('')).toBe(false);
+  });
+
+  it('rejects the cloud metadata endpoint (SSRF pivot with credentials attached)', () => {
+    expect(isAllowedKantoxBaseUrl('http://169.254.169.254/latest/meta-data/')).toBe(false);
   });
 });
