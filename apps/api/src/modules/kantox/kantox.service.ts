@@ -493,9 +493,19 @@ export async function onOrderConfirmedForKantox(order: {
   id: string; tenantId: string; orderNumber: string | null;
   dueDate?: Date | string | null; deliveredAt?: Date | string | null; eta?: Date | string | null;
   customerPaymentTermType?: string | null; customerCreditDays?: number | null;
-}, settings: TenantSettings | null, items: KantoxOrderSnapshotItem[]): Promise<void> {
+}, items: KantoxOrderSnapshotItem[]): Promise<void> {
   try {
-    const resolved = await resolveKantoxSettings(order.tenantId, settings);
+    // Read the tenant's own settings here — the caller is the order-status
+    // path, which must not pay for a settings join on every status change.
+    const [tenant] = await db
+      .select({ settings: tenants.settings })
+      .from(tenants)
+      .where(eq(tenants.id, order.tenantId))
+      .limit(1);
+    const resolved = await resolveKantoxSettings(
+      order.tenantId,
+      (tenant?.settings ?? null) as TenantSettings | null,
+    );
     if (!resolved) return; // tenant has no Kantox — fast no-op
     const snap: KantoxOrderSnapshot = { ...order, orderId: order.id, items };
     const plan = buildHedgePlan(snap, resolved);
@@ -511,7 +521,7 @@ export async function onOrderConfirmedForKantox(order: {
       });
     }
     await logActivity({
-      userId: 'kantox-system',
+      userId: null, // system-initiated (order-status hook), not a user action
       tenantId: order.tenantId,
       action: 'KANTOX_PUSH',
       entityType: 'kantox_hedge_entry',

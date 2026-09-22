@@ -152,7 +152,9 @@ function parsePlatform(ua: string | null): string | null {
 // ─── Logging ─────────────────────────────────────────────────────────
 
 export interface LogActivityParams {
-  userId: string;
+  /** Acting user. `null` for system-initiated actions (background hooks) —
+   *  the column is a nullable FK, so a synthetic actor id would be rejected. */
+  userId: string | null;
   tenantId?: string;
   action: string;
   entityType: string | null;

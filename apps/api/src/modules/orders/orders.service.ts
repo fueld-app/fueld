@@ -2605,7 +2605,7 @@ export async function updateOrderStatus(
           .select()
           .from(orderItems)
           .where(eq(orderItems.orderId, id));
-        void onOrderConfirmedForKantox(kantoxOrder, null, kantoxItems);
+        void onOrderConfirmedForKantox(kantoxOrder, kantoxItems);
       } else {
         void onOrderCancelledForKantox(kantoxOrder.tenantId, id);
       }
