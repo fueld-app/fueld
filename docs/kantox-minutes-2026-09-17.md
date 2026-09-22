@@ -27,11 +27,11 @@
 ### A. Fueld — code (Patrick, this week)
 1. ✅ Amount logic simplified (full exposure, platform-side ratio) — 5788f568
 2. ✅ Scope filter: USD-only, EUR POs excluded, negative-margin skipped (a74d975e)
-3. ✅ Event hooks wired: CONFIRMED → SO+PO push; payment → close delta; CANCELLED/LOST → negatives; late payment → flag (a74d975e)
+3. ✅ Event hooks wired: CONFIRMED → SO+PO push; payment → close delta; CANCELLED/LOST → negatives; late payment → flag (a74d975e) — **fixed f33cfaf2**: the CONFIRMED hook was handed `settings=null` and silently resolved to "disabled", so no entry would ever have been pushed; it now reads the tenant's own settings. The push audit row used the non-UUID actor `'kantox-system'`, which the `activity_logs.user_id` FK rejected (and `logActivity` swallows) — system actions now log with `user_id = null`.
 4. ✅ Value-date rounding: WEEKLY_MONDAY default, config knob ready
 5. ✅ Reconciliation sync loop live (15 min; will extend when Kantox sends the GET list)
 6. ⬜ UI: order-card FX hedging block; admin Kantox settings form
-7. ✅ Tests: 26 green (client contract, scope filter, two-leg plan, close-delta math)
+7. ✅ Tests: 29 green (client contract, scope filter, two-leg plan, close-delta math, + 3 DB-backed hook tests pinning the `settings=null` and audit-actor defects)
 8. ✅ Route fix: /orders/:id/hedge param conflict caught by blue-green startup gate (3359e5b9)
 
 ### B. Fueld — ops (Patrick, before Wednesday)
