@@ -769,6 +769,14 @@ export const routes: Routes = [
                 title: 'Admin > Settings > Broker Deals',
               },
               {
+                path: 'kantox',
+                loadComponent: () =>
+                  import('./features/admin/pages/settings/kantox-settings-page.component').then(
+                    (m) => m.KantoxSettingsPageComponent,
+                  ),
+                title: 'Admin > Settings > Kantox FX',
+              },
+              {
                 path: 'features',
                 loadComponent: () =>
                   import('./features/admin/pages/settings/features-settings-page.component').then(

@@ -12,16 +12,19 @@
 //  tenant; production credentials only on Riviera Marine (Patrick, 17/09).
 // ═══════════════════════════════════════════════════════════════════════
 
-import { Elysia } from 'elysia';
+import { Elysia, t } from 'elysia';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { kantoxHedgeEntries, tenants } from '../../db/schema';
 import type { ApiResponse } from '@fueld/types';
 import { authGuard } from '../auth/auth.guard';
 import {
+  getKantoxSettingsView,
   listHedgesForOrder,
   resolveKantoxSettings,
   makeClient,
+  updateKantoxSettings,
+  type KantoxSettingsView,
 } from './kantox.service';
 
 function requireRoles(auth: { role: string } | undefined, roles: string[]) {
@@ -97,6 +100,55 @@ export const kantoxController = new Elysia({ prefix: '/kantox' })
       .orderBy(desc(kantoxHedgeEntries.createdAt))
       .limit(100);
     return { success: true, data: rows } as ApiResponse<unknown>;
+  })
+
+  // Non-secret config for the admin settings form (password never returned)
+  .get('/settings', async ({ auth }) => {
+    const denied = requireRoles(auth, ['ADMIN']);
+    if (denied) return denied satisfies ApiResponse<null>;
+    const data = await getKantoxSettingsView(auth!.tenantId);
+    return { success: true, data } satisfies ApiResponse<KantoxSettingsView>;
+  }, {
+    detail: { tags: ['Kantox'], summary: 'Get Kantox Dynamic Hedging settings' },
+  })
+
+  // Merge-write of the configurable fields. Deliberately excludes the API
+  // password — that lives in the encrypted credential vault (Admin →
+  // Integrations) so it is never round-tripped through this form.
+  .put('/settings', async ({ auth, body }) => {
+    const denied = requireRoles(auth, ['ADMIN']);
+    if (denied) return denied satisfies ApiResponse<null>;
+    try {
+      const data = await updateKantoxSettings(auth!.tenantId, body);
+      return { success: true, data } satisfies ApiResponse<KantoxSettingsView>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save Kantox settings';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      enabled: t.Optional(t.Boolean()),
+      apiBaseUrl: t.Optional(t.String()),
+      apiUser: t.Optional(t.String()),
+      companyRef: t.Optional(t.String()),
+      hedgeCurrency: t.Optional(t.String()),
+      hedgeCounterCurrency: t.Optional(t.String()),
+      marginHedgePercent: t.Optional(t.Number({ minimum: 0, maximum: 100 })),
+      paymentDateBufferDays: t.Optional(t.Number({ minimum: 0, maximum: 365 })),
+      dailyHedgeLimitUsd: t.Optional(t.Number({ minimum: 0 })),
+      valueDateRounding: t.Optional(t.Union([
+        t.Literal('NONE'),
+        t.Literal('WEEKLY_MONDAY'),
+        t.Literal('TWICE_MONTHLY'),
+        t.Literal('MONTHLY'),
+      ])),
+      hedgeCodPrepay: t.Optional(t.Boolean()),
+      amountBasis: t.Optional(t.Union([
+        t.Literal('MINIMUM'),
+        t.Literal('EXACT_AT_INVOICE'),
+      ])),
+    }),
+    detail: { tags: ['Kantox'], summary: 'Update Kantox Dynamic Hedging settings' },
   });
 
 // Order-scoped read — mounted under /orders (matches plan §7)

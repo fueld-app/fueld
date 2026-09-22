@@ -2986,3 +2986,87 @@ export interface BrokerCommissionReportDto {
   currency: string;
   byCustomer: BrokerCommissionReportByCustomerDto[];
 }
+// ── Kantox Dynamic Hedging (USD→EUR margin hedging) ───────────────
+// Feature is per-tenant (TenantSettings.kantoxSettings.enabled). The API
+// password is stored in the encrypted credential vault and is never part
+// of these DTOs — `hasPassword` only reports whether one is configured.
+
+export type KantoxValueDateRounding = 'NONE' | 'WEEKLY_MONDAY' | 'TWICE_MONTHLY' | 'MONTHLY';
+export type KantoxAmountBasis = 'MINIMUM' | 'EXACT_AT_INVOICE';
+export type KantoxHedgeDirection = 'BUY' | 'SELL';
+export type KantoxHedgeEntryKind = 'INITIAL' | 'AMEND' | 'CANCEL' | 'REISSUE';
+export type KantoxHedgeEntryStatus =
+  | 'PENDING_SEND' | 'SENDING' | 'SENT' | 'HEDGED' | 'CLOSED' | 'FAILED' | 'CANCELLED';
+
+export interface KantoxSettingsDto {
+  enabled: boolean;
+  apiBaseUrl: string;
+  apiUser: string;
+  companyRef: string;
+  hedgeCurrency: string;
+  hedgeCounterCurrency: string;
+  marginHedgePercent: number;
+  paymentDateBufferDays: number;
+  dailyHedgeLimitUsd: number;
+  valueDateRounding: KantoxValueDateRounding;
+  hedgeCodPrepay: boolean;
+  amountBasis: KantoxAmountBasis;
+  hasPassword: boolean;
+}
+
+export interface KantoxStatusDto {
+  enabled: boolean;
+  configured: boolean;
+  apiBaseUrl: string | null;
+  apiUser: string | null;
+  companyRef: string | null;
+  marginHedgePercent: number | null;
+  valueDateRounding: KantoxValueDateRounding | null;
+  amountBasis: KantoxAmountBasis | null;
+}
+
+export interface KantoxConnectionResultDto {
+  ok: boolean;
+  companyRef: string;
+}
+
+/** One hedge leg as stored on our side. `amount` is the gross exposure we
+ *  sent; Kantox applies the hedge ratio as a platform business rule. */
+export interface KantoxHedgeEntryDto {
+  id: string;
+  orderId: string | null;
+  leg: string;
+  direction: KantoxHedgeDirection;
+  amount: string;
+  amountBasis: string | null;
+  currency: string;
+  counterCurrency: string;
+  valueDate: string | null;
+  entryRef: string;
+  kantoxEntryId: string | null;
+  kantoxPositionRef: string | null;
+  kind: KantoxHedgeEntryKind;
+  status: KantoxHedgeEntryStatus;
+  cancelledAmount: string;
+  hedgedRate: string | null;
+  executionRate: string | null;
+  errorMessage: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+/** Kantox returns a net position per value-date bucket, so the rate shown on
+ *  the order card is the bucket's weighted average — not a per-entry rate. */
+export interface KantoxPositionDto {
+  positionRef?: string | null;
+  amount?: string | number | null;
+  weightedAverageRate?: string | number | null;
+  positionStatus?: string | null;
+  amountToTriggerCo?: string | null;
+}
+
+export interface OrderHedgeDto {
+  enabled: boolean;
+  hedges: KantoxHedgeEntryDto[];
+  positions: KantoxPositionDto[];
+}

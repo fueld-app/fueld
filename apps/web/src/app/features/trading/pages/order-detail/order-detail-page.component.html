@@ -471,6 +471,16 @@
   } @placeholder { <div></div> }
 }
 
+@if (hedgingEnabled()) {
+  @defer (on idle) {
+      <app-order-hedging-card
+        [hedges]="orderHedges()"
+        [positions]="hedgePositions()"
+        [loading]="hedgesLoading()"
+      />
+  } @placeholder { <div></div> }
+}
+
   </div>
 }
 

@@ -15,6 +15,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
+  activityLogs,
   integrationCredentials,
   kantoxHedgeEntries,
   orders,
@@ -201,6 +202,36 @@ export function closeDeltaForPayment(openAmount: number, cancelledSoFar: number,
   const remaining = openAmount - cancelledSoFar;
   if (remaining <= 0 || paymentAmount <= 0) return 0;
   return -Math.min(remaining, paymentAmount);
+}
+
+/** Which open hedge legs are past their value date and still unpaid.
+ *
+ *  Decision 1 of the 17/09 Kantox call: rolls for late payments are handled
+ *  MANUALLY by Pierre on the Kantox platform — we send nothing and build no
+ *  roll automation. Our only obligation is to surface the position so he has
+ *  something to act on; Kantox does not auto-roll.
+ *
+ *  An entry is "late" when it is still open (sent, not closed/cancelled) and
+ *  its value date has already passed. `todayIso` is injectable for tests. */
+export function findLateHedgeEntries(
+  entries: Array<{
+    id: string;
+    status: string;
+    valueDate: string | null;
+    amount: string | number;
+    cancelledAmount: string | number;
+  }>,
+  todayIso: string,
+): string[] {
+  return entries
+    .filter((e) => {
+      if (e.status !== 'SENT' && e.status !== 'HEDGED') return false;
+      if (!e.valueDate) return false;
+      if (e.valueDate >= todayIso) return false; // value date today or later ≠ late
+      const remaining = Number(e.amount) - Number(e.cancelledAmount);
+      return Number.isFinite(remaining) && remaining > 0;
+    })
+    .map((e) => e.id);
 }
 
 /** entryRef scheme — suffix refs verified to net correctly in preprod
@@ -744,6 +775,46 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
   } catch (err: any) {
     console.error(`[Kantox] status reconciliation failed for tenant ${tenantId}: ${err?.message ?? err}`);
   }
+
+  // 3. Late-payment flag (decision 1): rolls are handled manually by Pierre on
+  //    the Kantox platform, so our only job is to surface past-due open legs.
+  //    Logged at most once per entry — the sync runs every 15 min and an
+  //    un-deduped flag would drown the activity feed.
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const lateIds = findLateHedgeEntries(candidates, today);
+    if (lateIds.length > 0) {
+      const alreadyFlagged = await db
+        .select({ entityId: activityLogs.entityId })
+        .from(activityLogs)
+        .where(
+          and(
+            eq(activityLogs.tenantId, tenantId),
+            eq(activityLogs.action, 'KANTOX_LATE_PAYMENT'),
+          ),
+        );
+      const flagged = new Set(alreadyFlagged.map((r) => r.entityId));
+      for (const id of lateIds) {
+        if (flagged.has(id)) continue;
+        const row = candidates.find((c) => c.id === id);
+        await logActivity({
+          userId: null,
+          tenantId,
+          action: 'KANTOX_LATE_PAYMENT',
+          entityType: 'kantox_hedge_entry',
+          entityId: id,
+          metadata: {
+            entryRef: row?.entryRef ?? null,
+            valueDate: row?.valueDate ?? null,
+            orderId: row?.orderId ?? null,
+            note: 'Value date passed with exposure still open — Pierre rolls manually on the Kantox platform',
+          },
+        });
+      }
+    }
+  } catch (err: any) {
+    console.error(`[Kantox] late-payment flag failed for tenant ${tenantId}: ${err?.message ?? err}`);
+  }
 }
 
 /** Boot-time registration — call once from index.ts. Per-tenant try/catch:
@@ -776,4 +847,102 @@ export async function listEnabledTenants(): Promise<string[]> {
     .from(tenants)
     .where(sql`settings->'kantoxSettings'->>'enabled' = 'true'`);
   return rows.map((r) => r.id);
+}
+
+// ── admin settings (config UI) ────────────────────────────────────────
+
+/** Non-secret config for the admin form. The API password is managed in
+ *  Admin → Integrations and is NEVER returned here. `hasPassword` lets the
+ *  form distinguish "not configured" from "configured but hidden". */
+export interface KantoxSettingsView {
+  enabled: boolean;
+  apiBaseUrl: string;
+  apiUser: string;
+  companyRef: string;
+  hedgeCurrency: string;
+  hedgeCounterCurrency: string;
+  marginHedgePercent: number;
+  paymentDateBufferDays: number;
+  dailyHedgeLimitUsd: number;
+  valueDateRounding: NonNullable<TenantSettings['kantoxSettings']>['valueDateRounding'];
+  hedgeCodPrepay: boolean;
+  amountBasis: NonNullable<TenantSettings['kantoxSettings']>['amountBasis'];
+  hasPassword: boolean;
+}
+
+export async function getKantoxSettingsView(tenantId: string): Promise<KantoxSettingsView> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  const cfg = (tenant?.settings as TenantSettings | null)?.kantoxSettings ?? {};
+
+  const [cred] = await db
+    .select({ id: integrationCredentials.id })
+    .from(integrationCredentials)
+    .where(
+      and(
+        eq(integrationCredentials.tenantId, tenantId),
+        eq(integrationCredentials.provider, 'kantox'),
+        eq(integrationCredentials.key, 'apiPassword'),
+      ),
+    )
+    .limit(1);
+
+  return {
+    enabled: cfg.enabled ?? false,
+    apiBaseUrl: cfg.apiBaseUrl ?? DEFAULTS.apiBaseUrl,
+    apiUser: cfg.apiUser ?? '',
+    companyRef: cfg.companyRef ?? '',
+    hedgeCurrency: cfg.hedgeCurrency ?? DEFAULTS.hedgeCurrency,
+    hedgeCounterCurrency: cfg.hedgeCounterCurrency ?? DEFAULTS.hedgeCounterCurrency,
+    marginHedgePercent: cfg.marginHedgePercent ?? DEFAULTS.marginHedgePercent,
+    paymentDateBufferDays: cfg.paymentDateBufferDays ?? DEFAULTS.paymentDateBufferDays,
+    dailyHedgeLimitUsd: cfg.dailyHedgeLimitUsd ?? DEFAULTS.dailyHedgeLimitUsd,
+    valueDateRounding: cfg.valueDateRounding ?? DEFAULTS.valueDateRounding,
+    hedgeCodPrepay: cfg.hedgeCodPrepay ?? DEFAULTS.hedgeCodPrepay,
+    amountBasis: cfg.amountBasis ?? DEFAULTS.amountBasis,
+    hasPassword: !!cred,
+  };
+}
+
+/** Merge-write the non-secret Kantox config. Only the keys present in
+ *  `input` are touched, so the form can save a single field without
+ *  clobbering the rest. The password is deliberately NOT settable here —
+ *  it lives in the encrypted credential vault (Admin → Integrations). */
+export async function updateKantoxSettings(
+  tenantId: string,
+  input: Partial<KantoxSettingsView>,
+): Promise<KantoxSettingsView> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!tenant) throw new Error('Tenant not found');
+
+  const settings = { ...((tenant.settings as TenantSettings | null) ?? {}) };
+  const current = { ...(settings.kantoxSettings ?? {}) };
+
+  if (input.enabled !== undefined) current.enabled = input.enabled;
+  if (input.apiBaseUrl !== undefined) current.apiBaseUrl = input.apiBaseUrl.trim() || DEFAULTS.apiBaseUrl;
+  if (input.apiUser !== undefined) current.apiUser = input.apiUser.trim();
+  if (input.companyRef !== undefined) current.companyRef = input.companyRef.trim();
+  if (input.hedgeCurrency !== undefined) current.hedgeCurrency = input.hedgeCurrency.trim().toUpperCase() || DEFAULTS.hedgeCurrency;
+  if (input.hedgeCounterCurrency !== undefined) current.hedgeCounterCurrency = input.hedgeCounterCurrency.trim().toUpperCase() || DEFAULTS.hedgeCounterCurrency;
+  if (input.marginHedgePercent !== undefined) current.marginHedgePercent = Math.min(100, Math.max(0, input.marginHedgePercent));
+  if (input.paymentDateBufferDays !== undefined) current.paymentDateBufferDays = Math.max(0, Math.round(input.paymentDateBufferDays));
+  if (input.dailyHedgeLimitUsd !== undefined) current.dailyHedgeLimitUsd = Math.max(0, input.dailyHedgeLimitUsd);
+  if (input.valueDateRounding !== undefined) current.valueDateRounding = input.valueDateRounding;
+  if (input.hedgeCodPrepay !== undefined) current.hedgeCodPrepay = input.hedgeCodPrepay;
+  if (input.amountBasis !== undefined) current.amountBasis = input.amountBasis;
+
+  settings.kantoxSettings = current;
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenantId));
+
+  return getKantoxSettingsView(tenantId);
 }

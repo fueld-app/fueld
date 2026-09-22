@@ -10,6 +10,7 @@ import {
   computeUsdMargin,
   deriveValueDate,
   entryRef,
+  findLateHedgeEntries,
 } from '../src/modules/kantox/kantox.service';
 
 /**
@@ -322,5 +323,47 @@ describe('buildHedgePlan — tenant scope decisions (17/09 call)', () => {
   it('derives entry refs from the order number', () => {
     const plan = buildHedgePlan(snapshot(), SETTINGS);
     expect(plan.entries[0].entryRef).toBe('20260911-000522#S');
+  });
+});
+
+describe('findLateHedgeEntries — past-due open legs (decision 1: Pierre rolls manually)', () => {
+  const entry = (over: Partial<{ id: string; status: string; valueDate: string | null; amount: string; cancelledAmount: string }> = {}) => ({
+    id: over.id ?? 'e1',
+    status: over.status ?? 'SENT',
+    valueDate: over.valueDate === undefined ? '2026-09-10' : over.valueDate,
+    amount: over.amount ?? '1000.00',
+    cancelledAmount: over.cancelledAmount ?? '0.00',
+  });
+
+  it('flags a sent entry whose value date has passed with exposure still open', () => {
+    expect(findLateHedgeEntries([entry()], '2026-09-22')).toEqual(['e1']);
+  });
+
+  it('does not flag an entry whose value date is today or still in the future', () => {
+    expect(findLateHedgeEntries([entry({ valueDate: '2026-09-22' })], '2026-09-22')).toEqual([]);
+    expect(findLateHedgeEntries([entry({ valueDate: '2026-10-01' })], '2026-09-22')).toEqual([]);
+  });
+
+  it('does not flag fully-cancelled or closed entries — nothing left to roll', () => {
+    expect(findLateHedgeEntries([entry({ status: 'CLOSED' })], '2026-09-22')).toEqual([]);
+    expect(findLateHedgeEntries([entry({ status: 'CANCELLED' })], '2026-09-22')).toEqual([]);
+    expect(findLateHedgeEntries([entry({ amount: '1000.00', cancelledAmount: '1000.00' })], '2026-09-22')).toEqual([]);
+  });
+
+  it('flags a partially-paid entry — the remainder is still exposed', () => {
+    expect(findLateHedgeEntries([entry({ cancelledAmount: '400.00' })], '2026-09-22')).toEqual(['e1']);
+  });
+
+  it('does not flag pending or failed sends — those belong to the retry loop', () => {
+    expect(findLateHedgeEntries([entry({ status: 'PENDING_SEND' })], '2026-09-22')).toEqual([]);
+    expect(findLateHedgeEntries([entry({ status: 'FAILED' })], '2026-09-22')).toEqual([]);
+  });
+
+  it('flags HEDGED (executed) entries too — an executed past-due leg still needs a roll', () => {
+    expect(findLateHedgeEntries([entry({ status: 'HEDGED' })], '2026-09-22')).toEqual(['e1']);
+  });
+
+  it('ignores dateless entries — they have no value date to be late against', () => {
+    expect(findLateHedgeEntries([entry({ valueDate: null })], '2026-09-22')).toEqual([]);
   });
 });

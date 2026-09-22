@@ -29,6 +29,9 @@ import {
   type OwnCompanyDto,
   type OrderAttachmentDto,
   type CustomerPaymentDto,
+  type KantoxHedgeEntryDto,
+  type KantoxPositionDto,
+  type OrderHedgeDto,
   type SupplierCreditNoteDto,
   type CompanyContactDto,
   type BankAccountDto,
@@ -65,6 +68,7 @@ import { OrderNotesTermsCardComponent } from './components/order-notes-terms-car
 import { OrderDeliveryCardComponent } from './components/order-delivery-card/order-delivery-card.component';
 import { OrderAttachmentsCardComponent } from './components/order-attachments-card/order-attachments-card.component';
 import { OrderPhotoGalleryComponent } from './components/order-photo-gallery/order-photo-gallery.component';
+import { OrderHedgingCardComponent } from './components/order-hedging-card/order-hedging-card.component';
 import { OrderSettingsDropdownComponent } from './components/order-settings-dropdown/order-settings-dropdown.component';
 import { OrderPlattsSignalsComponent } from './components/order-platts-signals/order-platts-signals.component';
 import { OrderSecondaryTabsComponent } from './components/order-secondary-tabs/order-secondary-tabs.component';
@@ -150,6 +154,7 @@ import type {
     OrderPaymentsCardComponent,
     OrderAttachmentsCardComponent,
   OrderPhotoGalleryComponent,
+    OrderHedgingCardComponent,
     OrderSettingsDropdownComponent,
     OrderPlattsSignalsComponent,
     OrderSecondaryTabsComponent,
@@ -338,6 +343,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   selectedAttachment: File | null = null;
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
+  // Kantox FX hedging — read-only card; the endpoint itself reports whether
+  // the feature is on for this tenant, so no separate flag fetch is needed.
+  readonly orderHedges = signal<KantoxHedgeEntryDto[]>([]);
+  readonly hedgePositions = signal<KantoxPositionDto[]>([]);
+  readonly hedgesLoading = signal(false);
+  readonly hedgingEnabled = signal(false);
   readonly supplierPayments = computed(() => this.financialSvc.supplierPayments());
   // Supplier credit notes come with the order detail payload (Phase 2).
   readonly supplierCreditNotes = computed(
@@ -1282,6 +1293,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.inquirySvc.loadReplies(this.orderId()),
         this.loadAttachments(),
         this.loadPayments(),
+        this.loadOrderHedges(),
         this.loadSupplierPayments(),
         this.portDocSvc.load(this.orderId()),
         this.loadSupplierNominationSummary(),
@@ -1427,6 +1439,33 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.payments.set([]);
     } finally {
       this.paymentsLoading.set(false);
+    }
+  }
+
+  /** Kantox FX hedges for this order. Returns `enabled: false` for tenants
+   *  without the feature, so the card simply doesn't render. A Kantox outage
+   *  must not break the order page — failures leave the card hidden. */
+  async loadOrderHedges(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    this.hedgesLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<OrderHedgeDto>>(`${API_URL}/orders/${id}/hedge`),
+      );
+      if (res.success && res.data) {
+        this.hedgingEnabled.set(!!res.data.enabled);
+        this.orderHedges.set(res.data.hedges ?? []);
+        this.hedgePositions.set(res.data.positions ?? []);
+      } else {
+        this.hedgingEnabled.set(false);
+      }
+    } catch {
+      this.hedgingEnabled.set(false);
+      this.orderHedges.set([]);
+      this.hedgePositions.set([]);
+    } finally {
+      this.hedgesLoading.set(false);
     }
   }
 
