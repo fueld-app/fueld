@@ -26,6 +26,7 @@ import {
   updateKantoxSettings,
   type KantoxSettingsView,
 } from './kantox.service';
+import { resolveOrderId } from '../orders/orders.service';
 
 function requireRoles(auth: { role: string } | undefined, roles: string[]) {
   if (!auth || !roles.includes(auth.role)) {
@@ -160,7 +161,14 @@ export const kantoxOrderHedgeController = new Elysia()
     const settings = await tenantSettingsFor(auth!.tenantId);
     const resolved = await resolveKantoxSettings(auth!.tenantId, settings);
     if (!resolved) return { success: true, data: { enabled: false, hedges: [], positions: [] } } as ApiResponse<unknown>;
-    const hedges = await listHedgesForOrder(auth!.tenantId, params.id);
+
+    // The route param is an order number on the detail page (/trading/orders/
+    // 20260911-000522), not a UUID. Every sibling endpoint resolves it first —
+    // passing the raw value here hits a uuid column and 500s.
+    const orderId = await resolveOrderId(params.id);
+    if (!orderId) return { success: false, data: null, message: 'Order not found' } as ApiResponse<null>;
+
+    const hedges = await listHedgesForOrder(auth!.tenantId, orderId);
     // Position reads are best-effort — order page must render even if Kantox is down.
     let positions: unknown[] = [];
     try {
