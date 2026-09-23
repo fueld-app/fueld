@@ -1069,6 +1069,13 @@ export const orders = pgTable('orders', {
 
   eta: timestamp('eta', { withTimezone: true }),
   etd: timestamp('etd', { withTimezone: true }),
+  // NOTE: no writer. This is read by the Kantox value-date derivation as its
+  // HIGHEST-priority input and by the order payloads, but nothing in the codebase
+  // ever sets it — so it is always NULL and the derivation falls through to
+  // `deliveredAt ?? eta`. Kept rather than dropped because an explicit per-order
+  // due-date override is a plausible future feature, but do NOT assume it is
+  // populated: if a writer is ever added it will silently take priority over the
+  // delivery date for hedging, which is a much bigger change than it looks.
   dueDate: date('due_date'),
 
   // Delivery method for bunkers (e.g. 'Via Barge', 'Ex-tank', 'Pipeline') —
