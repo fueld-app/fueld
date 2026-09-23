@@ -1,7 +1,7 @@
 # Panel digest — closing the standing deferrals (20260923)
 
 Brief: `review-panel-brief-deferrals.md`
-Final range: **`5294047a..bcc351fe`** (HEAD). Round-1 reviewed `ccea5ce2`; fixes landed in `e7369b9f`, `d669b50c`, `d847e075`, `ef0d392f`, `57777acb`, `ef4a9831`, `989e1583`.
+Final range: **`5294047a..cfcb0a20`** (HEAD). Round-1 reviewed `ccea5ce2`; fixes landed in `e7369b9f`, `d669b50c`, `d847e075`, `ef0d392f`, `57777acb`, `ef4a9831`, `989e1583`.
 
 ## Verdicts
 
@@ -9,7 +9,7 @@ Final range: **`5294047a..bcc351fe`** (HEAD). Round-1 reviewed `ccea5ce2`; fixes
 |---|---|
 | kimi-k3 | needs-fixes at `ccea5ce2` (found **2 CRITICALs**) → **ship-it** at `d847e075` |
 | glm-5.3 | found a **HIGH** + the over-hedge → **ship-it** at `ef4a9831`, every claim live-probed |
-| deepseek-v4-pro | **ship-it**, findings resolved |
+| deepseek-v4-pro | **ship-it**; 4 LOW/NIT items returned in the final round, all fixed in `cfcb0a20` |
 
 ## What was delivered
 
@@ -44,9 +44,18 @@ Every new test was checked against the pre-fix commit. Verdicts: 5 of the new Ka
 
 ## Verification
 
-- kantox 59, financing 38, invoice 42, document revisions 46; full API sweep **269 pass**, 1 pre-existing failure.
+- kantox **60**, financing 38, invoice 42, document revisions 46; full API sweep of 12 suites **261 pass, 0 fail**.
 - Live probes: the second tranche entry rejected before 0129 and accepted after (duplicate same-ref still refused); the parent bump 0→30000 through a fail-then-retry, idempotent on a second pass; the `least()` clamp holding a racing pair at 50000 rather than 100000; no duplicate refs on any instance (Riviera 4 rows / 4 refs, others 0) so 0130 cannot fail to build.
 - Migrations 0129/0130/0131 apply cleanly in rolled-back transactions and are journal-registered (the CI journal check greps the tags).
+
+## Round-3 findings (all fixed, `cfcb0a20`)
+
+DeepSeek's final round returned ship-it with four LOW/NIT items, all now closed:
+
+- **Planning a payment close read the parent's cached `cancelledAmount`.** A close whose send LANDED at Kantox but whose response was lost stays FAILED until the 15-minute sync tick, so inside that window the cache understates what is already closed and a further payment plans against phantom exposure. Reproduced: a 100k parent with a landed-but-unrecorded 50k close — an 80k payment closes 80000 where only 50000 was genuinely open, 30000 of it against exposure that was already gone. Planning now counts each entry's own SENT/HEDGED children. **This is the fourth over-cancel vector found in this batch, and the third that only existed because of the fixes themselves.**
+- Migration 0131's index was not declared in `schema.ts`, so `db:generate` would have reported drift and offered to drop it. Declared.
+- `markSent`'s guard was "anything but SENT", so a HEDGED row could be downgraded and re-advance its parent. Tightened to PENDING_SEND|FAILED — the invariant now holds from the states callers can present rather than by trusting them.
+- Two unused `makeClient(...)` declarations removed.
 
 ## Deferred with reviewer agreement
 
