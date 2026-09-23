@@ -849,6 +849,17 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.payments().reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
   );
 
+  /**
+   * The order total the tranches divide, taken from the API's own tranche
+   * amounts. Summing them is exactly what issuance bills, so the editor's
+   * preview cannot disagree with the invoice. Deriving it here instead (e.g. from
+   * item rows) would include lines the invoice excludes and overstate every
+   * tranche.
+   */
+  readonly scheduleBillableTotal = computed(() =>
+    this.paymentSchedule().reduce((sum, t) => sum + (parseFloat(t.issuedAmount ?? t.amount) || 0), 0),
+  );
+
   readonly totalDueForMarkPaid = computed(() =>
     this.itemRows().reduce((sum, item) => {
       const qty = Number(item.deliveredQuantity ?? item.quantity ?? 0);
@@ -3121,10 +3132,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       activeOrderSupplier: () => self.activeOrderSupplier(),
       hasMultipleOrderSuppliers: () => self.hasMultipleOrderSuppliers(),
       invoiceNumber: () => self.invoiceNumber(),
-      // Name the tranche the header's invoice refers to. With split terms the
-      // first tranche is the deposit and is what the API defaults to, and the
-      // header shows that same number, so they agree.
-      invoiceId: () => self.paymentSchedule().find((t) => t.invoiceId)?.invoiceId ?? null,
+      // Name the tranche the header's invoice refers to, using the SAME value the
+      // email path uses: the tranche the trader last previewed, else the first
+      // issued one (the deposit, which is the API's default). Keeping one source
+      // means the header download and the attached PDF cannot disagree.
+      invoiceId: () => self.emailInvoiceId(),
       availableInquiryCancelReasons: () => self.availableInquiryCancelReasons(),
       deliveryDocumentationSettings: () => self.refData.deliveryDocumentationSettings(),
       getEffectiveDeliveredQuantity: (row) => self.getEffectiveDeliveredQuantity(row),

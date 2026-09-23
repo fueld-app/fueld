@@ -404,7 +404,7 @@
         [currency]="order()?.currency ?? 'USD'"
         [locked]="scheduleLocked()"
         [saving]="paymentScheduleSaving()"
-        [orderTotal]="totalDueForMarkPaid()"
+        [orderTotal]="scheduleBillableTotal()"
         (saveSchedule)="onSavePaymentSchedule($event)"
         (clearSchedule)="onClearPaymentSchedule()"
         (viewTrancheInvoice)="onViewTrancheInvoice($event)"

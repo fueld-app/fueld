@@ -2391,8 +2391,6 @@ export async function getCustomerPaymentLedger(
 ) {
   const limit = Math.min(opts.limit ?? 50, 200);
   const offset = opts.offset ?? 0;
-  const sortCol = opts.sort === 'amount' ? customerPayments.amount : customerPayments.receivedAt;
-
   // Build date filter conditions
   const conditions = [eq(customerPayments.customerId, companyId)];
   if (opts.dateFrom) conditions.push(sql`${customerPayments.receivedAt} >= ${opts.dateFrom}`);
@@ -2403,6 +2401,12 @@ export async function getCustomerPaymentLedger(
   // full amount received; the parts are summed onto it. Filtering at SQL level
   // (rather than collapsing after the LIMIT) keeps paging honest.
   const partsSum = sql<string>`COALESCE((SELECT SUM(part.amount) FROM customer_payments part WHERE part.split_parent_id = ${customerPayments.id}), 0)`;
+  // Sorting "by amount" must sort by the amount the row DISPLAYS, i.e. the
+  // receipt's full value. Sorting on the keeper's own share would order a split
+  // receipt by half of what the column shows.
+  const sortCol = opts.sort === 'amount'
+    ? sql`(${customerPayments.amount} + ${partsSum})`
+    : customerPayments.receivedAt;
 
   const rows = await db
     .select({
