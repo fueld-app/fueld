@@ -539,3 +539,72 @@ describe('calculateOrderEconomics — deal commissions (Mario/Riviera model)', (
     expect(result.tradingProfit).toBe(result.totalGrossProfit);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Broker-deal commission rate resolution
+//
+//  Regression guard for the incident of 2026-09-23: the broker commission
+//  report and this module resolved the same per-line/order rate columns and
+//  disagreed, because one chained its fallbacks with `??` and the other with
+//  `||`. Both now resolve through lib/numbers.toFiniteNumber, so these cases
+//  pin the shared semantics.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('broker deal commission rate resolution', () => {
+  const item = (over: Partial<FinancingItemInput> = {}): FinancingItemInput => ({
+    quantity: '100',
+    costPrice: '450',
+    costCurrency: 'USD',
+    salesPrice: '500',
+    salesCurrency: 'USD',
+    ...over,
+  });
+
+  it('uses the per-line rate when it is set', () => {
+    const line = calculateLineEconomics(item({ commissionPerUnit: '7' }), 0.08, 30, true, 3);
+    expect(line.quantity).toBe(100);
+    // 100 MT × $7 = 700, not the order rate's 300
+    expect(line.grossProfit).toBe(700);
+  });
+
+  it('falls back to the order-level rate when the line has none', () => {
+    const line = calculateLineEconomics(item(), 0.08, 30, true, 3);
+    expect(line.grossProfit).toBe(300); // 100 × 3
+  });
+
+  it('treats a deliberate per-line 0 as zero rather than falling through', () => {
+    // The UI cannot store this (`+$event || null` maps 0 to null), so a stored
+    // 0 is intentional. `??` honours it; the old `||` fell through to 3 and
+    // paid the broker on a line explicitly marked as earning nothing.
+    const line = calculateLineEconomics(item({ commissionPerUnit: '0' }), 0.08, 30, true, 3);
+    expect(line.grossProfit).toBe(0);
+  });
+
+  it('ignores a blank per-line rate instead of reading it as zero', () => {
+    // Number('') is 0 — un-guarded, a blank string would override the order
+    // rate with zero and pay nothing.
+    const line = calculateLineEconomics(item({ commissionPerUnit: '' }), 0.08, 30, true, 3);
+    expect(line.grossProfit).toBe(300); // falls through to 100 × 3
+  });
+
+  it('treats a non-finite per-line rate as absent', () => {
+    // Postgres numeric accepts 'NaN'/'Infinity' literals, so this is storable.
+    const line = calculateLineEconomics(item({ commissionPerUnit: 'NaN' }), 0.08, 30, true, 3);
+    expect(Number.isFinite(line.grossProfit)).toBe(true);
+    expect(line.grossProfit).toBe(300);
+  });
+
+  it('reports zero commission when no rate exists at any tier', () => {
+    const line = calculateLineEconomics(item(), 0.08, 30, true, null);
+    expect(line.grossProfit).toBe(0);
+  });
+
+  it('bills the delivered quantity, not the ordered quantity, when it is set', () => {
+    const line = calculateLineEconomics(
+      item({ quantity: '100', deliveredQuantity: '80', commissionPerUnit: '3' }),
+      0.08, 30, true, null,
+    );
+    expect(line.quantity).toBe(80);
+    expect(line.grossProfit).toBe(240); // 80 × 3
+  });
+});

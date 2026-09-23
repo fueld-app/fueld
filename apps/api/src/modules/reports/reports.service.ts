@@ -56,6 +56,7 @@ import {
   vessels,
 } from '../../db/schema';
 import { sendNotificationEmail } from '../../lib/email';
+import { toFiniteNumber } from '../../lib/numbers';
 import { logActivity } from '../activity/activity.service';
 import { calculateOrderEconomics, calculateRevenueBase, effectiveSupplierDays, getFinancingRateAnnual } from '../orders/order-financing';
 import { getFinancingTranchesByOrder } from '../orders/payment-schedule.service';
@@ -2399,25 +2400,6 @@ export function startReportsScheduleJob(): void {
 
 // ── Broker commission report ─────────────────────────────────────
 
-/** Parse to a finite number, or null when the value is absent or not finite.
- *
- *  `?? ` distinguishes "absent" from a deliberate 0 — unlike order-financing.ts's
- *  `||`, which treats 0 as absent. 0 is a meaningful per-line rate ("this line
- *  earns no commission"), and the UI cannot even produce one (its `+$event ||
- *  null` converts a typed 0 to null), so a stored 0 is intentional and wins.
- *
- *  Empty/whitespace strings map to null, NOT 0: `Number('')` is 0, so without
- *  this guard a blank rate would resolve to a $0 commission and *override* the
- *  order rate — silently reproducing the very bug this report was fixed for.
- *  `Number.isFinite` additionally rejects NaN/Infinity, which Postgres accepts
- *  in a numeric column and which would otherwise poison every total. */
-function num(value: string | number | null | undefined): number | null {
-  if (value == null) return null;
-  if (typeof value === 'string' && value.trim() === '') return null;
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 export async function buildBrokerCommissionReport(
   tenantId: string,
   from: string,
@@ -2508,20 +2490,20 @@ export async function buildBrokerCommissionReport(
   for (const r of filtered) {
     // Commission rate resolution: per-line override → order-level rate →
     // tenant default. The ordering matches order-financing.ts and the design
-    // doc's reference SQL; the *guard* deliberately does not — see num().
+    // doc's reference SQL; the *guard* deliberately does not — see toFiniteNumber().
     //
-    // Guarded with `num()` because a non-finite rate poisons the whole report:
+    // Guarded with `toFiniteNumber()` because a non-finite rate poisons the whole report:
     // parseFloat('NaN') → rate * qty → NaN → grandTotalCommission becomes NaN →
     // every total, the CSV/XLSX export, and the create-orders flow that turns
     // these totals into real invoices. Postgres numeric accepts the literals
     // 'NaN' and 'Infinity', and sanitizeNumeric (orders.service.ts:1971) only
     // normalises ''/'null'/'undefined', so such a row CAN be stored.
-    const rate = num(r.itemCommissionPerUnit) ?? num(r.orderCommissionPerMt) ?? num(defaultCommissionRate) ?? 0;
+    const rate = toFiniteNumber(r.itemCommissionPerUnit) ?? toFiniteNumber(r.orderCommissionPerMt) ?? toFiniteNumber(defaultCommissionRate) ?? 0;
     // Bill what was delivered, falling back to the ordered quantity while a
     // deal is still undelivered (deliveredQuantity is null until BDR entry).
     // Mirrors order-financing.ts getEffectiveQuantity so the commission report
     // and the broker-deal profit column cannot disagree on the same line.
-    const qty = num(r.deliveredQuantity) ?? num(r.quantity) ?? 0;
+    const qty = toFiniteNumber(r.deliveredQuantity) ?? toFiniteNumber(r.quantity) ?? 0;
     const commissionAmount = rate * qty;
     grandTotalCommission += commissionAmount;
 
@@ -2545,8 +2527,8 @@ export async function buildBrokerCommissionReport(
     if (existing) {
       existing.orders.push(order);
       existing.orderCount++;
-      existing.totalCommission = ((num(existing.totalCommission) ?? 0) + commissionAmount).toFixed(2);
-      existing.totalQuantity = ((num(existing.totalQuantity) ?? 0) + qty).toFixed(6);
+      existing.totalCommission = ((toFiniteNumber(existing.totalCommission) ?? 0) + commissionAmount).toFixed(2);
+      existing.totalQuantity = ((toFiniteNumber(existing.totalQuantity) ?? 0) + qty).toFixed(6);
     } else {
       byCustomerMap.set(key, {
         customerId: r.customerId,

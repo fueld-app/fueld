@@ -1,4 +1,5 @@
 import type { TenantSettings } from '../../db/schema';
+import { toFiniteNumber } from '../../lib/numbers';
 import { getFxRate } from '../prices/price.service';
 
 export const DEFAULT_FINANCING_RATE_ANNUAL = 0.08;
@@ -75,13 +76,14 @@ export interface OrderEconomics {
   lineEconomics: LineEconomics[];
 }
 
+/** Numeric parse for financing maths. Returns a number (never null) because
+ *  every caller here feeds arithmetic; absent/unparsable input is 0.
+ *
+ *  Delegates the parsing rules to `toFiniteNumber` so this module and the
+ *  broker commission report cannot drift apart again — they previously
+ *  disagreed on the same columns and produced different money for one deal. */
 function parseNumber(value: string | number | null | undefined): number {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
+  return toFiniteNumber(value) ?? 0;
 }
 
 function normalizedCurrency(currency: string | null | undefined): string {
@@ -236,7 +238,13 @@ export function calculateLineEconomics(
   // and broker deals carry no financing cost. costBase/revenueBase are still
   // computed so the "Value" column can show the pass-through deal value.
   if (isBrokerDeal) {
-    const rate = parseNumber(item.commissionPerUnit) || orderCommissionPerMt || 0;
+    // Per-line rate → order-level rate, resolved with `??` so a deliberate 0
+    // wins instead of falling through. This mirrors the commission report
+    // exactly; the two modules previously used `||` here vs `??` there and
+    // reported different money for the same deal. Note the UI cannot store a
+    // per-line 0 (its `+$event || null` converts one to null), so a stored 0
+    // is intentional.
+    const rate = toFiniteNumber(item.commissionPerUnit) ?? orderCommissionPerMt ?? 0;
     const currency = normalizedCurrency(item.salesCurrency ?? item.costCurrency);
     const commissionBase = quantity * rate * getFxRate(currency);
     return {
