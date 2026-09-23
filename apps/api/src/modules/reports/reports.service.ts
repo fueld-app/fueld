@@ -2489,15 +2489,17 @@ export async function buildBrokerCommissionReport(
 
   for (const r of filtered) {
     // Commission rate resolution: per-line override → order-level rate →
-    // tenant default. The ordering matches order-financing.ts and the design
-    // doc's reference SQL; the *guard* deliberately does not — see toFiniteNumber().
+    // tenant default. Both the ordering AND the guard now match
+    // order-financing.calculateLineEconomics — they share lib/numbers
+    // toFiniteNumber, which is the point of that helper.
     //
-    // Guarded with `toFiniteNumber()` because a non-finite rate poisons the whole report:
-    // parseFloat('NaN') → rate * qty → NaN → grandTotalCommission becomes NaN →
-    // every total, the CSV/XLSX export, and the create-orders flow that turns
-    // these totals into real invoices. Postgres numeric accepts the literals
-    // 'NaN' and 'Infinity', and sanitizeNumeric (orders.service.ts:1971) only
-    // normalises ''/'null'/'undefined', so such a row CAN be stored.
+    // The guard matters because a non-finite rate poisons the whole report:
+    // rate * qty → NaN → grandTotalCommission becomes NaN → every total, the
+    // CSV/XLSX export, and the create-orders flow that turns these totals into
+    // real invoices. Postgres numeric accepts the literals 'NaN' and
+    // 'Infinity' (verified on this deployment, PG16), and sanitizeNumeric
+    // (orders.service.ts:1971) only normalises ''/'null'/'undefined', so such
+    // a row CAN be stored.
     const rate = toFiniteNumber(r.itemCommissionPerUnit) ?? toFiniteNumber(r.orderCommissionPerMt) ?? toFiniteNumber(defaultCommissionRate) ?? 0;
     // Bill what was delivered, falling back to the ordered quantity while a
     // deal is still undelivered (deliveredQuantity is null until BDR entry).

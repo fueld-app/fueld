@@ -21,10 +21,11 @@
  *   valid fallback — which is exactly how the broker commission report managed
  *   to report zero on every deal.
  * - **`Number.isFinite` → null.** Rejects `NaN` and `Infinity`. Postgres
- *   `numeric` accepts the literals `'NaN'` and `'Infinity'`, and the item write
- *   path's `sanitizeNumeric` only nulls `''`/`'null'`/`'undefined'`, so such a
- *   value is storable. Un-guarded, `NaN` propagates through a running sum and
- *   poisons an entire report total.
+ *   `numeric` accepts the literal `'NaN'`, and (since PG14) `'Infinity'` too —
+ *   both verified on this deployment (PG16). The item write path's
+ *   `sanitizeNumeric` only nulls `''`/`'null'`/`'undefined'`, so either value
+ *   is storable. Un-guarded, `NaN` propagates through a running sum and poisons
+ *   an entire report total.
  * - **Numbers pass through the same finiteness check**, so a `NaN` that
  *   arrived as a number is treated the same as one that arrived as a string.
  *
@@ -34,6 +35,12 @@
 export function toFiniteNumber(value: string | number | null | undefined): number | null {
   if (value == null) return null;
   if (typeof value === 'string' && value.trim() === '') return null;
+  // Only numbers and strings are legitimate. Anything else (a boolean or an
+  // array arriving through unvalidated JSON) would otherwise be JS-coerced —
+  // `Number(true)` is 1, `Number(['5'])` is 5 — letting garbage win a `??`
+  // chain as a plausible-looking rate. The type signature forbids it; this
+  // makes the runtime agree with the signature.
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }

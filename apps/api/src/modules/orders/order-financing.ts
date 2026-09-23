@@ -228,6 +228,10 @@ export function calculateLineEconomics(
   financingDays: number,
   isBrokerDeal = false,
   orderCommissionPerMt: number | null = null,
+  /** Tenant's configured default commission rate — the third tier, matching
+   *  the broker commission report. Omitted by callers that have no settings
+   *  loaded, in which case the chain simply ends at the order level. */
+  defaultCommissionRate: number | null = null,
 ): LineEconomics {
   const quantity = getEffectiveQuantity(item);
   const costBase = calculateCostBase(item);
@@ -238,13 +242,28 @@ export function calculateLineEconomics(
   // and broker deals carry no financing cost. costBase/revenueBase are still
   // computed so the "Value" column can show the pass-through deal value.
   if (isBrokerDeal) {
-    // Per-line rate → order-level rate, resolved with `??` so a deliberate 0
-    // wins instead of falling through. This mirrors the commission report
-    // exactly; the two modules previously used `||` here vs `??` there and
-    // reported different money for the same deal. Note the UI cannot store a
-    // per-line 0 (its `+$event || null` converts one to null), so a stored 0
-    // is intentional.
-    const rate = toFiniteNumber(item.commissionPerUnit) ?? orderCommissionPerMt ?? 0;
+    // Per-line rate → order-level rate, resolved through the shared
+    // lib/numbers.toFiniteNumber with `??`, so a deliberate 0 wins instead of
+    // falling through. The report previously used `??` while this used `||`,
+    // and both now share one primitive and one zero semantics.
+    //
+    // KNOWN GAP (tier parity, tracked): the report has a THIRD tier — the
+    // tenant's defaultCommissionRate — which this function does not resolve,
+    // because its five call sites do not all have tenant settings in scope and
+    // making it async cascades through orders/dashboard services. So a broker
+    // deal with neither a per-line nor an order-level rate invoices
+    // defaultRate × qty in the report while the profit column shows 0.
+    // Currently unreachable: every broker deal in production carries an
+    // order-level rate (0 of 197 are unrated), so behaviour matches today.
+    // Closing it needs the tenant default plumbed in — see `defaultCommissionRate`
+    // on calculateLineEconomics, which already accepts it.
+    //
+    // Note the UI cannot store a per-line 0 (its `+$event || null` turns one
+    // into null), so a stored 0 is intentional.
+    const rate = toFiniteNumber(item.commissionPerUnit)
+      ?? toFiniteNumber(orderCommissionPerMt)
+      ?? toFiniteNumber(defaultCommissionRate)
+      ?? 0;
     const currency = normalizedCurrency(item.salesCurrency ?? item.costCurrency);
     const commissionBase = quantity * rate * getFxRate(currency);
     return {
@@ -280,7 +299,9 @@ export function calculateOrderEconomics(
 ): OrderEconomics {
   const financingDays = getFinancingDays(terms);
   const orderCommissionPerMt = parseNumber(commissionPerMt) || 0;
-  const lineEconomics = items.map((item) => calculateLineEconomics(item, financingRateAnnual, financingDays, isBrokerDeal, orderCommissionPerMt));
+  const lineEconomics = items.map((item) =>
+    calculateLineEconomics(item, financingRateAnnual, financingDays, isBrokerDeal, orderCommissionPerMt),
+  );
 
   const totals = lineEconomics.reduce(
     (sum, line) => ({
