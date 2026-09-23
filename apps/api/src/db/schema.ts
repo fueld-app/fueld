@@ -1716,6 +1716,12 @@ export const kantoxHedgeEntries = pgTable('kantox_hedge_entries', {
   errorMessage: text('error_message'),
   retryCount: integer('retry_count').notNull().default(0),
   notes: text('notes'),
+  // The entry this one lifecycles against (a CANCEL/AMEND of a parent INITIAL).
+  // Without it the parent's cancelledAmount can only be advanced by the code path
+  // that pushed the child — and the sync loop, which may be the one that finally
+  // gets the child to SENT after a failure, cannot find the parent. That split is
+  // how a payment could read as still-open locally while Kantox had closed it.
+  parentEntryId: uuid('parent_entry_id').references((): AnyPgColumn => kantoxHedgeEntries.id, { onDelete: 'set null' }),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

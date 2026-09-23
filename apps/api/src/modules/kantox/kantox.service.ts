@@ -12,7 +12,7 @@
 //  the confirmed contract (margin basis, value date, delta close).
 // ═══════════════════════════════════════════════════════════════════════
 
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   activityLogs,
@@ -526,6 +526,33 @@ function orderNumberSafe(orderNumber: string | null): string {
   return orderNumber ?? 'order';
 }
 
+/**
+ * Mark an entry SENT and advance its parent's cancelled total.
+ *
+ * Both halves must happen together and only once, wherever the child reaches
+ * SENT — including when the SYNC LOOP is what finally pushes it after a failure.
+ * Splitting them (child set by the pusher, parent bumped by whoever remembers to)
+ * is what let a payment read as still-open locally after Kantox had closed it.
+ * The bump is guarded on the child's own status transition, so a retry cannot
+ * double-count.
+ */
+async function markSent(
+  rowId: string,
+  patch: { kantoxEntryId?: string | null; kantoxPositionRef?: string | null; errorMessage?: string | null },
+): Promise<void> {
+  const transitioned = await db
+    .update(kantoxHedgeEntries)
+    .set({ status: 'SENT', updatedAt: new Date(), ...patch })
+    .where(and(eq(kantoxHedgeEntries.id, rowId), ne(kantoxHedgeEntries.status, 'SENT')))
+    .returning({ parentEntryId: kantoxHedgeEntries.parentEntryId, amount: kantoxHedgeEntries.amount });
+  const child = transitioned[0];
+  if (!child?.parentEntryId) return;
+  await db
+    .update(kantoxHedgeEntries)
+    .set({ cancelledAmount: sql`${kantoxHedgeEntries.cancelledAmount} + ${Math.abs(Number(child.amount))}`, updatedAt: new Date() })
+    .where(eq(kantoxHedgeEntries.id, child.parentEntryId));
+}
+
 // ── push orchestration (insert-claim-CAS-send, never blocks the caller) ──
 
 async function pushPlannedEntry(
@@ -705,7 +732,7 @@ export async function onOrderCancelledForKantox(tenantId: string, orderId: strin
         valueDate: row.valueDate ?? undefined,
         entryRef: `${row.entryRef}C${nextLifecycleSeq(row.entryRef, rows.map((r) => r.entryRef), 'C')}`,
       };
-      await pushLifecycleEntry(tenantId, resolved, planned, { orderId, kind: 'CANCEL', parentRowId: row.id, notes: `Fueld cancel ${row.entryRef}` });
+      await pushLifecycleEntry(tenantId, resolved, planned, { orderId, kind: 'CANCEL', parentRowId: row.id, notes: `Fueld cancel ${row.entryRef}`, baseRef: row.entryRef });
     }
   } catch (err) {
     console.error(`[Kantox] onOrderCancelled failed for order ${orderId} — non-fatal:`, err);
@@ -802,17 +829,17 @@ export async function onCustomerPaymentForKantox(
       // Record the ref we just used, so a second close in this same pass does
       // not pick the same sequence.
       existingRefs.push(planned.entryRef);
-      await pushLifecycleEntry(tenantId, resolved, planned, { orderId, kind: 'CANCEL', parentRowId: row.id, notes: `Fueld payment close ${row.entryRef}` });
+      await pushLifecycleEntry(tenantId, resolved, planned, { orderId, kind: 'CANCEL', parentRowId: row.id, notes: `Fueld payment close ${row.entryRef}`, baseRef: row.entryRef });
+      // `cancelledAmount` is advanced by markSent when the child reaches SENT —
+      // bumping it here as well would double-count. This only closes the parent
+      // once the child's own amount has carried it to fully closed.
       const newCancelled = Number(row.cancelledAmount) + Math.abs(delta);
-      const fullyClosed = newCancelled >= Number(row.amount);
-      await db
-        .update(kantoxHedgeEntries)
-        .set({
-          cancelledAmount: newCancelled.toFixed(2),
-          ...(fullyClosed ? { status: 'CLOSED' as const } : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(kantoxHedgeEntries.id, row.id));
+      if (newCancelled >= Number(row.amount)) {
+        await db
+          .update(kantoxHedgeEntries)
+          .set({ status: 'CLOSED' as const, updatedAt: new Date() })
+          .where(and(eq(kantoxHedgeEntries.id, row.id), ne(kantoxHedgeEntries.status, 'CLOSED')));
+      }
     }
   } catch (err) {
     console.error(`[Kantox] onCustomerPayment failed for order ${orderId} — non-fatal:`, err);
@@ -825,30 +852,59 @@ async function pushLifecycleEntry(
   tenantId: string,
   resolved: KantoxSettingsResolved,
   planned: PlannedHedgeEntry,
-  ctx: { orderId: string; kind: 'CANCEL' | 'AMEND' | 'REISSUE'; parentRowId?: string; notes: string },
+  ctx: { orderId: string; kind: 'CANCEL' | 'AMEND' | 'REISSUE'; parentRowId?: string; notes: string; baseRef?: string },
 ): Promise<void> {
-  const [row] = await db
-    .insert(kantoxHedgeEntries)
-    .values({
-      tenantId,
-      orderId: ctx.orderId,
-      leg: planned.leg,
-      direction: planned.direction,
-      amount: planned.amount,
-      amountBasis: planned.amountBasis,
-      currency: resolved.hedgeCurrency,
-      counterCurrency: resolved.hedgeCounterCurrency,
-      valueDate: planned.valueDate,
-      entryRef: planned.entryRef,
-      kind: ctx.kind,
-      status: 'PENDING_SEND',
-      notes: ctx.notes,
-    })
-    .returning({ id: kantoxHedgeEntries.id });
+  // A lifecycle ref is derived by counting the children already on file, which is
+  // a snapshot — two closes racing on one parent can pick the same sequence, and
+  // the unique index now rejects the loser at insert. Losing the race must not
+  // silently drop a real close, so retry once with a freshly counted sequence.
+  // (The insert is the only thing retried; the parent bump happens on SENT.)
+  let insertRef = planned.entryRef;
+  let inserted: { id: string } | undefined;
+  for (let attempt = 0; attempt < 2 && !inserted; attempt++) {
+    try {
+      const [row] = await db
+        .insert(kantoxHedgeEntries)
+        .values({
+          tenantId,
+          orderId: ctx.orderId,
+          leg: planned.leg,
+          direction: planned.direction,
+          amount: planned.amount,
+          amountBasis: planned.amountBasis,
+          currency: resolved.hedgeCurrency,
+          counterCurrency: resolved.hedgeCounterCurrency,
+          valueDate: planned.valueDate,
+          entryRef: insertRef,
+          kind: ctx.kind,
+          status: 'PENDING_SEND',
+          notes: ctx.notes,
+          parentEntryId: ctx.parentRowId ?? null,
+        })
+        .returning({ id: kantoxHedgeEntries.id });
+      inserted = row;
+    } catch (err: any) {
+      if (!/duplicate key|unique/i.test(String(err?.message ?? err))) throw err;
+      if (attempt > 0) throw err; // second collision is not a race — surface it
+      // Someone else took this ref: recount against what is now on file.
+      const rows = await db
+        .select({ entryRef: kantoxHedgeEntries.entryRef })
+        .from(kantoxHedgeEntries)
+        .where(and(eq(kantoxHedgeEntries.tenantId, tenantId), eq(kantoxHedgeEntries.orderId, ctx.orderId)));
+      // The base ref is the parent's own ref; the caller knows it, so no
+      // re-parsing of the suffixed ref is needed.
+      const baseRef = ctx.baseRef ?? planned.entryRef;
+      const tag = ctx.kind === 'CANCEL' ? 'C' : ctx.kind === 'AMEND' ? 'A' : 'R';
+      insertRef = `${baseRef}${tag}${nextLifecycleSeq(baseRef, rows.map((r) => r.entryRef), tag)}`;
+    }
+  }
+  if (!inserted) throw new Error(`[Kantox] could not claim a lifecycle ref for ${planned.entryRef}`);
+  const row = inserted;
+
   try {
     const entry = await makeClient(resolved).submitEntry({
       companyRef: resolved.companyRef,
-      entryRef: planned.entryRef,
+      entryRef: insertRef,
       marketDirection: planned.direction === 'SELL' ? 'sell' : 'buy',
       currency: resolved.hedgeCurrency,
       counterCurrency: resolved.hedgeCounterCurrency,
@@ -856,16 +912,7 @@ async function pushLifecycleEntry(
       valueDate: planned.valueDate,
       notes: ctx.notes,
     });
-    await db
-      .update(kantoxHedgeEntries)
-      .set({ status: 'SENT', kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef, updatedAt: new Date() })
-      .where(eq(kantoxHedgeEntries.id, row.id));
-    if (ctx.parentRowId) {
-      await db
-        .update(kantoxHedgeEntries)
-        .set({ cancelledAmount: sql`${kantoxHedgeEntries.cancelledAmount} + ${Math.abs(Number(planned.amount))}`, updatedAt: new Date() })
-        .where(eq(kantoxHedgeEntries.id, ctx.parentRowId));
-    }
+    await markSent(row.id, { kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef });
   } catch (err: any) {
     await db
       .update(kantoxHedgeEntries)
@@ -913,9 +960,7 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
           valueDate: row.valueDate ?? undefined,
           notes: row.notes ?? undefined,
         });
-        await db.update(kantoxHedgeEntries)
-          .set({ status: 'SENT', kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef, updatedAt: new Date() })
-          .where(eq(kantoxHedgeEntries.id, row.id));
+        await markSent(row.id, { kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef });
       } else if (row.status === 'FAILED' && row.retryCount < MAX_RETRIES && row.entryRef && row.amount && row.direction && row.currency) {
         // Rejected-entry refs are reusable (verified live); dedup-safe because
         // KantoxDuplicateRefError in submit marks SENT instead of FAILED.
@@ -929,9 +974,7 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
           valueDate: row.valueDate ?? undefined,
           notes: row.notes ?? undefined,
         });
-        await db.update(kantoxHedgeEntries)
-          .set({ status: 'SENT', kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef, errorMessage: null, updatedAt: new Date() })
-          .where(eq(kantoxHedgeEntries.id, row.id));
+        await markSent(row.id, { kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef, errorMessage: null });
       }
     } catch (err: any) {
       const bump = { retryCount: (row.retryCount ?? 0) + 1, errorMessage: String(err?.message ?? err).slice(0, 500), updatedAt: new Date() };

@@ -513,3 +513,21 @@ describe('scheduled orders hedge each tranche under its own ref', () => {
     expect(sells.reduce((s, e) => s + Number(e.amount), 0)).toBe(100000);
   });
 });
+
+describe('lifecycle ref sequencing is collision-proof', () => {
+  it('recounts a fresh sequence instead of reusing a taken one', () => {
+    // The race: two closes on one parent both count no children yet, so both
+    // would pick C1. The loser must recount against what is now on file.
+    const base = 'ORD#S1';
+    const first = nextLifecycleSeq(base, [], 'C');
+    const second = nextLifecycleSeq(base, [`${base}C${first}`], 'C');
+    expect(first).toBe(1);
+    expect(second).toBe(2);
+    expect(`${base}C${first}`).not.toBe(`${base}C${second}`);
+  });
+
+  it('sequences each kind independently so a cancel cannot block an amend', () => {
+    expect(nextLifecycleSeq('ORD#S1', ['ORD#S1C1'], 'A')).toBe(1);
+    expect(nextLifecycleSeq('ORD#S1', ['ORD#S1A1'], 'C')).toBe(1);
+  });
+});
