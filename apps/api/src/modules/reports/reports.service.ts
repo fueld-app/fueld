@@ -2399,6 +2399,25 @@ export function startReportsScheduleJob(): void {
 
 // ── Broker commission report ─────────────────────────────────────
 
+/** Parse to a finite number, or null when the value is absent or not finite.
+ *
+ *  `?? ` distinguishes "absent" from a deliberate 0 — unlike order-financing.ts's
+ *  `||`, which treats 0 as absent. 0 is a meaningful per-line rate ("this line
+ *  earns no commission"), and the UI cannot even produce one (its `+$event ||
+ *  null` converts a typed 0 to null), so a stored 0 is intentional and wins.
+ *
+ *  Empty/whitespace strings map to null, NOT 0: `Number('')` is 0, so without
+ *  this guard a blank rate would resolve to a $0 commission and *override* the
+ *  order rate — silently reproducing the very bug this report was fixed for.
+ *  `Number.isFinite` additionally rejects NaN/Infinity, which Postgres accepts
+ *  in a numeric column and which would otherwise poison every total. */
+function num(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export async function buildBrokerCommissionReport(
   tenantId: string,
   from: string,
@@ -2424,7 +2443,9 @@ export async function buildBrokerCommissionReport(
   // and every broker deal without a per-line rate reported 0.00 commission.
   // Accept the legacy key too, so an instance provisioned before the rename
   // still resolves its configured rate.
-  const defaultCommissionPerMt: string = String(bd.defaultCommissionRate ?? bd.defaultCommissionPerMt ?? 0);
+  // Held under the historical local name, but this is the tenant's *default
+  // commission rate* — the per-MT naming is a leftover from before the rename.
+  const defaultCommissionRate = bd.defaultCommissionRate ?? bd.defaultCommissionPerMt ?? 0;
   const commissionCurrency: string = bd.commissionCurrency ?? 'USD';
 
   // Build the date filter using COALESCE with the configured fields
@@ -2447,6 +2468,11 @@ export async function buildBrokerCommissionReport(
       // from the tenant default when a deal is marked as a broker deal.
       itemCommissionPerUnit: orderItems.commissionPerUnit,
       orderCommissionPerMt: orders.commissionPerMt,
+      // Moxie's rule is "3 $/MT leveret" — commission is earned on what was
+      // actually delivered. order-financing.ts (getEffectiveQuantity) already
+      // prefers deliveredQuantity for broker-deal profit; the report billed the
+      // ordered quantity, so a partial delivery over-commissioned.
+      deliveredQuantity: orderItems.deliveredQuantity,
       deliveredAt: orders.deliveredAt,
       status: orders.status,
       primaryDate: dateColumn,
@@ -2480,16 +2506,22 @@ export async function buildBrokerCommissionReport(
   let grandTotalCommission = 0;
 
   for (const r of filtered) {
-    // Commission rate resolution, matching order-financing.ts and the design
-    // doc: per-line override → order-level rate → tenant default. Reading only
-    // the per-line field meant any deal priced without a per-line rate
-    // (the common case) reported zero.
-    const rate = r.itemCommissionPerUnit != null
-      ? parseFloat(String(r.itemCommissionPerUnit))
-      : (r.orderCommissionPerMt != null
-        ? parseFloat(String(r.orderCommissionPerMt))
-        : parseFloat(defaultCommissionPerMt));
-    const qty = parseFloat(String(r.quantity)) || 0;
+    // Commission rate resolution: per-line override → order-level rate →
+    // tenant default. The ordering matches order-financing.ts and the design
+    // doc's reference SQL; the *guard* deliberately does not — see num().
+    //
+    // Guarded with `num()` because a non-finite rate poisons the whole report:
+    // parseFloat('NaN') → rate * qty → NaN → grandTotalCommission becomes NaN →
+    // every total, the CSV/XLSX export, and the create-orders flow that turns
+    // these totals into real invoices. Postgres numeric accepts the literals
+    // 'NaN' and 'Infinity', and sanitizeNumeric (orders.service.ts:1971) only
+    // normalises ''/'null'/'undefined', so such a row CAN be stored.
+    const rate = num(r.itemCommissionPerUnit) ?? num(r.orderCommissionPerMt) ?? num(defaultCommissionRate) ?? 0;
+    // Bill what was delivered, falling back to the ordered quantity while a
+    // deal is still undelivered (deliveredQuantity is null until BDR entry).
+    // Mirrors order-financing.ts getEffectiveQuantity so the commission report
+    // and the broker-deal profit column cannot disagree on the same line.
+    const qty = num(r.deliveredQuantity) ?? num(r.quantity) ?? 0;
     const commissionAmount = rate * qty;
     grandTotalCommission += commissionAmount;
 
@@ -2498,7 +2530,9 @@ export async function buildBrokerCommissionReport(
       vesselName: r.vesselName ?? '—',
       placeName: r.placeName ?? '—',
       productType: r.productType,
-      quantity: String(r.quantity),
+      // The quantity actually billed (delivered where known) — the report must
+      // not state one quantity while multiplying another.
+      quantity: String(qty),
       unit: r.unit,
       commissionPerMt: String(rate),
       commissionAmount: commissionAmount.toFixed(2),
@@ -2511,8 +2545,8 @@ export async function buildBrokerCommissionReport(
     if (existing) {
       existing.orders.push(order);
       existing.orderCount++;
-      existing.totalCommission = (parseFloat(existing.totalCommission) + commissionAmount).toFixed(2);
-      existing.totalQuantity = (parseFloat(existing.totalQuantity) + qty).toFixed(6);
+      existing.totalCommission = ((num(existing.totalCommission) ?? 0) + commissionAmount).toFixed(2);
+      existing.totalQuantity = ((num(existing.totalQuantity) ?? 0) + qty).toFixed(6);
     } else {
       byCustomerMap.set(key, {
         customerId: r.customerId,

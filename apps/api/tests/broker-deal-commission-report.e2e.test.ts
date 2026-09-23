@@ -177,7 +177,11 @@ describe('broker commission report e2e', () => {
   // 0.00 for every such deal.
   it('falls back to the ORDER-level commissionPerMt when the line item has no rate', async () => {
     const seeded = await seedAuthBasics();
-    await enableBrokerDeals(seeded.tenant.id, { defaultCommissionRate: 3 });
+    // Deliberately DIFFERENT from the order-level rate below. With both at 3,
+    // 80 × 3 = 240 is produced by either branch, so the test passed even with
+    // the order-level read deleted — it pinned nothing. 5 vs 3 makes the two
+    // branches produce distinguishable totals (400 vs 240).
+    await enableBrokerDeals(seeded.tenant.id, { defaultCommissionRate: 5 });
     const login = await loginE2E(seeded.user.email, seeded.password);
     const token = login.accessToken;
 
@@ -194,9 +198,11 @@ describe('broker commission report e2e', () => {
 
     const report = await requestJson('/reports/broker-commission?from=2026-07-01&to=2026-07-31', { token });
     expect(report.data?.success).toBe(true);
-    // 80 MT × $3/MT = $240 — not $0.00
+    // 80 MT × $3/MT (the ORDER rate) = $240. Falling through to the tenant
+    // default of 5 would give 400, so this pins the order-level branch.
     expect(parseFloat(report.data?.data?.totalCommission)).toBe(240);
     expect(report.data?.data?.byCustomer[0].orders[0].commissionAmount).toBe('240.00');
+    expect(report.data?.data?.byCustomer[0].orders[0].commissionPerMt).toBe('3');
   });
 
   it('prefers the per-line rate over the order-level rate when both are set', async () => {
@@ -218,6 +224,74 @@ describe('broker commission report e2e', () => {
     const report = await requestJson('/reports/broker-commission?from=2026-07-01&to=2026-07-31', { token });
     expect(report.data?.success).toBe(true);
     expect(parseFloat(report.data?.data?.totalCommission)).toBe(700); // 100 × 7, not 100 × 3
+  });
+
+  // A rate of 'NaN'/'Infinity' is storable (Postgres numeric accepts those
+  // literals, and sanitizeNumeric only nulls ''/'null'/'undefined'). Left
+  // unguarded, one such row makes grandTotalCommission NaN, which then flows
+  // into the exported CSV/XLSX and the flow that turns these totals into real
+  // commission invoices.
+  it('treats a non-finite stored rate as absent instead of poisoning the total', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id, { defaultCommissionRate: 3 });
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    // A good order alongside the poisoned one, to prove the total survives.
+    await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      commissionPerUnit: '3',
+      quantity: '100',
+      status: 'CONFIRMED',
+      deliveredAt: '2026-07-10',
+    });
+
+    const badId = await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      commissionPerUnit: null,
+      quantity: '80',
+      status: 'CONFIRMED',
+      deliveredAt: '2026-07-11',
+    });
+    const db = await getDb();
+    await db.update(orderItems).set({ commissionPerUnit: 'NaN' }).where(eq(orderItems.orderId, badId));
+
+    const report = await requestJson('/reports/broker-commission?from=2026-07-01&to=2026-07-31', { token });
+    expect(report.data?.success).toBe(true);
+
+    const total = parseFloat(report.data?.data?.totalCommission);
+    // The headline assertion: not NaN. Un-guarded, rate*qty is NaN and the
+    // grand total becomes NaN, corrupting every downstream consumer.
+    expect(Number.isFinite(total)).toBe(true);
+    // 100 MT × $3 (per-line) = 300, plus the poisoned line falling through to
+    // the tenant default of 3 → 80 × 3 = 240. Total 540.
+    expect(total).toBe(540);
+    expect(report.data?.data?.totalCommission).not.toContain('NaN');
+  });
+
+  // Note on the '' edge case: `Number('')` is 0 (not NaN), so a blank rate
+  // would otherwise resolve to a $0 commission and override the order rate.
+  // num() maps it to null. This is unit-level defence only — Postgres rejects
+  // '' and whitespace for a numeric column, so it cannot arrive from the DB.
+  it('resolves a blank or whitespace rate to the next tier, not to zero', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id, { defaultCommissionRate: 3 });
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    const orderId = await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      commissionPerUnit: null,
+      quantity: '80',
+      status: 'CONFIRMED',
+      deliveredAt: '2026-07-10',
+    });
+    const db = await getDb();
+    // Only the order rate is set; the line has no rate at all.
+    await db.update(orders).set({ commissionPerMt: '9' }).where(eq(orders.id, orderId));
+
+    const report = await requestJson('/reports/broker-commission?from=2026-07-01&to=2026-07-31', { token });
+    expect(report.data?.success).toBe(true);
+    // 80 MT × $9 (the ORDER rate) = 720 — proving the per-line tier falls
+    // through rather than resolving to 0.
+    expect(parseFloat(report.data?.data?.totalCommission)).toBe(720);
   });
 
   it('filters by date range using deliveredAt (default reportDateField)', async () => {
