@@ -2637,7 +2637,13 @@ export async function updateOrderStatus(
           .select()
           .from(orderItems)
           .where(eq(orderItems.orderId, id));
-        void onOrderConfirmedForKantox(kantoxOrder, kantoxItems);
+        // Split payment terms settle in instalments, so the hedge is dated per
+        // tranche rather than on one order-level date.
+        const kantoxTranches = await getFinancingTranchesByOrder([id]);
+        void onOrderConfirmedForKantox(
+          { ...kantoxOrder, customerTranches: kantoxTranches.get(id) ?? null },
+          kantoxItems,
+        );
       } else {
         void onOrderCancelledForKantox(kantoxOrder.tenantId, id);
       }

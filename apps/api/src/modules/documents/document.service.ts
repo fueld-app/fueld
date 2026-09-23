@@ -157,11 +157,34 @@ export function documentTypePrefix(documentType: DocumentType): string {
   }
 }
 
-export function buildVerificationRef(documentType: DocumentType, issuedAt: Date, revisionNumber: number): string {
+/**
+ * Human-quotable reference for a document revision.
+ *
+ * Revision numbers are scoped to a document STREAM, so date + revision alone is
+ * not unique: two orders' first revision on the same day both read
+ * `INV-YYYYMMDD-R001` (confirmed on live data — one such ref occurred 12 times).
+ * A field named "reference" that several documents share is not a reference, so
+ * the stream is folded in: a short digest of the stream key, which is unique per
+ * stream by construction.
+ *
+ * The fingerprint remains the exact identity and is printed alongside; this only
+ * makes the human-facing string unambiguous. Refs already written are frozen on
+ * their revision rows (and printed on documents the customer holds), so this
+ * changes only revisions created from here on.
+ */
+export function buildVerificationRef(
+  documentType: DocumentType,
+  issuedAt: Date,
+  revisionNumber: number,
+  streamDiscriminator?: string | null,
+): string {
   const yyyy = String(issuedAt.getUTCFullYear());
   const mm = String(issuedAt.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(issuedAt.getUTCDate()).padStart(2, '0');
-  return `${documentTypePrefix(documentType)}-${yyyy}${mm}${dd}-R${String(revisionNumber).padStart(3, '0')}`;
+  const base = `${documentTypePrefix(documentType)}-${yyyy}${mm}${dd}-R${String(revisionNumber).padStart(3, '0')}`;
+  if (!streamDiscriminator) return base;
+  const digest = createHash('sha256').update(streamDiscriminator).digest('hex').slice(0, 4).toUpperCase();
+  return `${base}-${digest}`;
 }
 
 function mapRevisionInfo(revision: typeof documentRevisions.$inferSelect, isNew = false): DocumentRevisionInfo {
@@ -277,7 +300,7 @@ export async function persistDocumentRevision(params: {
   const issuedAt = new Date();
   const fingerprintShort = sha256Hex.slice(0, 12).toUpperCase();
   const verifyToken = randomUUID().replace(/-/g, '');
-  const verificationRef = buildVerificationRef(params.documentType, issuedAt, revisionNumber);
+  const verificationRef = buildVerificationRef(params.documentType, issuedAt, revisionNumber, streamKey);
 
   const safeStream = sanitizePathSegment(streamKey);
   const relativePath = join('documents', sanitizePathSegment(params.tenantId), safeStream, `r${String(revisionNumber).padStart(4, '0')}-${fingerprintShort}.pdf`);

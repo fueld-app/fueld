@@ -301,6 +301,14 @@ export interface KantoxOrderSnapshot {
   eta?: Date | string | null;
   customerPaymentTermType?: string | null;
   customerCreditDays?: number | null;
+  /**
+   * Split payment terms: the customer pays in instalments, so the sell-side
+   * exposure does not all settle on one date. `dueDays` is the days from the
+   * delivery/ETA anchor (same basis as `deriveValueDate`'s CREDIT branch) and
+   * `percent` the share of the order total. When present, the SELL leg is split
+   * into one entry per tranche, each carrying its own value date.
+   */
+  customerTranches?: Array<{ percent: number | null; dueDays: number | null }> | null;
   items: KantoxOrderSnapshotItem[];
 }
 
@@ -336,6 +344,72 @@ function itemBasisQty(item: KantoxOrderSnapshotItem): number {
  *  - amounts are FULL exposure (hedge ratio is a Kantox platform rule)
  *  - one amount per leg: minimum pre-invoice quantity × price
  */
+/**
+ * Value date for one tranche, using the same anchor and rounding policy as the
+ * order-level date: delivery (falling back to ETA, then 30 days out) plus the
+ * tranche's own days, plus the tenant's payment buffer, then rounded.
+ */
+function trancheValueDate(
+  snap: KantoxOrderSnapshot,
+  settings: Pick<KantoxSettingsResolved, 'paymentDateBufferDays' | 'valueDateRounding'>,
+  dueDays: number,
+): string {
+  const anchorRaw = snap.deliveredAt ?? snap.eta ?? null;
+  const anchor = anchorRaw == null ? null : new Date(String(anchorRaw));
+  const base = anchor && !Number.isNaN(anchor.getTime()) ? new Date(anchor) : new Date();
+  if (!anchor || Number.isNaN(anchor.getTime())) base.setDate(base.getDate() + 30);
+  base.setDate(base.getDate() + dueDays);
+  return deriveValueDate({
+    dueDate: base,
+    bufferDays: settings.paymentDateBufferDays,
+    rounding: settings.valueDateRounding,
+  });
+}
+
+/**
+ * Split a SELL amount across the order's tranches.
+ *
+ * Kantox keys an entry by its ref, so each tranche needs its OWN ref —
+ * reusing one ref for several amounts would collide (the second push is skipped
+ * as "already claimed", silently losing that tranche's hedge). Tranches whose
+ * due date cannot be measured are dropped from the split and their share is
+ * folded into the first measurable tranche, so the order's total hedged amount
+ * is unchanged; the date used is then the earliest, which over-hedges the
+ * timeline rather than under-hedging it.
+ *
+ * Returns null when the schedule cannot be used at all — the caller then keeps
+ * the single order-level entry, exactly as before.
+ */
+export function splitSellLegByTranche(
+  amount: number,
+  tranches: Array<{ percent: number | null; dueDays: number | null }> | null | undefined,
+): Array<{ refIndex: number; amount: number; dueDays: number }> | null {
+  if (!tranches || tranches.length === 0) return null;
+  const usable = tranches.filter((t) => t.percent != null && t.percent > 0);
+  if (usable.length === 0) return null;
+  if (usable.some((t) => t.dueDays == null)) return null; // unmeasurable: keep the order-level date
+
+  const totalPercent = usable.reduce((sum, t) => sum + (t.percent ?? 0), 0);
+  if (totalPercent <= 0) return null;
+
+  const shares = usable.map((t) => ({
+    dueDays: Math.max(0, Math.round(t.dueDays ?? 0)),
+    amount: Math.round((amount * (t.percent ?? 0) / totalPercent) * 100) / 100,
+  }));
+
+  // The last tranche absorbs the rounding so the parts sum to the whole.
+  const allocated = shares.slice(0, -1).reduce((sum, s) => sum + s.amount, 0);
+  const last = shares[shares.length - 1]!;
+  last.amount = Math.round((amount - allocated) * 100) / 100;
+
+  // Drop zero-value splits (a share too small to survive rounding), then
+  // re-index so refs stay contiguous.
+  const kept = shares
+    .filter((share) => share.amount > 0)
+    .map((share, i) => ({ refIndex: i + 1, amount: share.amount, dueDays: share.dueDays }));
+  return kept.length > 0 ? kept : null;
+}
+
 export function buildHedgePlan(
   snap: KantoxOrderSnapshot,
   settings: Pick<KantoxSettingsResolved, 'marginHedgePercent' | 'paymentDateBufferDays' | 'valueDateRounding' | 'hedgeCurrency' | 'hedgeCounterCurrency'>,
@@ -401,15 +475,35 @@ export function buildHedgePlan(
   }
 
   const orderRef = snap.orderNumber ?? snap.orderId;
+
+  // Split payment terms: the customer settles in instalments, so the sell-side
+  // exposure is hedged per tranche, each to ITS own value date. The amounts still
+  // sum to the order's full sell exposure.
+  const sellSplits = splitSellLegByTranche(soAmount, snap.customerTranches);
+  const sellEntries: PlannedHedgeEntry[] = sellSplits
+    ? sellSplits.map((split) => ({
+        leg: 'SO',
+        direction: 'SELL' as const,
+        amount: split.amount.toFixed(2),
+        amountBasis: split.amount.toFixed(2),
+        valueDate: trancheValueDate(snap, settings, split.dueDays),
+        // A per-tranche ref: reusing the base SO ref for several amounts would
+        // collide and the later pushes would be skipped as already claimed.
+        entryRef: sellSplits.length === 1
+          ? entryRef(orderNumberSafe(orderRef), 'SO', undefined, 'INITIAL', 0)
+          : `${orderNumberSafe(orderRef)}#S${split.refIndex}`,
+      }))
+    : [{
+        leg: 'SO',
+        direction: 'SELL' as const,
+        amount: soAmount.toFixed(2),
+        amountBasis: soAmount.toFixed(2),
+        valueDate,
+        entryRef: entryRef(orderNumberSafe(orderRef), 'SO', undefined, 'INITIAL', 0),
+      }];
+
   const entries: PlannedHedgeEntry[] = [
-    {
-      leg: 'SO',
-      direction: 'SELL',
-      amount: soAmount.toFixed(2),
-      amountBasis: soAmount.toFixed(2),
-      valueDate,
-      entryRef: entryRef(orderNumberSafe(orderRef), 'SO', undefined, 'INITIAL', 0),
-    },
+    ...sellEntries,
     ...poEntries.map((po, i) => ({
       leg: po.leg,
       direction: 'BUY' as const,
@@ -524,6 +618,8 @@ export async function onOrderConfirmedForKantox(order: {
   id: string; tenantId: string; orderNumber: string | null;
   dueDate?: Date | string | null; deliveredAt?: Date | string | null; eta?: Date | string | null;
   customerPaymentTermType?: string | null; customerCreditDays?: number | null;
+  /** Split payment terms — see KantoxOrderSnapshot.customerTranches. */
+  customerTranches?: Array<{ percent: number | null; dueDays: number | null }> | null;
 }, items: KantoxOrderSnapshotItem[]): Promise<void> {
   try {
     // Read the tenant's own settings here — the caller is the order-status

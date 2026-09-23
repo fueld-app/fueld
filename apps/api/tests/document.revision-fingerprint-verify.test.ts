@@ -300,7 +300,9 @@ describe('document revision tracking (DB)', () => {
     const offer1 = await requestRaw(`/orders/${orderId}/offer/pdf`, { token });
     expect(offer1.status).toBe(200);
     expect(offer1.headers.get('x-document-revision')).toBe('1');
-    expect(offer1.headers.get('x-document-reference')).toMatch(/^OFF-\d{8}-R001$/);
+    // The ref carries a per-stream suffix so two documents issued the same day
+    // cannot share a reference; the human-readable date+revision part is intact.
+    expect(offer1.headers.get('x-document-reference')).toMatch(/^OFF-\d{8}-R001(-[0-9A-F]{4})?$/);
     expect(offer1.headers.get('x-document-fingerprint')).toMatch(/^[0-9A-F]{12}$/);
     expect(offer1.headers.get('x-document-verify-token')).toBeTruthy();
 
@@ -555,7 +557,7 @@ describe('verify URL endpoints', () => {
     expect(verify.headers.get('content-type')).toContain('application/pdf');
     expect(verify.headers.get('content-disposition')).toContain('inline; filename="');
     expect(verify.headers.get('x-document-revision')).toBeTruthy();
-    expect(verify.headers.get('x-document-reference')).toMatch(/^OFF-\d{8}-R\d{3,}$/);
+    expect(verify.headers.get('x-document-reference')).toMatch(/^OFF-\d{8}-R\d{3,}(-[0-9A-F]{4})?$/);
     expect(verify.headers.get('x-document-fingerprint')).toMatch(/^[0-9A-F]{12}$/);
   });
 
@@ -568,7 +570,7 @@ describe('verify URL endpoints', () => {
     expect(verify.status).toBe(200);
     expect(verify.headers.get('content-type')).toContain('application/pdf');
     expect(verify.headers.get('x-document-revision')).toBeTruthy();
-    expect(verify.headers.get('x-document-reference')).toMatch(/^PFI-\d{8}-R\d{3,}$/);
+    expect(verify.headers.get('x-document-reference')).toMatch(/^PFI-\d{8}-R\d{3,}(-[0-9A-F]{4})?$/);
   });
 
   it('verify by orderId returns PDF with correct headers (invoice)', async () => {
@@ -579,7 +581,7 @@ describe('verify URL endpoints', () => {
     const verify = await requestRaw(`/verify/${orderId}/invoice`);
     expect(verify.status).toBe(200);
     expect(verify.headers.get('content-type')).toContain('application/pdf');
-    expect(verify.headers.get('x-document-reference')).toMatch(/^INV-\d{8}-R\d{3,}$/);
+    expect(verify.headers.get('x-document-reference')).toMatch(/^INV-\d{8}-R\d{3,}(-[0-9A-F]{4})?$/);
   });
 
   it('verify by token returns exact revision PDF with metadata headers', async () => {
@@ -1094,5 +1096,26 @@ describe('print meta in PDF document', () => {
     expect(allText).toContain('Revision: 2');
     expect(allText).toContain('Ref: INV-20260313-R002');
     expect(allText).toContain('Fingerprint: 1234ABCD5678');
+  });
+});
+
+describe('verification reference is unique per document stream', () => {
+  it('distinguishes two documents issued on the same day at the same revision', () => {
+    const date = new Date('2026-09-23T10:00:00Z');
+    // Two different streams, each at its first revision — the collision that
+    // made "reference" a misnomer.
+    const a = __documentTestUtils.buildVerificationRef('INVOICE', date, 1, 'INVOICE:order-a:v1');
+    const b = __documentTestUtils.buildVerificationRef('INVOICE', date, 1, 'INVOICE:order-b:v1');
+    expect(a).not.toBe(b);
+    // Same stream and revision still reproduces the same ref (stable across
+    // re-renders of the same document).
+    expect(__documentTestUtils.buildVerificationRef('INVOICE', date, 1, 'INVOICE:order-a:v1')).toBe(a);
+    // And the date/revision part is still human-readable.
+    expect(a.startsWith('INV-20260923-R001')).toBe(true);
+  });
+
+  it('keeps the plain form when no stream is given', () => {
+    expect(__documentTestUtils.buildVerificationRef('INVOICE', new Date('2026-09-23T10:00:00Z'), 1))
+      .toBe('INV-20260923-R001');
   });
 });

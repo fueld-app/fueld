@@ -174,6 +174,15 @@ export interface LogActivityParams {
 }
 
 /** Insert an activity log entry (fire-and-forget). */
+/**
+ * Record an activity-log entry.
+ *
+ * NEVER THROWS: everything below is inside the try/catch, which logs and
+ * returns. Callers rely on that — several routes call this AFTER a mutation has
+ * already committed (void/reissue, deletes, payments), and a bookkeeping failure
+ * must not turn a completed action into a reported error. If this ever starts
+ * rethrowing, those call sites need their own guards.
+ */
 export async function logActivity(params: LogActivityParams): Promise<void> {
   try {
     let tenantId = params.tenantId;
