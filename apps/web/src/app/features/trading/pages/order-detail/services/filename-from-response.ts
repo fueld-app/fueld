@@ -23,6 +23,9 @@ export function filenameFromResponse(res: HttpResponse<unknown>): string | null 
     }
   }
 
-  const plain = /filename="?([^";]+)"?/i.exec(disposition);
+  // Strip any filename*= token first: if the extended decode above threw, this
+  // plain-form match would otherwise capture the RFC 5987 token as the name.
+  const withoutExtended = disposition.replace(/filename\*=[^;]+/gi, '');
+  const plain = /filename="?([^";]+)"?/i.exec(withoutExtended);
   return plain?.[1]?.trim() || null;
 }

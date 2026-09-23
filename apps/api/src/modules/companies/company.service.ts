@@ -2424,8 +2424,11 @@ export async function getCustomerPaymentLedger(
       // Which invoices this receipt settled. One entry for an ordinary payment;
       // several when one transfer covered a split order's tranches, so a reader
       // can tell the two apart (the totals above cannot).
+      // amount is cast to text: numeric comes back as a JSON NUMBER otherwise,
+      // which would contradict the string type here, the DTO, and the order
+      // route's appliedTo -- three stories for one field.
       appliedTo: sql<Array<{ invoiceId: string | null; amount: string }>>`(
-        SELECT COALESCE(json_agg(json_build_object('invoiceId', part.invoice_id, 'amount', part.amount) ORDER BY part.created_at), '[]'::json)
+        SELECT COALESCE(json_agg(json_build_object('invoiceId', part.invoice_id, 'amount', part.amount::text) ORDER BY part.created_at), '[]'::json)
         FROM customer_payments part
         WHERE part.id = ${customerPayments.id} OR part.split_parent_id = ${customerPayments.id}
       )`,
@@ -2504,6 +2507,8 @@ export async function getCustomerPaymentLedger(
       method: r.method,
       note: r.note,
       createdAt: r.createdAt.toISOString(),
+      // Selected above; omitting it here had made that subquery dead code.
+      appliedTo: r.appliedTo ?? [],
     })),
     totals,
     pagination: { limit, offset, hasMore: rows.length === limit },

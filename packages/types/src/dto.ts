@@ -1460,8 +1460,9 @@ export interface CustomerPaymentDto {
   createdBy: string | null;
   createdAt: string;
   /**
-   * The invoices this payment settled. More than one when a single transfer
-   * covered a split order's tranches; empty for an ordinary payment.
+   * The invoices this payment settled, with the amount applied to each. A single
+   * entry for an ordinary payment; several when one transfer covered a split
+   * order's tranches. Empty only when the payment is not attached to an invoice.
    */
   appliedTo: Array<{ invoiceId: string | null; amount: string }>;
 

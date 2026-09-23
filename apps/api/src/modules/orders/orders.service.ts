@@ -2310,7 +2310,9 @@ export async function listOrderPayments(orderId: string) {
       ...mapPaymentRow(head),
       // The amount the trader actually banked, across every invoice it settled.
       amount: total.toFixed(2),
-      // Empty for an ordinary single-invoice payment.
+      // One entry for an ordinary single-invoice payment, several when the
+      // receipt covered a split order's tranches (invoiceId null if it settled
+      // nothing yet).
       appliedTo: children.length > 0
         ? all.map((row) => ({ invoiceId: row.invoiceId, amount: String(row.amount) }))
         : [],
