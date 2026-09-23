@@ -520,6 +520,16 @@ describe('scheduled orders hedge each tranche under its own ref', () => {
     expect(sells[0]!.amount).toBe('100000.00');
   });
 
+  it('uses a suffixed ref for a SINGLE-tranche schedule, leaving bare #S to unscheduled orders', () => {
+    // The boundary round-1 fixed: a singleton schedule must not claim the bare
+    // `#S` ref, or a re-CONFIRM would reuse a pre-schedule hedge's ref with a
+    // different payload.
+    const sells = buildHedgePlan({ ...base, customerTranches: [{ percent: 100, dueDays: 60 }] }, settings)
+      .entries.filter((e) => e.direction === 'SELL');
+    expect(sells.map((e) => e.entryRef)).toEqual(['ORD-1#S1']);
+    expect(sells[0]!.amount).toBe('100000.00');
+  });
+
   it('gives each tranche its own ref and its own date', () => {
     const sells = buildHedgePlan({ ...base, customerTranches: [{ percent: 50, dueDays: 0 }, { percent: 50, dueDays: 60 }] }, settings)
       .entries.filter((e) => e.direction === 'SELL');

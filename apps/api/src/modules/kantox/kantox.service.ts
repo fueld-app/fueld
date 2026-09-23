@@ -235,7 +235,13 @@ export function findLateHedgeEntries(
 }
 
 /** entryRef scheme — suffix refs verified to net correctly in preprod
- *  (TEST-A + TEST-A#C1 → bucket netted 0.0). */
+ *  (TEST-A + TEST-A#C1 → bucket netted 0.0).
+ *
+ *  Used for the INITIAL (unscheduled) and PO legs. Lifecycle closes do NOT go
+ *  through here: they are sequenced per parent from the children already on file
+ *  (see nextLifecycleSeq), because two closes on one parent must not both pick
+ *  the same suffix. The AMEND and REISSUE branches are retained for the planned
+ *  amend/re-push path; nothing calls them today. */
 export function entryRef(
   orderNumber: string,
   leg: 'SO' | 'PO',
@@ -562,9 +568,17 @@ async function markSent(
     .returning({ parentEntryId: kantoxHedgeEntries.parentEntryId, amount: kantoxHedgeEntries.amount });
   const child = transitioned[0];
   if (!child?.parentEntryId) return;
+  // Clamp at the parent's own amount. Two payments recorded at once both read the
+  // same snapshot, so both can plan a close against one entry; without a ceiling
+  // the local cancelled total could exceed what was ever hedged, and the NEXT
+  // payment would then size its close off inflated figures. Kantox-side protection
+  // is separate (refs + reconciliation); this keeps the books from lying.
   await db
     .update(kantoxHedgeEntries)
-    .set({ cancelledAmount: sql`${kantoxHedgeEntries.cancelledAmount} + ${Math.abs(Number(child.amount))}`, updatedAt: new Date() })
+    .set({
+      cancelledAmount: sql`least(${kantoxHedgeEntries.amount}, ${kantoxHedgeEntries.cancelledAmount} + ${Math.abs(Number(child.amount))})`,
+      updatedAt: new Date(),
+    })
     .where(eq(kantoxHedgeEntries.id, child.parentEntryId));
 }
 
@@ -737,6 +751,14 @@ export async function onOrderCancelledForKantox(tenantId: string, orderId: strin
     const client = makeClient(resolved);
     for (const row of rows) {
       if (row.status === 'CANCELLED' || row.status === 'CLOSED') continue;
+      // A FAILED entry may never have reached Kantox, so cancelling it would send
+      // a negative for exposure that was never opened — a naked opposite position.
+      // It cannot be told apart from "landed but the response was lost" without
+      // asking Kantox, and the sync loop now reconciles duplicate refs instead of
+      // stranding them, so a genuinely-live failed entry is resolved there.
+      // Leaving it alone is the conservative choice: an un-cancelled hedge is a
+      // position Pierre can close by hand, a naked short is a new trade.
+      if (row.status === 'FAILED') continue;
       const remaining = Number(row.amount) - Number(row.cancelledAmount);
       if (remaining <= 0) continue;
       const planned: PlannedHedgeEntry = {
@@ -995,6 +1017,16 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
         await markSent(row.id, { kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef, errorMessage: null });
       }
     } catch (err: any) {
+      // A duplicate ref means Kantox ALREADY holds this entry — the send landed
+      // and only the response was lost. Treat it exactly as pushPlannedEntry does:
+      // mark SENT (which advances the parent) rather than burning retries to
+      // FAILED. This matters more than it used to: closes now get a FRESH ref per
+      // attempt, so a stranded child would leave the parent reading open while
+      // Kantox had closed it, and the next payment would then over-cancel.
+      if (err instanceof KantoxDuplicateRefError) {
+        await markSent(row.id, { errorMessage: 'dedup hit — reconciling via GET entries' });
+        continue;
+      }
       const bump = { retryCount: (row.retryCount ?? 0) + 1, errorMessage: String(err?.message ?? err).slice(0, 500), updatedAt: new Date() };
       if (row.retryCount + 1 >= MAX_RETRIES) await db.update(kantoxHedgeEntries).set({ ...bump, status: 'FAILED' }).where(eq(kantoxHedgeEntries.id, row.id));
       else if (row.status === 'PENDING_SEND') await db.update(kantoxHedgeEntries).set(bump).where(eq(kantoxHedgeEntries.id, row.id));
