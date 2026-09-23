@@ -72,13 +72,29 @@ refs (`PS-…`); 2 `KANTOX_PUSH` activity rows, `user_id = null` (the corrected 
 
 ## Next
 
-- **Checkpoint: Thursday 1 Oct, 10:00 CEST (12:00 Dubai)** — rescheduled; the 23 Sep 09:30 CEST
-  slot was superseded. Patrick missed the 23 Sep call (wrong time); Clément reported via Pierre
-  that it went well with **no action points**.
+- **Checkpoint: Thursday 1 Oct, 10:00–10:30 CEST (12:00 Dubai)** — and **weekly thereafter through
+  Thursday 29 Oct** (Clément re-issued it as a recurring series on 23/09 08:00Z). Teams link plus
+  a Barcelona room. Note Patrick is invited as **optional** (`OPT-PARTICIPANT`) — he is the
+  technical implementer and the one who asked the open questions, so that may be worth correcting.
+- ⚠️ **The recurring invite was delivered to Junk Mail** and had to be moved to the inbox manually.
+  It is a clean message (DKIM/SPF/DMARC all pass, `RWL_MAILSPIKE_VERYGOOD`); it scored 5.30 purely
+  on `RCPT_IN_SUBJECT (3.00) + HAS_GOOGLE_REDIR + URI_COUNT_ODD + MIME_BASE64_TEXT_BOGUS +
+  PARTS_DIFFER`. Cause: Google Calendar echoes the guest address into the subject, so a
+  `@fueld.app` string appears in `Subject` alongside `@kantox.com` — a textbook "recipient in
+  subject" phishing signature. **Every recurring Kantox invite is likely to file to Junk by
+  default**, and the Junk folder has no other false positives to learn from. Worth a rule.
 - Pierre: value-date rounding re-raise once he has seen real flows (he answered 17/09 as
   "difficult to understand now the impact, changeable"). Everything else he asked for is answered.
 - Pierre: generic API mailbox address still needed for prod credentials; SMS mobile provided
   (`+33 6 38 69 56 04`).
+
+## Reply watch
+
+No reply from Clément as of **2026-09-23 11:15Z**, ~2.5h after the 08:40Z send. Inbox checked
+directly (not just reported): the only Kantox traffic is his 22/09 reply. Expect answers around the
+1 Oct checkpoint; the two that block further work are `GET entries` support (our sync loop) and the
+`closed`-status semantics (currently causing a wrong status in our DB).
+
 
 ## Documentation corrections made 23/09
 
