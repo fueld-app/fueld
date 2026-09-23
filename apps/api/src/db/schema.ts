@@ -1731,6 +1731,12 @@ export const kantoxHedgeEntries = pgTable('kantox_hedge_entries', {
   initialUniq: uniqueIndex('kantox_hedge_entries_initial_uniq')
     .on(table.tenantId, table.orderId, table.leg, table.entryRef)
     .where(sql`kind = 'INITIAL'`),
+  // An entry ref identifies an entry at Kantox, across every kind — so it must be
+  // unique per order regardless of kind, not just among INITIALs. Without this,
+  // two concurrent closes could both mint `...C1` (the sequence is read from a
+  // snapshot), and Kantox rejects the second at send time, after the row exists.
+  refUniq: uniqueIndex('kantox_hedge_entries_ref_uniq')
+    .on(table.tenantId, table.orderId, table.entryRef),
 }));
 
 // ═══════════════════════════════════════════════════════════════════════
