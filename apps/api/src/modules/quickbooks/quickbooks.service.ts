@@ -6,7 +6,7 @@
 //  using the same AES-256-GCM scheme as LLI credentials.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { and, desc, eq, isNull, ne, notInArray, or } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, ne, notInArray, or } from 'drizzle-orm';
 import { db } from '../../db';
 import { integrationCredentials, tenants, users, orders, invoices, orderItems, counterparties, type TenantSettings } from '../../db/schema';
 import { customerFacingItems } from '../documents/customer-facing-items';
@@ -1062,18 +1062,37 @@ export async function getInvoiceSyncStatus(invoiceId: string): Promise<{
  */
 export async function syncOrderToQuickBooks(orderId: string): Promise<{ qbInvoiceId: string; qbInvoiceNumber: string }> {
   // Find the invoice for this order
-  const [invoice] = await db
-    .select({ id: invoices.id })
+  const live = await db
+    .select({ id: invoices.id, trancheSeq: invoices.trancheSeq })
     .from(invoices)
     .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
-    .orderBy(desc(invoices.createdAt))
-    .limit(1);
+    .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt));
 
-  if (!invoice) {
+  if (live.length === 0) {
     throw new Error('No invoice found for this order. Generate an invoice first.');
   }
 
-  return syncInvoiceToQuickBooks(invoice.id);
+  // A split-terms order has one invoice per tranche. Pushing a single one would
+  // book half the deal in QuickBooks while reporting the order as synced, so
+  // refuse until per-tranche proration lands rather than silently under-state
+  // the receivable.
+  if (live.length > 1) {
+    throw new SplitInvoicesNotSyncableError(orderId, live.length);
+  }
+
+  return syncInvoiceToQuickBooks(live[0]!.id);
+}
+
+/**
+ * Thrown when an order carries more than one live invoice (split payment terms)
+ * and QuickBooks sync is asked for "the order's invoice" — there is no such
+ * single document. Callers sync a specific invoice id instead.
+ */
+export class SplitInvoicesNotSyncableError extends Error {
+  constructor(orderId: string, liveCount: number) {
+    super(`Order ${orderId} has ${liveCount} invoices (split payment terms) — sync each invoice to QuickBooks by its own id`);
+    this.name = 'SplitInvoicesNotSyncableError';
+  }
 }
 
 /**
@@ -1084,18 +1103,27 @@ export async function getOrderSyncStatus(orderId: string): Promise<{
   qbInvoiceId: string | null;
   qbInvoiceNumber: string | null;
 }> {
-  const [invoice] = await db
+  const live = await db
     .select({ id: invoices.id })
     .from(invoices)
     .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
-    .orderBy(desc(invoices.createdAt))
-    .limit(1);
+    .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt));
 
-  if (!invoice) {
+  if (live.length === 0) {
     return { synced: false, qbInvoiceId: null, qbInvoiceNumber: null };
   }
 
-  return getInvoiceSyncStatus(invoice.id);
+  // A split-terms order is only synced when EVERY tranche is; reporting it off
+  // one tranche would show a half-booked deal as done.
+  if (live.length > 1) {
+    for (const row of live) {
+      const status = await getInvoiceSyncStatus(row.id);
+      if (!status.synced) return { synced: false, qbInvoiceId: null, qbInvoiceNumber: null };
+    }
+    return getInvoiceSyncStatus(live[0]!.id);
+  }
+
+  return getInvoiceSyncStatus(live[0]!.id);
 }
 
 /**

@@ -242,7 +242,7 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
       seq integer NOT NULL,
       label text,
       percent numeric(6,3) NOT NULL,
-      due_basis text NOT NULL DEFAULT 'FROM_DELIVERY',
+      due_basis /* text, standing in for the due_basis enum: the shim only needs the values */ text NOT NULL DEFAULT 'FROM_DELIVERY',
       credit_days integer,
       fixed_due_date date,
       created_at timestamptz NOT NULL DEFAULT now(),

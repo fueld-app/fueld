@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { and, desc, eq, inArray, isNull, ne, notInArray } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
-import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError, InvoiceLinesChangedError } from '../orders/invoice.service';
+import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError, InvoiceLinesChangedError, UnpricedScheduleError } from '../orders/invoice.service';
 import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, generateBrokerConfirmationPdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById, updateOrderStatus } from '../orders/orders.service';
@@ -492,7 +492,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         // A finalized internal transfer passes the gate above but has no
         // customer receivable, and a mixed-currency order has no single
         // invoiceable total. Both are user-fixable states, so they are 400s.
-        if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError)) throw err;
+        if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError) && !(err instanceof UnpricedScheduleError)) throw err;
         set.status = 400;
         return { success: false, message: err.message };
       }
@@ -644,7 +644,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             // bears one.
             issuedInvoiceNumber = result.invoiceNumber;
           } catch (err) {
-            if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError)) throw err;
+            if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError) && !(err instanceof UnpricedScheduleError)) throw err;
             set.status = 400;
             return { success: false, message: err.message };
           }

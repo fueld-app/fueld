@@ -144,14 +144,25 @@ export async function allocateInvoiceNumber(tenantId: string, now = new Date()):
  */
 export async function voidOrderInvoice(
   orderId: string,
-  options: { reissue?: boolean; dueDate?: string } = {},
+  options: { reissue?: boolean; dueDate?: string; invoiceId?: string } = {},
 ): Promise<{ voided: typeof invoices.$inferSelect; replacement: typeof invoices.$inferSelect | null }> {
-  const [current] = await db
+  // With split payment terms an order has one invoice PER TRANCHE, so a caller
+  // that means "the invoice" must say which. Without an id this acts on the
+  // order's ONLY live invoice and refuses when there is more than one, rather
+  // than silently voiding the first tranche and re-billing it the whole deal.
+  const live = await db
     .select()
     .from(invoices)
     .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
-    .orderBy(asc(invoices.createdAt))
-    .limit(1);
+    .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt));
+
+  const current = options.invoiceId
+    ? live.find((row) => row.id === options.invoiceId)
+    : live[0];
+
+  if (options.invoiceId && !current) {
+    throw new InvoiceNotFoundError(orderId);
+  }
 
   // Distinguish "never issued" from "already voided, nothing live to void" so
   // the caller can tell the trader which it is.
@@ -166,6 +177,10 @@ export async function voidOrderInvoice(
     throw new InvoiceNotFoundError(orderId);
   }
 
+  if (!options.invoiceId && live.length > 1) {
+    throw new AmbiguousInvoiceError(orderId, live.length);
+  }
+
   // Resolve and validate everything the reissue needs BEFORE mutating anything:
   // `computeInvoiceAmount` can refuse (mixed-currency lines) and that must not
   // leave a voided invoice with nothing to replace it.
@@ -177,10 +192,15 @@ export async function voidOrderInvoice(
       .where(eq(orders.id, orderId))
       .limit(1);
     if (!order) throw new Error(`Order ${orderId} not found`);
+    // A tranche replacement must keep billing ITS SHARE, not become a second
+    // full-value invoice for the whole deal.
+    const amount = current.trancheSeq == null
+      ? await computeInvoiceAmount(orderId)
+      : current.amount ?? '0.00';
     reissueContext = {
       tenantId: order.tenantId,
       dueDate: options.dueDate ?? current.dueDate,
-      amount: await computeInvoiceAmount(orderId),
+      amount,
     };
   }
 
@@ -212,6 +232,16 @@ export async function voidOrderInvoice(
       tenantId: context.tenantId,
       dueDate: context.dueDate,
       amount: context.amount,
+      // Carry the tranche identity through the correction, or the replacement
+      // would take the unscheduled slot and coexist with its own voided tranche.
+      tranche: current.trancheSeq == null
+        ? null
+        : {
+            scheduleId: current.scheduleId,
+            seq: current.trancheSeq,
+            label: current.trancheLabel,
+            percent: current.tranchePercent ?? '0',
+          },
     });
     if (!replacement) {
       // Lost the per-order slot to a concurrent issuer; re-read theirs.
@@ -263,13 +293,13 @@ async function parkInvoicePayments(
  * applied oldest-tranche-first until it runs out — which is what a deposit
  * payment is normally for. Each affected invoice is recomputed afterwards.
  */
-async function allocateUnallocatedPayments(orderId: string): Promise<void> {
+async function allocateUnallocatedPayments(orderId: string, executor: Executor = db): Promise<void> {
   const [unallocated, targets] = await Promise.all([
-    db.select({ id: customerPayments.id, amount: customerPayments.amount })
+    executor.select({ id: customerPayments.id, amount: customerPayments.amount })
       .from(customerPayments)
       .where(and(eq(customerPayments.orderId, orderId), isNull(customerPayments.invoiceId)))
       .orderBy(asc(customerPayments.receivedAt)),
-    db.select({ id: invoices.id, amount: invoices.amount })
+    executor.select({ id: invoices.id, amount: invoices.amount, amountPaid: invoices.amountPaid })
       .from(invoices)
       .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
       .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt)),
@@ -277,28 +307,78 @@ async function allocateUnallocatedPayments(orderId: string): Promise<void> {
 
   if (unallocated.length === 0 || targets.length === 0) return;
 
-  // Outstanding per target, so an already-covered tranche is skipped.
-  const outstanding = targets.map((target) => parseFloat(String(target.amount ?? 0)) || 0);
-  const touched = new Set<string>();
+  // What each target still needs, so money already covering a tranche is not
+  // double-counted when a second payment arrives.
+  const outstanding = targets.map((target) =>
+    Math.max(0, (parseFloat(String(target.amount ?? 0)) || 0) - (parseFloat(String(target.amountPaid ?? 0)) || 0)));
 
   for (const payment of unallocated) {
     let remaining = parseFloat(String(payment.amount ?? 0)) || 0;
-    let firstHit: string | null = null;
-    for (let index = 0; index < targets.length && remaining > 0; index++) {
+    // A payment row carries ONE invoiceId, so money that straddles tranches is
+    // written as one row per tranche it covers. Parking the whole amount on the
+    // first tranche would leave the balance invoice reading 0 paid while
+    // collections chases money already banked.
+    const parts: Array<{ invoiceId: string; amount: number }> = [];
+    for (let index = 0; index < targets.length && remaining > 0.004; index++) {
       if (outstanding[index]! <= 0) continue;
       const applied = Math.min(remaining, outstanding[index]!);
       outstanding[index] = outstanding[index]! - applied;
       remaining -= applied;
-      firstHit ??= targets[index]!.id;
-      touched.add(targets[index]!.id);
+      parts.push({ invoiceId: targets[index]!.id, amount: applied });
     }
-    // A payment larger than the whole order still has to land somewhere; park it
-    // on the first target rather than leaving it unattached.
-    const primary = firstHit ?? targets[0]!.id;
-    await db.update(customerPayments).set({ invoiceId: primary }).where(eq(customerPayments.id, payment.id));
-  }
 
-  for (const id of touched) await recomputeInvoiceAmountPaid(id);
+    if (parts.length === 0) {
+      // Nothing outstanding anywhere (an overpayment): park it on the oldest
+      // invoice so the money stays visible instead of vanishing.
+      await executor.update(customerPayments).set({ invoiceId: targets[0]!.id }).where(eq(customerPayments.id, payment.id));
+      await recomputeInvoiceAmountPaid(targets[0]!.id, executor);
+      continue;
+    }
+
+    // Split off the overflow as sibling rows sharing the first row's identity,
+    // so the sum of the order's payment rows is preserved exactly.
+    const [keeper, ...rest] = parts;
+    await executor.update(customerPayments)
+      .set({ invoiceId: keeper!.invoiceId, amount: keeper!.amount.toFixed(2) })
+      .where(eq(customerPayments.id, payment.id));
+    if (rest.length > 0) {
+      const [source] = await executor
+        .select()
+        .from(customerPayments)
+        .where(eq(customerPayments.id, payment.id))
+        .limit(1);
+      if (source) {
+        const remainder = remaining > 0.004 ? remaining : 0;
+        await executor.insert(customerPayments).values(rest.map((part) => ({
+          tenantId: source.tenantId,
+          customerId: source.customerId,
+          orderId: source.orderId,
+          invoiceId: part.invoiceId,
+          amount: part.amount.toFixed(2),
+          currency: source.currency,
+          receivedAt: source.receivedAt,
+          method: source.method,
+          note: source.note,
+          createdBy: source.createdBy,
+        })));
+        if (remainder > 0) {
+          await executor.insert(customerPayments).values({
+            tenantId: source.tenantId,
+            customerId: source.customerId,
+            orderId: source.orderId,
+            invoiceId: keeper!.invoiceId,
+            amount: remainder.toFixed(2),
+            currency: source.currency,
+            receivedAt: source.receivedAt,
+            method: source.method,
+            note: source.note,
+            createdBy: source.createdBy,
+          });
+        }
+      }
+    }
+    for (const part of parts) await recomputeInvoiceAmountPaid(part.invoiceId, executor);
+  }
 }
 
 /** Attach the order's unallocated payments to the invoice that is now live. */
@@ -331,7 +411,8 @@ async function insertInvoiceWithRetry(params: {
   dueDate: string;
   amount: string;
   tranche?: {
-    scheduleId: string;
+    /** Null when the tranche's schedule row was cleared after issuance. */
+    scheduleId: string | null;
     seq: number;
     label: string | null;
     percent: string;
@@ -404,6 +485,31 @@ export class InvoiceNumberAllocationError extends Error {
   }
 }
 
+/**
+ * The order has several live invoices (split payment terms) and the caller did
+ * not say which one to act on. Voiding an arbitrary tranche would be wrong, so
+ * the caller must disambiguate by invoice id.
+ */
+export class AmbiguousInvoiceError extends Error {
+  constructor(orderId: string, liveCount: number) {
+    super(`Order ${orderId} has ${liveCount} live invoices (one per tranche) — specify which invoice to void`);
+    this.name = 'AmbiguousInvoiceError';
+    void orderId;
+  }
+}
+
+/**
+ * A scheduled order has no invoiceable value yet (unpriced line items), so its
+ * tranches would each bill zero. Callers surface this to the trader.
+ */
+export class UnpricedScheduleError extends Error {
+  constructor(orderId: string) {
+    super(`Price the line items before issuing this order's invoice schedule (order ${orderId})`);
+    this.name = 'UnpricedScheduleError';
+    void orderId;
+  }
+}
+
 /** Thrown when an order has no invoice to act on. */
 export class InvoiceNotFoundError extends Error {
   constructor(orderId: string) {
@@ -437,27 +543,31 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
   // The LIVE invoice, not merely the first one: a voided invoice stays on file
   // for audit and must never be handed out as the order's current invoice, or a
   // regenerate after a void/reissue would print the voided document.
-  const [existing] = await db
-    .select()
+  const [probe] = await db
+    .select({ id: invoices.id })
     .from(invoices)
     .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
-    .orderBy(desc(invoices.createdAt))
     .limit(1);
-  if (existing) {
-    // Re-claim AND recompute on the idempotent path: both are idempotent, and if
-    // a previous issuance crashed between inserting the row and settling it,
-    // this is the only place that can recover the money and the stale amountPaid.
-    const claimed = await claimUnallocatedPayments(db, orderId, existing.id);
-    if (claimed > 0) {
-      await recomputeInvoiceAmountPaid(existing.id);
-      const [settled] = await db
+  if (probe) {
+    // Issuance is transactional, so a live invoice means the whole schedule was
+    // written. Still re-claim and recompute: both are idempotent, and a crash
+    // between issuance and settlement is only recoverable here.
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(invoices)
+        .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
+        .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt))
+        .limit(1);
+      if (!existing) throw new InvoiceNumberAllocationError(orderId);
+      await allocateUnallocatedPayments(orderId, tx);
+      const [settled] = await tx
         .select()
         .from(invoices)
         .where(eq(invoices.id, existing.id))
         .limit(1);
       return settled ?? existing;
-    }
-    return existing;
+    });
   }
 
   const [order] = await db
@@ -487,38 +597,50 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
   const tranches = await listOrderPaymentSchedule(orderId);
   if (tranches.length > 0) {
     const orderTotal = parseFloat(await computeInvoiceAmount(orderId)) || 0;
-    const percents = tranches.map((tranche) => parseFloat(tranche.percent) || 0);
-    for (const [index, tranche] of tranches.entries()) {
-      await insertInvoiceWithRetry({
-        orderId,
-        tenantId: order.tenantId,
-        dueDate: tranche.dueDate ?? computeInvoiceDueDate(
-          order.deliveredAt ?? order.eta,
-          order.customerPaymentTermType,
-          order.customerCreditDays,
-        ),
-        // The last tranche absorbs rounding so the parts sum to the total.
-        amount: splitAmountByPercent(orderTotal, percents, index),
-        tranche: {
-          scheduleId: tranche.id,
-          seq: tranche.seq,
-          label: tranche.label,
-          percent: tranche.percent,
-        },
-      });
+    // A schedule divides the deal's value; with no priced lines there is nothing
+    // to divide, and issuing would burn one invoice number per tranche on
+    // zero-value documents that are not receivables.
+    if (orderTotal <= 0) {
+      throw new UnpricedScheduleError(orderId);
     }
+    const percents = tranches.map((tranche) => parseFloat(tranche.percent) || 0);
+    // ONE transaction for the whole schedule. Issuing tranches one by one meant a
+    // failure between them left a half-billed order that the idempotent path
+    // could never complete -- the customer would never receive the balance.
+    return await db.transaction(async (tx) => {
+      for (const [index, tranche] of tranches.entries()) {
+        await insertInvoiceWithRetry({
+          executor: tx,
+          orderId,
+          tenantId: order.tenantId,
+          dueDate: tranche.dueDate ?? computeInvoiceDueDate(
+            order.deliveredAt ?? order.eta,
+            order.customerPaymentTermType,
+            order.customerCreditDays,
+          ),
+          // The last tranche absorbs rounding so the parts sum to the total.
+          amount: splitAmountByPercent(orderTotal, percents, index),
+          tranche: {
+            scheduleId: tranche.id,
+            seq: tranche.seq,
+            label: tranche.label,
+            percent: tranche.percent,
+          },
+        });
+      }
 
-    // Settle once across every tranche: money taken before issuance is
-    // unattached and may cover any of them.
-    await allocateUnallocatedPayments(orderId);
-    const [first] = await db
-      .select()
-      .from(invoices)
-      .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
-      .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt))
-      .limit(1);
-    if (!first) throw new InvoiceNumberAllocationError(orderId);
-    return first;
+      // Settle once across every tranche: money taken before issuance is
+      // unattached and may cover any of them.
+      await allocateUnallocatedPayments(orderId, tx);
+      const [first] = await tx
+        .select()
+        .from(invoices)
+        .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
+        .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt))
+        .limit(1);
+      if (!first) throw new InvoiceNumberAllocationError(orderId);
+      return first;
+    });
   }
 
   const dueDate = computeInvoiceDueDate(
@@ -567,6 +689,23 @@ export class InternalTransferHasNoInvoiceError extends Error {
     this.name = 'InternalTransferHasNoInvoiceError';
     void orderId;
   }
+}
+
+/**
+ * The order's live invoices, in tranche order. Unscheduled orders have exactly
+ * one; split payment terms have one per tranche. Every reader that means "the
+ * order's invoice" must go through this so they agree on ordering and on which
+ * documents exist.
+ */
+export async function listLiveOrderInvoices(
+  orderId: string,
+  executor: Executor = db,
+): Promise<Array<typeof invoices.$inferSelect>> {
+  return executor
+    .select()
+    .from(invoices)
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
+    .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt));
 }
 
 /**

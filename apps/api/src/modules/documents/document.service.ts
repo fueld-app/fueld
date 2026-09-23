@@ -1,7 +1,7 @@
 import pdfmake from 'pdfmake';
 import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
-import { and, asc, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
@@ -10,7 +10,8 @@ import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, priceReferences, type TenantSettings } from '../../db/schema';
 import { isIanaTimezone } from '../../utils/timezone';
 import { getDateFormatSettings, getCostSalesDecimalPrecision } from '../admin/settings.service';
-import { ensureOrderInvoice, InvoiceLinesChangedError } from '../orders/invoice.service';
+import { ensureOrderInvoice, InvoiceLinesChangedError, InvoiceNotFoundError } from '../orders/invoice.service';
+import { splitAmountByPercent } from '../orders/invoice-amounts';
 import { customerFacingItems, isSupplierCreditPlaceholder } from './customer-facing-items';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -345,6 +346,19 @@ export async function getLatestDocumentRevisionByOrderId(
  * consulted so revisions issued before invoice rows existed keep verifying.
  * Read-only by design — the public verify route must never generate.
  */
+/**
+ * Count the order's live invoices. With split payment terms an order has one
+ * invoice per tranche, so "the order's invoice" is not a single document and
+ * order-scoped readers must refuse rather than pick one arbitrarily.
+ */
+export async function countLiveOrderInvoices(orderId: string): Promise<number> {
+  const rows = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])));
+  return rows.length;
+}
+
 export async function getLatestInvoiceRevisionForOrder(orderId: string): Promise<DocumentRevisionInfo | null> {
   // Prefer a revision belonging to the order's LIVE invoice. Ordering by
   // revisionNumber alone would surface the voided invoice's revision after a
@@ -1587,7 +1601,51 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
  * part-taxed). Regenerating returns the stored artifact; a genuinely wrong
  * invoice has to be voided and reissued, which is a deliberate act.
  */
-export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
+/**
+ * The amount this tranche SHOULD bill, given the order's live lines total and
+ * the percents of the order's live tranches. Sibling percents come from the
+ * invoices themselves (snapshotted at issuance), so this needs no schedule read
+ * and keeps working after the schedule row is cleared.
+ */
+async function expectedTrancheShare(
+  liveLinesTotal: number,
+  invoice: typeof invoices.$inferSelect,
+): Promise<number> {
+  const percent = numberOrNull(invoice.tranchePercent);
+  if (percent == null || percent <= 0) return liveLinesTotal;
+  const siblings = await db
+    .select({ seq: invoices.trancheSeq, percent: invoices.tranchePercent })
+    .from(invoices)
+    .where(and(
+      eq(invoices.orderId, invoice.orderId),
+      inArray(invoices.status, ['SENT', 'PAID', 'OVERDUE']),
+      isNotNull(invoices.trancheSeq),
+    ))
+    .orderBy(asc(invoices.trancheSeq));
+  const index = siblings.findIndex((row) => row.seq === invoice.trancheSeq);
+  if (index < 0) return Math.round(liveLinesTotal * percent) / 100;
+  const percents = siblings.map((row) => numberOrNull(row.percent) ?? 0);
+  return numberOrNull(splitAmountByPercent(liveLinesTotal, percents, index)) ?? liveLinesTotal;
+}
+
+/**
+ * Load one invoice of an order, refusing an id that belongs to a different order
+ * (so an invoice id cannot be used to render another order's document).
+ */
+async function fetchInvoiceRowForOrder(orderId: string, invoiceId: string): Promise<typeof invoices.$inferSelect> {
+  const [row] = await db
+    .select()
+    .from(invoices)
+    .where(and(eq(invoices.orderId, orderId), eq(invoices.id, invoiceId)))
+    .limit(1);
+  if (!row) throw new InvoiceNotFoundError(orderId);
+  return row;
+}
+
+export async function generateOrderInvoicePdfBuffer(
+  orderId: string,
+  options: { invoiceId?: string } = {},
+): Promise<{
   buffer: Buffer;
   invoiceNumber: string;
   fileName: string;
@@ -1600,7 +1658,13 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   // Materialize the invoice row on ISSUANCE. Before this existed, no production
   // code path ever inserted into `invoices`, so the number was always a PREVIEW
   // placeholder and every reader (collections, aging, QuickBooks) saw nothing.
-  const invoice = await ensureOrderInvoice(order.id);
+  await ensureOrderInvoice(order.id);
+  // Split payment terms issue one invoice per tranche, so the caller picks which
+  // one to render. Without an id this returns the deposit tranche; the other
+  // tranches are reachable by naming their invoice.
+  const invoice = options.invoiceId
+    ? await fetchInvoiceRowForOrder(order.id, options.invoiceId)
+    : await ensureOrderInvoice(order.id);
 
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'INVOICE',
@@ -1624,7 +1688,15 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   const frozenAmount = numberOrNull(invoice.amount);
   if (frozenAmount != null) {
     const liveLinesTotal = await computeInvoiceAmountForItems(order.items);
-    if (Math.abs(liveLinesTotal - frozenAmount) > 0.005) {
+    // An unscheduled order bills the whole deal, so its frozen amount IS the
+    // lines total. A tranche invoice bills a SHARE of it, so the same check has
+    // to be made against the share the tranche would get from the lines as they
+    // stand now -- comparing a half-invoice to the full total would reject every
+    // tranche on its first render.
+    const expected = invoice.trancheSeq == null
+      ? liveLinesTotal
+      : await expectedTrancheShare(liveLinesTotal, invoice);
+    if (Math.abs(liveLinesTotal - frozenAmount) > 0.005 && Math.abs(expected - frozenAmount) > 0.005) {
       throw new InvoiceLinesChangedError(order.id, frozenAmount.toFixed(2), liveLinesTotal.toFixed(2));
     }
   }
@@ -3342,6 +3414,7 @@ export const __documentTestUtils = {
   loadOrderBankDetails,
   overwriteDocumentRevisionArtifact,
   formatNumber,
+  generateInvoicePdfBuffer,
   formatPhoneDisplay,
   phoneToTelUri,
   phoneTextNode,

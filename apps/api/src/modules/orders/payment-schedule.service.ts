@@ -168,9 +168,12 @@ export async function listOrderPaymentSchedule(orderId: string): Promise<Schedul
   const orderTotal = parseFloat(await computeInvoiceAmount(orderId)) || 0;
 
 
-  return rows.map((row) => {
-    const percent = parseFloat(row.percent) || 0;
-    const amount = (orderTotal * percent) / 100;
+  // Preview the SAME amounts issuance will bill, including the last-tranche
+  // rounding absorption -- otherwise a preview shows 33.33/33.33/33.33 for a
+  // schedule that issues as 33.33/33.33/33.34.
+  const percents = rows.map((row) => parseFloat(row.percent) || 0);
+  return rows.map((row, index) => {
+    const amount = splitAmountByPercent(orderTotal, percents, index);
     return {
       id: row.id,
       orderId: row.orderId,
@@ -180,7 +183,7 @@ export async function listOrderPaymentSchedule(orderId: string): Promise<Schedul
       dueBasis: row.dueBasis as DueBasis,
       creditDays: row.creditDays ?? null,
       fixedDueDate: row.fixedDueDate ?? null,
-      amount: amount.toFixed(2),
+      amount,
       dueDate: computeTrancheDueDate(row.dueBasis as DueBasis, row.creditDays, row.fixedDueDate, order),
     };
   });

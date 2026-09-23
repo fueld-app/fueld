@@ -2,6 +2,7 @@ import { Elysia, t } from 'elysia';
 import {
   generateOfferPdfBuffer,
   generateProformaInvoicePdfBuffer,
+  countLiveOrderInvoices,
   getDocumentRevisionByVerifyToken,
   getLatestDocumentRevisionByOrderId,
   getLatestInvoiceRevisionForOrder,
@@ -109,6 +110,14 @@ export const verifyController = new Elysia({ prefix: '/verify' })
       if (!orderId) {
         set.status = 404;
         return { success: false, message: 'Document not found' };
+      }
+
+      // A split-terms order has several live invoices, so an order-scoped link
+      // would resolve to an arbitrary tranche. Each tranche's own QR uses the
+      // token route below, which pins the exact revision.
+      if (await countLiveOrderInvoices(orderId) > 1) {
+        set.status = 409;
+        return { success: false, message: 'This order has multiple invoices — verify the specific invoice from its document' };
       }
 
       const revision = await getLatestInvoiceRevisionForOrder(orderId);

@@ -28,9 +28,12 @@ import {
   MixedCurrencyInvoiceError,
   deriveInvoiceStatus,
   ensureOrderInvoice,
+  listLiveOrderInvoices,
   recomputeInvoiceAmountPaid,
   resolvePaymentInvoiceTarget,
   voidOrderInvoice,
+  AmbiguousInvoiceError,
+  UnpricedScheduleError,
   InvoiceAlreadyVoidError,
   InvoiceNotFoundError,
 } from '../src/modules/orders/invoice.service';
@@ -38,7 +41,7 @@ import { seedBasics, truncateAll } from './helpers/db';
 import { documentRevisions } from '../src/db/schema';
 import { assertValidSchedule, InvalidScheduleError, listOrderPaymentSchedule, setOrderPaymentSchedule } from '../src/modules/orders/payment-schedule.service';
 import { splitAmountByPercent } from '../src/modules/orders/invoice-amounts';
-import { __documentTestUtils } from '../src/modules/documents/document.service';
+import { __documentTestUtils, generateOrderInvoicePdfBuffer } from '../src/modules/documents/document.service';
 
 type Basics = Awaited<ReturnType<typeof seedBasics>>;
 
@@ -671,5 +674,121 @@ describe('split payment terms (50/50 CIA + 21 dd)', () => {
       .where(and(eq(invoices.orderId, order.id), ne(invoices.status, 'VOID')));
     expect(live.length).toBe(1);
     expect(live[0]!.trancheSeq).toBeNull();
+  });
+});
+
+describe('split terms edge cases', () => {
+  it('refuses to issue a schedule for an order with no priced lines', async () => {
+    const basics = await seedOrderWithItems();
+    const { order } = basics;
+    // Unpriced draft line: the tranches would each bill zero.
+    await db.update(orderItems).set({ salesPrice: null }).where(eq(orderItems.orderId, order.id));
+    await setOrderPaymentSchedule(order.id, [
+      { percent: 50, dueBasis: 'ON_ISSUE' },
+      { percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+
+    await expect(ensureOrderInvoice(order.id)).rejects.toBeInstanceOf(UnpricedScheduleError);
+    const live = await db.select().from(invoices)
+      .where(and(eq(invoices.orderId, order.id), ne(invoices.status, 'VOID')));
+    expect(live.length).toBe(0);
+  });
+
+  it('refuses to void an arbitrary tranche and reissues only the one named', async () => {
+    const { order } = await seedOrderWithItems();
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    await ensureOrderInvoice(order.id);
+
+    const live = await db.select().from(invoices)
+      .where(and(eq(invoices.orderId, order.id), ne(invoices.status, 'VOID')))
+      .orderBy(asc(invoices.trancheSeq));
+    expect(live.length).toBe(2);
+
+    // Voiding "the order's invoice" is ambiguous once tranches exist.
+    await expect(voidOrderInvoice(order.id)).rejects.toBeInstanceOf(AmbiguousInvoiceError);
+
+    // Naming one works, and the replacement keeps billing ITS tranche's share.
+    const { voided, replacement } = await voidOrderInvoice(order.id, { invoiceId: live[0]!.id });
+    expect(voided.id).toBe(live[0]!.id);
+    expect(replacement).not.toBeNull();
+    expect(replacement!.trancheSeq).toBe(live[0]!.trancheSeq);
+    expect(replacement!.amount).toBe(live[0]!.amount);
+    // The untouched tranche is still live and still billed at its own share.
+    const [other] = await db.select().from(invoices).where(eq(invoices.id, live[1]!.id));
+    expect(other!.status).not.toBe('VOID');
+    expect(other!.amount).toBe(live[1]!.amount);
+  });
+});
+
+describe('tranche invoice rendering', () => {
+  it('renders each tranche document without tripping the lines-vs-frozen guard', async () => {
+    const { order } = await seedOrderWithItems();
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    await ensureOrderInvoice(order.id);
+
+    const live = await listLiveOrderInvoices(order.id);
+    expect(live.length).toBe(2);
+
+    const total = parseFloat(await computeInvoiceAmount(order.id));
+
+    // Each tranche's document must render. The guard compares the order's full
+    // lines total against the frozen amount, so a share-valued invoice trips it
+    // unless the guard scales by the tranche's percent.
+    const deposit = await generateOrderInvoicePdfBuffer(order.id);
+    expect(deposit.invoiceNumber).toBe(live[0]!.invoiceNumber);
+    expect(deposit.buffer.length).toBeGreaterThan(1000);
+    expect(parseFloat(live[0]!.amount ?? '0') + parseFloat(live[1]!.amount ?? '0')).toBeCloseTo(total, 2);
+
+    // The balance tranche renders to its OWN document, not the deposit's. This is
+    // the path the trader needs to send invoice #2 at all.
+    const balance = await generateOrderInvoicePdfBuffer(order.id, { invoiceId: String(live[1]!.id) });
+    expect(balance.invoiceNumber).toBe(live[1]!.invoiceNumber);
+    expect(balance.buffer.length).toBeGreaterThan(1000);
+    // Each tranche is a DIFFERENT document: distinct invoice number, distinct
+    // stored revision and artifact. (The printed `verificationRef` is a
+    // date+revision display label shared across streams — pre-existing, and not
+    // an identity; verify resolves by order id or token.)
+    expect(balance.revision.id).not.toBe(deposit.revision.id);
+    expect(balance.revision.filePath).not.toBe(deposit.revision.filePath);
+  });
+});
+
+describe('pre-issuance payment across tranches', () => {
+  it('splits a payment that covers both tranches so neither reads unpaid', async () => {
+    const { tenant, order } = await seedOrderWithItems();
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    const total = parseFloat(await computeInvoiceAmount(order.id));
+
+    // Payment taken before issuance, covering the WHOLE deal — both tranches.
+    await db.insert(customerPayments).values({
+      tenantId: tenant.id, customerId: order.clientId, orderId: order.id, invoiceId: null,
+      amount: total.toFixed(2), currency: 'USD', receivedAt: new Date(),
+    });
+
+    await ensureOrderInvoice(order.id);
+    const live = await listLiveOrderInvoices(order.id);
+    expect(live.length).toBe(2);
+
+    // Both tranches must read paid. Stamping the whole payment on the deposit
+    // would leave the balance invoice reading 0.00 paid while collections chases
+    // money already banked.
+    expect(parseFloat(live[0]!.amountPaid ?? '0')).toBeCloseTo(parseFloat(live[0]!.amount ?? '0'), 2);
+    expect(parseFloat(live[1]!.amountPaid ?? '0')).toBeCloseTo(parseFloat(live[1]!.amount ?? '0'), 2);
+
+    // And the money must be conserved: the rows still sum to what was received.
+    const rows = await db.select().from(customerPayments).where(eq(customerPayments.orderId, order.id));
+    const sum = rows.reduce((acc, row) => acc + parseFloat(row.amount), 0);
+    expect(sum).toBeCloseTo(total, 2);
+    // Every row is attached to a live tranche, none stranded unallocated.
+    expect(rows.every((row) => row.invoiceId != null)).toBe(true);
   });
 });
