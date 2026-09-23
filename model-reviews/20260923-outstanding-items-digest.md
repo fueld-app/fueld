@@ -40,4 +40,4 @@ An absurd positive `dueDays` (e.g. `creditDays` 99999, or a far-future `FIXED_DA
 
 ## Not done
 
-Deployed to all four instances as `d9e7a363` after these fixes. The remaining known deferrals are unchanged: split sibling payment rows have no group identity (safe while no payment edit/delete route exists), no per-tranche PDF line proration, no per-tranche Kantox value dates, and `verificationRef` remains a date+revision display label rather than an identity.
+Deployed to all four instances as `3a100097`, whose source is byte-identical to the reviewed `d9e7a363` (`git diff d9e7a363 3a100097 -- apps packages .github` is empty; the only difference is this digest and the changelog). The remaining known deferrals are unchanged: split sibling payment rows have no group identity (safe while no payment edit/delete route exists), no per-tranche PDF line proration, no per-tranche Kantox value dates, and `verificationRef` remains a date+revision display label rather than an identity.
