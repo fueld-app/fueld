@@ -2621,7 +2621,15 @@ export async function updateOrderStatus(
 
   // Kantox Dynamic Hedging (tenant-gated, fire-and-forget, never blocks the
   // status change — all errors are swallowed inside the hook).
-  if (updated && (newStatus === 'CONFIRMED' || newStatus === 'CANCELLED' || newStatus === 'LOST')) {
+  //
+  // Fire only on a REAL transition. Re-saving an already-CONFIRMED order used to
+  // be harmless because the hedge refs were a pure function of order data and the
+  // dedup fence skipped the repeat. The ref set is now schedule-dependent, so a
+  // re-save AFTER the trader adds (or clears) a payment schedule would emit
+  // different refs — `#S` versus `#S1`/`#S2` — and Kantox would accept both,
+  // hedging the sell exposure twice.
+  if (updated && previous && previous.status !== newStatus
+    && (newStatus === 'CONFIRMED' || newStatus === 'CANCELLED' || newStatus === 'LOST')) {
     const [kantoxOrder] = await db
       .select({
         id: orders.id, tenantId: orders.tenantId, orderNumber: orders.orderNumber,

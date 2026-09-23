@@ -396,19 +396,34 @@ export function splitSellLegByTranche(
   const totalPercent = usable.reduce((sum, t) => sum + (t.percent ?? 0), 0);
   if (totalPercent <= 0) return null;
 
-  const shares = usable.map((t) => ({
-    dueDays: Math.max(0, Math.round(t.dueDays ?? 0)),
-    amount: Math.round((amount * (t.percent ?? 0) / totalPercent) * 100) / 100,
-  }));
+  // Largest-remainder allocation: give every tranche its floor in cents, then
+  // hand the leftover cents to the shares with the biggest fractional part.
+  //
+  // The previous "last tranche absorbs the rounding" approach could OVER-hedge:
+  // each of the first n-1 shares rounded up by up to half a cent, and if the last
+  // share was smaller than that accumulated overshoot it went negative and was
+  // dropped by the `> 0` filter — leaving the kept parts summing to MORE than the
+  // input (10 tranches of $0.05 summed to $0.09). Largest-remainder keeps the sum
+  // exact for every input, which is the property the caller relies on.
+  const totalCents = Math.round(amount * 100);
+  const exact = usable.map((t) => (totalCents * (t.percent ?? 0)) / totalPercent);
+  const floors = exact.map((value) => Math.floor(value));
+  let leftover = totalCents - floors.reduce((sum, value) => sum + value, 0);
+  // Distribute leftover cents to the largest fractional parts (stable order).
+  const order = exact
+    .map((value, index) => ({ index, frac: value - Math.floor(value) }))
+    .sort((a, b) => b.frac - a.frac || a.index - b.index);
+  for (const { index } of order) {
+    if (leftover <= 0) break;
+    floors[index] = (floors[index] ?? 0) + 1;
+    leftover -= 1;
+  }
 
-  // The last tranche absorbs the rounding so the parts sum to the whole.
-  const allocated = shares.slice(0, -1).reduce((sum, s) => sum + s.amount, 0);
-  const last = shares[shares.length - 1]!;
-  last.amount = Math.round((amount - allocated) * 100) / 100;
-
-  // Drop zero-value splits (a share too small to survive rounding), then
-  // re-index so refs stay contiguous.
-  const kept = shares
+  const kept = usable
+    .map((t, index) => ({
+      dueDays: Math.max(0, Math.round(t.dueDays ?? 0)),
+      amount: (floors[index] ?? 0) / 100,
+    }))
     .filter((share) => share.amount > 0)
     .map((share, i) => ({ refIndex: i + 1, amount: share.amount, dueDays: share.dueDays }));
   return kept.length > 0 ? kept : null;
@@ -809,9 +824,12 @@ export async function onCustomerPaymentForKantox(
     // payment against two 50k entries would extinguish 100k of exposure — the
     // over-cancel that creates an opposite position). Oldest entry first, which
     // matches the order the exposure was hedged in.
+    // Pass the amount UNCHANGED: the helper decides what counts as a receipt. An
+    // abs() here would hand a refund to the helper as a positive receipt and
+    // defeat its own guard.
     const plan = planPaymentClosures(
       sellRows.map((row) => ({ amount: Number(row.amount), cancelled: Number(row.cancelledAmount) })),
-      Math.abs(paymentAmount),
+      paymentAmount,
     );
     // Every ref on file, so each close gets its own sequence rather than
     // colliding with a previous payment's cancel.

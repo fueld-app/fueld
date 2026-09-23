@@ -490,6 +490,22 @@ describe('splitSellLegByTranche', () => {
     const parts = splitSellLegByTranche(999999.99, [{ percent: 50, dueDays: 0 }, { percent: 50, dueDays: 30 }])!;
     expect(parts.reduce((s, p) => s + p.amount, 0)).toBeCloseTo(999999.99, 2);
   });
+
+  // The old "last tranche absorbs the rounding" scheme could OVER-hedge: the
+  // earlier shares each rounded up, and when the last share was smaller than that
+  // accumulated overshoot it went negative and was dropped, leaving the kept parts
+  // summing to more than the input (10 x $0.05 became $0.09). Largest-remainder
+  // makes the sum exact for every input.
+  it('sums exactly even when shares round to sub-cent amounts', () => {
+    const cases: Array<[number, number]> = [[0.05, 10], [1, 150], [0.03, 12], [0.01, 12], [100000, 12], [1234.56, 7]];
+    for (const [amount, n] of cases) {
+      const parts = splitSellLegByTranche(amount, Array.from({ length: n }, () => ({ percent: 100 / n, dueDays: 30 })))!;
+      const sum = parts.reduce((s, p) => s + p.amount, 0);
+      expect(sum).toBeCloseTo(amount, 2);
+      // Never more than the input — the direction that would over-hedge.
+      expect(sum).toBeLessThanOrEqual(amount + 1e-9);
+    }
+  });
 });
 
 describe('scheduled orders hedge each tranche under its own ref', () => {
