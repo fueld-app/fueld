@@ -134,6 +134,7 @@ function getTruncateTables() {
     'port_gate_list_personnel',
     'order_number_sequences',
     'invoice_number_sequences',
+    'order_payment_schedule',
     'counterparties',
     'vessels',
     'places',
@@ -228,11 +229,33 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
   // Mirror the migration's one-invoice-per-order invariant: the compat shim is
   // the fallback path when migrations did not apply, and without this index the
   // issuance concurrency guarantee silently disappears.
+  // Mirrors migration 0127: one LIVE invoice per (order, tranche).
   await sql`DROP INDEX IF EXISTS invoices_one_per_order`;
   await sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS invoices_one_per_order
-      ON invoices (order_id) WHERE status <> 'VOID'
+    CREATE UNIQUE INDEX IF NOT EXISTS invoices_one_live_per_tranche
+      ON invoices (order_id, coalesce(tranche_seq, 0)) WHERE status <> 'VOID'
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS order_payment_schedule (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      seq integer NOT NULL,
+      label text,
+      percent numeric(6,3) NOT NULL,
+      due_basis text NOT NULL DEFAULT 'FROM_DELIVERY',
+      credit_days integer,
+      fixed_due_date date,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS order_payment_schedule_order_seq_idx
+      ON order_payment_schedule (order_id, seq)
+  `;
+  for (const col of ['schedule_id uuid', 'tranche_seq integer', 'tranche_label text', 'tranche_percent numeric(6,3)']) {
+    await sql.unsafe(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS ${col}`);
+  }
 
   await sql`
     ALTER TABLE orders

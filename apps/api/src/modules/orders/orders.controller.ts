@@ -45,6 +45,7 @@ import {
   setOrderBunkerBookingSent,
 } from './orders.service';
 import { logActivity } from '../activity/activity.service';
+import { listOrderPaymentSchedule, setOrderPaymentSchedule, InvalidScheduleError } from './payment-schedule.service';
 import { voidOrderInvoice, InvoiceNotFoundError, InvoiceAlreadyVoidError, MixedCurrencyInvoiceError, InternalTransferHasNoInvoiceError, InvoiceLinesChangedError } from './invoice.service';
 import {
   SupplierCreditNoteError,
@@ -1456,6 +1457,59 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         tags: ['Orders'],
         summary: 'List all photo (image) attachments for an order',
       },
+    },
+  )
+
+  // ─── Payment schedule (split payment terms) ───────────────────────
+  .get(
+    '/:id/payment-schedule',
+    async ({ params, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, data: null, message: 'Order not found' }; }
+      const schedule = await listOrderPaymentSchedule(orderId);
+      return { success: true, data: schedule } satisfies ApiResponse<typeof schedule>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Orders'], summary: "Get an order's payment schedule (split terms)" },
+    },
+  )
+  .put(
+    '/:id/payment-schedule',
+    async ({ params, body, auth, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, data: null, message: 'Order not found' }; }
+      try {
+        const schedule = await setOrderPaymentSchedule(orderId, body.tranches);
+        await logActivity({
+          userId: auth.sub,
+          tenantId: auth.tenantId,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: { event: 'PAYMENT_SCHEDULE_SET', tranches: schedule.length },
+        });
+        return { success: true, data: schedule } satisfies ApiResponse<typeof schedule>;
+      } catch (err) {
+        // A schedule that does not total 100%, or one that would restate already
+        // issued invoices, is the trader's to fix — a 400, not a 500.
+        if (!(err instanceof InvalidScheduleError)) throw err;
+        set.status = 400;
+        return { success: false, data: null, message: err.message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        tranches: t.Array(t.Object({
+          label: t.Optional(t.Nullable(t.String())),
+          percent: t.Number(),
+          dueBasis: t.Union([t.Literal('ON_ISSUE'), t.Literal('FROM_DELIVERY'), t.Literal('FIXED_DATE')]),
+          creditDays: t.Optional(t.Nullable(t.Number())),
+          fixedDueDate: t.Optional(t.Nullable(t.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }))),
+        })),
+      }),
+      detail: { tags: ['Orders'], summary: "Replace an order's payment schedule (split terms)" },
     },
   )
 

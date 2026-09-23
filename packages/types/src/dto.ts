@@ -1385,6 +1385,36 @@ export interface PortDocumentationOrderContextDto {
 //  INVOICE
 // ═══════════════════════════════════════════════════════════════════════
 
+/** When a payment-schedule tranche falls due (split payment terms). */
+export type InvoiceDueBasis = 'ON_ISSUE' | 'FROM_DELIVERY' | 'FIXED_DATE';
+
+/** One tranche of an order's payment schedule. */
+export interface OrderPaymentScheduleTrancheDto {
+  id: string;
+  orderId: string;
+  seq: number;
+  label: string | null;
+  percent: string;
+  dueBasis: InvoiceDueBasis;
+  creditDays: number | null;
+  fixedDueDate: string | null;
+  /** This tranche's share of the order's current total. */
+  amount: string;
+  /** Due date it will carry at issuance, or null when not yet knowable. */
+  dueDate: string | null;
+}
+
+/** Body for replacing an order's payment schedule. */
+export interface SetOrderPaymentScheduleDto {
+  tranches: Array<{
+    label?: string | null;
+    percent: number;
+    dueBasis: InvoiceDueBasis;
+    creditDays?: number | null;
+    fixedDueDate?: string | null;
+  }>;
+}
+
 export interface InvoiceDto {
   id: string;
   orderId: string;

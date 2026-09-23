@@ -32,6 +32,8 @@
  * so uniqueness is effectively per-tenant. Keep every query scoped via the order.
  */
 import { and, asc, desc, eq, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
+import { computeInvoiceDueDate, splitAmountByPercent } from './invoice-amounts';
+import { listOrderPaymentSchedule } from './payment-schedule.service';
 import { db, type Database } from '../../db';
 
 /**
@@ -39,6 +41,8 @@ import { db, type Database } from '../../db';
  * so the same helper works inside and outside `db.transaction`.
  */
 type Executor = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
+export { computeInvoiceDueDate, computeInvoiceAmount, MixedCurrencyInvoiceError } from './invoice-amounts';
+import { computeInvoiceAmount } from './invoice-amounts';
 import { customerPayments, invoices, invoiceNumberSequences, orderItems, orders, tenants, type TenantSettings } from '../../db/schema';
 import { customerFacingItems } from '../documents/customer-facing-items';
 
@@ -120,62 +124,6 @@ export async function allocateInvoiceNumber(tenantId: string, now = new Date()):
  * customer-facing line items only, delivered quantity where known, in order
  * currency, as a fixed-2 string for numeric(14,2).
  */
-export async function computeInvoiceAmount(orderId: string): Promise<string> {
-  const items = await db
-    .select({
-      id: orderItems.id,
-      productType: orderItems.productType,
-      hideOnDocuments: orderItems.hideOnDocuments,
-      salesPrice: orderItems.salesPrice,
-      salesCurrency: orderItems.salesCurrency,
-      deliveredQuantity: orderItems.deliveredQuantity,
-      quantity: orderItems.quantity,
-    })
-    .from(orderItems)
-    .where(eq(orderItems.orderId, orderId))
-    .orderBy(asc(orderItems.sortOrder), asc(orderItems.createdAt));
-
-  const billable = customerFacingItems(items);
-  // `invoices` carries a single scalar amount with no currency column, so a
-  // mixed-currency order cannot be expressed as one number. Refuse rather than
-  // freeze a meaningless blended total that later gets compared against
-  // single-currency payments.
-  const currencies = new Set(
-    billable.map((item) => (item.salesCurrency ?? '').toUpperCase()).filter(Boolean),
-  );
-  if (currencies.size > 1) {
-    throw new MixedCurrencyInvoiceError([...currencies].sort());
-  }
-
-  // Sum the billable rows in the database as numeric: quantities are
-  // numeric(14,6) and prices numeric(14,7), and routing those through float64
-  // (or doing it in JS) can drift a cent on a large order. The same reasoning
-  // already applies to recomputeInvoiceAmountPaid.
-  const conditions = [eq(orderItems.orderId, orderId)];
-  if (billable.length !== items.length) {
-    // Some rows are excluded (hidden / credit-note placeholders), so the sum has
-    // to run over exactly the billable ids rather than the whole order.
-    conditions.push(inArray(orderItems.id, billable.map((item) => item.id)));
-  }
-
-  const [row] = await db
-    .select({
-      total: sql<string>`COALESCE(SUM(coalesce(${orderItems.deliveredQuantity}, ${orderItems.quantity})::numeric * coalesce(${orderItems.salesPrice}, 0)::numeric), 0)::numeric(14,2)::text`,
-    })
-    .from(orderItems)
-    .where(and(...conditions));
-
-  return row?.total ?? '0.00';
-}
-
-/** Callers must surface this to the user; it is a data problem, not an outage. */
-export class MixedCurrencyInvoiceError extends Error {
-  constructor(public readonly currencies: string[]) {
-    super(`Cannot invoice an order with mixed line currencies (${currencies.join(', ')})`);
-    this.name = 'MixedCurrencyInvoiceError';
-  }
-}
-
 /**
  * Void an issued invoice and, when asked, issue a replacement.
  *
@@ -308,6 +256,51 @@ async function parkInvoicePayments(
     .where(and(eq(customerPayments.orderId, orderId), eq(customerPayments.invoiceId, invoiceId)));
 }
 
+/**
+ * Attach the order's unallocated payments across its live invoices.
+ *
+ * With tranches there is no single target, so money recorded before issuance is
+ * applied oldest-tranche-first until it runs out — which is what a deposit
+ * payment is normally for. Each affected invoice is recomputed afterwards.
+ */
+async function allocateUnallocatedPayments(orderId: string): Promise<void> {
+  const [unallocated, targets] = await Promise.all([
+    db.select({ id: customerPayments.id, amount: customerPayments.amount })
+      .from(customerPayments)
+      .where(and(eq(customerPayments.orderId, orderId), isNull(customerPayments.invoiceId)))
+      .orderBy(asc(customerPayments.receivedAt)),
+    db.select({ id: invoices.id, amount: invoices.amount })
+      .from(invoices)
+      .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
+      .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt)),
+  ]);
+
+  if (unallocated.length === 0 || targets.length === 0) return;
+
+  // Outstanding per target, so an already-covered tranche is skipped.
+  const outstanding = targets.map((target) => parseFloat(String(target.amount ?? 0)) || 0);
+  const touched = new Set<string>();
+
+  for (const payment of unallocated) {
+    let remaining = parseFloat(String(payment.amount ?? 0)) || 0;
+    let firstHit: string | null = null;
+    for (let index = 0; index < targets.length && remaining > 0; index++) {
+      if (outstanding[index]! <= 0) continue;
+      const applied = Math.min(remaining, outstanding[index]!);
+      outstanding[index] = outstanding[index]! - applied;
+      remaining -= applied;
+      firstHit ??= targets[index]!.id;
+      touched.add(targets[index]!.id);
+    }
+    // A payment larger than the whole order still has to land somewhere; park it
+    // on the first target rather than leaving it unattached.
+    const primary = firstHit ?? targets[0]!.id;
+    await db.update(customerPayments).set({ invoiceId: primary }).where(eq(customerPayments.id, payment.id));
+  }
+
+  for (const id of touched) await recomputeInvoiceAmountPaid(id);
+}
+
 /** Attach the order's unallocated payments to the invoice that is now live. */
 async function claimUnallocatedPayments(
   executor: Executor,
@@ -337,8 +330,16 @@ async function insertInvoiceWithRetry(params: {
   tenantId: string;
   dueDate: string;
   amount: string;
+  tranche?: {
+    scheduleId: string;
+    seq: number;
+    label: string | null;
+    percent: string;
+  } | null;
 }): Promise<typeof invoices.$inferSelect | null> {
   const dbc = params.executor ?? db;
+  const trancheSeq = params.tranche?.seq ?? null;
+
   for (let attempt = 0; attempt < 5; attempt++) {
     const [created] = await dbc
       .insert(invoices)
@@ -349,20 +350,30 @@ async function insertInvoiceWithRetry(params: {
         dueDate: params.dueDate,
         amount: params.amount,
         amountPaid: '0',
+        scheduleId: params.tranche?.scheduleId ?? null,
+        trancheSeq,
+        trancheLabel: params.tranche?.label ?? null,
+        tranchePercent: params.tranche?.percent ?? null,
       })
       .onConflictDoNothing()
       .returning();
     if (created) return created;
 
-    // No live row for this order ⇒ the conflict was the invoice number, not the
-    // per-order index, so a fresh number is the right response.
-    const [liveForOrder] = await dbc
+    // The conflict is either this slot (another issuer won it — return null and
+    // let the caller re-read theirs) or the global invoice_number (the counter
+    // and the table disagree — retry with a fresh number).
+    const [liveForSlot] = await dbc
       .select()
       .from(invoices)
-      .where(and(eq(invoices.orderId, params.orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
-      .orderBy(desc(invoices.createdAt))
+      .where(and(
+        eq(invoices.orderId, params.orderId),
+        trancheSeq == null
+          ? isNull(invoices.trancheSeq)
+          : eq(invoices.trancheSeq, trancheSeq),
+        notInArray(invoices.status, ['VOID', 'DRAFT']),
+      ))
       .limit(1);
-    if (liveForOrder) return null;
+    if (liveForSlot) return null;
   }
 
   throw new InvoiceNumberAllocationError(params.orderId);
@@ -407,33 +418,6 @@ export class InvoiceAlreadyVoidError extends Error {
     super(`Invoice ${invoiceNumber} is already void`);
     this.name = 'InvoiceAlreadyVoidError';
   }
-}
-
-/**
- * Due date for the whole-order invoice.
- *
- * CREDIT → delivery anchor + credit days (the trader's "delivery date + credit
- * days"); COD/PREPAY → payment is due on the anchor itself, not 30 days later
- * (the old PDF fallback silently granted COD orders a credit term).
- */
-export function computeInvoiceDueDate(
-  anchor: Date | string | null,
-  paymentTermType: string | null,
-  creditDays: number | null,
-  issuedAt = new Date(),
-): string {
-  const parsedAnchor = anchor == null ? null : new Date(String(anchor));
-  const anchorDay = parsedAnchor && !Number.isNaN(parsedAnchor.getTime())
-    ? new Date(Date.UTC(parsedAnchor.getUTCFullYear(), parsedAnchor.getUTCMonth(), parsedAnchor.getUTCDate()))
-    : null;
-  const base = anchorDay ?? new Date(Date.UTC(issuedAt.getUTCFullYear(), issuedAt.getUTCMonth(), issuedAt.getUTCDate()));
-
-  if (paymentTermType === 'COD' || paymentTermType === 'PREPAY') {
-    return base.toISOString().split('T')[0]!;
-  }
-
-  const days = paymentTermType === 'CREDIT' ? (creditDays ?? 30) : 30;
-  return new Date(base.getTime() + days * 86_400_000).toISOString().split('T')[0]!;
 }
 
 /**
@@ -495,6 +479,46 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
   // companies — they are not customer receivables.
   if (order.orderKind === 'INTERNAL_TRANSFER') {
     throw new InternalTransferHasNoInvoiceError(orderId);
+  }
+
+  // Split payment terms: issue one invoice per scheduled tranche. An order with
+  // no schedule falls through to the single-invoice behaviour below — the whole
+  // deal on the order's own customer terms.
+  const tranches = await listOrderPaymentSchedule(orderId);
+  if (tranches.length > 0) {
+    const orderTotal = parseFloat(await computeInvoiceAmount(orderId)) || 0;
+    const percents = tranches.map((tranche) => parseFloat(tranche.percent) || 0);
+    for (const [index, tranche] of tranches.entries()) {
+      await insertInvoiceWithRetry({
+        orderId,
+        tenantId: order.tenantId,
+        dueDate: tranche.dueDate ?? computeInvoiceDueDate(
+          order.deliveredAt ?? order.eta,
+          order.customerPaymentTermType,
+          order.customerCreditDays,
+        ),
+        // The last tranche absorbs rounding so the parts sum to the total.
+        amount: splitAmountByPercent(orderTotal, percents, index),
+        tranche: {
+          scheduleId: tranche.id,
+          seq: tranche.seq,
+          label: tranche.label,
+          percent: tranche.percent,
+        },
+      });
+    }
+
+    // Settle once across every tranche: money taken before issuance is
+    // unattached and may cover any of them.
+    await allocateUnallocatedPayments(orderId);
+    const [first] = await db
+      .select()
+      .from(invoices)
+      .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
+      .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt))
+      .limit(1);
+    if (!first) throw new InvoiceNumberAllocationError(orderId);
+    return first;
   }
 
   const dueDate = computeInvoiceDueDate(

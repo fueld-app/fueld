@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 beforeEach(async () => {
   await truncateAll();
 });
-import { and, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, ne } from 'drizzle-orm';
 import { db } from '../src/db';
 import {
   invoices,
@@ -36,6 +36,8 @@ import {
 } from '../src/modules/orders/invoice.service';
 import { seedBasics, truncateAll } from './helpers/db';
 import { documentRevisions } from '../src/db/schema';
+import { assertValidSchedule, InvalidScheduleError, listOrderPaymentSchedule, setOrderPaymentSchedule } from '../src/modules/orders/payment-schedule.service';
+import { splitAmountByPercent } from '../src/modules/orders/invoice-amounts';
 import { __documentTestUtils } from '../src/modules/documents/document.service';
 
 type Basics = Awaited<ReturnType<typeof seedBasics>>;
@@ -565,5 +567,109 @@ describe('frozen total invariant', () => {
   it('prints the live line sum when no total is frozen (proforma)', () => {
     const doc = __documentTestUtils.buildProformaDocument({ ...baseData, items: lineItems });
     expect(totalFrom(doc)).toBe(60000);
+  });
+});
+
+describe('payment schedule validation', () => {
+  it('requires the tranches to total exactly 100%', () => {
+    const base = { dueBasis: 'FROM_DELIVERY' as const, creditDays: 21 };
+
+    expect(() => assertValidSchedule([
+      { ...base, percent: 50 },
+      { ...base, percent: 50 },
+    ])).not.toThrow();
+
+    // Under-billing leaves part of the deal unbilled; over-billing charges twice.
+    expect(() => assertValidSchedule([{ ...base, percent: 50 }, { ...base, percent: 40 }]))
+      .toThrow(InvalidScheduleError);
+    expect(() => assertValidSchedule([{ ...base, percent: 60 }, { ...base, percent: 60 }]))
+      .toThrow(InvalidScheduleError);
+    expect(() => assertValidSchedule([])).toThrow(InvalidScheduleError);
+  });
+
+  it('requires a date on a fixed-date tranche and rejects negative credit days', () => {
+    expect(() => assertValidSchedule([{ percent: 100, dueBasis: 'FIXED_DATE' }])).toThrow();
+    expect(() => assertValidSchedule([{ percent: 100, dueBasis: 'FIXED_DATE', fixedDueDate: '2026-10-15' }])).not.toThrow();
+    expect(() => assertValidSchedule([{ percent: 100, dueBasis: 'FROM_DELIVERY', creditDays: -5 }])).toThrow();
+  });
+});
+
+describe('tranche amount rounding', () => {
+  it('allocates the last tranche so the parts sum exactly to the total', () => {
+    // Three equal thirds of 100.00 must not leave a cent unaccounted.
+    const parts = [0, 1, 2].map((i) => splitAmountByPercent(100, [33.333, 33.333, 33.334], i));
+    expect(parts.reduce((sum, p) => sum + Number(p), 0)).toBeCloseTo(100, 2);
+
+    const halves = [0, 1].map((i) => splitAmountByPercent(684204, [50, 50], i));
+    expect(halves).toEqual(['342102.00', '342102.00']);
+
+    // An awkward total still reconciles.
+    const odd = [0, 1, 2].map((i) => splitAmountByPercent(1000, [30, 30, 40], i));
+    expect(odd.reduce((sum, p) => sum + Number(p), 0)).toBeCloseTo(1000, 2);
+  });
+});
+
+describe('split payment terms (50/50 CIA + 21 dd)', () => {
+  it('issues one invoice per tranche with its own share and due date', async () => {
+    const basics = await seedOrderWithItems();
+    const { order } = basics;
+
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+
+    const first = await ensureOrderInvoice(order.id);
+    const all = await db.select().from(invoices)
+      .where(and(eq(invoices.orderId, order.id), ne(invoices.status, 'VOID')))
+      .orderBy(asc(invoices.trancheSeq));
+
+    expect(all.length).toBe(2);
+    expect(all.map((i) => i.trancheSeq)).toEqual([1, 2]);
+    expect(all.map((i) => i.trancheLabel)).toEqual(['Deposit', 'Balance']);
+
+    // Shares must sum to the order total, never double or under bill.
+    const orderTotal = Number(await computeInvoiceAmount(order.id));
+    expect(all.reduce((sum, i) => sum + Number(i.amount), 0)).toBeCloseTo(orderTotal, 2);
+    expect(Number(all[0]!.amount)).toBeCloseTo(orderTotal / 2, 2);
+
+    // Each tranche carries a DISTINCT number and its own due date.
+    expect(all[0]!.invoiceNumber).not.toBe(all[1]!.invoiceNumber);
+    expect(all[0]!.dueDate <= all[1]!.dueDate).toBe(true);
+    // The deposit is already payable; the balance follows delivery + 21 days.
+    expect(all[1]!.dueDate > all[0]!.dueDate).toBe(true);
+
+    void first;
+  });
+
+  it('refuses to change a schedule once a tranche has been issued', async () => {
+    const { order } = await seedOrderWithItems();
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    await ensureOrderInvoice(order.id);
+
+    await expect(setOrderPaymentSchedule(order.id, [
+      { percent: 100, dueBasis: 'FROM_DELIVERY', creditDays: 30 },
+    ])).rejects.toBeInstanceOf(InvalidScheduleError);
+  });
+
+  it('clearing the schedule restores the single-invoice behaviour', async () => {
+    const { order } = await seedOrderWithItems();
+    await setOrderPaymentSchedule(order.id, [
+      { percent: 60, dueBasis: 'ON_ISSUE' },
+      { percent: 40, dueBasis: 'FROM_DELIVERY', creditDays: 30 },
+    ]);
+    expect((await listOrderPaymentSchedule(order.id)).length).toBe(2);
+
+    await setOrderPaymentSchedule(order.id, []);
+    expect(await listOrderPaymentSchedule(order.id)).toEqual([]);
+
+    await ensureOrderInvoice(order.id);
+    const live = await db.select().from(invoices)
+      .where(and(eq(invoices.orderId, order.id), ne(invoices.status, 'VOID')));
+    expect(live.length).toBe(1);
+    expect(live[0]!.trancheSeq).toBeNull();
   });
 });

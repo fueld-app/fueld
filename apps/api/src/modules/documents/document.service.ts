@@ -1013,6 +1013,10 @@ function buildInvoiceDocument(data: {
   invoiceNumber: string;
   orderNumber?: string | null;
   dueDate: string;
+  /** Split payment terms: which tranche this document bills. */
+  trancheLabel?: string | null;
+  tranchePercent?: string | null;
+  trancheSeq?: number | null;
   clientName: string;
   clientCountry: string | null;
   clientAddress?: string | null;
@@ -1084,7 +1088,13 @@ function buildInvoiceDocument(data: {
     const price = parseFloat(item.salesPrice ?? '0') || 0;
     return sum + qty * price;
   }, 0);
-  const totalAmountDueLabel = `Total amount due to ${data.companyName?.trim() || 'Company'}`;
+  // A tranche invoice bills only its share of the order, so the headline must
+  // name the tranche — otherwise the customer reads "total amount due" against
+  // a figure that is half the deal.
+  const companyLabel = data.companyName?.trim() || 'Company';
+  const totalAmountDueLabel = data.trancheLabel || data.tranchePercent
+    ? `${data.trancheLabel ? `${data.trancheLabel} — ` : ''}${data.tranchePercent}% of order. Total amount due to ${companyLabel}`
+    : `Total amount due to ${companyLabel}`;
 
   const docDefinition: TDocumentDefinitions = {
     pageSize: 'A4',
@@ -1715,6 +1725,9 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     // The invoice's OWN frozen total, not a fresh sum of the lines: the two can
     // differ if the order was edited between issuance and the first render.
     frozenTotal: invoice.amount,
+    trancheLabel: invoice.trancheLabel,
+    tranchePercent: invoice.tranchePercent,
+    trancheSeq: invoice.trancheSeq,
   };
 
   const docDefinition = buildProformaDocument(docData);
@@ -2734,6 +2747,10 @@ function buildProformaDocument(data: {
    * order's lines were edited in the window before the first render.
    */
   frozenTotal?: string | null;
+  /** Split payment terms: which tranche this document bills. */
+  trancheLabel?: string | null;
+  tranchePercent?: string | null;
+  trancheSeq?: number | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -2827,7 +2844,13 @@ function buildProformaDocument(data: {
     ? parseFloat(data.frozenTotal) || 0
     : lineItemsTotal;
   const grandTotalCurrency = data.items[0]?.salesCurrency || data.currency;
-  const totalAmountDueLabel = `Total amount due to ${data.companyName?.trim() || 'Company'}`;
+  // A tranche invoice bills only its share of the order, so the headline must
+  // name the tranche — otherwise the customer reads "total amount due" against
+  // a figure that is half the deal.
+  const companyLabel = data.companyName?.trim() || 'Company';
+  const totalAmountDueLabel = data.trancheLabel || data.tranchePercent
+    ? `${data.trancheLabel ? `${data.trancheLabel} — ` : ''}${data.tranchePercent}% of order. Total amount due to ${companyLabel}`
+    : `Total amount due to ${companyLabel}`;
 
   // Delivery date string — use the actual marked delivery date (deliveredAt), not ETA/ETD range
   let deliveryDateStr = '';

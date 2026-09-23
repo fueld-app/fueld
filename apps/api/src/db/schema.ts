@@ -109,6 +109,19 @@ export const invoiceStatusEnum = pgEnum('invoice_status', [
   'VOID',
 ]);
 
+/**
+ * When a payment-schedule tranche falls due (split payment terms).
+ *
+ * ON_ISSUE       — payable as soon as the invoice is issued (a deposit / CIA).
+ * FROM_DELIVERY  — delivery anchor + `creditDays` ("21 d.d.").
+ * FIXED_DATE     — an exact calendar date the trader pinned.
+ */
+export const invoiceDueBasisEnum = pgEnum('invoice_due_basis', [
+  'ON_ISSUE',
+  'FROM_DELIVERY',
+  'FIXED_DATE',
+]);
+
 export const documentTypeEnum = pgEnum('document_type', [
   'OFFER',
   'PROFORMA_INVOICE',
@@ -1352,6 +1365,43 @@ export const orderPortDocuments = pgTable('order_port_documents', {
 //  12. INVOICES
 // ═══════════════════════════════════════════════════════════════════════
 
+/**
+ * Payment schedule (split payment terms — Riviera Marine).
+ *
+ * `invoices` was Phase 0: one live invoice per order. Real deals are often paid
+ * in tranches — "50% CIA and 50% at 21 dd" — which is two receivables with two
+ * different due dates, and the customer expects two invoices. Each row here is
+ * one tranche; issuance turns each into its own `invoices` row.
+ *
+ * Source of truth is `percent`, never a fixed amount: when the trader edits the
+ * order's lines the schedule rescales deterministically, and only tranches that
+ * have not been issued yet are affected. Amounts live on the issued invoice.
+ *
+ * A schedule is optional. An order with no rows behaves exactly as it did in
+ * Phase 0 (one implicit 100% tranche on the order's own customer terms), so the
+ * feature is purely additive.
+ */
+export const orderPaymentSchedule = pgTable('order_payment_schedule', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  /** Display order and the stable identity of a tranche within its order. */
+  seq: integer('seq').notNull(),
+  /** Free-text label shown on the invoice, e.g. "Deposit", "Balance". */
+  label: text('label'),
+  /** Share of the order total, 0-100; the rows of an order must sum to 100. */
+  percent: numeric('percent', { precision: 6, scale: 3 }).notNull(),
+  dueBasis: invoiceDueBasisEnum('due_basis').notNull().default('FROM_DELIVERY'),
+  /** Days added to the delivery anchor; only meaningful for FROM_DELIVERY. */
+  creditDays: integer('credit_days'),
+  /** Exact due date; required when dueBasis = FIXED_DATE. */
+  fixedDueDate: date('fixed_due_date'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  /** One tranche per (order, seq) — also the target of the per-tranche index. */
+  orderSeq: uniqueIndex('order_payment_schedule_order_seq_idx').on(table.orderId, table.seq),
+}));
+
 export const invoices = pgTable('invoices', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderId: uuid('order_id').notNull().references(() => orders.id),
@@ -1363,16 +1413,28 @@ export const invoices = pgTable('invoices', {
   amount: numeric('amount', { precision: 14, scale: 2 }),
   amountPaid: numeric('amount_paid', { precision: 14, scale: 2 }).default('0'),
 
+  // Split payment terms: which tranche of the order this invoice bills, and the
+  // share it was billed at. Snapshotted rather than derived, so re-editing the
+  // schedule can never restate an invoice the customer already holds.
+  scheduleId: uuid('schedule_id').references(() => orderPaymentSchedule.id, { onDelete: 'set null' }),
+  trancheSeq: integer('tranche_seq'),
+  trancheLabel: text('tranche_label'),
+  tranchePercent: numeric('tranche_percent', { precision: 6, scale: 3 }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   /**
-   * Phase 0 issues exactly one invoice per order. Declared here (not only in the
-   * migration) so drizzle-kit generate/push would never drop it. Phase 1 drops
-   * this when split/tranche terms allow several invoices per order.
+   * One LIVE invoice per (order, tranche). Replaces the Phase 0 one-per-order
+   * index now that split payment terms issue a tranche per invoice.
+   *
+   * `coalesce(tranche_seq, 0)` covers both cases with one index: a scheduled
+   * order has seq >= 1 per tranche, and an unscheduled order has a single
+   * invoice with tranche_seq NULL, which must still collide with itself.
+   * Partial on status so a voided invoice frees its slot for a reissue.
    */
-  onePerOrder: uniqueIndex('invoices_one_per_order')
-    .on(table.orderId)
+  oneLivePerTranche: uniqueIndex('invoices_one_live_per_tranche')
+    .on(table.orderId, sql`coalesce(tranche_seq, 0)`)
     .where(sql`status <> 'VOID'`),
 }));
 
