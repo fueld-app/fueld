@@ -6,6 +6,9 @@ import {
 } from '../src/modules/kantox/kantox.client';
 import {
   closeDeltaForPayment,
+  planPaymentClosures,
+  nextLifecycleSeq,
+  splitSellLegByTranche,
   computeHedgeAmount,
   computeUsdMargin,
   deriveValueDate,
@@ -390,5 +393,96 @@ describe('isAllowedKantoxBaseUrl — the vaulted password only goes to Kantox', 
 
   it('rejects the cloud metadata endpoint (SSRF pivot with credentials attached)', () => {
     expect(isAllowedKantoxBaseUrl('http://169.254.169.254/latest/meta-data/')).toBe(false);
+  });
+});
+
+describe('planPaymentClosures — a payment is consumed across the open entries', () => {
+  it('sizes each closure against what is LEFT of the payment', () => {
+    // Split terms hedge one entry per tranche. The old loop handed the whole
+    // payment to every entry, so this payment would have cancelled BOTH in full.
+    const plan = planPaymentClosures([{ amount: 50000, cancelled: 0 }, { amount: 50000, cancelled: 0 }], 50000);
+    expect(plan).toEqual([{ index: 0, delta: -50000 }]);
+    expect(plan.reduce((s, p) => s + Math.abs(p.delta), 0)).toBe(50000);
+  });
+
+  it('spreads a payment over several entries without exceeding it', () => {
+    const plan = planPaymentClosures([{ amount: 50000, cancelled: 0 }, { amount: 50000, cancelled: 0 }], 75000);
+    expect(plan).toEqual([{ index: 0, delta: -50000 }, { index: 1, delta: -25000 }]);
+    expect(plan.reduce((s, p) => s + Math.abs(p.delta), 0)).toBe(75000);
+  });
+
+  it('never cancels more than the remaining exposure when the payment is larger', () => {
+    const plan = planPaymentClosures([{ amount: 50000, cancelled: 40000 }, { amount: 30000, cancelled: 0 }], 999999);
+    expect(plan.reduce((s, p) => s + Math.abs(p.delta), 0)).toBe(40000); // 10k + 30k
+  });
+
+  it('skips entries already closed', () => {
+    const plan = planPaymentClosures([{ amount: 10000, cancelled: 10000 }, { amount: 20000, cancelled: 0 }], 5000);
+    expect(plan).toEqual([{ index: 1, delta: -5000 }]);
+  });
+
+  it('is a no-op for a zero or negative payment', () => {
+    expect(planPaymentClosures([{ amount: 100, cancelled: 0 }], 0)).toEqual([]);
+    expect(planPaymentClosures([{ amount: 100, cancelled: 0 }], -5)).toEqual([]);
+  });
+});
+
+describe('nextLifecycleSeq — each close on a parent gets its own ref', () => {
+  it('starts at 1 and continues past the children already on file', () => {
+    expect(nextLifecycleSeq('X#S1', [], 'C')).toBe(1);
+    expect(nextLifecycleSeq('X#S1', ['X#S1C1'], 'C')).toBe(2);
+    expect(nextLifecycleSeq('X#S1', ['X#S1C1', 'X#S1C2'], 'C')).toBe(3);
+  });
+
+  it('does not confuse another parent or tag', () => {
+    expect(nextLifecycleSeq('X#S1', ['X#S2C3', 'X#S1A9', 'OTHER'], 'C')).toBe(1);
+  });
+
+  it('handles a suffix that is not a number without losing the sequence', () => {
+    expect(nextLifecycleSeq('X#S1', ['X#S1C', 'X#S1C2'], 'C')).toBe(3);
+  });
+});
+
+describe('splitSellLegByTranche', () => {
+  it('splits by share, last tranche absorbing the rounding', () => {
+    expect(splitSellLegByTranche(1000, [{ percent: 33.333, dueDays: 0 }, { percent: 33.333, dueDays: 30 }, { percent: 33.334, dueDays: 60 }]))
+      .toEqual([{ refIndex: 1, amount: 333.33, dueDays: 0 }, { refIndex: 2, amount: 333.33, dueDays: 30 }, { refIndex: 3, amount: 333.34, dueDays: 60 }]);
+  });
+
+  it('returns null (order-level entry) when a tranche has no measurable date', () => {
+    expect(splitSellLegByTranche(1000, [{ percent: 50, dueDays: null }, { percent: 50, dueDays: 60 }])).toBeNull();
+  });
+
+  it('returns null with no usable schedule', () => {
+    expect(splitSellLegByTranche(1000, null)).toBeNull();
+    expect(splitSellLegByTranche(1000, [])).toBeNull();
+    expect(splitSellLegByTranche(1000, [{ percent: 0, dueDays: 0 }])).toBeNull();
+  });
+
+  it('keeps the parts summing to the whole', () => {
+    const parts = splitSellLegByTranche(999999.99, [{ percent: 50, dueDays: 0 }, { percent: 50, dueDays: 30 }])!;
+    expect(parts.reduce((s, p) => s + p.amount, 0)).toBeCloseTo(999999.99, 2);
+  });
+});
+
+describe('scheduled orders hedge each tranche under its own ref', () => {
+  const settings = { marginHedgePercent: 100, paymentDateBufferDays: 0, valueDateRounding: 'NONE' as const, hedgeCurrency: 'USD', hedgeCounterCurrency: 'EUR' };
+  const item = { productType: 'VLSFO', quantity: '100', quantityMin: '100', salesPrice: '1000', salesCurrency: 'USD', costPrice: '900', costCurrency: 'USD', orderSupplierId: 's1' } as never;
+  const base = { tenantId: 't1', orderId: 'o1', orderNumber: 'ORD-1', deliveredAt: '2026-09-20T00:00:00Z', customerPaymentTermType: 'CREDIT', customerCreditDays: 60, items: [item] };
+
+  it('leaves an unscheduled order exactly as before', () => {
+    const sells = buildHedgePlan(base, settings).entries.filter((e) => e.direction === 'SELL');
+    expect(sells).toHaveLength(1);
+    expect(sells[0]!.entryRef).toBe('ORD-1#S');
+    expect(sells[0]!.amount).toBe('100000.00');
+  });
+
+  it('gives each tranche its own ref and its own date', () => {
+    const sells = buildHedgePlan({ ...base, customerTranches: [{ percent: 50, dueDays: 0 }, { percent: 50, dueDays: 60 }] }, settings)
+      .entries.filter((e) => e.direction === 'SELL');
+    expect(sells.map((e) => e.entryRef)).toEqual(['ORD-1#S1', 'ORD-1#S2']);
+    expect(sells.map((e) => e.valueDate)).toEqual(['2026-09-20', '2026-11-19']);
+    // The hedge still covers the full sell exposure.
+    expect(sells.reduce((s, e) => s + Number(e.amount), 0)).toBe(100000);
   });
 });

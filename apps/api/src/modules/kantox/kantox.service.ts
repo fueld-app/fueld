@@ -12,7 +12,7 @@
 //  the confirmed contract (margin basis, value date, delta close).
 // ═══════════════════════════════════════════════════════════════════════
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   activityLogs,
@@ -262,7 +262,11 @@ export async function listHedgesForOrder(tenantId: string, orderId: string) {
   return db
     .select()
     .from(kantoxHedgeEntries)
-    .where(and(eq(kantoxHedgeEntries.tenantId, tenantId), eq(kantoxHedgeEntries.orderId, orderId)));
+    .where(and(eq(kantoxHedgeEntries.tenantId, tenantId), eq(kantoxHedgeEntries.orderId, orderId)))
+    // Insertion order: a payment is consumed across the open entries oldest
+    // first, so which tranche it closes must be deterministic rather than
+    // whatever the planner returns.
+    .orderBy(asc(kantoxHedgeEntries.createdAt), asc(kantoxHedgeEntries.id));
 }
 
 export type { KantoxEntry, KantoxPosition };
@@ -487,11 +491,13 @@ export function buildHedgePlan(
         amount: split.amount.toFixed(2),
         amountBasis: split.amount.toFixed(2),
         valueDate: trancheValueDate(snap, settings, split.dueDays),
-        // A per-tranche ref: reusing the base SO ref for several amounts would
-        // collide and the later pushes would be skipped as already claimed.
-        entryRef: sellSplits.length === 1
-          ? entryRef(orderNumberSafe(orderRef), 'SO', undefined, 'INITIAL', 0)
-          : `${orderNumberSafe(orderRef)}#S${split.refIndex}`,
+        // A per-tranche ref, ALWAYS suffixed when a schedule is present. Reusing
+        // the base ref for several amounts would collide (later pushes skipped as
+        // already claimed), and reusing it for a single-tranche schedule would
+        // let a re-CONFIRM claim the same ref as a pre-schedule hedge with a
+        // different payload. The bare `#S` is reserved for orders with no
+        // schedule, so unscheduled behaviour is unchanged.
+        entryRef: `${orderNumberSafe(orderRef)}#S${split.refIndex}`,
       }))
     : [{
         leg: 'SO',
@@ -678,13 +684,63 @@ export async function onOrderCancelledForKantox(tenantId: string, orderId: strin
         amount: (-remaining).toFixed(2),
         amountBasis: '0.00',
         valueDate: row.valueDate ?? undefined,
-        entryRef: `${row.entryRef}C${row.retryCount + 1}`,
+        entryRef: `${row.entryRef}C${nextLifecycleSeq(row.entryRef, rows.map((r) => r.entryRef), 'C')}`,
       };
       await pushLifecycleEntry(tenantId, resolved, planned, { orderId, kind: 'CANCEL', parentRowId: row.id, notes: `Fueld cancel ${row.entryRef}` });
     }
   } catch (err) {
     console.error(`[Kantox] onOrderCancelled failed for order ${orderId} — non-fatal:`, err);
   }
+}
+
+/**
+ * Sequence number for the NEXT lifecycle (cancel/amend) entry on a parent row.
+ *
+ * Derived from how many such children already exist, NOT from the parent's
+ * `retryCount`: that only advances when the parent's own send fails, so two
+ * partial payments against one open leg both produced `...C1`. Kantox rejects a
+ * repeated ref even with a different payload, and the lifecycle push swallows
+ * the failure — so the second payment would silently close nothing.
+ */
+export function nextLifecycleSeq(entryRef: string, existingRefs: string[], tag: 'C' | 'A' | 'R'): number {
+  const prefix = `${entryRef}${tag}`;
+  let highest = 0;
+  for (const ref of existingRefs) {
+    if (!ref.startsWith(prefix)) continue;
+    const n = Number.parseInt(ref.slice(prefix.length), 10);
+    if (Number.isFinite(n) && n > highest) highest = n;
+  }
+  return highest + 1;
+}
+
+/**
+ * Consume a payment across the order's open sell entries, oldest first.
+ *
+ * This is the part `closeDeltaForPayment` cannot do alone: that function sizes
+ * ONE closure, while the order may hold several sell entries (split payment
+ * terms hedge one per tranche). Handing the full payment to each entry
+ * over-cancels — a 50k payment against two 50k entries would extinguish 100k of
+ * exposure, and an over-cancel creates a position in the opposite direction.
+ * Returns the entries to close, in order, with the amount for each.
+ */
+export function planPaymentClosures(
+  entries: Array<{ amount: number; cancelled: number }>,
+  paymentAmount: number,
+): Array<{ index: number; delta: number }> {
+  // Only a POSITIVE receipt relieves exposure. A zero or negative amount is not
+  // a payment (it is a correction or a refund), and treating its magnitude as a
+  // receipt would close a hedge that is still open.
+  if (!(paymentAmount > 0)) return [];
+  let unapplied = paymentAmount;
+  const plan: Array<{ index: number; delta: number }> = [];
+  for (let index = 0; index < entries.length && unapplied > 0; index++) {
+    const entry = entries[index]!;
+    const delta = closeDeltaForPayment(entry.amount, entry.cancelled, unapplied);
+    if (delta === 0) continue;
+    unapplied -= Math.abs(delta);
+    plan.push({ index, delta });
+  }
+  return plan;
 }
 
 /** Fire-and-forget — USD customer payment received → close delta on the SO leg.
@@ -701,17 +757,32 @@ export async function onCustomerPaymentForKantox(
     const sellRows = rows.filter((r) => r.direction === 'SELL' && (r.status === 'SENT' || r.status === 'HEDGED'));
     if (sellRows.length === 0) return; // nothing open (e.g. payment before push)
     const client = makeClient(resolved);
-    for (const row of sellRows) {
-      const delta = closeDeltaForPayment(Number(row.amount), Number(row.cancelledAmount), paymentAmount);
-      if (delta === 0) continue;
+    // A payment must be CONSUMED across the order's open sell entries, not
+    // applied in full to each: a split-terms order hedges one entry per tranche,
+    // and passing the whole payment to every entry would over-cancel (a 50k
+    // payment against two 50k entries would extinguish 100k of exposure — the
+    // over-cancel that creates an opposite position). Oldest entry first, which
+    // matches the order the exposure was hedged in.
+    const plan = planPaymentClosures(
+      sellRows.map((row) => ({ amount: Number(row.amount), cancelled: Number(row.cancelledAmount) })),
+      Math.abs(paymentAmount),
+    );
+    // Every ref on file, so each close gets its own sequence rather than
+    // colliding with a previous payment's cancel.
+    const existingRefs = rows.map((r) => r.entryRef);
+    for (const { index: planIndex, delta } of plan) {
+      const row = sellRows[planIndex]!;
       const planned: PlannedHedgeEntry = {
         leg: row.leg,
         direction: 'SELL',
         amount: delta.toFixed(2),
         amountBasis: '0.00',
         valueDate: row.valueDate ?? undefined,
-        entryRef: `${row.entryRef}C${row.retryCount + 1}`,
+        entryRef: `${row.entryRef}C${nextLifecycleSeq(row.entryRef, existingRefs, 'C')}`,
       };
+      // Record the ref we just used, so a second close in this same pass does
+      // not pick the same sequence.
+      existingRefs.push(planned.entryRef);
       await pushLifecycleEntry(tenantId, resolved, planned, { orderId, kind: 'CANCEL', parentRowId: row.id, notes: `Fueld payment close ${row.entryRef}` });
       const newCancelled = Number(row.cancelledAmount) + Math.abs(delta);
       const fullyClosed = newCancelled >= Number(row.amount);

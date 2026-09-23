@@ -1723,8 +1723,13 @@ export const kantoxHedgeEntries = pgTable('kantox_hedge_entries', {
 }, (table) => ({
   // One INITIAL row per order+leg (two-leg flow: SO leg + one per PO leg).
   // AMEND/CANCEL/REISSUE rows are legitimately multi-row.
+  // One INITIAL entry per (order, leg, REF). The ref is part of the key because
+  // split payment terms hedge one SELL entry per tranche and they all share
+  // leg='SO' — keying on (order, leg) alone would reject every tranche after the
+  // first, and the insert path swallows a duplicate key as "already claimed", so
+  // those tranches would silently never be submitted.
   initialUniq: uniqueIndex('kantox_hedge_entries_initial_uniq')
-    .on(table.tenantId, table.orderId, table.leg)
+    .on(table.tenantId, table.orderId, table.leg, table.entryRef)
     .where(sql`kind = 'INITIAL'`),
 }));
 
