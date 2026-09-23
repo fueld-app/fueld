@@ -564,7 +564,15 @@ async function markSent(
   const transitioned = await db
     .update(kantoxHedgeEntries)
     .set({ status: 'SENT', updatedAt: new Date(), ...patch })
-    .where(and(eq(kantoxHedgeEntries.id, rowId), ne(kantoxHedgeEntries.status, 'SENT')))
+    // Only from a state that has NOT yet been counted: PENDING_SEND (first send)
+    // or FAILED (retry). Guarding merely on `<> SENT` would let a HEDGED row be
+    // downgraded to SENT and re-advance its parent — the "exactly once" invariant
+    // must hold from the states the callers can actually present, not by trusting
+    // them to.
+    .where(and(
+      eq(kantoxHedgeEntries.id, rowId),
+      inArray(kantoxHedgeEntries.status, ['PENDING_SEND', 'FAILED']),
+    ))
     .returning({ parentEntryId: kantoxHedgeEntries.parentEntryId, amount: kantoxHedgeEntries.amount });
   const child = transitioned[0];
   if (!child?.parentEntryId) return;
@@ -748,7 +756,6 @@ export async function onOrderCancelledForKantox(tenantId: string, orderId: strin
     const resolved = await resolveKantoxSettings(tenantId, (tenant?.settings as any) ?? null);
     if (!resolved) return;
     const rows = await listHedgesForOrder(tenantId, orderId);
-    const client = makeClient(resolved);
     for (const row of rows) {
       if (row.status === 'CANCELLED' || row.status === 'CLOSED') continue;
       // A FAILED entry may never have reached Kantox, so cancelling it would send
@@ -839,7 +846,6 @@ export async function onCustomerPaymentForKantox(
     const rows = await listHedgesForOrder(tenantId, orderId);
     const sellRows = rows.filter((r) => r.direction === 'SELL' && (r.status === 'SENT' || r.status === 'HEDGED'));
     if (sellRows.length === 0) return; // nothing open (e.g. payment before push)
-    const client = makeClient(resolved);
     // A payment must be CONSUMED across the order's open sell entries, not
     // applied in full to each: a split-terms order hedges one entry per tranche,
     // and passing the whole payment to every entry would over-cancel (a 50k
@@ -849,8 +855,24 @@ export async function onCustomerPaymentForKantox(
     // Pass the amount UNCHANGED: the helper decides what counts as a receipt. An
     // abs() here would hand a refund to the helper as a positive receipt and
     // defeat its own guard.
+    // Derive each entry's already-closed amount from its OWN lifecycle children
+    // rather than trusting the parent's cached `cancelledAmount`. That cache is
+    // advanced when a child reaches SENT, and a child whose send landed at Kantox
+    // but whose response was lost stays FAILED until the (15-minute) sync tick —
+    // so in that window the cache understates what is already closed, and a
+    // further payment would plan a close against phantom exposure. Counting the
+    // children on file is the same figure without the lag.
+    const closedBySeq = new Map<string, number>();
+    for (const child of rows) {
+      if (!child.parentEntryId) continue;
+      if (child.status !== 'SENT' && child.status !== 'HEDGED') continue;
+      closedBySeq.set(child.parentEntryId, (closedBySeq.get(child.parentEntryId) ?? 0) + Math.abs(Number(child.amount)));
+    }
     const plan = planPaymentClosures(
-      sellRows.map((row) => ({ amount: Number(row.amount), cancelled: Number(row.cancelledAmount) })),
+      sellRows.map((row) => ({
+        amount: Number(row.amount),
+        cancelled: closedBySeq.get(row.id) ?? 0,
+      })),
       paymentAmount,
     );
     // Every ref on file, so each close gets its own sequence rather than

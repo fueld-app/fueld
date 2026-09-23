@@ -557,3 +557,28 @@ describe('lifecycle ref sequencing is collision-proof', () => {
     expect(nextLifecycleSeq('ORD#S1', ['ORD#S1A1'], 'C')).toBe(1);
   });
 });
+
+describe('payment planning reads the children on file, not the cached total', () => {
+  /**
+   * The parent's `cancelledAmount` is a cache advanced when a child reaches SENT.
+   * A child whose send landed at Kantox but whose response was lost stays FAILED
+   * until the (15-minute) sync tick, so inside that window the cache understates
+   * what is already closed and a further payment would plan against phantom
+   * exposure. Counting the children on file gives the same figure without the lag.
+   */
+  function planFrom(closedFrom: 'cache' | 'children', parentAmount: number, childrenSent: number[], payment: number) {
+    const cached = closedFrom === 'cache' ? 0 : childrenSent.reduce((s, c) => s + Math.abs(c), 0);
+    return planPaymentClosures([{ amount: parentAmount, cancelled: cached }], payment);
+  }
+
+  it('never closes against exposure a landed-but-unrecorded child already closed', () => {
+    // 100k parent; a 50k close LANDED at Kantox but the cache still says 0.
+    const stalePlan = planFrom('cache', 100000, [-50000], 80000);
+    const honestPlan = planFrom('children', 100000, [-50000], 80000);
+    expect(stalePlan.reduce((s, p) => s + Math.abs(p.delta), 0)).toBe(80000); // 30k against closed exposure
+    expect(honestPlan.reduce((s, p) => s + Math.abs(p.delta), 0)).toBe(50000); // exactly what is open
+    expect(honestPlan.reduce((s, p) => s + Math.abs(p.delta), 0)).toBeLessThan(
+      stalePlan.reduce((s, p) => s + Math.abs(p.delta), 0),
+    );
+  });
+});

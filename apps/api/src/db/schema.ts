@@ -1743,6 +1743,9 @@ export const kantoxHedgeEntries = pgTable('kantox_hedge_entries', {
   // snapshot), and Kantox rejects the second at send time, after the row exists.
   refUniq: uniqueIndex('kantox_hedge_entries_ref_uniq')
     .on(table.tenantId, table.orderId, table.entryRef),
+  // Declared so schema.ts matches migration 0131 — otherwise `db:generate`
+  // reports the index as drift and would try to drop it.
+  parentEntryIdx: index('kantox_hedge_entries_parent_entry_idx').on(table.parentEntryId),
 }));
 
 // ═══════════════════════════════════════════════════════════════════════
