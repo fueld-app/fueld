@@ -2281,6 +2281,12 @@ export async function listOrderPayments(orderId: string) {
   // A receipt that covered more than one invoice is stored as several rows
   // sharing one parent. It was recorded ONCE, so it is listed once, with the
   // total actually received and the invoices it settled named alongside.
+  //
+  // A part whose parent is missing would be dropped here. That cannot happen
+  // through the writers: the only insert sets split_parent_id to the row it just
+  // stamped, and `ON DELETE CASCADE` removes parts with their parent. It is
+  // listed only for the parent, so an order holding nothing but orphan parts
+  // would show no receipts -- worth revisiting if a writer ever crosses orders.
   const parents = new Map<string, typeof rows>();
   const parts = new Map<string, typeof rows>();
   for (const row of rows) {

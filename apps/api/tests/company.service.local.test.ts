@@ -433,3 +433,62 @@ describe('company.service local flows', () => {
     expect(dbRow?.isPrimary).toBe(true);
   });
 });
+
+describe('customer payment ledger with split receipts', () => {
+  it('counts one receipt once while conserving every cent received', async () => {
+    const { tenant, client, vessel, place } = await seedBasics();
+    const db = await getDb();
+    const { getCustomerPaymentLedger } = await loadCompanyService();
+    const { setOrderPaymentSchedule } = await import('../src/modules/orders/payment-schedule.service');
+    const { ensureOrderInvoice, computeInvoiceAmount } = await import('../src/modules/orders/invoice.service');
+    const { customerPayments, orderItems } = await import('../src/db/schema');
+
+    const [order] = await db.insert(orders).values({
+      tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id,
+      orderNumber: `LEDGER-${Date.now()}`, status: 'DELIVERED', currency: 'USD',
+      customerPaymentTermType: 'CREDIT', customerCreditDays: 21,
+      deliveredAt: new Date('2026-09-20T00:00:00Z'),
+    }).returning();
+    await db.insert(orderItems).values({
+      orderId: order!.id, productType: 'VLSFO', quantity: '100', unit: 'MT',
+      costPrice: '600', salesPrice: '5000', costCurrency: 'USD', salesCurrency: 'USD',
+    });
+    await setOrderPaymentSchedule(order!.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    const total = parseFloat(await computeInvoiceAmount(order!.id));
+
+    // One bank credit covering the whole deal, recorded BEFORE issuance, so it
+    // gets split across the two tranche invoices.
+    await db.insert(customerPayments).values({
+      tenantId: tenant.id, customerId: client.id, orderId: order!.id, invoiceId: null,
+      amount: total.toFixed(2), currency: 'USD', receivedAt: new Date('2026-09-21T10:00:00Z'),
+    });
+    await ensureOrderInvoice(order!.id);
+
+    const rows = await db.select().from(customerPayments).where(eq(customerPayments.orderId, order!.id));
+    expect(rows.length).toBe(2); // one row per invoice, as the schema requires
+
+    const ledger = await getCustomerPaymentLedger(client.id);
+    const totals = (ledger as unknown as { totals: Array<{ currency: string; totalReceived: string; count: number }> }).totals;
+    const usd = totals.find((t) => t.currency === 'USD') ?? totals[0]!;
+    // Money received counts every row...
+    expect(parseFloat(usd!.totalReceived)).toBeCloseTo(total, 2);
+    // ...but the count is of RECEIPTS, so one transfer is not reported as two.
+    expect(usd!.count).toBe(1);
+
+    const pages = (ledger as unknown as { payments: Array<{ amount: string }> }).payments;
+    expect(pages.length).toBe(1);
+    expect(parseFloat(pages[0]!.amount)).toBeCloseTo(total, 2);
+
+    // A date window that excludes the receipt excludes it entirely — the parts
+    // carry their parent's receivedAt, so a filter can never catch half a split.
+    const outside = await getCustomerPaymentLedger(client.id, { dateFrom: '2026-01-01', dateTo: '2026-01-31' });
+    const outsideTotals = (outside as unknown as { totals: Array<{ totalReceived: string; count: number }> }).totals;
+    const outsidePages = (outside as unknown as { payments: unknown[] }).payments;
+    expect(outsidePages.length).toBe(0);
+    expect(outsideTotals[0]?.count ?? 0).toBe(0);
+    expect(parseFloat(outsideTotals[0]?.totalReceived ?? '0')).toBe(0);
+  });
+});

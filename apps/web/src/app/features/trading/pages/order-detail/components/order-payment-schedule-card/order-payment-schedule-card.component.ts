@@ -217,6 +217,8 @@ export class OrderPaymentScheduleCardComponent {
   /** Set when tranche invoices exist: the schedule is frozen until they are voided. */
   readonly locked = input(false);
   readonly saving = input(false);
+  /** The order's current lines total, so the preview can show real amounts. */
+  readonly orderTotal = input(0);
 
   readonly saveSchedule = output<DraftTranche[]>();
   readonly clearSchedule = output<void>();
@@ -239,11 +241,38 @@ export class OrderPaymentScheduleCardComponent {
     this.draft().reduce((sum, row) => sum + (parseFloat(row.percent) || 0), 0),
   );
 
-  /** The API requires exactly 100%; a tiny tolerance absorbs 33.333-style input. */
-  readonly totalsTo100 = computed(() => Math.abs(this.percentTotal() - 100) < 0.01);
+  /**
+   * The API accepts a total within PERCENT_TOLERANCE (0.001) of 100. Match it
+   * exactly: a looser check here would let the trader press Save on a schedule
+   * the server then rejects, which reads as a broken button.
+   */
+  private static readonly PERCENT_TOLERANCE = 0.001;
+  readonly totalsTo100 = computed(() => Math.abs(this.percentTotal() - 100) <= OrderPaymentScheduleCardComponent.PERCENT_TOLERANCE);
 
-  /** Live preview from the last saved schedule's amounts, scaled by the draft. */
-  readonly preview = computed(() => this.schedule());
+  /**
+   * What each draft tranche will bill, computed the same way issuance does
+   * (the last tranche absorbs rounding). Shown while editing so the trader sees
+   * the split before saving rather than after.
+   */
+  readonly preview = computed(() => {
+    const rows = this.draft();
+    const total = this.orderTotal();
+    if (total <= 0) return [];
+    const percents = rows.map((r) => parseFloat(r.percent) || 0);
+    return rows.map((row, index) => {
+      const share = index === percents.length - 1
+        ? Math.round(total * 100) / 100 - percents
+            .slice(0, -1)
+            .reduce((sum, pct) => sum + Math.round((total * pct) / 100 * 100) / 100, 0)
+        : Math.round((total * percents[index]!) / 100 * 100) / 100;
+      return {
+        seq: index + 1,
+        label: row.label,
+        amount: share.toFixed(2),
+        dueDate: null as string | null,
+      };
+    });
+  });
 
   asPercent(percent: string): string {
     const n = parseFloat(percent);

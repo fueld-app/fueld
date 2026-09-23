@@ -628,6 +628,12 @@ export class SendEmailModalComponent {
   readonly pdfFileName = input<string>('');
   readonly orderId = input<string>('');
   readonly nominationOrderSupplierId = input<string | null>(null);
+  /**
+   * With split payment terms the order has one invoice per tranche. Set this to
+   * attach a specific one; null attaches the default (the deposit). Without it
+   * the balance invoice could never be emailed.
+   */
+  readonly invoiceId = input<string | null>(null);
   readonly extraAttachments = input<SendEmailAttachmentOption[]>([]);
   /** Whether the current user has linked WhatsApp in Settings */
   readonly waLinked = input(false);
@@ -929,6 +935,7 @@ export class SendEmailModalComponent {
       subject: this.subject,
       htmlBody: this.htmlBody,
       attachmentIds: this.selectedAttachmentIds(),
+      invoiceId: this.invoiceId(),
     });
   }
 

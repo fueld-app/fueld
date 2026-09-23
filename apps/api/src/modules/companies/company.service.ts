@@ -2417,8 +2417,6 @@ export async function getCustomerPaymentLedger(
       method: customerPayments.method,
       note: customerPayments.note,
       createdAt: customerPayments.createdAt,
-      // How many invoices this one receipt settled (1 for an ordinary payment).
-      invoicesSettled: sql<number>`1 + (SELECT count(*)::int FROM customer_payments part WHERE part.split_parent_id = ${customerPayments.id})`,
     })
     .from(customerPayments)
     .leftJoin(orders, eq(orders.id, customerPayments.orderId))

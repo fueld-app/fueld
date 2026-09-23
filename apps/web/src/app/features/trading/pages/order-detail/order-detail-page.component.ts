@@ -311,6 +311,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly saving = signal(false);
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
   readonly invoiceNumber = signal('');
+  /**
+   * Which tranche invoice the send-email modal should attach. Set when the
+   * trader previews a specific tranche; otherwise the first issued tranche,
+   * which is the deposit and matches the API's default.
+   */
+  readonly emailInvoiceId = signal<string | null>(null);
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
 
   readonly selectedOwnCompany = computed(() => {
@@ -1461,12 +1467,18 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const id = this.orderId();
     if (!id) return;
     await this.financialSvc.loadPaymentSchedule(id);
-    this.paymentSchedule.set(this.financialSvc.paymentSchedule());
-    // No separate lock probe: whether tranche invoices exist is the API's call,
-    // and it refuses an edit with a clear message. Guessing here would need an
-    // invoice-list route this page does not have, and a wrong guess would either
-    // hide a legal edit or offer an illegal one.
-    this.scheduleLocked.set(false);
+    const schedule = this.financialSvc.paymentSchedule();
+    this.paymentSchedule.set(schedule);
+    // A tranche that carries an invoice is a document the customer holds, so the
+    // schedule must not change underneath it. The schedule response itself says
+    // which tranches are issued, so no separate probe is needed.
+    this.scheduleLocked.set(schedule.some((t) => t.invoiceId != null));
+    // Default the email attachment to the first issued tranche (the deposit,
+    // which is also what the API renders by default) unless a specific one is
+    // already selected from the preview.
+    if (!this.emailInvoiceId()) {
+      this.emailInvoiceId.set(schedule.find((t) => t.invoiceId)?.invoiceId ?? null);
+    }
   }
 
   async onSavePaymentSchedule(rows: Array<{ label: string; percent: string; dueBasis: InvoiceDueBasis; creditDays: string; fixedDueDate: string }>): Promise<void> {
@@ -1547,6 +1559,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const id = this.orderId();
     const modal = this.pdfModal();
     if (!id || !tranche.invoiceId || !modal) return;
+    // Remember which tranche is on screen so "Send" from the preview attaches
+    // THIS invoice, not the deposit.
+    this.emailInvoiceId.set(tranche.invoiceId);
     const label = tranche.invoiceNumber ?? `Tranche ${tranche.seq}`;
     modal.showLoading(label);
     try {
