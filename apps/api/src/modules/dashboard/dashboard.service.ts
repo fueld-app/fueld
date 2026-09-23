@@ -13,6 +13,7 @@ import {
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
 import { calculateOrderEconomics, calculateRevenueBase, effectiveSupplierDays, getFinancingRateAnnual } from '../orders/order-financing';
+import { deriveInvoiceDisplayStatus, SETTLEMENT_EPSILON } from '../orders/invoice.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Service — Smart Aggregations
@@ -82,8 +83,13 @@ export async function getCollections(
   const conditions = [
     eq(orders.tenantId, tenantId),
     lt(invoices.dueDate, today),
-    ne(invoices.status, 'PAID'),
+    // Outstanding is decided by the amounts, not the stored flag: `status` only
+    // moves when a payment goes through the app, so a row backfilled or adjusted
+    // out-of-band would otherwise be filtered out while still unpaid (fail-open).
+    // An invoice with no amount is not collectible and never appears here.
     ne(invoices.status, 'VOID'),
+    ne(invoices.status, 'DRAFT'),
+    sql`(coalesce(${invoices.amount}, 0) > 0 and coalesce(${invoices.amountPaid}, 0) < ${invoices.amount} - ${SETTLEMENT_EPSILON})`,
   ];
   if (from) conditions.push(gte(invoices.dueDate, from));
   if (to) conditions.push(lte(invoices.dueDate, to));
@@ -122,7 +128,7 @@ export async function getCollections(
       amountPaid: r.amountPaid,
       dueDate: r.dueDate,
       daysOverdue,
-      status: r.status,
+      status: deriveInvoiceDisplayStatus(r, daysOverdue),
     };
   });
 }

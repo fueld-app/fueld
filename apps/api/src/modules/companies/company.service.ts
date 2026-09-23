@@ -2,7 +2,7 @@
 //  Company Service — CRUD + Seasearcher sync for counterparties
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, ilike, or, and, sql, asc, desc, inArray, isNull, ne } from 'drizzle-orm';
+import { eq, ilike, or, and, sql, asc, desc, inArray, isNull, ne, notInArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { escapeLikePattern } from '../../utils/like';
 import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderItems, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, supplierPayments, invoices, creditApplications, portSuppliers, companyPlaceSupplyRules, creditLines, creditLineCounterparties } from '../../db/schema';
@@ -2441,7 +2441,9 @@ export async function getCustomerPaymentLedger(
     })
     .from(invoices)
     .innerJoin(orders, eq(orders.id, invoices.orderId))
-    .where(eq(orders.clientId, companyId))
+    // A voided invoice is not owed; DRAFT is not yet issued. Counting either
+    // would inflate the company's outstanding balance now that real rows exist.
+    .where(and(eq(orders.clientId, companyId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
     .groupBy(orders.currency);
 
   // Build per-currency totals map

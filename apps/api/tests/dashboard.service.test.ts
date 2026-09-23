@@ -56,6 +56,15 @@ describe('dashboard.service', () => {
       { productType: 'LSMGO', quantity: '50', unit: 'MT', salesPrice: '600', costPrice: '550' },
     ]);
 
+    // One invoice per order (enforced by invoices_one_per_order), so each case
+    // the collections query must handle gets its own order.
+    const paidOrder = await createOrder({
+      tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+    });
+    const futureOrder = await createOrder({
+      tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+    });
+
     await db.insert(invoices).values([
       {
         orderId: olderOrder.id,
@@ -74,7 +83,7 @@ describe('dashboard.service', () => {
         status: 'SENT',
       },
       {
-        orderId: newerOrder.id,
+        orderId: paidOrder.id,
         invoiceNumber: 'INV-PAID',
         dueDate: isoDate(-7),
         amount: '1000.00',
@@ -82,7 +91,7 @@ describe('dashboard.service', () => {
         status: 'PAID',
       },
       {
-        orderId: newerOrder.id,
+        orderId: futureOrder.id,
         invoiceNumber: 'INV-FUTURE',
         dueDate: isoDate(3),
         amount: '2000.00',

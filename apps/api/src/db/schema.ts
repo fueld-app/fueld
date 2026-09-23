@@ -236,6 +236,8 @@ export interface TenantSettings {
   // Order numbering
   orderNumberTemplate?: string;  // e.g. '{PREFIX}{YYYY}{MM}{DD}-{SEQ:6}', default '{YYYY}{MM}{DD}-{SEQ:6}'
   orderNumberPrefix?: string;    // optional prefix, e.g. 'FU-'
+  invoiceNumberTemplate?: string; // e.g. '{PREFIX}{YYYY}-{SEQ:4}', default '{PREFIX}{YYYY}-{SEQ:4}'
+  invoiceNumberPrefix?: string;   // default 'INV-'
   // Vessel-company roles (configurable from admin)
   vesselCompanyRoles?: { key: string; label: string; group: string; description?: string; seasearcherCode?: string }[];
   // Configurable product and unit options for order line items
@@ -1016,6 +1018,15 @@ export const orderNumberSequences = pgTable('order_number_sequences', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Invoice numbers are allocated from their own sequence so that order numbers
+// and invoice numbers never share a counter (a cancelled order must not burn an
+// invoice number, and vice versa). Same atomic-upsert pattern as orders.
+export const invoiceNumberSequences = pgTable('invoice_number_sequences', {
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id).primaryKey(),
+  lastSeq: integer('last_seq').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const orders = pgTable('orders', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
@@ -1354,7 +1365,16 @@ export const invoices = pgTable('invoices', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  /**
+   * Phase 0 issues exactly one invoice per order. Declared here (not only in the
+   * migration) so drizzle-kit generate/push would never drop it. Phase 1 drops
+   * this when split/tranche terms allow several invoices per order.
+   */
+  onePerOrder: uniqueIndex('invoices_one_per_order')
+    .on(table.orderId)
+    .where(sql`status <> 'VOID'`),
+}));
 
 // ═══════════════════════════════════════════════════════════════════════
 //  12a. DOCUMENT REVISIONS (immutable PDF artifacts + fingerprints)

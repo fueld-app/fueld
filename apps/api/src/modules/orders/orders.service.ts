@@ -20,7 +20,6 @@ import {
   orderNumberSequences,
   tenants,
   customerPayments,
-  invoices,
   supplierPayments,
   companyContacts,
   priceReferences,
@@ -29,6 +28,7 @@ import {
 } from '../../db/schema';
 import type { Order, TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
+import { recomputeInvoiceAmountPaid, resolvePaymentInvoiceTarget } from './invoice.service';
 import { checkCreditAvailability } from '../credit/credit.service';
 import { sendTemplatedGroupMessage, buildProductTemplateVariables } from '../whatsapp/whatsapp.service';
 import {
@@ -2281,18 +2281,6 @@ export async function listOrderPayments(orderId: string) {
   return rows.map(mapPaymentRow);
 }
 
-async function updateInvoiceAmountPaid(orderId: string): Promise<void> {
-  const [{ total }] = await db
-    .select({ total: sql<number>`COALESCE(SUM(${customerPayments.amount}), 0)::float` })
-    .from(customerPayments)
-    .where(eq(customerPayments.orderId, orderId));
-
-  await db
-    .update(invoices)
-    .set({ amountPaid: total.toFixed(2), updatedAt: new Date() })
-    .where(eq(invoices.orderId, orderId));
-}
-
 export async function createOrderPayment(orderId: string, input: {
   amount: string;
   currency: string;
@@ -2309,12 +2297,10 @@ export async function createOrderPayment(orderId: string, input: {
 
   if (!orderRow) return null;
 
-  const [invoice] = await db
-    .select({ id: invoices.id })
-    .from(invoices)
-    .where(eq(invoices.orderId, orderId))
-    .orderBy(desc(invoices.createdAt))
-    .limit(1);
+  // A payment settles ONE invoice. Stamping the newest invoice (the old
+  // behaviour) sent every payment to the balance invoice the moment an order
+  // carried more than one.
+  const invoice = await resolvePaymentInvoiceTarget(orderId);
 
   const [created] = await db
     .insert(customerPayments)
@@ -2333,7 +2319,7 @@ export async function createOrderPayment(orderId: string, input: {
     .returning();
 
   if (invoice?.id) {
-    await updateInvoiceAmountPaid(orderId);
+    await recomputeInvoiceAmountPaid(invoice.id);
   }
 
   // Kantox: USD customer payment closes the sell-leg hedge (tenant-gated,

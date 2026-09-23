@@ -4,6 +4,15 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 
 ---
 
+## Invoicing
+
+- **Real invoice numbers and a working receivables ledger.** Issuing a final invoice now creates the invoice on the order with a proper number (e.g. `INV-2026-0007`, format configurable per tenant), its own amount, and its own due date. Previously invoices were never actually recorded, so documents showed a placeholder number, the Collections widget and Invoice Aging report stayed empty, and QuickBooks sync could not run at all.
+- **Due dates follow the real delivery date.** Credit terms are now counted from the actual delivery date (falling back to ETA before delivery) instead of always counting from ETA. Cash-on-delivery and prepayment invoices are due on the delivery/advance date rather than silently gaining a 30-day credit term.
+- **Payments settle a specific invoice.** Recording a payment updates that invoice's paid amount, so the paid/outstanding figures on each invoice are correct and one invoice's payment can no longer be counted against another.
+- **Overdue is always current.** Overdue status is calculated from each invoice's due date at the moment you look at it, so it can never go stale.
+
+---
+
 ## Orders & Inquiries
 
 - **Lost Inquiries are now separate from Cancelled Orders.** When you cancel an inquiry before it becomes an order, it now shows up in a new "Lost Inquiries" list instead of mixing with cancelled orders. Cancelled Orders now only contains actual orders that were cancelled.

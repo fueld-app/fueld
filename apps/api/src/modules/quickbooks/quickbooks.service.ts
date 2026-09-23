@@ -6,9 +6,10 @@
 //  using the same AES-256-GCM scheme as LLI credentials.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, or, desc } from 'drizzle-orm';
+import { eq, and, or, desc, ne } from 'drizzle-orm';
 import { db } from '../../db';
 import { integrationCredentials, tenants, users, orders, invoices, orderItems, counterparties, type TenantSettings } from '../../db/schema';
+import { customerFacingItems } from '../documents/customer-facing-items';
 import { encrypt, decrypt } from '../../lib/crypto';
 import { randomBytes } from 'crypto';
 import type { IntegrationStatusDto } from '@fueld/types';
@@ -892,11 +893,21 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
     // Non-critical — use default item ID
   }
 
-  // Build line items
-  const lines = items.map((item) => {
-    const qty = parseFloat(item.quantity?.toString() ?? '0');
-    const price = parseFloat(item.salesPrice?.toString() ?? '0');
-    const amount = parseFloat((qty * price).toFixed(2));
+  // Build line items.
+  //
+  // These must mirror the invoice exactly, because the QB total is now
+  // reconcilable against a real `invoices.amount`:
+  //   - customerFacingItems drops broker-commission (`hideOnDocuments`) and
+  //     legacy supplier credit-note placeholder lines, which the customer
+  //     invoice also omits.
+  //   - the billed quantity is the delivered quantity where recorded, matching
+  //     computeInvoiceAmount.
+  // Without both, the QB invoice silently disagreed with the invoice the
+  // customer received (measured across all three tenants before this fix).
+  const lines = customerFacingItems(items).map((item) => {
+    const qty = parseFloat(String(item.deliveredQuantity ?? item.quantity ?? '0')) || 0;
+    const price = parseFloat(item.salesPrice?.toString() ?? '0') || 0;
+    const amount = qty * price;
     const desc = [
       item.productType,
       item.description?.trim(),
@@ -911,11 +922,15 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
     };
   });
 
-  // If no line items, create a single line with the invoice amount
-  if (lines.length === 0) {
-    const amount = parseFloat(invoice.amount?.toString() ?? '0');
+  // Lines that do not sum to the invoice (an all-hidden order, or a rounding
+  // drift) would push a QB invoice that disagrees with the customer's copy.
+  // Fall back to a single line carrying the invoice amount.
+  const lineTotal = Math.round(lines.reduce((sum, line) => sum + line.Amount, 0) * 100) / 100;
+  const invoiceTotal = parseFloat(invoice.amount?.toString() ?? '0') || 0;
+  if (lines.length === 0 || Math.abs(lineTotal - invoiceTotal) > 0.005) {
+    lines.length = 0;
     lines.push({
-      Amount: amount,
+      Amount: invoiceTotal,
       DetailType: 'SalesItemLineDetail',
       Description: `Invoice ${invoice.invoiceNumber} — Order ${order.orderNumber ?? ''}`,
       SalesItemLineDetail: { ItemRef: { value: fallbackItemId } },
@@ -928,6 +943,9 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
     Line: lines,
     CustomerMemo: { value: `Fueld Order ${order.orderNumber ?? ''} — Invoice ${invoice.invoiceNumber}` },
     BillEmail: { Address: '' }, // Will be set if customer has email
+    // Carry the invoice's own due date across so QuickBooks ages the receivable
+    // on the same date the customer was told to pay.
+    DueDate: invoice.dueDate,
   };
 
   const createRes = await fetch(`${apiBase}/v3/company/${realmId}/invoice`, {
@@ -1042,7 +1060,7 @@ export async function syncOrderToQuickBooks(orderId: string): Promise<{ qbInvoic
   const [invoice] = await db
     .select({ id: invoices.id })
     .from(invoices)
-    .where(eq(invoices.orderId, orderId))
+    .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
     .orderBy(desc(invoices.createdAt))
     .limit(1);
 
@@ -1064,7 +1082,7 @@ export async function getOrderSyncStatus(orderId: string): Promise<{
   const [invoice] = await db
     .select({ id: invoices.id })
     .from(invoices)
-    .where(eq(invoices.orderId, orderId))
+    .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
     .orderBy(desc(invoices.createdAt))
     .limit(1);
 

@@ -58,6 +58,7 @@ import {
 import { sendNotificationEmail } from '../../lib/email';
 import { logActivity } from '../activity/activity.service';
 import { calculateOrderEconomics, calculateRevenueBase, effectiveSupplierDays, getFinancingRateAnnual } from '../orders/order-financing';
+import { deriveInvoiceDisplayStatus, SETTLEMENT_EPSILON } from '../orders/invoice.service';
 import { generateOrderNumber, syncPrimaryOrderSupplierFromLegacy } from '../orders/orders.service';
 
 const MANAGE_SHARED_REPORT_ROLES: Role[] = [
@@ -819,8 +820,12 @@ async function buildInvoiceAgingReport(
   const today = new Date().toISOString().slice(0, 10);
   const conditions = [
     eq(orders.tenantId, tenantId),
-    ne(invoices.status, 'PAID'),
+    // Settled state comes from the amounts, not the stored flag (see
+    // deriveInvoiceDisplayStatus) — a stale `PAID` must not hide a real debt.
+    // An invoice with no amount is not collectible and never appears here.
     ne(invoices.status, 'VOID'),
+    ne(invoices.status, 'DRAFT'),
+    sql`(coalesce(${invoices.amount}, 0) > 0 and coalesce(${invoices.amountPaid}, 0) < ${invoices.amount} - ${SETTLEMENT_EPSILON})`,
     inArray(orders.id, dataset.orderRows.map((row) => row.orderId)),
   ];
   if (context.userIds) conditions.push(inArray(orders.salesRepId, context.userIds));
@@ -862,7 +867,7 @@ async function buildInvoiceAgingReport(
       vesselName: row.vesselName,
       traderName: row.traderName ?? null,
       dueDate: row.dueDate,
-      status: row.status as InvoiceAgingReportRowDto['status'],
+      status: deriveInvoiceDisplayStatus(row, bucket.daysOverdue) as InvoiceAgingReportRowDto['status'],
       amount: formatMoney(amount),
       amountPaid: formatMoney(amountPaid),
       outstandingAmount: formatMoney(outstandingAmount),

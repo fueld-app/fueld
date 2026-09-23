@@ -45,6 +45,7 @@ import {
   setOrderBunkerBookingSent,
 } from './orders.service';
 import { logActivity } from '../activity/activity.service';
+import { voidOrderInvoice, InvoiceNotFoundError, InvoiceAlreadyVoidError, MixedCurrencyInvoiceError, InternalTransferHasNoInvoiceError } from './invoice.service';
 import {
   SupplierCreditNoteError,
   createSupplierCreditNote,
@@ -1454,6 +1455,76 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Orders'],
         summary: 'List all photo (image) attachments for an order',
+      },
+    },
+  )
+
+  // ─── Void / reissue an issued invoice ────────────────────────────
+  // An issued invoice never re-renders (number, amount and due date are frozen
+  // on the row), so this is the ONLY correction path. Voiding keeps the original
+  // for audit and issues a fresh invoice with a new number.
+  .post(
+    '/:id/invoice/void',
+    async ({ params, body, auth, set }) => {
+      try {
+        // Voiding a receivable and minting a replacement number is as
+        // destructive as deleting an order, so it carries the same gate as the
+        // DELETE route below: admin only, and only for the caller's own tenant.
+        if (auth.role !== 'ADMIN') {
+          set.status = 403;
+          return { success: false, data: null, message: 'Admin access required to void an invoice' };
+        }
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) { set.status = 404; return { success: false, data: null, message: 'Order not found' }; }
+        const [ownership] = await db
+          .select({ tenantId: orders.tenantId })
+          .from(orders)
+          .where(eq(orders.id, orderId))
+          .limit(1);
+        if (!ownership || ownership.tenantId !== auth.tenantId) {
+          set.status = 404;
+          return { success: false, data: null, message: 'Order not found' };
+        }
+
+        const result = await voidOrderInvoice(orderId, { reissue: body.reissue ?? true });
+
+        await logActivity({
+          userId: auth.sub,
+          tenantId: auth.tenantId,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: {
+            event: 'INVOICE_VOIDED',
+            voidedInvoiceNumber: result.voided.invoiceNumber,
+            reissuedInvoiceNumber: result.replacement?.invoiceNumber ?? null,
+            reason: body.reason ?? null,
+          },
+        });
+
+        return { success: true, data: result } satisfies ApiResponse<typeof result>;
+      } catch (err) {
+        console.error('[Orders] Void invoice failed:', err);
+        // Only domain refusals become 400s. An unexpected failure must stay a
+        // 500 (and not leak a raw driver message to the client).
+        const isDomainRefusal = err instanceof InvoiceNotFoundError
+          || err instanceof InvoiceAlreadyVoidError
+          || err instanceof MixedCurrencyInvoiceError
+          || err instanceof InternalTransferHasNoInvoiceError;
+        set.status = isDomainRefusal ? 400 : 500;
+        const message = isDomainRefusal && err instanceof Error ? err.message : 'Failed to void invoice';
+        return { success: false, data: null, message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        reissue: t.Optional(t.Boolean({ description: 'Issue a replacement invoice with a new number (default true)' })),
+        reason: t.Optional(t.Nullable(t.String({ description: 'Why the invoice is being voided (audit log)' }))),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Void an issued invoice and optionally reissue it',
       },
     },
   )

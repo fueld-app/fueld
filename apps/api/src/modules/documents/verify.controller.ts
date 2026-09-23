@@ -1,10 +1,10 @@
 import { Elysia, t } from 'elysia';
 import {
   generateOfferPdfBuffer,
-  generateOrderInvoicePdfBuffer,
   generateProformaInvoicePdfBuffer,
   getDocumentRevisionByVerifyToken,
   getLatestDocumentRevisionByOrderId,
+  getLatestInvoiceRevisionForOrder,
   isDocumentRevisionVerificationExpired,
   loadDocumentRevisionBuffer,
 } from './document.service';
@@ -97,6 +97,11 @@ export const verifyController = new Elysia({ prefix: '/verify' })
   )
 
   // ── GET /verify/:orderId/invoice ──────────────────────────────────
+  // Public and unauthenticated. It must NEVER generate: generation now
+  // materializes the invoice row, so a public generate path would let anyone
+  // mint invoice numbers and burn sequence values. Serve only what an
+  // authenticated issuance already persisted. (A revision may be keyed by the
+  // invoice id once one exists, so try both.)
   .get(
     '/:orderId/invoice',
     async ({ params, set }) => {
@@ -106,14 +111,16 @@ export const verifyController = new Elysia({ prefix: '/verify' })
         return { success: false, message: 'Document not found' };
       }
 
-      const existingRevision = await getLatestDocumentRevisionByOrderId(orderId, 'INVOICE');
-      const generated = existingRevision ? null : await generateOrderInvoicePdfBuffer(orderId);
-      const revision = existingRevision ?? generated!.revision;
+      const revision = await getLatestInvoiceRevisionForOrder(orderId);
+      if (!revision) {
+        set.status = 404;
+        return { success: false, message: 'No issued invoice to verify' };
+      }
       if (await isDocumentRevisionVerificationExpired(revision)) {
         set.status = 410;
         return { success: false, message: 'Verification link expired' };
       }
-      const fileName = generated?.fileName ?? `Invoice_${orderId.slice(0, 8)}.pdf`;
+      const fileName = `Invoice_${orderId.slice(0, 8)}.pdf`;
       const buffer = loadDocumentRevisionBuffer(revision);
 
       set.headers['Content-Type'] = 'application/pdf';

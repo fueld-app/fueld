@@ -1,6 +1,7 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
+import { eq, and, desc, inArray, isNull, ne } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
+import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError } from '../orders/invoice.service';
 import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, generateBrokerConfirmationPdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById, updateOrderStatus } from '../orders/orders.service';
@@ -8,7 +9,7 @@ import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
 import { sendWhatsAppGroupMessage, sendWhatsAppMessage, sendTemplatedGroupMessage, buildProductTemplateVariables } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
-import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderPortDocuments, orderSuppliers, orderTransferSides } from '../../db/schema';
+import { users, counterparties, invoices, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderPortDocuments, orderSuppliers, orderTransferSides } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 import { getInquirySettings, getDeliveryDocumentationSettings } from '../admin/settings.service';
 import { composeBookingEmail, resolveBookingRecipients } from './booking-email.service';
@@ -482,7 +483,19 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         set.status = 400;
         return { success: false, message: transferBlock };
       }
-      const { buffer, fileName, revision } = await generateOrderInvoicePdfBuffer(orderId);
+      let buffer: Buffer;
+      let fileName: string;
+      let revision: Awaited<ReturnType<typeof generateOrderInvoicePdfBuffer>>['revision'];
+      try {
+        ({ buffer, fileName, revision } = await generateOrderInvoicePdfBuffer(orderId));
+      } catch (err) {
+        // A finalized internal transfer passes the gate above but has no
+        // customer receivable, and a mixed-currency order has no single
+        // invoiceable total. Both are user-fixable states, so they are 400s.
+        if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError)) throw err;
+        set.status = 400;
+        return { success: false, message: err.message };
+      }
 
       set.headers['Content-Type'] = 'application/pdf';
       set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
@@ -564,6 +577,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       }
       let pdfBuffer: Buffer | undefined;
       let pdfFileName: string | undefined;
+      let issuedInvoiceNumber: string | undefined;
       let nominationResponseUrl: string | null = null;
       let nominationSupplierId: string | null = null;
 
@@ -619,9 +633,21 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         }
         case 'INVOICE': {
           if (!order.bankAccountId) { set.status = 400; return { success: false, message: 'Select a bank account first' }; }
-          const result = await generateOrderInvoicePdfBuffer(orderId);
-          pdfBuffer = result.buffer;
-          pdfFileName = result.fileName;
+          try {
+            const result = await generateOrderInvoicePdfBuffer(orderId);
+            pdfBuffer = result.buffer;
+            pdfFileName = result.fileName;
+            // The client composed the subject before the number existed (the
+            // compose route is read-only). This is the first place the real
+            // number is known, so substitute it into what actually gets sent —
+            // otherwise the email can name no invoice while the attached PDF
+            // bears one.
+            issuedInvoiceNumber = result.invoiceNumber;
+          } catch (err) {
+            if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError)) throw err;
+            set.status = 400;
+            return { success: false, message: err.message };
+          }
           break;
         }
         case 'BROKER_CONFIRMATION': {
@@ -664,9 +690,19 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         }
       }
 
-      const htmlBody = docType === 'NOMINATION' && nominationResponseUrl
+      const rawHtmlBody = docType === 'NOMINATION' && nominationResponseUrl
         ? injectNominationResponseLink(body.htmlBody, nominationResponseUrl)
         : body.htmlBody;
+
+      // When this send is what ISSUED the invoice, the number is only known now:
+      // fold it into the subject/body the trader composed so the email and the
+      // attached PDF agree.
+      const sentSubject = issuedInvoiceNumber && !body.subject.includes(issuedInvoiceNumber)
+        ? `${body.subject} (${issuedInvoiceNumber})`
+        : body.subject;
+      const htmlBody = issuedInvoiceNumber && !rawHtmlBody.includes(issuedInvoiceNumber)
+        ? rawHtmlBody.replace(/<\/body>/i, `<p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Invoice number: <strong>${issuedInvoiceNumber}</strong></p></body>`)
+        : rawHtmlBody;
 
       // Send the email
       const { channel, tokenExpiredWarning } = await sendDocumentEmail({
@@ -679,7 +715,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         recipientEmails: body.recipientEmails,
         ccEmails: body.ccEmails ?? [],
         bccEmails: body.bccEmails ?? [],
-        subject: body.subject,
+        subject: sentSubject,
         htmlBody,
         pdfBuffer,
         pdfFileName,
@@ -926,11 +962,23 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           })()
         : formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays);
 
-      // Invoice number (for invoice type) — fetch from invoices table
+      // Invoice number (for invoice type) — READ ONLY here.
+      //
+      // This is the compose/pre-fill route: it hands the modal its defaults.
+      // It must not ISSUE anything, because merely opening the modal and
+      // cancelling would otherwise create a receivable whose amount is frozen
+      // from whatever the lines happened to be at that moment. The invoice is
+      // materialized when the invoice is actually viewed or sent, and this
+      // simply reflects it when it already exists.
       let invoiceNumber: string | undefined;
       if (docType === 'INVOICE') {
-        const [inv] = await db.select({ invoiceNumber: invoicesTable.invoiceNumber }).from(invoicesTable).where(eq(invoicesTable.orderId, orderId)).limit(1);
-        invoiceNumber = inv?.invoiceNumber ?? undefined;
+        const [existing] = await db
+          .select({ invoiceNumber: invoices.invoiceNumber })
+          .from(invoices)
+          .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
+          .orderBy(desc(invoices.createdAt))
+          .limit(1);
+        invoiceNumber = existing?.invoiceNumber ?? undefined;
       }
 
       // ── Build subject and body — use admin template if available ──

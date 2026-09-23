@@ -248,8 +248,24 @@ describe('documents + verify controller e2e', () => {
     expect(String(sendMissing.data?.message ?? '')).toContain('Order not found');
   });
 
+  it('refuses to issue a customer invoice for a finalized internal transfer', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+    const db = await getDb();
+    const { orders } = await import('../src/db/schema');
+    const { eq } = await import('drizzle-orm');
+
+    await db.update(orders).set({ orderKind: 'INTERNAL_TRANSFER' }).where(eq(orders.id, orderId));
+
+    // An internal transfer has no customer receivable. Whichever guard fires
+    // first (the transfer-side gate, or the issuance refusal behind it), this
+    // must be a 4xx with a message — never a raw 500.
+    const res = await requestRaw(`/orders/${orderId}/invoice/pdf`, { token });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.data)).toMatch(/transfer/i);
+  });
+
   it('serves verify endpoints publicly and returns 404 for unknown token/order', async () => {
-    const { orderId } = await seedDocumentReadyOrder();
+    const { token, orderId } = await seedDocumentReadyOrder();
 
     const offer = await requestRaw(`/verify/${orderId}/offer`);
     expect(offer.status).toBe(200);
@@ -261,9 +277,21 @@ describe('documents + verify controller e2e', () => {
     expect(proforma.status).toBe(200);
     expect(proforma.headers.get('content-type')).toContain('application/pdf');
 
+    // The public invoice verify route must NOT generate. Generation creates the
+    // invoice row, so a public path would let anyone mint invoice numbers and
+    // burn sequence values. With nothing issued yet it 404s...
+    const unissuedInvoice = await requestRaw(`/verify/${orderId}/invoice`);
+    expect(unissuedInvoice.status).toBe(404);
+
+    // ...and once an authenticated issuance has persisted a revision, it serves
+    // that exact artifact.
+    const issued = await requestRaw(`/orders/${orderId}/invoice/pdf`, { token });
+    expect(issued.status).toBe(200);
+
     const invoice = await requestRaw(`/verify/${orderId}/invoice`);
     expect(invoice.status).toBe(200);
     expect(invoice.headers.get('content-type')).toContain('application/pdf');
+    expect(invoice.headers.get('x-document-reference')).toBeTruthy();
 
     const missingOrder = await requestRaw('/verify/ORDER-DOES-NOT-EXIST/offer');
     expect(missingOrder.status).toBe(404);
@@ -309,7 +337,10 @@ describe('documents + verify controller e2e', () => {
 
       const graphPayload = JSON.parse(String(calls[0]?.init?.body));
       expect(graphPayload.message.toRecipients[0].emailAddress.address).toBe('finance@example.com');
-      expect(String(graphPayload.message.subject)).toBe('Invoice Test');
+      // First send issues the invoice, so the real number is folded into the
+      // composed subject — otherwise the email would name no invoice while the
+      // attached PDF bears one.
+      expect(String(graphPayload.message.subject)).toMatch(/^Invoice Test \(INV-\d{4}-\d{4}\)$/);
       expect(graphPayload.message.attachments?.length).toBe(1);
     } finally {
       globalThis.fetch = originalFetch;

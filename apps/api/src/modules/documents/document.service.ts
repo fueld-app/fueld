@@ -1,7 +1,7 @@
 import pdfmake from 'pdfmake';
 import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
@@ -10,6 +10,8 @@ import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, priceReferences, type TenantSettings } from '../../db/schema';
 import { isIanaTimezone } from '../../utils/timezone';
 import { getDateFormatSettings, getCostSalesDecimalPrecision } from '../admin/settings.service';
+import { ensureOrderInvoice } from '../orders/invoice.service';
+import { customerFacingItems, isSupplierCreditPlaceholder } from './customer-facing-items';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -119,45 +121,6 @@ export function sanitizePathSegment(value: string): string {
  */
 export function formatProductTypeLabel(productType: string): string {
   return productType.replace(/_/g, ' ');
-}
-
-/**
- * True for legacy supplier credit-note placeholder lines: CREDIT_NOTE-type
- * product lines carrying no sell price. These are buy-side financial
- * adjustments, never customer-facing product rows.
- * A CREDIT_NOTE line WITH a (negative) sell price is a customer credit and
- * keeps rendering on documents until the credit-note document feature ships.
- */
-export function isSupplierCreditPlaceholder<
-  T extends { productType: string; salesPrice?: string | number | null },
->(item: T): boolean {
-  return (
-    (item.productType ?? '').toUpperCase() === 'CREDIT_NOTE' &&
-    (item.salesPrice == null || item.salesPrice === '')
-  );
-}
-
-/**
- * Filter for items rendered on customer/broker-facing generated documents
- * (CONFIRMATION, OFFER, NOMINATION, PFI, INVOICE, broker confirmation).
- *
- * Excludes:
- *  - items flagged hideOnDocuments (e.g. broker commission line items)
- *  - supplier credit-note placeholder lines (see isSupplierCreditPlaceholder):
- *    they previously rendered as rows with a bare dash for the price.
- *    Zero-priced legitimate lines (e.g. fees included in the price) are NOT
- *    affected — only unpriced CREDIT_NOTE-type lines are excluded.
- */
-export function customerFacingItems<
-  T extends {
-    productType: string;
-    hideOnDocuments?: boolean | null;
-    salesPrice?: string | number | null;
-  },
->(items: T[]): T[] {
-  return items.filter(
-    (item) => !item.hideOnDocuments && !isSupplierCreditPlaceholder(item),
-  );
 }
 
 export function documentTypePrefix(documentType: DocumentType): string {
@@ -350,6 +313,35 @@ export async function getLatestDocumentRevisionByOrderId(
   return revision ? mapRevisionInfo(revision) : null;
 }
 
+/**
+ * Latest INVOICE revision for an order, whatever it is keyed by.
+ *
+ * Issued invoices are keyed by their invoice id (the stream target is
+ * `invoiceId ?? orderId`), while the legacy order-keyed stream is still
+ * consulted so revisions issued before invoice rows existed keep verifying.
+ * Read-only by design — the public verify route must never generate.
+ */
+export async function getLatestInvoiceRevisionForOrder(orderId: string): Promise<DocumentRevisionInfo | null> {
+  // Prefer a revision belonging to the order's LIVE invoice. Ordering by
+  // revisionNumber alone would surface the voided invoice's revision after a
+  // void/reissue (its number is higher), so the verify link printed on the new
+  // document would resolve to the cancelled one.
+  const [revision] = await db
+    .select({ revision: documentRevisions })
+    .from(documentRevisions)
+    .innerJoin(invoices, eq(invoices.id, documentRevisions.invoiceId))
+    .where(and(
+      eq(documentRevisions.orderId, orderId),
+      eq(documentRevisions.documentType, 'INVOICE'),
+      ne(invoices.status, 'VOID'),
+    ))
+    .orderBy(desc(documentRevisions.revisionNumber))
+    .limit(1);
+
+  if (revision) return mapRevisionInfo(revision.revision);
+  return getLatestDocumentRevisionByOrderId(orderId, 'INVOICE');
+}
+
 export async function getLatestDocumentRevisionByStream(params: {
   documentType: DocumentType;
   orderId?: string | null;
@@ -518,7 +510,6 @@ export async function fetchOrderForInvoice(orderId: string) {
         items: {
           orderBy: [asc(orderItems.sortOrder), asc(orderItems.createdAt)],
         },
-        invoices: true,
       },
     });
 
@@ -1530,8 +1521,14 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
 
 /**
  * Generate an invoice PDF buffer for a given order ID.
- * Uses the first invoice attached to the order, or creates a preview
- * with a placeholder invoice number.
+ *
+ * An issued invoice is a legal artifact: its number, amount and due date are
+ * frozen on the row at issuance, and the PDF must keep matching the receivable
+ * that aging/collections/QuickBooks use. So this NEVER re-renders a new version
+ * because the order changed afterwards — a post-issuance line-item edit cannot
+ * silently restate an invoice that has already been sent (and may already be
+ * part-taxed). Regenerating returns the stored artifact; a genuinely wrong
+ * invoice has to be voided and reissued, which is a deliberate act.
  */
 export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   buffer: Buffer;
@@ -1543,41 +1540,27 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   const { dateFormat } = await getDateFormatSettings();
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
 
-  // Find the first invoice or generate a preview number
-  const invoice = order.invoices?.[0];
+  // Materialize the invoice row on ISSUANCE. Before this existed, no production
+  // code path ever inserted into `invoices`, so the number was always a PREVIEW
+  // placeholder and every reader (collections, aging, QuickBooks) saw nothing.
+  const invoice = await ensureOrderInvoice(order.id);
+
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'INVOICE',
     orderId: order.id,
-    invoiceId: invoice?.id ?? null,
+    invoiceId: invoice.id,
   });
-
-  const invoiceSourceUpdatedAtMs = maxMs([
-    order.updatedAt,
-    order.client.updatedAt,
-    order.vessel.updatedAt,
-    order.place.updatedAt,
-    order.invoicingCompany?.updatedAt ?? null,
-    order.salesRep?.updatedAt ?? null,
-    invoice?.updatedAt ?? invoice?.createdAt ?? null,
-    order.customerContact?.updatedAt ?? null,
-    order.supplierContact?.updatedAt ?? null,
-  ]);
-  const itemSourceUpdatedAtMs = maxItemUpdatedAtMs(order.items);
-  const sourceUpdatedAtMs = Math.max(invoiceSourceUpdatedAtMs, itemSourceUpdatedAtMs);
-
-  if (existingRevision && sourceUpdatedAtMs <= existingRevision.issuedAt.getTime()) {
-    const existingBuffer = loadDocumentRevisionBuffer(existingRevision);
-    const existingInvoiceNumber = invoice?.invoiceNumber ?? `PREVIEW-${orderId.slice(0, 8).toUpperCase()}`;
-    const existingFileName = `Fueld_Invoice_${existingInvoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+  if (existingRevision) {
+    const fileName = `Fueld_Invoice_${invoice.invoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
     return {
-      buffer: existingBuffer,
-      invoiceNumber: existingInvoiceNumber,
-      fileName: existingFileName,
+      buffer: loadDocumentRevisionBuffer(existingRevision),
+      invoiceNumber: invoice.invoiceNumber,
+      fileName,
       revision: existingRevision,
     };
   }
 
-  const invoiceNumber = invoice?.invoiceNumber ?? `PREVIEW-${orderId.slice(0, 8).toUpperCase()}`;
+  const invoiceNumber = invoice.invoiceNumber;
 
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
 
@@ -1626,12 +1609,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     fromEmail: order.salesRep?.email ?? null,
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
-    dueDate: computeDueDate(
-      invoice?.createdAt ?? order.createdAt,
-      order.customerPaymentTermType,
-      order.customerCreditDays,
-      order.eta,
-    ),
+    dueDate: invoice.dueDate,
     customerNote: order.customerNote ?? null,
     purchaseOrderNumber: order.purchaseOrderNumber ?? null,
     deliveredAt: order.deliveredAt ?? null,
@@ -1666,7 +1644,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
       salesPriceFinalized: item.salesPriceFinalized,
       salesCurrency: item.salesCurrency,
     })),
-    createdAt: invoice?.createdAt ?? order.createdAt,
+    createdAt: invoice.createdAt,
     verifyUrl,
     verifyLink,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
@@ -1675,6 +1653,9 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     docTitle: 'INVOICE',
     printMeta: null as DocumentPrintMeta | null,
+    // The invoice's OWN frozen total, not a fresh sum of the lines: the two can
+    // differ if the order was edited between issuance and the first render.
+    frozenTotal: invoice.amount,
   };
 
   const docDefinition = buildProformaDocument(docData);
@@ -1683,7 +1664,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   const revision = await persistDocumentRevision({
     tenantId: order.tenantId,
     orderId: order.id,
-    invoiceId: invoice?.id ?? null,
+    invoiceId: invoice.id,
     documentType: 'INVOICE',
     fileName,
     buffer,
@@ -2687,6 +2668,13 @@ function buildProformaDocument(data: {
   printMeta?: DocumentPrintMeta | null;
   purchaseOrderNumber?: string | null;
   deliveredAt?: Date | null;
+  /**
+   * Total already frozen on the invoice row. When present it wins over the sum
+   * of the line items, so the headline figure on an ISSUED invoice can never
+   * disagree with the receivable that aging/collections read — even if the
+   * order's lines were edited in the window before the first render.
+   */
+  frozenTotal?: string | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -2769,11 +2757,16 @@ function buildProformaDocument(data: {
       totalCell as TableCell,
     ];
   });
-  const grandTotal = data.items.reduce((sum, item) => {
+  const lineItemsTotal = data.items.reduce((sum, item) => {
     const qty = parseFloat(item.quantity) || 0;
     const price = parseFloat(item.salesPrice ?? '0') || 0;
     return sum + qty * price;
   }, 0);
+  // An issued invoice prints its frozen total; a proforma (never invoiced)
+  // prints the live sum.
+  const grandTotal = data.frozenTotal != null && data.frozenTotal !== ''
+    ? parseFloat(data.frozenTotal) || 0
+    : lineItemsTotal;
   const grandTotalCurrency = data.items[0]?.salesCurrency || data.currency;
   const totalAmountDueLabel = `Total amount due to ${data.companyName?.trim() || 'Company'}`;
 

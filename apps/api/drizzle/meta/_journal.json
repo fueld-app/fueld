@@ -883,6 +883,13 @@
       "when": 1789954800000,
       "tag": "0125_atradius_cover",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1790041200000,
+      "tag": "0126_invoice_number_sequences",
+      "breakpoints": true
     }
   ]
 }

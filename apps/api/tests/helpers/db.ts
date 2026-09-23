@@ -129,6 +129,7 @@ function getTruncateTables() {
     'port_document_assets',
     'port_gate_list_personnel',
     'order_number_sequences',
+    'invoice_number_sequences',
     'counterparties',
     'vessels',
     'places',
@@ -210,6 +211,23 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
       last_seq integer NOT NULL DEFAULT 0,
       updated_at timestamptz NOT NULL DEFAULT now()
     )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS invoice_number_sequences (
+      tenant_id uuid PRIMARY KEY REFERENCES tenants(id),
+      last_seq integer NOT NULL DEFAULT 0,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  // Mirror the migration's one-invoice-per-order invariant: the compat shim is
+  // the fallback path when migrations did not apply, and without this index the
+  // issuance concurrency guarantee silently disappears.
+  await sql`DROP INDEX IF EXISTS invoices_one_per_order`;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS invoices_one_per_order
+      ON invoices (order_id) WHERE status <> 'VOID'
   `;
 
   await sql`
