@@ -534,7 +534,7 @@ export class InvoiceAlreadyVoidError extends Error {
  * invoice number nor moves the due date.
  *
  * Concurrency: the early return alone cannot stop two simultaneous issuances
- * (two tabs, a double-click, a retried request). The `invoices_one_per_order`
+ * (two tabs, a double-click, a retried request). The `invoices_one_live_per_tranche`
  * unique index is the real guarantee — the loser of the race inserts nothing
  * and re-reads the winner's row. That costs one burned sequence number, which
  * is the correct trade: invoice numbers must never be reused.

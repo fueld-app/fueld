@@ -346,19 +346,6 @@ export async function getLatestDocumentRevisionByOrderId(
  * consulted so revisions issued before invoice rows existed keep verifying.
  * Read-only by design — the public verify route must never generate.
  */
-/**
- * Count the order's live invoices. With split payment terms an order has one
- * invoice per tranche, so "the order's invoice" is not a single document and
- * order-scoped readers must refuse rather than pick one arbitrarily.
- */
-export async function countLiveOrderInvoices(orderId: string): Promise<number> {
-  const rows = await db
-    .select({ id: invoices.id })
-    .from(invoices)
-    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])));
-  return rows.length;
-}
-
 export async function getLatestInvoiceRevisionForOrder(orderId: string): Promise<DocumentRevisionInfo | null> {
   // Prefer a revision belonging to the order's LIVE invoice. Ordering by
   // revisionNumber alone would surface the voided invoice's revision after a
@@ -1614,6 +1601,19 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
  * invoices themselves (snapshotted at issuance), so this needs no schedule read
  * and keeps working after the schedule row is cleared.
  */
+/**
+ * Count the order's live invoices. With split payment terms an order has one
+ * invoice per tranche, so "the order's invoice" is not a single document and
+ * order-scoped readers must refuse rather than pick one arbitrarily.
+ */
+export async function countLiveOrderInvoices(orderId: string): Promise<number> {
+  const rows = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])));
+  return rows.length;
+}
+
 async function expectedTrancheShare(
   liveLinesTotal: number,
   invoice: typeof invoices.$inferSelect,
@@ -1648,7 +1648,9 @@ async function expectedTrancheShare(
 
   const percents = seqs.map((seq) => numberOrNull(bySeq.get(seq) ?? null) ?? 0);
   return numberOrNull(splitAmountByPercent(liveLinesTotal, percents, index)) ?? liveLinesTotal;
-}/**
+}
+
+/**
  * Load one invoice of an order, refusing an id that belongs to a different order
  * (so an invoice id cannot be used to render another order's document).
  */

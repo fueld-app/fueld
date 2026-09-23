@@ -841,3 +841,33 @@ describe('tranche share is its percent, not its position', () => {
     expect(parseFloat(live[1]!.amount ?? '0')).toBeCloseTo(Math.round((total * 33.333) / 100 * 100) / 100, 2);
   });
 });
+
+describe('tranche share reconstruction on an asymmetric schedule', () => {
+  it('renders a middle tranche after its later sibling was voided', async () => {
+    const { order } = await seedOrderWithItems();
+    // Asymmetric, so positional derivation and percent derivation disagree:
+    // only the LAST tranche absorbs the residual, and it is the one we void.
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 20, dueBasis: 'ON_ISSUE' },
+      { label: 'Middle', percent: 30, dueBasis: 'FROM_DELIVERY', creditDays: 14 },
+      { label: 'Tail', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    await ensureOrderInvoice(order.id);
+    const live = await listLiveOrderInvoices(order.id);
+    expect(live.length).toBe(3);
+    const total = parseFloat(await computeInvoiceAmount(order.id));
+    // The tail tranche is the residual absorber, so its amount can differ from a
+    // naive 50% by a cent.
+    expect(parseFloat(live[2]!.amount ?? '0')).toBeCloseTo(total - parseFloat(live[0]!.amount ?? '0') - parseFloat(live[1]!.amount ?? '0'), 2);
+
+    // Void the LAST tranche. If a survivor's expected share were derived from its
+    // position among the remaining live invoices, Middle would look like the
+    // residual absorber (it does not) and the guard would refuse a correct doc.
+    await voidOrderInvoice(order.id, { invoiceId: String(live[2]!.id), reissue: false });
+
+    for (const row of live.slice(0, 2)) {
+      const doc = await generateOrderInvoicePdfBuffer(order.id, { invoiceId: String(row.id) });
+      expect(doc.invoiceNumber).toBe(row.invoiceNumber);
+    }
+  });
+});
