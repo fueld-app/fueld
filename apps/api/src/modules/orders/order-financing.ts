@@ -12,6 +12,15 @@ export interface FinancingTermsInput {
   /** Pre-computed effective supplier days from a due-date override (order-financing
    *  callers pass this when the primary supplier leg pins an invoice due date). */
   supplierEffectiveDays?: number | null;
+  /**
+   * Split payment terms: the order's tranches, as { percent, dueDays } where
+   * dueDays is the days from the same anchor the single-term calculation uses
+   * (delivery/issue) until that tranche falls due. When present, customer days
+   * are computed per tranche instead of from `customerCreditDays`, because the
+   * money is collected in instalments and each instalment is financed for its
+   * own period.
+   */
+  customerTranches?: Array<{ percent: number | null; dueDays: number | null }> | null;
 }
 
 export interface FinancingItemInput {
@@ -138,11 +147,44 @@ function asDay(value: Date | string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * Financing days for the customer side.
+ *
+ * A single payment term is one number of days. Split payment terms collect the
+ * money in instalments, so exposure is the share-weighted excess over each
+ * tranche's OWN period: a 50% cash-in-advance tranche is not financed at all
+ * while the 50% at 60 days is financed for the full excess.
+ *
+ * The tranche excesses are SUMMED, not averaged. A weighted AVERAGE of the days
+ * silently discards real cost whenever the average gap falls at or below the
+ * supplier's own days — e.g. 50% CIA + 50% at 60d against a 30-day supplier
+ * gives an average of 15 excess days (floored to 0) where the true figure is
+ * 0.5 x 30 = 15 days of exposure on half the value. Summing weighted excesses
+ * keeps that cost visible.
+ *
+ * Reducing to one tranche of 100% at the order's credit days reproduces the
+ * single-term answer exactly.
+ */
 export function getFinancingDays(input: FinancingTermsInput): number {
-  const customerDays = getPaymentTermDays(input.customerPaymentTermType, input.customerCreditDays);
   const supplierDays = input.supplierEffectiveDays != null
     ? Math.max(0, Math.round(input.supplierEffectiveDays))
     : getPaymentTermDays(input.supplierPaymentTermType, input.supplierCreditDays);
+
+  const tranches = input.customerTranches?.filter((t) => t.percent != null && t.percent > 0) ?? [];
+  if (tranches.length > 0) {
+    const totalPercent = tranches.reduce((sum, t) => sum + (t.percent ?? 0), 0);
+    if (totalPercent <= 0) return 0;
+    // Weighted excess, normalised by the shares actually present so a schedule
+    // that does not total exactly 100 does not distort the figure.
+    const weightedExcess = tranches.reduce((sum, t) => {
+      const days = Math.max(0, Math.round(t.dueDays ?? 0));
+      const excess = Math.max(days - supplierDays, 0);
+      return sum + ((t.percent ?? 0) / totalPercent) * excess;
+    }, 0);
+    return Math.round(weightedExcess * 100) / 100;
+  }
+
+  const customerDays = getPaymentTermDays(input.customerPaymentTermType, input.customerCreditDays);
   return Math.max(customerDays - supplierDays, 0);
 }
 

@@ -37,6 +37,7 @@ import {
   effectiveSupplierDays,
   getFinancingRateAnnual,
 } from './order-financing';
+import { getFinancingTranchesByOrder } from './payment-schedule.service';
 import {
   listSupplierCreditNotes,
   summarizeSupplierCredits,
@@ -1307,7 +1308,7 @@ export async function listOrders(query?: ListOrdersQuery) {
   }> = {};
 
   if (orderIds.length > 0) {
-    const [itemRows, financingRateByTenant] = await Promise.all([
+    const [itemRows, financingRateByTenant, financingTranches] = await Promise.all([
       db
         .select({
           orderId: orderItems.orderId,
@@ -1324,6 +1325,9 @@ export async function listOrders(query?: ListOrdersQuery) {
         .from(orderItems)
         .where(inArray(orderItems.orderId, orderIds)),
       getTenantFinancingRateByIds(Array.from(new Set(rows.map((row) => row.tenantId)))),
+      // Split payment terms finance each tranche for its own period, so the
+      // schedule has to reach the economics calculation.
+      getFinancingTranchesByOrder(orderIds),
     ]);
 
     const itemsByOrder = new Map<string, typeof itemRows>();
@@ -1341,6 +1345,7 @@ export async function listOrders(query?: ListOrdersQuery) {
           customerCreditDays: row.customerCreditDays,
           supplierPaymentTermType: row.supplierPaymentTermType,
           supplierCreditDays: row.supplierCreditDays,
+          customerTranches: financingTranches.get(row.id) ?? null,
           supplierEffectiveDays: effectiveSupplierDays({
             supplierDueDate: row.supplierDueDate,
             deliveredAt: row.deliveredAt,
@@ -1541,8 +1546,10 @@ export async function getOrderById(idOrNumber: string) {
     ]);
 
   const financingRateAnnual = getFinancingRateAnnual((tenant?.settings ?? {}) as TenantSettings);
+  const [scheduledTranches] = await Promise.all([getFinancingTranchesByOrder([row.id])]);
   const orderEconomics = calculateOrderEconomics(
     {
+      customerTranches: scheduledTranches.get(row.id) ?? null,
       customerPaymentTermType: row.customerPaymentTermType,
       customerCreditDays: row.customerCreditDays,
       supplierPaymentTermType: row.supplierPaymentTermType,

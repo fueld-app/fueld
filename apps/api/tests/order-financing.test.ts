@@ -58,6 +58,51 @@ describe('order-financing', () => {
       })).toBe(20);
     });
 
+    // ── Split payment terms ──────────────────────────────────────────
+    // A schedule collects the money in instalments, so each instalment is
+    // financed for its OWN period. The excesses are summed, not averaged: a
+    // weighted average floors to zero whenever the average gap is at or below
+    // the supplier's days, silently discarding real cost.
+    it('finances each tranche for its own period, weighted by share', () => {
+      expect(getFinancingDays({
+        supplierPaymentTermType: 'CREDIT',
+        supplierCreditDays: 30,
+        customerTranches: [
+          { percent: 50, dueDays: 0 },   // cash in advance: nothing to finance
+          { percent: 50, dueDays: 60 },  // 30 excess days on half the value
+        ],
+      })).toBe(15);
+    });
+
+    it('reduces to the single-term answer for one tranche at the credit days', () => {
+      expect(getFinancingDays({
+        customerPaymentTermType: 'CREDIT',
+        customerCreditDays: 60,
+        supplierPaymentTermType: 'CREDIT',
+        supplierCreditDays: 30,
+        customerTranches: [{ percent: 100, dueDays: 60 }],
+      })).toBe(30);
+    });
+
+    it('ignores tranches a supplier credit already covers', () => {
+      expect(getFinancingDays({
+        supplierPaymentTermType: 'CREDIT',
+        supplierCreditDays: 45,
+        customerTranches: [
+          { percent: 50, dueDays: 30 },
+          { percent: 50, dueDays: 60 },
+        ],
+      })).toBe(7.5); // only the 60-day half has 15 excess days
+    });
+
+    it('finances nothing when every tranche is cash in advance', () => {
+      expect(getFinancingDays({
+        supplierPaymentTermType: 'CREDIT',
+        supplierCreditDays: 30,
+        customerTranches: [{ percent: 100, dueDays: 0 }],
+      })).toBe(0);
+    });
+
     it('returns 0 when supplier days exceed customer days', () => {
       expect(getFinancingDays({
         customerPaymentTermType: 'CREDIT',

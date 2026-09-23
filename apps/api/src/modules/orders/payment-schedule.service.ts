@@ -19,7 +19,7 @@
  * anchors on `deliveredAt ?? eta` plus `creditDays` — the trader's "delivery
  * date + credit days". `FIXED_DATE` is an exact day the trader pinned.
  */
-import { and, asc, eq, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { invoices, orderPaymentSchedule, orders } from '../../db/schema';
 import { computeInvoiceAmount, computeInvoiceDueDate, splitAmountByPercent } from './invoice-amounts';
@@ -217,6 +217,65 @@ export async function listOrderPaymentSchedule(orderId: string): Promise<Schedul
       issuedDueDate: invoice?.dueDate ?? null,
     };
   });
+}
+
+/**
+ * Every order's schedule, in one query, as financing terms.
+ *
+ * Financing is computed for lists of orders at a time (dashboard, reports,
+ * order cards), so this returns a map rather than a lookup per order — an N+1
+ * here would run once per order on every list render.
+ *
+ * `dueDays` is the days from the SAME anchor the single-term calculation uses
+ * (delivery, falling back to ETA) until the tranche falls due, so a schedule is
+ * directly comparable with the customer credit days it replaces.
+ */
+export async function getFinancingTranchesByOrder(
+  orderIds: string[],
+): Promise<Map<string, Array<{ percent: number | null; dueDays: number | null }>>> {
+  const result = new Map<string, Array<{ percent: number | null; dueDays: number | null }>>();
+  if (orderIds.length === 0) return result;
+
+  const [scheduleRows, orderRows] = await Promise.all([
+    db
+      .select()
+      .from(orderPaymentSchedule)
+      .where(inArray(orderPaymentSchedule.orderId, orderIds))
+      .orderBy(asc(orderPaymentSchedule.seq)),
+    db
+      .select({ id: orders.id, eta: orders.eta, deliveredAt: orders.deliveredAt })
+      .from(orders)
+      .where(inArray(orders.id, orderIds)),
+  ]);
+  if (scheduleRows.length === 0) return result;
+
+  const anchors = new Map(orderRows.map((row) => [row.id, row.deliveredAt ?? row.eta ?? null]));
+
+  for (const row of scheduleRows) {
+    const anchor = asUtcDay(anchors.get(row.orderId) ?? null);
+    let dueDays: number | null = null;
+    if (row.dueBasis === 'ON_ISSUE') {
+      dueDays = 0;
+    } else if (row.dueBasis === 'FIXED_DATE' && row.fixedDueDate) {
+      const due = asUtcDay(row.fixedDueDate);
+      dueDays = anchor && due ? Math.round((due.getTime() - anchor.getTime()) / 86_400_000) : null;
+    } else if (row.dueBasis === 'FROM_DELIVERY') {
+      dueDays = Math.max(0, Math.round(row.creditDays ?? 0));
+    }
+
+    const list = result.get(row.orderId) ?? [];
+    list.push({ percent: parseFloat(String(row.percent)) || 0, dueDays });
+    result.set(row.orderId, list);
+  }
+
+  return result;
+}
+
+function asUtcDay(value: Date | string | null): Date | null {
+  if (value == null) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
 /** Due date a tranche will carry at issuance, or null when not yet knowable. */

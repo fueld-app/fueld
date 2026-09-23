@@ -58,6 +58,7 @@ import {
 import { sendNotificationEmail } from '../../lib/email';
 import { logActivity } from '../activity/activity.service';
 import { calculateOrderEconomics, calculateRevenueBase, effectiveSupplierDays, getFinancingRateAnnual } from '../orders/order-financing';
+import { getFinancingTranchesByOrder } from '../orders/payment-schedule.service';
 import { deriveInvoiceDisplayStatus, SETTLEMENT_EPSILON } from '../orders/invoice.service';
 import { generateOrderNumber, syncPrimaryOrderSupplierFromLegacy } from '../orders/orders.service';
 
@@ -118,6 +119,12 @@ type ScopedDataset = {
   itemRows: ScopedItemRow[];
   itemsByOrder: Map<string, ScopedItemRow[]>;
   financingRateAnnual: number;
+  /**
+   * Split payment terms per order, as financing terms. Loaded once with the
+   * dataset because four report builders share it — a lookup per order inside
+   * the builders would run on every report render.
+   */
+  financingTranches: Map<string, Array<{ percent: number | null; dueDays: number | null }>>;
 };
 
 type ReportsQueryInput = ReportFiltersDto & {
@@ -623,6 +630,7 @@ async function fetchScopedDataset(
       itemRows: [],
       itemsByOrder: new Map(),
       financingRateAnnual,
+      financingTranches: new Map(),
     };
   }
 
@@ -662,6 +670,7 @@ async function fetchScopedDataset(
     itemRows: itemRows as ScopedItemRow[],
     itemsByOrder,
     financingRateAnnual,
+    financingTranches: await getFinancingTranchesByOrder(filteredOrderRows.map((row) => row.orderId)),
   };
 }
 
@@ -673,6 +682,7 @@ function buildEconomicsByOrder(dataset: ScopedDataset) {
     if (!revenueEligibleStatuses.has(order.status)) continue;
     const economics = calculateOrderEconomics(
       {
+        customerTranches: dataset.financingTranches.get(order.orderId) ?? null,
         customerPaymentTermType: order.customerPaymentTermType,
         customerCreditDays: order.customerCreditDays,
         supplierPaymentTermType: order.supplierPaymentTermType,

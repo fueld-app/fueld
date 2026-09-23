@@ -41,6 +41,12 @@ export interface OrderActionContext {
   invoiceNumber: () => string;
   /** With split payment terms, which tranche invoice the header refers to. */
   invoiceId?: () => string | null;
+  /**
+   * The issued tranche invoice ids, for actions that must act on every tranche
+   * (QuickBooks sync) rather than on "the order's invoice", which does not exist
+   * once the deal is split.
+   */
+  trancheInvoiceIds?: () => string[];
   availableInquiryCancelReasons: () => string[];
   deliveryDocumentationSettings: () => DeliveryDocumentationSettingsDto;
   getEffectiveDeliveredQuantity: (row: OrderItemRow) => number | null;
@@ -469,10 +475,40 @@ export class OrderActionService {
     ctx.showToast('success', 'Order marked as paid and moved to completed.');
   }
 
+  /**
+   * Sync to QuickBooks.
+   *
+   * A split-terms order has one invoice per tranche and there is no single
+   * "order invoice" to push, so each tranche is synced by its own id. The
+   * order-level endpoint refuses a split order (correctly — pushing one tranche
+   * while reporting the order synced would book half the deal), and the tranche
+   * ids come from the schedule the page already holds.
+   */
   private async syncToQuickBooks(ctx: OrderActionContext): Promise<void> {
     const orderId = ctx.orderId();
+    const trancheInvoiceIds = ctx.trancheInvoiceIds?.() ?? [];
+
     ctx.showToast('success', 'Syncing to QuickBooks…');
     try {
+      if (trancheInvoiceIds.length > 0) {
+        let synced = 0;
+        for (const invoiceId of trancheInvoiceIds) {
+          const res = await firstValueFrom(
+            this.http.post<ApiResponse<{ qbInvoiceId: string; qbInvoiceNumber: string }>>(
+              `${API_URL}/admin/settings/integrations/quickbooks/sync-invoice/${invoiceId}`,
+              {},
+            ),
+          );
+          if (!res.success) {
+            ctx.showToast('error', res.message ?? 'Failed to sync a tranche invoice to QuickBooks.');
+            return;
+          }
+          synced += 1;
+        }
+        ctx.showToast('success', `Synced ${synced} invoice${synced === 1 ? '' : 's'} to QuickBooks.`);
+        return;
+      }
+
       const res = await firstValueFrom(
         this.http.post<ApiResponse<{ qbInvoiceId: string; qbInvoiceNumber: string }>>(
           `${API_URL}/admin/settings/integrations/quickbooks/sync-order/${orderId}`,

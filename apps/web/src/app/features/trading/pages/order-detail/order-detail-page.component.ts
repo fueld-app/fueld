@@ -103,7 +103,6 @@ import { OrderPortDocumentationService } from './services/order-port-documentati
 import { OrderInquiryService } from './services/order-inquiry.service';
 import { OrderFinancialService } from './services/order-financial.service';
 import { OrderSupplierService } from './services/order-supplier.service';
-import { OrderPdfService } from './services/order-pdf.service';
 import { OrderCommunicationService } from './services/order-communication.service';
 import { OrderSearchService } from './services/order-search.service';
 import { OrderSaveService } from './services/order-save.service';
@@ -204,7 +203,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly inquirySvc = inject(OrderInquiryService);
   protected readonly financialSvc = inject(OrderFinancialService);
   protected readonly supplierSvc = inject(OrderSupplierService);
-  protected readonly pdfSvc = inject(OrderPdfService);
   protected readonly commSvc = inject(OrderCommunicationService);
   protected readonly searchSvc = inject(OrderSearchService);
   protected readonly saveSvc = inject(OrderSaveService);
@@ -3144,6 +3142,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       // issued one (the deposit, which is the API's default). Keeping one source
       // means the header download and the attached PDF cannot disagree.
       invoiceId: () => self.emailInvoiceId(),
+      // Every issued tranche, so QuickBooks sync can push each one — a split
+      // order has no single invoice to send.
+      trancheInvoiceIds: () =>
+        self.paymentSchedule()
+          .map((t) => t.invoiceId)
+          .filter((id): id is string => !!id),
       availableInquiryCancelReasons: () => self.availableInquiryCancelReasons(),
       deliveryDocumentationSettings: () => self.refData.deliveryDocumentationSettings(),
       getEffectiveDeliveredQuantity: (row) => self.getEffectiveDeliveredQuantity(row),

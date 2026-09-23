@@ -13,6 +13,7 @@ import {
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
 import { calculateOrderEconomics, calculateRevenueBase, effectiveSupplierDays, getFinancingRateAnnual } from '../orders/order-financing';
+import { getFinancingTranchesByOrder } from '../orders/payment-schedule.service';
 import { deriveInvoiceDisplayStatus, SETTLEMENT_EPSILON } from '../orders/invoice.service';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -247,9 +248,13 @@ export async function getTeamStats(
     totalNetProfit: number;
   }>();
 
+  // Split payment terms finance each tranche for its own period.
+  const financingTranches = await getFinancingTranchesByOrder(orderRows.map((row) => row.orderId));
+
   for (const row of orderRows) {
     const economics = calculateOrderEconomics(
       {
+        customerTranches: financingTranches.get(row.orderId) ?? null,
         customerPaymentTermType: row.customerPaymentTermType,
         customerCreditDays: row.customerCreditDays,
         supplierPaymentTermType: row.supplierPaymentTermType,
