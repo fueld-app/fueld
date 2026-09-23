@@ -2421,6 +2421,14 @@ export async function getCustomerPaymentLedger(
       method: customerPayments.method,
       note: customerPayments.note,
       createdAt: customerPayments.createdAt,
+      // Which invoices this receipt settled. One entry for an ordinary payment;
+      // several when one transfer covered a split order's tranches, so a reader
+      // can tell the two apart (the totals above cannot).
+      appliedTo: sql<Array<{ invoiceId: string | null; amount: string }>>`(
+        SELECT COALESCE(json_agg(json_build_object('invoiceId', part.invoice_id, 'amount', part.amount) ORDER BY part.created_at), '[]'::json)
+        FROM customer_payments part
+        WHERE part.id = ${customerPayments.id} OR part.split_parent_id = ${customerPayments.id}
+      )`,
     })
     .from(customerPayments)
     .leftJoin(orders, eq(orders.id, customerPayments.orderId))

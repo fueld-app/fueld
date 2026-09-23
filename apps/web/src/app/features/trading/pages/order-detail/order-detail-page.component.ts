@@ -1278,6 +1278,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.customerContact.set(null);
     this.supplierContact.set(null);
     this.invoiceNumber.set('');
+    // Per-order, like the invoice number: a tranche id from the order we just
+    // left would be sent as a foreign invoiceId and refused (404) when emailing
+    // from the next order.
+    this.emailInvoiceId.set(null);
+    this.paymentSchedule.set([]);
+    this.scheduleLocked.set(false);
     this.showCustomerPaymentNote.set(false);
     this.showSupplierPaymentNote.set(false);
   }
@@ -1486,7 +1492,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.scheduleLocked.set(schedule.some((t) => t.invoiceId != null));
     // Default the email attachment to the first issued tranche (the deposit,
     // which is also what the API renders by default) unless a specific one is
-    // already selected from the preview.
+    // already selected from the preview. resetStateForNewOrder clears the
+    // selection when the order changes, so this can only fill in THIS order's.
     if (!this.emailInvoiceId()) {
       this.emailInvoiceId.set(schedule.find((t) => t.invoiceId)?.invoiceId ?? null);
     }

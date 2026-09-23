@@ -300,7 +300,22 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
   await sql`
     ALTER TABLE customer_payments
     ADD COLUMN IF NOT EXISTS split_parent_id uuid
-      REFERENCES customer_payments(id) ON DELETE CASCADE
+  `;
+  // The constraint separately: ADD COLUMN IF NOT EXISTS ignores REFERENCES when
+  // the column already exists, and the cascade is what keeps a split receipt's
+  // parts from outliving it. Mirrors migration 0128.
+  await sql`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'customer_payments_split_parent_id_fkey'
+          AND conrelid = 'customer_payments'::regclass
+      ) THEN
+        ALTER TABLE customer_payments
+          ADD CONSTRAINT customer_payments_split_parent_id_fkey
+          FOREIGN KEY (split_parent_id) REFERENCES customer_payments(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
   `;
   await sql`
     CREATE INDEX IF NOT EXISTS customer_payments_split_parent_idx
