@@ -2,6 +2,7 @@ import { Service, inject } from '@angular/core';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API_URL, toAbsoluteUrl } from '@app/core/config/api';
+import { filenameFromResponse } from './filename-from-response';
 import { OrderStatus } from '@fueld/types';
 
 interface PdfModal {
@@ -62,7 +63,7 @@ export class OrderPdfService {
       );
       const blob = res.body;
       if (!blob) throw new Error('Missing PDF body');
-      pdfModal.setBlob(blob, fileName, this.buildVerifyUrlFromResponse(res));
+      pdfModal.setBlob(blob, filenameFromResponse(res) ?? fileName, this.buildVerifyUrlFromResponse(res));
     } catch {
       pdfModal.showError();
       showToast('error', `Failed to generate ${documentTitle.toLowerCase()} PDF.`);

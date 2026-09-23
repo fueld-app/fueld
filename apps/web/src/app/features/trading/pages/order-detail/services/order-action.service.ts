@@ -11,6 +11,7 @@ import type {
 } from '@fueld/types';
 import type { OrderItemRow } from '../../../components/order-items/order-item.types';
 import { API_URL, toAbsoluteUrl } from '@app/core/config/api';
+import { filenameFromResponse } from './filename-from-response';
 import { OrderFinancialService } from './order-financial.service';
 import { OrderPortDocumentationService } from './order-port-documentation.service';
 import { OrderReferenceDataService } from './order-reference-data.service';
@@ -388,7 +389,10 @@ export class OrderActionService {
       const res = await firstValueFrom(this.http.get(endpoint, { responseType: 'blob', observe: 'response' }));
       const blob = res.body;
       if (!blob) throw new Error('Missing PDF body');
-      modal.setBlob(blob, fileName, this.buildVerifyUrlFromResponse(res));
+      // Prefer the server's own filename: it is built from the invoice the API
+      // actually rendered. The local fallback is empty for a split order (the
+      // page has no invoice number of its own), which produced "Fueld_Invoice_.pdf".
+      modal.setBlob(blob, filenameFromResponse(res) ?? fileName, this.buildVerifyUrlFromResponse(res));
     } catch {
       modal.showError();
       ctx.showToast('error', `Failed to generate ${documentTitle.toLowerCase()} PDF.`);
