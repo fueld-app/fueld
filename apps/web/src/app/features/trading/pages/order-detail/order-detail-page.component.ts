@@ -29,6 +29,8 @@ import {
   type OwnCompanyDto,
   type OrderAttachmentDto,
   type CustomerPaymentDto,
+  type OrderPaymentScheduleTrancheDto,
+  type InvoiceDueBasis,
   type KantoxHedgeEntryDto,
   type KantoxPositionDto,
   type OrderHedgeDto,
@@ -64,6 +66,7 @@ import type { DropdownOption } from '../../../../shared/components/searchable-dr
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { OrderPaymentTermsCardComponent } from './components/order-payment-terms-card/order-payment-terms-card.component';
+import { OrderPaymentScheduleCardComponent } from './components/order-payment-schedule-card/order-payment-schedule-card.component';
 import { OrderNotesTermsCardComponent } from './components/order-notes-terms-card/order-notes-terms-card.component';
 import { OrderDeliveryCardComponent } from './components/order-delivery-card/order-delivery-card.component';
 import { OrderAttachmentsCardComponent } from './components/order-attachments-card/order-attachments-card.component';
@@ -149,6 +152,7 @@ import type {
     InternalTransferSidesComponent,
     CreditApplicationModalComponent,
     OrderPaymentTermsCardComponent,
+    OrderPaymentScheduleCardComponent,
     OrderNotesTermsCardComponent,
     OrderDeliveryCardComponent,
     OrderPaymentsCardComponent,
@@ -343,6 +347,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   selectedAttachment: File | null = null;
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
+  // Split payment terms: a schedule bills one invoice per tranche. The card is
+  // the only way to set that up without an API call.
+  readonly paymentSchedule = signal<OrderPaymentScheduleTrancheDto[]>([]);
+  readonly paymentScheduleSaving = signal(false);
+  /** Invoices exist per tranche, so the schedule must not change underneath them. */
+  readonly scheduleLocked = signal(false);
   // Kantox FX hedging — read-only card; the endpoint itself reports whether
   // the feature is on for this tenant, so no separate flag fetch is needed.
   readonly orderHedges = signal<KantoxHedgeEntryDto[]>([]);
@@ -1297,6 +1307,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.inquirySvc.loadReplies(this.orderId()),
         this.loadAttachments(),
         this.loadPayments(),
+        this.loadPaymentSchedule(),
         this.loadOrderHedges(),
         this.loadSupplierPayments(),
         this.portDocSvc.load(this.orderId()),
@@ -1446,6 +1457,60 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
   }
 
+  async loadPaymentSchedule(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    await this.financialSvc.loadPaymentSchedule(id);
+    this.paymentSchedule.set(this.financialSvc.paymentSchedule());
+    // No separate lock probe: whether tranche invoices exist is the API's call,
+    // and it refuses an edit with a clear message. Guessing here would need an
+    // invoice-list route this page does not have, and a wrong guess would either
+    // hide a legal edit or offer an illegal one.
+    this.scheduleLocked.set(false);
+  }
+
+  async onSavePaymentSchedule(rows: Array<{ label: string; percent: string; dueBasis: InvoiceDueBasis; creditDays: string; fixedDueDate: string }>): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    this.paymentScheduleSaving.set(true);
+    try {
+      const result = await this.financialSvc.savePaymentSchedule(id, {
+        tranches: rows.map((row) => ({
+          label: row.label.trim() || null,
+          percent: parseFloat(row.percent) || 0,
+          dueBasis: row.dueBasis,
+          creditDays: row.dueBasis === 'FROM_DELIVERY' && row.creditDays !== '' ? Math.trunc(parseFloat(row.creditDays) || 0) : null,
+          fixedDueDate: row.dueBasis === 'FIXED_DATE' ? (row.fixedDueDate || null) : null,
+        })),
+      });
+      if (result.ok) {
+        this.paymentSchedule.set(this.financialSvc.paymentSchedule());
+        this.showToast('success', 'Payment schedule saved.');
+      } else {
+        this.showToast('error', result.message ?? 'Could not save the payment schedule.');
+      }
+    } finally {
+      this.paymentScheduleSaving.set(false);
+    }
+  }
+
+  async onClearPaymentSchedule(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    this.paymentScheduleSaving.set(true);
+    try {
+      const result = await this.financialSvc.savePaymentSchedule(id, { tranches: [] });
+      if (result.ok) {
+        this.paymentSchedule.set([]);
+        this.showToast('success', 'The whole deal will be billed as one invoice.');
+      } else {
+        this.showToast('error', result.message ?? 'Could not clear the payment schedule.');
+      }
+    } finally {
+      this.paymentScheduleSaving.set(false);
+    }
+  }
+
   /** Kantox FX hedges for this order. Returns `enabled: false` for tenants
    *  without the feature, so the card simply doesn't render. A Kantox outage
    *  must not break the order page — failures leave the card hidden. */
@@ -1470,6 +1535,33 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.hedgePositions.set([]);
     } finally {
       this.hedgesLoading.set(false);
+    }
+  }
+
+  /**
+   * Open ONE tranche's invoice. A split-terms order has an invoice per tranche
+   * and the plain download defaults to the deposit, so the balance invoice is
+   * only reachable by naming it.
+   */
+  async onViewTrancheInvoice(tranche: OrderPaymentScheduleTrancheDto): Promise<void> {
+    const id = this.orderId();
+    const modal = this.pdfModal();
+    if (!id || !tranche.invoiceId || !modal) return;
+    const label = tranche.invoiceNumber ?? `Tranche ${tranche.seq}`;
+    modal.showLoading(label);
+    try {
+      const res = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/invoice/pdf?invoiceId=${encodeURIComponent(tranche.invoiceId)}`, {
+          responseType: 'blob',
+          observe: 'response',
+        }),
+      );
+      const blob = res.body;
+      if (!blob) throw new Error('Missing PDF body');
+      modal.setBlob(blob, `Fueld_Invoice_${(tranche.invoiceNumber ?? id).replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`);
+    } catch {
+      modal.showError();
+      this.showToast('error', 'Failed to generate the invoice PDF.');
     }
   }
 
@@ -3014,6 +3106,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       activeOrderSupplier: () => self.activeOrderSupplier(),
       hasMultipleOrderSuppliers: () => self.hasMultipleOrderSuppliers(),
       invoiceNumber: () => self.invoiceNumber(),
+      // Name the tranche the header's invoice refers to. With split terms the
+      // first tranche is the deposit and is what the API defaults to, and the
+      // header shows that same number, so they agree.
+      invoiceId: () => self.paymentSchedule().find((t) => t.invoiceId)?.invoiceId ?? null,
       availableInquiryCancelReasons: () => self.availableInquiryCancelReasons(),
       deliveryDocumentationSettings: () => self.refData.deliveryDocumentationSettings(),
       getEffectiveDeliveredQuantity: (row) => self.getEffectiveDeliveredQuantity(row),

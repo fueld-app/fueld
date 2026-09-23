@@ -1402,6 +1402,13 @@ export interface OrderPaymentScheduleTrancheDto {
   amount: string;
   /** Due date it will carry at issuance, or null when not yet knowable. */
   dueDate: string | null;
+  /** The invoice this tranche was issued as, or null until it is issued. */
+  invoiceId: string | null;
+  invoiceNumber: string | null;
+  invoiceStatus: string | null;
+  /** The frozen amount/due date on the issued document (the customer's copy). */
+  issuedAmount: string | null;
+  issuedDueDate: string | null;
 }
 
 /** Body for replacing an order's payment schedule. */

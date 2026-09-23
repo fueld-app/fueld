@@ -148,6 +148,9 @@ export class OrderCommunicationService {
           subject: payload.subject,
           htmlBody: payload.htmlBody,
           attachmentIds: payload.attachmentIds,
+          // Split terms issue one invoice per tranche; name it so the balance
+          // invoice can be emailed, not only the deposit.
+          ...(payload.invoiceId ? { invoiceId: payload.invoiceId } : {}),
         },
       )
       .subscribe({

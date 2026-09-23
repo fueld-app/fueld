@@ -1,7 +1,7 @@
 import { Service, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, CreditLineDto, BankAccountDto, OwnCompanyDto, SupplierPaymentDto, CreateSupplierPaymentDto } from '@fueld/types';
+import type { ApiResponse, CreditLineDto, BankAccountDto, OwnCompanyDto, SupplierPaymentDto, CreateSupplierPaymentDto, OrderPaymentScheduleTrancheDto, SetOrderPaymentScheduleDto } from '@fueld/types';
 import { PaymentTermType } from '@fueld/types';
 import { API_URL } from '@app/core/config/api';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
@@ -238,6 +238,56 @@ export class OrderFinancialService {
     }
 
     return companies[0]?.id ?? null;
+  }
+
+  // ─── Payment schedule (split payment terms) ───────────────────────
+  // An order can be paid in tranches (e.g. 50% cash in advance, 50% at 21 days),
+  // in which case issuance bills one invoice per tranche.
+
+  readonly paymentSchedule = signal<OrderPaymentScheduleTrancheDto[]>([]);
+  readonly paymentScheduleLoading = signal(false);
+
+  async loadPaymentSchedule(orderId: string): Promise<void> {
+    this.paymentScheduleLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<OrderPaymentScheduleTrancheDto[]>>(
+          `${API_URL}/orders/${orderId}/payment-schedule`,
+        ),
+      );
+      this.paymentSchedule.set(res.success && res.data ? res.data : []);
+    } catch {
+      this.paymentSchedule.set([]);
+    } finally {
+      this.paymentScheduleLoading.set(false);
+    }
+  }
+
+  /**
+   * Replace the schedule. The API validates that the tranches total 100% and
+   * refuses if any tranche invoice has already been issued (that would restate a
+   * document the customer holds), so surface its message rather than guessing.
+   */
+  async savePaymentSchedule(
+    orderId: string,
+    dto: SetOrderPaymentScheduleDto,
+  ): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<OrderPaymentScheduleTrancheDto[]>>(
+          `${API_URL}/orders/${orderId}/payment-schedule`,
+          dto,
+        ),
+      );
+      if (res.success && res.data) {
+        this.paymentSchedule.set(res.data);
+        return { ok: true };
+      }
+      return { ok: false, message: res.message ?? 'Could not save the payment schedule.' };
+    } catch (err: unknown) {
+      const message = (err as { error?: { message?: string } })?.error?.message;
+      return { ok: false, message: message ?? 'Could not save the payment schedule.' };
+    }
   }
 
   resolveRequestedBankAccountId(

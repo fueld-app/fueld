@@ -173,12 +173,29 @@ export async function listOrderPaymentSchedule(orderId: string): Promise<Schedul
   const orderTotal = parseFloat(await computeInvoiceAmount(orderId)) || 0;
 
 
+  // Once the schedule is issued, each tranche has a real invoice. Expose it so
+  // the UI can name the tranche it wants to download or email -- the API renders
+  // a specific invoice by id, and without this the caller cannot know the id.
+  const issued = await db
+    .select({
+      id: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      trancheSeq: invoices.trancheSeq,
+      status: invoices.status,
+      dueDate: invoices.dueDate,
+      amount: invoices.amount,
+    })
+    .from(invoices)
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])));
+  const issuedBySeq = new Map(issued.filter((row) => row.trancheSeq != null).map((row) => [row.trancheSeq!, row]));
+
   // Preview the SAME amounts issuance will bill, including the last-tranche
   // rounding absorption -- otherwise a preview shows 33.33/33.33/33.33 for a
   // schedule that issues as 33.33/33.33/33.34.
   const percents = rows.map((row) => parseFloat(row.percent) || 0);
   return rows.map((row, index) => {
     const amount = splitAmountByPercent(orderTotal, percents, index);
+    const invoice = issuedBySeq.get(row.seq);
     return {
       id: row.id,
       orderId: row.orderId,
@@ -190,6 +207,14 @@ export async function listOrderPaymentSchedule(orderId: string): Promise<Schedul
       fixedDueDate: row.fixedDueDate ?? null,
       amount,
       dueDate: computeTrancheDueDate(row.dueBasis as DueBasis, row.creditDays, row.fixedDueDate, order),
+      // Null until the tranche has been issued.
+      invoiceId: invoice?.id ?? null,
+      invoiceNumber: invoice?.invoiceNumber ?? null,
+      invoiceStatus: invoice?.status ?? null,
+      // Prefer the FROZEN amount/date once issued: the document the customer
+      // holds is the truth, not a recomputation from current terms.
+      issuedAmount: invoice?.amount ?? null,
+      issuedDueDate: invoice?.dueDate ?? null,
     };
   });
 }

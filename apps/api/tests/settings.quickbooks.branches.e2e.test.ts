@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { users } from '../src/db/schema';
+import { orders, orderItems, users } from '../src/db/schema';
+import { ensureOrderInvoice, listLiveOrderInvoices } from '../src/modules/orders/invoice.service';
+import { setOrderPaymentSchedule } from '../src/modules/orders/payment-schedule.service';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { loginE2E, requestJson, requestRaw } from './helpers/e2e';
 
@@ -146,5 +148,63 @@ describe('settings quickbooks branch e2e', () => {
     const items = (integrations.data?.data ?? []) as Array<{ provider: string; configured: boolean }>;
     const qb = items.find((item) => item.provider === 'QUICKBOOKS');
     expect(qb?.configured).toBe(false);
+  });
+});
+
+describe('quickbooks split-terms refusal (HTTP)', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(async () => {
+    await truncateAll();
+    globalThis.fetch = originalFetch;
+  });
+
+  it('refuses to sync a split order, names the alternative, and exposes it as a route', async () => {
+    // Seed ONCE: a second seedAuthBasics collides on the tenant domain.
+    const seeded = await seedAuthBasics();
+    const db = await getDb();
+    await db.update(users).set({ role: 'ADMIN', updatedAt: new Date() }).where(eq(users.id, seeded.user.id));
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    if (!login.accessToken) throw new Error('Expected login to return an accessToken');
+    const token = login.accessToken;
+    const { tenant, client, vessel, place } = seeded;
+
+    const [order] = await db.insert(orders).values({
+      tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id,
+      orderNumber: `QBSPLIT-${Date.now()}`, currency: 'USD', status: 'DELIVERED',
+      customerPaymentTermType: 'CREDIT', customerCreditDays: 21,
+    }).returning();
+    await db.insert(orderItems).values({
+      orderId: order!.id, productType: 'VLSFO', quantity: '100', unit: 'MT',
+      costPrice: '600', salesPrice: '5000', costCurrency: 'USD', salesCurrency: 'USD',
+    });
+    await setOrderPaymentSchedule(order!.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    await ensureOrderInvoice(order!.id);
+    const live = await listLiveOrderInvoices(order!.id);
+    expect(live.length).toBe(2);
+
+    // "The order's invoice" is not a single document, so the order-level sync
+    // must refuse rather than push one tranche and call the order synced.
+    const orderSync = await requestJson(`/admin/settings/integrations/quickbooks/sync-order/${order!.id}`, {
+      method: 'POST', token,
+    });
+    expect(orderSync.data?.success).toBe(false);
+    expect(String(orderSync.data?.message ?? '')).toContain('sync each invoice');
+
+    // The order-sync status must not claim a half-synced order is done.
+    const status = await requestJson(`/admin/settings/integrations/quickbooks/order-status/${order!.id}`, { token });
+    expect(status.status).toBe(200);
+    expect((status.data?.data as { synced: boolean } | null)?.synced).toBe(false);
+
+    // And the per-invoice route the refusal points at must exist (it fails on
+    // configuration, not on a missing route).
+    const perInvoice = await requestJson(`/admin/settings/integrations/quickbooks/sync-invoice/${live[0]!.id}`, {
+      method: 'POST', token,
+    });
+    expect(perInvoice.status).toBe(200);
+    expect(String(perInvoice.data?.message ?? '')).not.toContain('not found');
   });
 });

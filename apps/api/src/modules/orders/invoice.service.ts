@@ -349,6 +349,9 @@ async function allocateUnallocatedPayments(orderId: string, executor: Executor =
         .limit(1);
       if (source) {
         const remainder = remaining > 0.004 ? remaining : 0;
+        // Every part points at the row the trader recorded, so the receipt keeps
+        // its identity: one bank credit, not N phantom receipts. ON DELETE
+        // CASCADE on that link means deleting the receipt removes its parts.
         await executor.insert(customerPayments).values(rest.map((part) => ({
           tenantId: source.tenantId,
           customerId: source.customerId,
@@ -360,6 +363,7 @@ async function allocateUnallocatedPayments(orderId: string, executor: Executor =
           method: source.method,
           note: source.note,
           createdBy: source.createdBy,
+          splitParentId: payment.id,
         })));
         if (remainder > 0) {
           await executor.insert(customerPayments).values({
@@ -373,6 +377,7 @@ async function allocateUnallocatedPayments(orderId: string, executor: Executor =
             method: source.method,
             note: source.note,
             createdBy: source.createdBy,
+            splitParentId: payment.id,
           });
         }
       }

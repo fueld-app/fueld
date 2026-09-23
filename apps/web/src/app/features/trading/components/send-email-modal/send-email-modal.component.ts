@@ -51,6 +51,8 @@ export interface SendEmailPayload {
   subject: string;
   htmlBody: string;
   attachmentIds: string[];
+  /** With split payment terms, which tranche invoice to attach. */
+  invoiceId?: string | null;
 }
 
 export interface SendWhatsAppPayload {

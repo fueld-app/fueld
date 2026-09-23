@@ -118,6 +118,8 @@ import {
   decodeStateOrigin as decodeQBStateOrigin,
   syncOrderToQuickBooks,
   getOrderSyncStatus,
+  syncInvoiceToQuickBooks,
+  getInvoiceSyncStatus,
 } from '../quickbooks/quickbooks.service';
 import { updateUserTeams } from './admin.service';
 import { sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
@@ -1345,6 +1347,42 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Sync an order\'s invoice to QuickBooks Online' },
+  })
+
+  // Sync ONE invoice to QuickBooks Online. Split payment terms issue one invoice
+  // per tranche, so an order's receivable cannot be pushed as "the order's
+  // invoice" — each tranche is synced by its own id. This is what
+  // syncOrderToQuickBooks points you at when it refuses a split order.
+  .post('/integrations/quickbooks/sync-invoice/:invoiceId', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      const result = await syncInvoiceToQuickBooks(params.invoiceId);
+      return {
+        success: true,
+        data: { qbInvoiceId: result.qbInvoiceId, qbInvoiceNumber: result.qbInvoiceNumber },
+      } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to sync to QuickBooks';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ invoiceId: t.String() }),
+    detail: { tags: ['Admin Settings'], summary: 'Sync a single invoice (one tranche) to QuickBooks Online' },
+  })
+
+  // Whether that one invoice reached QuickBooks.
+  .get('/integrations/quickbooks/invoice-status/:invoiceId', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      const status = await getInvoiceSyncStatus(params.invoiceId);
+      return { success: true, data: status } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ invoiceId: t.String() }),
+    detail: { tags: ['Admin Settings'], summary: 'Check if a single invoice is synced to QuickBooks' },
   })
 
   // Check if an order's invoice has been synced to QuickBooks

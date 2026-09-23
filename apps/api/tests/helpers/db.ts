@@ -1,7 +1,7 @@
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from '../../src/db/schema';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 
@@ -177,9 +177,46 @@ async function ensureMigrationsApplied(): Promise<void> {
 
   try {
     await migrationsPromise;
+  } catch (e) {
+    // Fall back to the compat shim below (a partially-built local database is a
+    // normal dev state), but SAY SO. A bare catch here previously hid a real
+    // problem: drizzle's migrator aborts on the first failing statement, so one
+    // migration that the compat shim already applied out-of-band stops every
+    // LATER migration from running — and the shim then silently papered over the
+    // missing columns until a test failed with "column does not exist" far from
+    // the cause. Report which migrations are actually unapplied.
+    await warnAboutUnappliedMigrations(e);
+  }
+}
+
+/**
+ * Name the migrations the tracker has not recorded, so a shim-covered gap is
+ * visible instead of surfacing as an unrelated column error in some test.
+ */
+let warnedAboutMigrations = false;
+async function warnAboutUnappliedMigrations(migrateError: unknown): Promise<void> {
+  if (warnedAboutMigrations) return;
+  warnedAboutMigrations = true;
+  try {
+    const journalPath = join(resolveMigrationsDir(), 'meta/_journal.json');
+    if (!existsSync(journalPath)) return;
+    const journal = JSON.parse(readFileSync(journalPath, 'utf-8')) as { entries: Array<{ tag: string }> };
+    const applied = (await getSql()`
+      SELECT hash FROM drizzle.__drizzle_migrations
+    `) as Array<{ hash: string }>;
+    const appliedCount = applied.length;
+    // The tracker stores hashes, not tags; it is ordered by application, so the
+    // count is what tells us how far it got.
+    const unapplied = journal.entries.slice(appliedCount).map((entry) => entry.tag);
+    const reason = migrateError instanceof Error ? migrateError.message.split('\n')[0] : String(migrateError);
+    console.warn(
+      `[test-db] migrations did not fully apply (${reason}). ` +
+      `Tracker has ${appliedCount} of ${journal.entries.length}. ` +
+      `Relying on the compat shim for: ${unapplied.join(', ') || '(none)'}. ` +
+      `Add each of those to _doEnsureTestSchemaCompat, or repair the tracker.`,
+    );
   } catch {
-    // If migrations fail (e.g. partial schema during local dev),
-    // fall back to the compat shim below.
+    // Diagnostics must never break the suite.
   }
 }
 
@@ -256,6 +293,19 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
   for (const col of ['schedule_id uuid', 'tranche_seq integer', 'tranche_label text', 'tranche_percent numeric(6,3)']) {
     await sql.unsafe(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS ${col}`);
   }
+
+  // Mirrors migration 0128: a receipt that settled several invoices points its
+  // parts at the row the trader actually recorded. ON DELETE CASCADE is the
+  // point — deleting the receipt must take its parts with it.
+  await sql`
+    ALTER TABLE customer_payments
+    ADD COLUMN IF NOT EXISTS split_parent_id uuid
+      REFERENCES customer_payments(id) ON DELETE CASCADE
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS customer_payments_split_parent_idx
+      ON customer_payments (split_parent_id)
+  `;
 
   await sql`
     ALTER TABLE orders

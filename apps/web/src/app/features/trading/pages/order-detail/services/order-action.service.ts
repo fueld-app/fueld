@@ -38,6 +38,8 @@ export interface OrderActionContext {
   activeOrderSupplier: () => { id: string; companyId?: string | null } | null;
   hasMultipleOrderSuppliers: () => boolean;
   invoiceNumber: () => string;
+  /** With split payment terms, which tranche invoice the header refers to. */
+  invoiceId?: () => string | null;
   availableInquiryCancelReasons: () => string[];
   deliveryDocumentationSettings: () => DeliveryDocumentationSettingsDto;
   getEffectiveDeliveredQuantity: (row: OrderItemRow) => number | null;
@@ -371,7 +373,13 @@ export class OrderActionService {
     const isFinalInvoice = status === 'DELIVERED' || status === 'INVOICED' || status === 'PAID';
     const documentTitle = isFinalInvoice ? 'Invoice' : 'Proforma Invoice';
     ctx.setEmailDocumentType(isFinalInvoice ? 'INVOICE' : 'PROFORMA');
-    const endpoint = isFinalInvoice ? `${API_URL}/orders/${id}/invoice/pdf` : `${API_URL}/orders/${id}/proforma/pdf`;
+    // A split-terms order has one invoice per tranche and the API defaults to the
+    // deposit. If the caller knows which tranche the header refers to, name it so
+    // the download matches the number shown on screen.
+    const trancheInvoiceId = ctx.invoiceId?.() ?? null;
+    const endpoint = isFinalInvoice
+      ? `${API_URL}/orders/${id}/invoice/pdf${trancheInvoiceId ? `?invoiceId=${encodeURIComponent(trancheInvoiceId)}` : ''}`
+      : `${API_URL}/orders/${id}/proforma/pdf`;
     const fileName = isFinalInvoice ? `Fueld_Invoice_${ctx.invoiceNumber()}.pdf` : `Proforma_Invoice_${ctx.order()?.orderNumber ?? id}.pdf`;
     const modal = ctx.pdfModal();
     if (!modal) return;

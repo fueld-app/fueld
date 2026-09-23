@@ -2398,7 +2398,12 @@ export async function getCustomerPaymentLedger(
   if (opts.dateFrom) conditions.push(sql`${customerPayments.receivedAt} >= ${opts.dateFrom}`);
   if (opts.dateTo) conditions.push(sql`${customerPayments.receivedAt} <= ${opts.dateTo}`);
 
-  // Fetch payment rows with order number
+  // A receipt that settled more than one invoice is stored as one row per
+  // invoice sharing a parent. It is listed ONCE — as its parent — carrying the
+  // full amount received; the parts are summed onto it. Filtering at SQL level
+  // (rather than collapsing after the LIMIT) keeps paging honest.
+  const partsSum = sql<string>`COALESCE((SELECT SUM(part.amount) FROM customer_payments part WHERE part.split_parent_id = ${customerPayments.id}), 0)`;
+
   const rows = await db
     .select({
       id: customerPayments.id,
@@ -2406,27 +2411,32 @@ export async function getCustomerPaymentLedger(
       orderNumber: orders.orderNumber,
       invoiceId: customerPayments.invoiceId,
       invoiceNumber: invoices.invoiceNumber,
-      amount: customerPayments.amount,
+      amount: sql<string>`(${customerPayments.amount} + ${partsSum})::numeric(14,2)`,
       currency: customerPayments.currency,
       receivedAt: customerPayments.receivedAt,
       method: customerPayments.method,
       note: customerPayments.note,
       createdAt: customerPayments.createdAt,
+      // How many invoices this one receipt settled (1 for an ordinary payment).
+      invoicesSettled: sql<number>`1 + (SELECT count(*)::int FROM customer_payments part WHERE part.split_parent_id = ${customerPayments.id})`,
     })
     .from(customerPayments)
     .leftJoin(orders, eq(orders.id, customerPayments.orderId))
     .leftJoin(invoices, eq(invoices.id, customerPayments.invoiceId))
-    .where(and(...conditions))
+    .where(and(...conditions, isNull(customerPayments.splitParentId)))
     .orderBy(desc(sortCol))
     .limit(limit)
     .offset(offset);
 
-  // Totals per currency (all rows, not just the page)
+  // Totals per currency over EVERY row, not just the page. Money received must
+  // count the split parts too — a receipt is one bank credit however many
+  // invoices it settled — while the count is of RECEIPTS, so a split payment is
+  // not reported as several.
   const totalsRows = await db
     .select({
       currency: customerPayments.currency,
       totalReceived: sql<string>`COALESCE(SUM(${customerPayments.amount}), 0)::numeric(14,2)`,
-      count: sql<number>`count(*)::int`,
+      count: sql<number>`count(*) FILTER (WHERE ${customerPayments.splitParentId} IS NULL)::int`,
     })
     .from(customerPayments)
     .where(and(...conditions))

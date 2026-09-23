@@ -6,7 +6,7 @@
     "start": "sh scripts/serve.sh",
     "build": "sh scripts/ng.sh build",
     "watch": "sh scripts/ng.sh build --watch --configuration development",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test": "sh scripts/ng.sh test",
     "test:coverage": "sh scripts/ng.sh test --watch=false --coverage",
     "test:e2e": "sh scripts/e2e.sh test",

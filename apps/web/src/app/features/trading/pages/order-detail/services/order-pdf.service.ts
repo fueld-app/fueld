@@ -27,6 +27,8 @@ export class OrderPdfService {
     invoiceNumber: string | null | undefined,
     orderNumber: string | null | undefined,
     status: string | null | undefined,
+    /** With split payment terms, which tranche invoice to render. */
+    invoiceId?: string | null,
   ): Promise<void> {
     if (!orderId) return;
     if (!hasLineItems) {
@@ -44,8 +46,10 @@ export class OrderPdfService {
       status === OrderStatus.Invoiced ||
       status === OrderStatus.Paid;
     const documentTitle = isFinalInvoice ? 'Invoice' : 'Proforma Invoice';
+    // A split-terms order has one invoice per tranche and the API defaults to the
+    // deposit, so a caller that means a specific tranche must name it.
     const endpoint = isFinalInvoice
-      ? `${API_URL}/orders/${orderId}/invoice/pdf`
+      ? `${API_URL}/orders/${orderId}/invoice/pdf${invoiceId ? `?invoiceId=${encodeURIComponent(invoiceId)}` : ''}`
       : `${API_URL}/orders/${orderId}/proforma/pdf`;
     const fileName = isFinalInvoice
       ? `Fueld_Invoice_${invoiceNumber ?? orderId}.pdf`

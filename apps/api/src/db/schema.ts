@@ -13,6 +13,7 @@ import {
   index,
   uniqueIndex,
   primaryKey,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
@@ -1553,7 +1554,17 @@ export const customerPayments = pgTable('customer_payments', {
   note: text('note'),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+  // A receipt that covers more than one invoice is stored as one row per
+  // invoice (a row carries a single invoice_id), so the row the trader actually
+  // recorded is the parent and every additional part points back at it. This
+  // keeps "how much did we receive" answerable as ONE receipt instead of N
+  // phantom receipts, and makes a delete/edit of the parent cascade to its parts
+  // rather than silently un-conserving the money. NULL for an ordinary
+  // single-invoice payment, which is the overwhelming majority.
+  splitParentId: uuid('split_parent_id').references((): AnyPgColumn => customerPayments.id, { onDelete: 'cascade' }),
+}, (table) => ({
+  splitParentIdx: index('customer_payments_split_parent_idx').on(table.splitParentId),
+}));
 
 // ═══════════════════════════════════════════════════════════════════════
 //  12c. SUPPLIER PAYMENTS (per-leg supplier settlement ledger entries)

@@ -2278,7 +2278,38 @@ export async function listOrderPayments(orderId: string) {
     .where(eq(customerPayments.orderId, orderId))
     .orderBy(desc(customerPayments.receivedAt));
 
-  return rows.map(mapPaymentRow);
+  // A receipt that covered more than one invoice is stored as several rows
+  // sharing one parent. It was recorded ONCE, so it is listed once, with the
+  // total actually received and the invoices it settled named alongside.
+  const parents = new Map<string, typeof rows>();
+  const parts = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (row.splitParentId) {
+      const bucket = parts.get(row.splitParentId) ?? [];
+      bucket.push(row);
+      parts.set(row.splitParentId, bucket);
+    } else {
+      const bucket = parents.get(row.id) ?? [];
+      bucket.push(row);
+      parents.set(row.id, bucket);
+    }
+  }
+
+  return [...parents.values()].map((group) => {
+    const head = group[0]!;
+    const children = parts.get(head.id) ?? [];
+    const all = [...group, ...children];
+    const total = all.reduce((sum, row) => sum + (parseFloat(String(row.amount)) || 0), 0);
+    return {
+      ...mapPaymentRow(head),
+      // The amount the trader actually banked, across every invoice it settled.
+      amount: total.toFixed(2),
+      // Empty for an ordinary single-invoice payment.
+      appliedTo: children.length > 0
+        ? all.map((row) => ({ invoiceId: row.invoiceId, amount: String(row.amount) }))
+        : [],
+    };
+  });
 }
 
 export async function createOrderPayment(orderId: string, input: {

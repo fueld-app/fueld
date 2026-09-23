@@ -445,7 +445,10 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
           node-version: '22'
       - name: Typecheck
-        run: cd apps/web && bunx tsc --noEmit -p tsconfig.json
+        # tsconfig.json has `files: []` + project references, so pointing tsc at
+        # it checks NOTHING and always passes. The app project is what actually
+        # covers src/**.
+        run: cd apps/web && bunx tsc --noEmit -p tsconfig.app.json
 
   web-build:
     name: Web (build)

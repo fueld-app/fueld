@@ -39,6 +39,7 @@ import {
   InvoiceLinesChangedError,
 } from '../src/modules/orders/invoice.service';
 import { seedBasics, truncateAll } from './helpers/db';
+import { listOrderPayments } from '../src/modules/orders/orders.service';
 import { documentRevisions } from '../src/db/schema';
 import { assertValidSchedule, InvalidScheduleError, listOrderPaymentSchedule, setOrderPaymentSchedule } from '../src/modules/orders/payment-schedule.service';
 import { splitAmountByPercent } from '../src/modules/orders/invoice-amounts';
@@ -869,5 +870,60 @@ describe('tranche share reconstruction on an asymmetric schedule', () => {
       const doc = await generateOrderInvoicePdfBuffer(order.id, { invoiceId: String(row.id) });
       expect(doc.invoiceNumber).toBe(row.invoiceNumber);
     }
+  });
+});
+
+describe('split receipt keeps one identity', () => {
+  it('lists a receipt that settled both tranches once, with its full amount', async () => {
+    const { tenant, order } = await seedOrderWithItems();
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    const total = parseFloat(await computeInvoiceAmount(order.id));
+    await db.insert(customerPayments).values({
+      tenantId: tenant.id, customerId: order.clientId, orderId: order.id, invoiceId: null,
+      amount: total.toFixed(2), currency: 'USD', receivedAt: new Date(),
+    });
+    await ensureOrderInvoice(order.id);
+
+    // Stored as one row per invoice (a row carries one invoice_id) ...
+    const raw = await db.select().from(customerPayments).where(eq(customerPayments.orderId, order.id));
+    expect(raw.length).toBe(2);
+
+    // ... but the trader recorded ONE receipt, so it is listed as one, at the
+    // amount actually banked, naming both invoices it settled.
+    const listed = await listOrderPayments(order.id);
+    expect(listed.length).toBe(1);
+    expect(parseFloat(listed[0]!.amount)).toBeCloseTo(total, 2);
+    expect(listed[0]!.appliedTo.length).toBe(2);
+    expect(listed[0]!.appliedTo.reduce((s: number, a: { amount: string }) => s + parseFloat(a.amount), 0)).toBeCloseTo(total, 2);
+
+    // Exactly one part points at the parent, and the parent is the recorded row.
+    const parts = raw.filter((r) => r.splitParentId != null);
+    expect(parts.length).toBe(1);
+    expect(parts[0]!.splitParentId).toBe(listed[0]!.id);
+  });
+
+  it('deleting the recorded receipt removes its parts, so money cannot be un-conserved', async () => {
+    const { tenant, order } = await seedOrderWithItems();
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    const total = parseFloat(await computeInvoiceAmount(order.id));
+    await db.insert(customerPayments).values({
+      tenantId: tenant.id, customerId: order.clientId, orderId: order.id, invoiceId: null,
+      amount: total.toFixed(2), currency: 'USD', receivedAt: new Date(),
+    });
+    await ensureOrderInvoice(order.id);
+    const listed = await listOrderPayments(order.id);
+    expect(listed.length).toBe(1);
+
+    // The hazard the panel flagged: a per-payment delete must not leave the
+    // parts behind claiming money that is no longer on file.
+    await db.delete(customerPayments).where(eq(customerPayments.id, String(listed[0]!.id)));
+    const left = await db.select().from(customerPayments).where(eq(customerPayments.orderId, order.id));
+    expect(left.length).toBe(0);
   });
 });

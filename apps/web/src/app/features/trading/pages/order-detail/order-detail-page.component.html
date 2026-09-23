@@ -399,6 +399,19 @@
 }
 @defer (on idle) {
     @if (orderId() || order()?.id) {
+      <app-order-payment-schedule-card
+        [schedule]="paymentSchedule()"
+        [currency]="order()?.currency ?? 'USD'"
+        [locked]="scheduleLocked()"
+        [saving]="paymentScheduleSaving()"
+        (saveSchedule)="onSavePaymentSchedule($event)"
+        (clearSchedule)="onClearPaymentSchedule()"
+        (viewTrancheInvoice)="onViewTrancheInvoice($event)"
+      />
+    }
+} @placeholder { <div></div> }
+@defer (on idle) {
+    @if (orderId() || order()?.id) {
       <app-order-payments-card
         [payments]="payments()"
         [paymentsTotal]="paymentsTotal()"
