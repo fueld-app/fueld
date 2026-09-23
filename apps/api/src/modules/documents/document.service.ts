@@ -1695,16 +1695,20 @@ export async function generateOrderInvoicePdfBuffer(
   const frozenAmount = numberOrNull(invoice.amount);
   if (frozenAmount != null) {
     const liveLinesTotal = await computeInvoiceAmountForItems(order.items);
-    // An unscheduled order bills the whole deal, so its frozen amount IS the
-    // lines total. A tranche invoice bills a SHARE of it, so the same check has
-    // to be made against the share the tranche would get from the lines as they
-    // stand now -- comparing a half-invoice to the full total would reject every
-    // tranche on its first render.
-    const expected = invoice.trancheSeq == null
-      ? liveLinesTotal
-      : await expectedTrancheShare(liveLinesTotal, invoice);
-    if (Math.abs(liveLinesTotal - frozenAmount) > 0.005 && Math.abs(expected - frozenAmount) > 0.005) {
-      throw new InvoiceLinesChangedError(order.id, frozenAmount.toFixed(2), liveLinesTotal.toFixed(2));
+    // The document must sum to itself. What "itself" is depends on the kind of
+    // invoice, and the two cases must be checked separately: an unscheduled
+    // order bills the whole deal, a tranche bills a SHARE of it. Testing both
+    // with OR would let an edited order slip through whenever the lines total
+    // happened to land on the tranche's frozen figure.
+    if (invoice.trancheSeq == null) {
+      if (Math.abs(liveLinesTotal - frozenAmount) > 0.005) {
+        throw new InvoiceLinesChangedError(order.id, frozenAmount.toFixed(2), liveLinesTotal.toFixed(2));
+      }
+    } else {
+      const expected = await expectedTrancheShare(liveLinesTotal, invoice);
+      if (Math.abs(expected - frozenAmount) > 0.005) {
+        throw new InvoiceLinesChangedError(order.id, frozenAmount.toFixed(2), expected.toFixed(2));
+      }
     }
   }
 

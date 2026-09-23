@@ -36,6 +36,7 @@ import {
   UnpricedScheduleError,
   InvoiceAlreadyVoidError,
   InvoiceNotFoundError,
+  InvoiceLinesChangedError,
 } from '../src/modules/orders/invoice.service';
 import { seedBasics, truncateAll } from './helpers/db';
 import { documentRevisions } from '../src/db/schema';
@@ -790,5 +791,24 @@ describe('pre-issuance payment across tranches', () => {
     expect(sum).toBeCloseTo(total, 2);
     // Every row is attached to a live tranche, none stranded unallocated.
     expect(rows.every((row) => row.invoiceId != null)).toBe(true);
+  });
+});
+
+describe('tranche render guard honesty', () => {
+  it('refuses to render a tranche whose share no longer matches the edited lines', async () => {
+    const { order } = await seedOrderWithItems();
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    await ensureOrderInvoice(order.id);
+
+    // Edit the order AFTER issuance: the tranche's share of the new lines no
+    // longer equals its frozen amount, so the held document must not be restated.
+    await db.update(orderItems)
+      .set({ salesPrice: '9999.99' })
+      .where(eq(orderItems.orderId, order.id));
+
+    await expect(generateOrderInvoicePdfBuffer(order.id)).rejects.toBeInstanceOf(InvoiceLinesChangedError);
   });
 });
