@@ -95,14 +95,12 @@ function computeInvoiceAmountForItems(
     deliveredQuantity?: string | number | null;
     quantity: string | number;
   }>,
-): Promise<number | null> {
-  const billable = customerFacingItems(items);
-  const total = billable.reduce((sum, item) => {
+): number {
+  return customerFacingItems(items).reduce((sum, item) => {
     const qty = parseFloat(String(item.deliveredQuantity ?? item.quantity ?? 0)) || 0;
     const price = parseFloat(String(item.salesPrice ?? 0)) || 0;
     return sum + qty * price;
   }, 0);
-  return Promise.resolve(total);
 }
 
 function numberOrNull(value: string | null | undefined): number | null {
@@ -1594,21 +1592,6 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   // placeholder and every reader (collections, aging, QuickBooks) saw nothing.
   const invoice = await ensureOrderInvoice(order.id);
 
-  // Refuse to render a document whose lines disagree with the frozen amount: it
-  // would not sum to itself. Only checked when nothing is persisted yet, so an
-  // already-issued artifact always keeps rendering.
-  const frozenAmount = numberOrNull(invoice.amount);
-  if (frozenAmount != null) {
-    const liveLinesTotal = (await computeInvoiceAmountForItems(order.items));
-    if (liveLinesTotal != null && Math.abs(liveLinesTotal - frozenAmount) > 0.005) {
-      throw new InvoiceLinesChangedError(
-        order.id,
-        frozenAmount.toFixed(2),
-        liveLinesTotal.toFixed(2),
-      );
-    }
-  }
-
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'INVOICE',
     orderId: order.id,
@@ -1622,6 +1605,18 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
       fileName,
       revision: existingRevision,
     };
+  }
+
+  // Nothing is persisted yet, so this would be the FIRST render of this invoice.
+  // Refuse if the order's lines no longer add up to the frozen amount: the
+  // document would not sum to itself. An already-issued artifact returns above
+  // and is never subject to this.
+  const frozenAmount = numberOrNull(invoice.amount);
+  if (frozenAmount != null) {
+    const liveLinesTotal = await computeInvoiceAmountForItems(order.items);
+    if (Math.abs(liveLinesTotal - frozenAmount) > 0.005) {
+      throw new InvoiceLinesChangedError(order.id, frozenAmount.toFixed(2), liveLinesTotal.toFixed(2));
+    }
   }
 
   const invoiceNumber = invoice.invoiceNumber;

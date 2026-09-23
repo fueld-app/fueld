@@ -35,6 +35,7 @@ import {
   InvoiceNotFoundError,
 } from '../src/modules/orders/invoice.service';
 import { seedBasics, truncateAll } from './helpers/db';
+import { documentRevisions } from '../src/db/schema';
 import { __documentTestUtils } from '../src/modules/documents/document.service';
 
 type Basics = Awaited<ReturnType<typeof seedBasics>>;
@@ -465,6 +466,41 @@ describe('display status derivation', () => {
     expect(deriveInvoiceDisplayStatus({ status: 'VOID', amount: '100.00', amountPaid: '0.00' }, 30)).toBe('VOID');
     expect(deriveInvoiceDisplayStatus({ status: 'VOID', amount: '100.00', amountPaid: '100.00' }, 30)).toBe('VOID');
     expect(deriveInvoiceDisplayStatus({ status: 'DRAFT', amount: '100.00', amountPaid: '0.00' }, 30)).toBe('DRAFT');
+  });
+});
+
+describe('issued artifact immutability', () => {
+  it('keeps serving the stored artifact after the lines change, and refuses only a fresh render', async () => {
+    const basics = await seedOrderWithItems();
+    const { order } = basics;
+    const { generateOrderInvoicePdfBuffer } = await import('../src/modules/documents/document.service');
+    const { InvoiceLinesChangedError } = await import('../src/modules/orders/invoice.service');
+
+    // First render issues AND persists the artifact.
+    const first = await generateOrderInvoicePdfBuffer(order.id);
+    expect(first.revision.revisionNumber).toBe(1);
+
+    // Now the trader edits the lines. The already-issued document must keep
+    // serving unchanged — it is the artifact the customer holds.
+    await db.update(orderItems).set({ salesPrice: '9999' }).where(eq(orderItems.orderId, order.id));
+    const again = await generateOrderInvoicePdfBuffer(order.id);
+    expect(again.revision.id).toBe(first.revision.id);
+    expect(again.buffer.equals(first.buffer)).toBe(true);
+    expect(again.invoiceNumber).toBe(first.invoiceNumber);
+
+    // But a DIFFERENT order that was issued (row created) without ever being
+    // rendered must refuse rather than print a self-contradicting document.
+    const other = await createOrderWithItems(basics);
+    await ensureOrderInvoice(other.id);
+    await db.insert(customerPayments).values({
+      tenantId: basics.tenant.id, customerId: other.clientId, orderId: other.id,
+      invoiceId: null, amount: '1.00', currency: 'USD', receivedAt: new Date(),
+    });
+    await ensureOrderInvoice(other.id);
+    await db.update(orderItems).set({ salesPrice: '7777' }).where(eq(orderItems.orderId, other.id));
+    await expect(generateOrderInvoicePdfBuffer(other.id)).rejects.toBeInstanceOf(InvoiceLinesChangedError);
+
+    await db.delete(documentRevisions).where(eq(documentRevisions.orderId, order.id));
   });
 });
 
