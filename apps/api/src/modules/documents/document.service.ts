@@ -164,8 +164,13 @@ export function documentTypePrefix(documentType: DocumentType): string {
  * not unique: two orders' first revision on the same day both read
  * `INV-YYYYMMDD-R001` (confirmed on live data — one such ref occurred 12 times).
  * A field named "reference" that several documents share is not a reference, so
- * the stream is folded in: a short digest of the stream key, which is unique per
- * stream by construction.
+ * the stream is folded in as a short digest of the stream key.
+ *
+ * The digest is 4 hex characters — 65,536 possibilities — so this makes a
+ * collision unlikely, NOT impossible; the SHA-256 fingerprint printed beside it
+ * is the exact identity, and it is what verification resolves on. Widening the
+ * digest would put a longer opaque string on a customer-facing document for a
+ * label nobody keys on.
  *
  * The fingerprint remains the exact identity and is printed alongside; this only
  * makes the human-facing string unambiguous. Refs already written are frozen on
