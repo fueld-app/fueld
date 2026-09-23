@@ -1620,22 +1620,35 @@ async function expectedTrancheShare(
 ): Promise<number> {
   const percent = numberOrNull(invoice.tranchePercent);
   if (percent == null || percent <= 0) return liveLinesTotal;
-  const siblings = await db
-    .select({ seq: invoices.trancheSeq, percent: invoices.tranchePercent })
-    .from(invoices)
-    .where(and(
-      eq(invoices.orderId, invoice.orderId),
-      inArray(invoices.status, ['SENT', 'PAID', 'OVERDUE']),
-      isNotNull(invoices.trancheSeq),
-    ))
-    .orderBy(asc(invoices.trancheSeq));
-  const index = siblings.findIndex((row) => row.seq === invoice.trancheSeq);
-  if (index < 0) return Math.round(liveLinesTotal * percent) / 100;
-  const percents = siblings.map((row) => numberOrNull(row.percent) ?? 0);
-  return numberOrNull(splitAmountByPercent(liveLinesTotal, percents, index)) ?? liveLinesTotal;
-}
 
-/**
+  // Reconstruct the schedule AS IT WAS AT ISSUANCE and re-split the live total
+  // the same way issuance did -- same percents, same order, same last-tranche
+  // residual absorption. Reconstructing is exact; deriving the share from the
+  // tranche's POSITION in the current live set is not, because voiding a sibling
+  // makes a survivor look like the residual absorber and a paid sibling dropping
+  // out shifts which share absorbs it.
+  //
+  // Voided rows are included (they are part of the issuance-time set) but a
+  // reissue shares its tranche's seq, so the live row wins on a seq collision.
+  const rows = await db
+    .select({ seq: invoices.trancheSeq, percent: invoices.tranchePercent, status: invoices.status })
+    .from(invoices)
+    .where(and(eq(invoices.orderId, invoice.orderId), isNotNull(invoices.trancheSeq)));
+
+  const bySeq = new Map<number, string>();
+  for (const row of rows) {
+    const seq = row.seq!;
+    const isLive = row.status !== 'VOID' && row.status !== 'DRAFT';
+    if (!bySeq.has(seq) || isLive) bySeq.set(seq, row.percent ?? '0');
+  }
+
+  const seqs = [...bySeq.keys()].sort((a, b) => a - b);
+  const index = seqs.indexOf(invoice.trancheSeq!);
+  if (index < 0) return Math.round((liveLinesTotal * percent) / 100 * 100) / 100;
+
+  const percents = seqs.map((seq) => numberOrNull(bySeq.get(seq) ?? null) ?? 0);
+  return numberOrNull(splitAmountByPercent(liveLinesTotal, percents, index)) ?? liveLinesTotal;
+}/**
  * Load one invoice of an order, refusing an id that belongs to a different order
  * (so an invoice id cannot be used to render another order's document).
  */
@@ -1706,7 +1719,9 @@ export async function generateOrderInvoicePdfBuffer(
       }
     } else {
       const expected = await expectedTrancheShare(liveLinesTotal, invoice);
-      if (Math.abs(expected - frozenAmount) > 0.005) {
+      // Compared in cents: the split rounds each share to 2dp, so a sub-cent
+      // float artifact must not read as a changed order.
+      if (Math.round(expected * 100) !== Math.round(frozenAmount * 100)) {
         throw new InvoiceLinesChangedError(order.id, frozenAmount.toFixed(2), expected.toFixed(2));
       }
     }

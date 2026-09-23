@@ -812,3 +812,32 @@ describe('tranche render guard honesty', () => {
     await expect(generateOrderInvoicePdfBuffer(order.id)).rejects.toBeInstanceOf(InvoiceLinesChangedError);
   });
 });
+
+describe('tranche share is its percent, not its position', () => {
+  it('still renders a surviving tranche after its sibling was voided', async () => {
+    const { order } = await seedOrderWithItems();
+    // Three tranches, so positional rounding matters: the LAST absorbs residual.
+    await setOrderPaymentSchedule(order.id, [
+      { label: 'Deposit', percent: 33.333, dueBasis: 'ON_ISSUE' },
+      { label: 'Second', percent: 33.333, dueBasis: 'FROM_DELIVERY', creditDays: 14 },
+      { label: 'Balance', percent: 33.334, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    await ensureOrderInvoice(order.id);
+    const live = await listLiveOrderInvoices(order.id);
+    expect(live.length).toBe(3);
+
+    const total = parseFloat(await computeInvoiceAmount(order.id));
+
+    // Void the FIRST tranche. If a survivor's expected share were derived from
+    // its position among the remaining invoices, the middle tranche would look
+    // like the residual absorber and its frozen amount would stop matching.
+    await voidOrderInvoice(order.id, { invoiceId: String(live[0]!.id), reissue: false });
+
+    for (const row of live.slice(1)) {
+      const doc = await generateOrderInvoicePdfBuffer(order.id, { invoiceId: String(row.id) });
+      expect(doc.invoiceNumber).toBe(row.invoiceNumber);
+    }
+    // Tranche 2 is a straight third; tranche 3 absorbed the residual.
+    expect(parseFloat(live[1]!.amount ?? '0')).toBeCloseTo(Math.round((total * 33.333) / 100 * 100) / 100, 2);
+  });
+});
