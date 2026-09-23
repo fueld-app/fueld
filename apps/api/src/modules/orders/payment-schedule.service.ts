@@ -108,16 +108,20 @@ export async function setOrderPaymentSchedule(
 ): Promise<ScheduleTranche[]> {
   if (tranches.length > 0) assertValidSchedule(tranches);
 
-  // An issued tranche is a live receivable; rewriting the schedule underneath it
-  // would silently restate what the customer already holds. DRAFT rows are not
-  // receivables, so they must not block an edit.
+  // A live invoice is a receivable the customer holds, and rewriting the
+  // schedule underneath it would silently restate that document. Any live
+  // invoice blocks an edit, not just ones already split into tranches: setting a
+  // schedule on an order that ALREADY has its single whole-deal invoice would
+  // never issue those tranches (issuance early-returns on the existing row), so
+  // the preview would promise tranches the money never follows. DRAFT rows are
+  // not receivables, so they must not block an edit.
   const issued = await db
-    .select({ seq: invoices.trancheSeq, number: invoices.invoiceNumber })
+    .select({ number: invoices.invoiceNumber })
     .from(invoices)
     .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])));
-  if (issued.some((row) => row.seq != null)) {
+  if (issued.length > 0) {
     throw new InvalidScheduleError(
-      'This order already has issued invoices per tranche — void them before changing the schedule',
+      'This order already has an issued invoice — void it before changing the schedule',
     );
   }
 

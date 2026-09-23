@@ -2,6 +2,8 @@ import { beforeEach, afterEach, describe, expect, it, mock } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { bankAccounts, companyContacts, counterparties, documentRevisions, supplierNominations, tenants } from '../src/db/schema';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
+import { listLiveOrderInvoices } from '../src/modules/orders/invoice.service';
+import { setOrderPaymentSchedule } from '../src/modules/orders/payment-schedule.service';
 
 // ── Mock acquireGraphTokenForUser so send-email tests can use the Graph path ──
 let mockGraphToken: string | null = null;
@@ -908,5 +910,38 @@ describe('documents + verify controller e2e', () => {
       .where(and(eq(documentRevisions.verifyToken, String(verifyToken)), eq(documentRevisions.tenantId, tenantId)))
       .limit(1);
     expect(revisionByToken.length).toBe(1);
+  });
+});
+
+describe('split-terms tranche download (HTTP)', () => {
+  beforeEach(async () => {
+    await truncateAll();
+  });
+
+  it('downloads each tranche by invoice id, and rejects an id from another order', async () => {
+    const { token, orderId, tenantId } = await seedDocumentReadyOrder();
+    await setOrderPaymentSchedule(orderId, [
+      { label: 'Deposit', percent: 50, dueBasis: 'ON_ISSUE' },
+      { label: 'Balance', percent: 50, dueBasis: 'FROM_DELIVERY', creditDays: 21 },
+    ]);
+    // The default download is the deposit tranche, and it is what ISSUES the
+    // schedule's invoices (issuance is on-demand, not on schedule save).
+    const deposit = await requestRaw(`/orders/${orderId}/invoice/pdf`, { token });
+    expect(deposit.status).toBe(200);
+    const live = await listLiveOrderInvoices(orderId);
+    expect(live.length).toBe(2);
+    expect(deposit.headers.get('content-disposition')).toContain(live[0]!.invoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_'));
+
+    // The balance tranche is reachable ONLY by naming its invoice — without this
+    // the trader cannot deliver the second invoice at all.
+    const balance = await requestRaw(`/orders/${orderId}/invoice/pdf?invoiceId=${live[1]!.id}`, { token });
+    expect(balance.status).toBe(200);
+    expect(balance.headers.get('content-type')).toContain('application/pdf');
+    expect(balance.headers.get('content-disposition')).toContain(live[1]!.invoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_'));
+    expect(balance.headers.get('x-document-verify-token')).toBeTruthy();
+
+    // An invoice id that is not this order's is a 404, not a 500.
+    const foreign = await requestRaw(`/orders/${orderId}/invoice/pdf?invoiceId=00000000-0000-0000-0000-000000000000`, { token });
+    expect(foreign.status).toBe(404);
   });
 });

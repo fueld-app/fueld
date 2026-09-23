@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { and, desc, eq, inArray, isNull, ne, notInArray } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
-import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError, InvoiceLinesChangedError, UnpricedScheduleError } from '../orders/invoice.service';
+import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError, InvoiceLinesChangedError, InvoiceNotFoundError, UnpricedScheduleError } from '../orders/invoice.service';
 import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, generateBrokerConfirmationPdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById, updateOrderStatus } from '../orders/orders.service';
@@ -487,11 +487,19 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       let fileName: string;
       let revision: Awaited<ReturnType<typeof generateOrderInvoicePdfBuffer>>['revision'];
       try {
-        ({ buffer, fileName, revision } = await generateOrderInvoicePdfBuffer(orderId));
+        ({ buffer, fileName, revision } = await generateOrderInvoicePdfBuffer(orderId, {
+          ...(query.invoiceId ? { invoiceId: query.invoiceId } : {}),
+        }));
       } catch (err) {
         // A finalized internal transfer passes the gate above but has no
         // customer receivable, and a mixed-currency order has no single
         // invoiceable total. Both are user-fixable states, so they are 400s.
+        // An invoice id that is not this order's is the caller naming the wrong
+        // document, which is a 404 rather than a server fault.
+        if (err instanceof InvoiceNotFoundError) {
+          set.status = 404;
+          return { success: false, message: err.message };
+        }
         if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError) && !(err instanceof UnpricedScheduleError)) throw err;
         set.status = 400;
         return { success: false, message: err.message };
@@ -509,7 +517,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
     {
       params: t.Object({ id: t.String() }),
-      query: t.Object({ side: t.Optional(t.String()) }),
+      query: t.Object({
+        side: t.Optional(t.String()),
+        invoiceId: t.Optional(t.String({ description: 'With split payment terms, which tranche invoice to render; defaults to the deposit tranche' })),
+      }),
       detail: {
         tags: ['Documents'],
         summary: 'Generate invoice PDF for an order. For internal-transfer orders, optional `side=SOURCE_SELL|DESTINATION_BUY` selects which transfer side must be FINALIZED.',
@@ -634,7 +645,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         case 'INVOICE': {
           if (!order.bankAccountId) { set.status = 400; return { success: false, message: 'Select a bank account first' }; }
           try {
-            const result = await generateOrderInvoicePdfBuffer(orderId);
+            const result = await generateOrderInvoicePdfBuffer(orderId, {
+              ...(body.invoiceId ? { invoiceId: body.invoiceId } : {}),
+            });
             pdfBuffer = result.buffer;
             pdfFileName = result.fileName;
             // The client composed the subject before the number existed (the
@@ -644,6 +657,12 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             // bears one.
             issuedInvoiceNumber = result.invoiceNumber;
           } catch (err) {
+            // Wrong-order invoice id is the caller naming a document that is not
+            // this order's, so it is a 404 rather than a server fault.
+            if (err instanceof InvoiceNotFoundError) {
+              set.status = 404;
+              return { success: false, message: err.message };
+            }
             if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError) && !(err instanceof UnpricedScheduleError)) throw err;
             set.status = 400;
             return { success: false, message: err.message };
@@ -792,6 +811,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         subject: t.String({ description: 'Email subject line' }),
         htmlBody: t.String({ description: 'HTML email body' }),
         orderSupplierId: t.Optional(t.Nullable(t.String({ description: 'Supplier leg to target for nomination emails' }))),
+        invoiceId: t.Optional(t.String({ description: 'With split payment terms, which tranche invoice to attach; defaults to the deposit tranche' })),
         attachmentIds: t.Optional(t.Array(t.String(), { description: 'Order attachment ids to include with the email' })),
       }),
       detail: {
