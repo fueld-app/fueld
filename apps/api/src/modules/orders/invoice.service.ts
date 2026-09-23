@@ -802,7 +802,9 @@ export async function resolvePaymentInvoiceTarget(
     .select()
     .from(invoices)
     .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
-    .orderBy(asc(invoices.createdAt));
+    // Tranche order, not creation order: the deposit is tranche 1 regardless of
+    // which row happened to be inserted first.
+    .orderBy(asc(invoices.trancheSeq), asc(invoices.createdAt));
 
   if (!candidates.length) return null;
 

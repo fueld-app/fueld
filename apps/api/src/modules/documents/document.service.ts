@@ -1030,6 +1030,8 @@ function buildInvoiceDocument(data: {
   /** Split payment terms: which tranche this document bills. */
   trancheLabel?: string | null;
   tranchePercent?: string | null;
+  /** The order's full lines total, shown so a tranche invoice reconciles. */
+  orderLinesTotal?: number | null;
   trancheSeq?: number | null;
   clientName: string;
   clientCountry: string | null;
@@ -1106,8 +1108,13 @@ function buildInvoiceDocument(data: {
   // name the tranche — otherwise the customer reads "total amount due" against
   // a figure that is half the deal.
   const companyLabel = data.companyName?.trim() || 'Company';
-  const totalAmountDueLabel = data.trancheLabel || data.tranchePercent
-    ? `${data.trancheLabel ? `${data.trancheLabel} — ` : ''}${data.tranchePercent}% of order. Total amount due to ${companyLabel}`
+  // numeric(6,3) serializes 50 as "50.000"; a legal document must not leak the
+  // column scale, so trim trailing zeros the way the prices already are.
+  const tranchePercentLabel = data.tranchePercent == null
+    ? null
+    : String(parseFloat(data.tranchePercent));
+  const totalAmountDueLabel = data.trancheLabel || tranchePercentLabel
+    ? `${data.trancheLabel ? `${data.trancheLabel} — ` : ''}${tranchePercentLabel}% of order. Total amount due to ${companyLabel}`
     : `Total amount due to ${companyLabel}`;
 
   const docDefinition: TDocumentDefinitions = {
@@ -1799,6 +1806,7 @@ export async function generateOrderInvoicePdfBuffer(
     frozenTotal: invoice.amount,
     trancheLabel: invoice.trancheLabel,
     tranchePercent: invoice.tranchePercent,
+    orderLinesTotal: invoice.trancheSeq == null ? null : await computeInvoiceAmountForItems(order.items),
     trancheSeq: invoice.trancheSeq,
   };
 
@@ -2822,6 +2830,8 @@ function buildProformaDocument(data: {
   /** Split payment terms: which tranche this document bills. */
   trancheLabel?: string | null;
   tranchePercent?: string | null;
+  /** The order's full lines total, shown so a tranche invoice reconciles. */
+  orderLinesTotal?: number | null;
   trancheSeq?: number | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
@@ -2920,8 +2930,13 @@ function buildProformaDocument(data: {
   // name the tranche — otherwise the customer reads "total amount due" against
   // a figure that is half the deal.
   const companyLabel = data.companyName?.trim() || 'Company';
-  const totalAmountDueLabel = data.trancheLabel || data.tranchePercent
-    ? `${data.trancheLabel ? `${data.trancheLabel} — ` : ''}${data.tranchePercent}% of order. Total amount due to ${companyLabel}`
+  // numeric(6,3) serializes 50 as "50.000"; a legal document must not leak the
+  // column scale, so trim trailing zeros the way the prices already are.
+  const tranchePercentLabel = data.tranchePercent == null
+    ? null
+    : String(parseFloat(data.tranchePercent));
+  const totalAmountDueLabel = data.trancheLabel || tranchePercentLabel
+    ? `${data.trancheLabel ? `${data.trancheLabel} — ` : ''}${tranchePercentLabel}% of order. Total amount due to ${companyLabel}`
     : `Total amount due to ${companyLabel}`;
 
   // Delivery date string — use the actual marked delivery date (deliveredAt), not ETA/ETD range
@@ -3087,6 +3102,18 @@ function buildProformaDocument(data: {
         ],
         margin: [0, 6, 0, 0],
       } as Content,
+      // A tranche invoice bills a share, so the lines above it total the whole
+      // deal: show that subtotal explicitly, or the reader cannot reconcile the
+      // arithmetic and the invoice gets queried.
+      ...(data.orderLinesTotal != null && tranchePercentLabel
+        ? [{
+            columns: [
+              { width: '*', text: 'Order total', fontSize: 9, color: '#6b7280' },
+              { width: 'auto', text: `${formatNumber(String(data.orderLinesTotal), priceDecimals)} ${grandTotalCurrency}`, fontSize: 9, color: '#6b7280', alignment: 'right' },
+            ],
+            margin: [0, 6, 0, 0],
+          } as Content]
+        : []),
       { text: '', margin: [0, 6, 0, 0] } as Content,
 
       // Payment terms + Notes + QR code (2-column: left has terms/notes, right has QR)

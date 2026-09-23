@@ -19,7 +19,7 @@
  * anchors on `deliveredAt ?? eta` plus `creditDays` — the trader's "delivery
  * date + credit days". `FIXED_DATE` is an exact day the trader pinned.
  */
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, notInArray, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { invoices, orderPaymentSchedule, orders } from '../../db/schema';
 import { computeInvoiceAmount, computeInvoiceDueDate, splitAmountByPercent } from './invoice-amounts';
@@ -109,11 +109,12 @@ export async function setOrderPaymentSchedule(
   if (tranches.length > 0) assertValidSchedule(tranches);
 
   // An issued tranche is a live receivable; rewriting the schedule underneath it
-  // would silently restate what the customer already holds.
+  // would silently restate what the customer already holds. DRAFT rows are not
+  // receivables, so they must not block an edit.
   const issued = await db
     .select({ seq: invoices.trancheSeq, number: invoices.invoiceNumber })
     .from(invoices)
-    .where(and(eq(invoices.orderId, orderId), sql`${invoices.status} <> 'VOID'`));
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])));
   if (issued.some((row) => row.seq != null)) {
     throw new InvalidScheduleError(
       'This order already has issued invoices per tranche — void them before changing the schedule',
