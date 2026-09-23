@@ -147,10 +147,13 @@ describe('broker commission report e2e', () => {
     expect(parseFloat(cust.totalCommission)).toBe(300);
   });
 
-  it('falls back to tenant defaultCommissionRate when item commissionPerUnit is null', async () => {
+  it('falls back to the tenant defaultCommissionRate when neither item nor order rate is set', async () => {
     const seeded = await seedAuthBasics();
-    // Set default commission rate to 5 (use both field names for compat)
-    await enableBrokerDeals(seeded.tenant.id, { defaultCommissionRate: 5, defaultCommissionPerMt: 5 });
+    // Only the CURRENT settings key is set. Setting both names (as this test
+    // once did) hides the bug: the report used to read only the legacy
+    // `defaultCommissionPerMt`, which nothing writes, so it fell through to 0
+    // and reported zero commission on every real broker deal.
+    await enableBrokerDeals(seeded.tenant.id, { defaultCommissionRate: 5 });
     const login = await loginE2E(seeded.user.email, seeded.password);
     const token = login.accessToken;
 
@@ -166,6 +169,55 @@ describe('broker commission report e2e', () => {
     expect(report.data?.success).toBe(true);
     // 80 MT × $5/MT = $400
     expect(parseFloat(report.data?.data?.totalCommission)).toBe(400);
+  });
+
+  // Moxie's real-world case: the UI seeds the order-level commissionPerMt from
+  // the tenant default when a deal is marked as a broker deal, and line items
+  // are priced with no per-line rate. Reading only the per-line field reported
+  // 0.00 for every such deal.
+  it('falls back to the ORDER-level commissionPerMt when the line item has no rate', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id, { defaultCommissionRate: 3 });
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    const orderId = await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      commissionPerUnit: null,
+      quantity: '80',
+      status: 'CONFIRMED',
+      deliveredAt: '2026-07-10',
+    });
+
+    // Set only the order-level rate, exactly as the UI does on the broker toggle
+    const db = await getDb();
+    await db.update(orders).set({ commissionPerMt: '3' }).where(eq(orders.id, orderId));
+
+    const report = await requestJson('/reports/broker-commission?from=2026-07-01&to=2026-07-31', { token });
+    expect(report.data?.success).toBe(true);
+    // 80 MT × $3/MT = $240 — not $0.00
+    expect(parseFloat(report.data?.data?.totalCommission)).toBe(240);
+    expect(report.data?.data?.byCustomer[0].orders[0].commissionAmount).toBe('240.00');
+  });
+
+  it('prefers the per-line rate over the order-level rate when both are set', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id, { defaultCommissionRate: 3 });
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    const orderId = await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      commissionPerUnit: '7',
+      quantity: '100',
+      status: 'CONFIRMED',
+      deliveredAt: '2026-07-10',
+    });
+
+    const db = await getDb();
+    await db.update(orders).set({ commissionPerMt: '3' }).where(eq(orders.id, orderId));
+
+    const report = await requestJson('/reports/broker-commission?from=2026-07-01&to=2026-07-31', { token });
+    expect(report.data?.success).toBe(true);
+    expect(parseFloat(report.data?.data?.totalCommission)).toBe(700); // 100 × 7, not 100 × 3
   });
 
   it('filters by date range using deliveredAt (default reportDateField)', async () => {

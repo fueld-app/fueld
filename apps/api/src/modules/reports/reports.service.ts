@@ -2418,7 +2418,13 @@ export async function buildBrokerCommissionReport(
   ]) as (typeof orders.status.enumValues)[number][];
   const reportDateField: string = bd.reportDateField ?? 'deliveredAt';
   const reportDateFallback: string = bd.reportDateFallback ?? 'eta';
-  const defaultCommissionPerMt: string = String(bd.defaultCommissionPerMt ?? 0);
+  // NOTE: the setting is `defaultCommissionRate`. It was renamed from
+  // `defaultCommissionPerMt` in fd69d793, which updated the settings API but
+  // not this report — so the fallback silently read a field nothing writes,
+  // and every broker deal without a per-line rate reported 0.00 commission.
+  // Accept the legacy key too, so an instance provisioned before the rename
+  // still resolves its configured rate.
+  const defaultCommissionPerMt: string = String(bd.defaultCommissionRate ?? bd.defaultCommissionPerMt ?? 0);
   const commissionCurrency: string = bd.commissionCurrency ?? 'USD';
 
   // Build the date filter using COALESCE with the configured fields
@@ -2436,7 +2442,11 @@ export async function buildBrokerCommissionReport(
       productType: orderItems.productType,
       quantity: orderItems.quantity,
       unit: orderItems.unit,
-      commissionPerMt: orderItems.commissionPerUnit,
+      // Per-line override, else the order-level rate. Both are stored; only the
+      // per-line one is typically set, and the order rate is what the UI seeds
+      // from the tenant default when a deal is marked as a broker deal.
+      itemCommissionPerUnit: orderItems.commissionPerUnit,
+      orderCommissionPerMt: orders.commissionPerMt,
       deliveredAt: orders.deliveredAt,
       status: orders.status,
       primaryDate: dateColumn,
@@ -2470,7 +2480,15 @@ export async function buildBrokerCommissionReport(
   let grandTotalCommission = 0;
 
   for (const r of filtered) {
-    const rate = r.commissionPerMt != null ? parseFloat(String(r.commissionPerMt)) : parseFloat(defaultCommissionPerMt);
+    // Commission rate resolution, matching order-financing.ts and the design
+    // doc: per-line override → order-level rate → tenant default. Reading only
+    // the per-line field meant any deal priced without a per-line rate
+    // (the common case) reported zero.
+    const rate = r.itemCommissionPerUnit != null
+      ? parseFloat(String(r.itemCommissionPerUnit))
+      : (r.orderCommissionPerMt != null
+        ? parseFloat(String(r.orderCommissionPerMt))
+        : parseFloat(defaultCommissionPerMt));
     const qty = parseFloat(String(r.quantity)) || 0;
     const commissionAmount = rate * qty;
     grandTotalCommission += commissionAmount;
