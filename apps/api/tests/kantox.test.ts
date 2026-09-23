@@ -425,6 +425,33 @@ describe('planPaymentClosures — a payment is consumed across the open entries'
     expect(planPaymentClosures([{ amount: 100, cancelled: 0 }], 0)).toEqual([]);
     expect(planPaymentClosures([{ amount: 100, cancelled: 0 }], -5)).toEqual([]);
   });
+
+  // The two invariants that keep a mis-netted hedge from ever being sent: a
+  // payment cannot relieve more than itself, and cannot relieve more than the
+  // exposure actually open.
+  it('never closes more than the payment across a range of shapes', () => {
+    const cases: Array<{ entries: Array<{ amount: number; cancelled: number }>; payment: number }> = [
+      { entries: [{ amount: 100, cancelled: 0 }], payment: 100 },
+      { entries: [{ amount: 100, cancelled: 0 }], payment: 500 },
+      { entries: [{ amount: 100, cancelled: 60 }, { amount: 50, cancelled: 0 }], payment: 70 },
+      { entries: [{ amount: 100, cancelled: 100 }, { amount: 50, cancelled: 0 }], payment: 30 },
+      { entries: [{ amount: 100, cancelled: 100 }], payment: 50 },
+      { entries: Array.from({ length: 20 }, () => ({ amount: 10, cancelled: 0 })), payment: 95 },
+      { entries: [{ amount: 100, cancelled: 0 }], payment: 0.001 },
+    ];
+    for (const { entries, payment } of cases) {
+      const plan = planPaymentClosures(entries, payment);
+      const closed = plan.reduce((s, p) => s + Math.abs(p.delta), 0);
+      const open = entries.reduce((s, e) => s + Math.max(0, e.amount - e.cancelled), 0);
+      expect(closed).toBeLessThanOrEqual(payment + 1e-9);
+      expect(closed).toBeLessThanOrEqual(open + 1e-9);
+      // And no single entry is closed beyond its own remaining exposure.
+      for (const p of plan) {
+        const entry = entries[p.index]!;
+        expect(Math.abs(p.delta)).toBeLessThanOrEqual(Math.max(0, entry.amount - entry.cancelled) + 1e-9);
+      }
+    }
+  });
 });
 
 describe('nextLifecycleSeq — each close on a parent gets its own ref', () => {

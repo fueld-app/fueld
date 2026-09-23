@@ -533,7 +533,11 @@ async function pushPlannedEntry(
   resolved: KantoxSettingsResolved,
   planned: PlannedHedgeEntry,
   ctx: { orderId: string; orderItemId?: string | null; orderSupplierId?: string | null; kind: 'INITIAL' | 'CANCEL' | 'AMEND' | 'REISSUE'; notes: string; retryCount?: number },
-): Promise<void> {
+  // `false` means the ref was already claimed and NOTHING was sent. Callers must
+  // not count that as a push: the whole reason this matters is that a silently
+  // skipped entry (every tranche after the first, before the index was widened)
+  // left exposure unhedged with only a console line to show for it.
+): Promise<boolean> {
   // Claim: insert before send — the partial unique index fences double-pushes.
   let rowId: string;
   try {
@@ -561,7 +565,7 @@ async function pushPlannedEntry(
   } catch (err: any) {
     if (/duplicate key|unique/i.test(String(err?.message ?? err))) {
       console.error(`[Kantox] ${planned.entryRef} already claimed — skipping`);
-      return;
+      return false;
     }
     throw err;
   }
@@ -572,7 +576,8 @@ async function pushPlannedEntry(
     .set({ status: 'SENDING', updatedAt: new Date() })
     .where(and(eq(kantoxHedgeEntries.id, rowId), eq(kantoxHedgeEntries.status, 'PENDING_SEND')))
     .returning({ id: kantoxHedgeEntries.id });
-  if (claimed.length === 0) return;
+  // Lost the CAS: another runner claimed this row, so THIS call sent nothing.
+  if (claimed.length === 0) return false;
 
   const client = makeClient(resolved);
   try {
@@ -604,7 +609,8 @@ async function pushPlannedEntry(
         .update(kantoxHedgeEntries)
         .set({ status: 'SENT', errorMessage: 'dedup hit — reconciling via GET entries', updatedAt: new Date() })
         .where(eq(kantoxHedgeEntries.id, rowId));
-      return;
+      // The ref exists on Kantox, so the exposure is covered — count it.
+      return true;
     }
     const isRateRejection = err instanceof KantoxRateRejectionError;
     await db
@@ -617,6 +623,7 @@ async function pushPlannedEntry(
       .where(eq(kantoxHedgeEntries.id, rowId));
     if (!isRateRejection) throw err; // rate rejections keep the ref reusable (verified live); others go to the retry loop
   }
+  return true;
 }
 
 /** Fire-and-forget hook — order reached CONFIRMED. Never throws. */
@@ -646,12 +653,16 @@ export async function onOrderConfirmedForKantox(order: {
       console.log(`[Kantox] order ${order.orderNumber ?? order.id} not hedged: ${plan.skipped}`);
       return;
     }
+    let sent = 0;
+    const skipped: string[] = [];
     for (const planned of plan.entries) {
-      await pushPlannedEntry(order.tenantId, resolved, planned, {
+      const pushed = await pushPlannedEntry(order.tenantId, resolved, planned, {
         orderId: order.id,
         kind: 'INITIAL',
         notes: `Fueld order ${order.orderNumber ?? order.id}`,
       });
+      if (pushed) sent += 1;
+      else skipped.push(planned.entryRef);
     }
     await logActivity({
       userId: null, // system-initiated (order-status hook), not a user action
@@ -659,7 +670,15 @@ export async function onOrderConfirmedForKantox(order: {
       action: 'KANTOX_PUSH',
       entityType: 'kantox_hedge_entry',
       entityId: order.id,
-      metadata: { entryCount: plan.entries.length, orderNumber: order.orderNumber },
+      // Record what was actually SUBMITTED, not what was planned: an entry whose
+      // ref was already claimed was not sent, and a log that says otherwise
+      // hides unhedged exposure.
+      metadata: {
+        entryCount: sent,
+        plannedCount: plan.entries.length,
+        ...(skipped.length > 0 ? { skippedRefs: skipped } : {}),
+        orderNumber: order.orderNumber,
+      },
     });
   } catch (err) {
     console.error(`[Kantox] onOrderConfirmed failed for order ${order.id} (tenant ${order.tenantId}) — non-fatal:`, err);
