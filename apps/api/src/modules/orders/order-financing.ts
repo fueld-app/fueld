@@ -170,10 +170,22 @@ export function getFinancingDays(input: FinancingTermsInput): number {
     ? Math.max(0, Math.round(input.supplierEffectiveDays))
     : getPaymentTermDays(input.supplierPaymentTermType, input.supplierCreditDays);
 
-  const tranches = input.customerTranches?.filter((t) => t.percent != null && t.percent > 0) ?? [];
-  if (tranches.length > 0) {
-    const totalPercent = tranches.reduce((sum, t) => sum + (t.percent ?? 0), 0);
-    if (totalPercent <= 0) return 0;
+  const supplied = input.customerTranches ?? [];
+  const tranches = supplied.filter((t) => t.percent != null && t.percent > 0);
+  const totalPercent = tranches.reduce((sum, t) => sum + (t.percent ?? 0), 0);
+  // Two ways a tranche can be unusable, and both must fall through to the
+  // order's own terms rather than being guessed at:
+  //  - due days UNKNOWABLE (a fixed date with no delivery/ETA anchor to measure
+  //    it from). Treating that as due immediately reads as cash in advance and
+  //    silently UNDERSTATES the carrying cost — the direction that flatters
+  //    profit.
+  //  - a share that could not be read. Dropping it would shrink the
+  //    denominator and inflate every surviving tranche's weight.
+  // Falling back is conservative and never a fabricated figure.
+  const allKnowable = supplied.length > 0
+    && tranches.length === supplied.length
+    && tranches.every((t) => t.dueDays != null);
+  if (tranches.length > 0 && totalPercent > 0 && allKnowable) {
     // Weighted excess, normalised by the shares actually present so a schedule
     // that does not total exactly 100 does not distort the figure.
     const weightedExcess = tranches.reduce((sum, t) => {

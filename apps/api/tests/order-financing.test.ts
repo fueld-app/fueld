@@ -75,9 +75,10 @@ describe('order-financing', () => {
     });
 
     it('reduces to the single-term answer for one tranche at the credit days', () => {
+      // Deliberately NO customerCreditDays: with the tranche path removed this
+      // returns 0, so the case actually discriminates rather than passing on the
+      // fallback.
       expect(getFinancingDays({
-        customerPaymentTermType: 'CREDIT',
-        customerCreditDays: 60,
         supplierPaymentTermType: 'CREDIT',
         supplierCreditDays: 30,
         customerTranches: [{ percent: 100, dueDays: 60 }],
@@ -95,8 +96,46 @@ describe('order-financing', () => {
       })).toBe(7.5); // only the 60-day half has 15 excess days
     });
 
-    it('finances nothing when every tranche is cash in advance', () => {
+    // A tranche whose due date cannot be measured (a fixed date with no
+    // delivery/ETA anchor) must NOT be read as cash in advance: that understates
+    // the carrying cost, which flatters profit. Falling back to the order's own
+    // terms is conservative; a fabricated zero is not.
+    it('falls back to the order terms when a tranche due date is unknowable', () => {
       expect(getFinancingDays({
+        customerPaymentTermType: 'CREDIT',
+        customerCreditDays: 60,
+        supplierPaymentTermType: 'CREDIT',
+        supplierCreditDays: 30,
+        customerTranches: [{ percent: 50, dueDays: null }, { percent: 50, dueDays: null }],
+      })).toBe(30);
+    });
+
+    it('falls back when only some tranche due dates are knowable', () => {
+      expect(getFinancingDays({
+        customerPaymentTermType: 'CREDIT',
+        customerCreditDays: 60,
+        supplierPaymentTermType: 'CREDIT',
+        supplierCreditDays: 30,
+        customerTranches: [{ percent: 50, dueDays: 0 }, { percent: 50, dueDays: null }],
+      })).toBe(30);
+    });
+
+    it('falls back rather than dropping an unreadable share from the denominator', () => {
+      expect(getFinancingDays({
+        customerPaymentTermType: 'CREDIT',
+        customerCreditDays: 60,
+        supplierPaymentTermType: 'CREDIT',
+        supplierCreditDays: 30,
+        customerTranches: [{ percent: null, dueDays: 60 }, { percent: 50, dueDays: 0 }],
+      })).toBe(30);
+    });
+
+    it('finances nothing when every tranche is cash in advance', () => {
+      // The order IS on credit terms; only the schedule makes this zero. Without
+      // the tranche path this reports the full 60-day gap instead.
+      expect(getFinancingDays({
+        customerPaymentTermType: 'CREDIT',
+        customerCreditDays: 60,
         supplierPaymentTermType: 'CREDIT',
         supplierCreditDays: 30,
         customerTranches: [{ percent: 100, dueDays: 0 }],

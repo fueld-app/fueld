@@ -500,7 +500,13 @@ export class OrderActionService {
             ),
           );
           if (!res.success) {
-            ctx.showToast('error', res.message ?? 'Failed to sync a tranche invoice to QuickBooks.');
+            // Say how much landed: a retry is safe (per-invoice sync is
+            // idempotent) but the trader needs to know it is a retry, not a
+            // first attempt.
+            const progress = synced > 0
+              ? ` ${synced} of ${trancheInvoiceIds.length} invoices were synced before this failure — retry to continue.`
+              : '';
+            ctx.showToast('error', `${res.message ?? 'Failed to sync a tranche invoice to QuickBooks.'}${progress}`);
             return;
           }
           synced += 1;

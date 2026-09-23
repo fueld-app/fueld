@@ -263,8 +263,12 @@ export async function getFinancingTranchesByOrder(
       dueDays = Math.max(0, Math.round(row.creditDays ?? 0));
     }
 
+    // percent is numeric(6,3) NOT NULL, so a parse failure is not reachable from
+    // Postgres today; keep it null rather than 0 so a bad value cannot silently
+    // drop a tranche from the denominator and inflate the surviving shares.
+    const percent = parseFloat(String(row.percent));
     const list = result.get(row.orderId) ?? [];
-    list.push({ percent: parseFloat(String(row.percent)) || 0, dueDays });
+    list.push({ percent: Number.isFinite(percent) ? percent : null, dueDays });
     result.set(row.orderId, list);
   }
 

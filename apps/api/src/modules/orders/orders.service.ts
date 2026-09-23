@@ -1546,7 +1546,7 @@ export async function getOrderById(idOrNumber: string) {
     ]);
 
   const financingRateAnnual = getFinancingRateAnnual((tenant?.settings ?? {}) as TenantSettings);
-  const [scheduledTranches] = await Promise.all([getFinancingTranchesByOrder([row.id])]);
+  const scheduledTranches = await getFinancingTranchesByOrder([row.id]);
   const orderEconomics = calculateOrderEconomics(
     {
       customerTranches: scheduledTranches.get(row.id) ?? null,

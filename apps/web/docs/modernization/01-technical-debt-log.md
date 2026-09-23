@@ -33,8 +33,8 @@ done for each. (See `02-performance-impact.md` for measured bundle effects.)
 - **Audit:** only one heavy non-critical-at-boot dependency was eagerly imported
   into the main bundle — `@simplewebauthn/browser` (WebAuthn/passkey), used in
   `auth.service.ts` only in 3 rare passkey flows (sign-in ×2, registration ×1).
-  No heavy client-side PDF engine exists — `order-pdf.service` delegates to the
-  API (server-side PDF generation).
+  No heavy client-side PDF engine exists — the order-detail PDF actions delegate
+  to the API (server-side PDF generation).
 - **Done:** extracted `core/auth/passkey.service.ts` (`@Service` wrapping
   `startAuthentication`/`startRegistration`) and lazy-loaded it in `AuthService`
   via `injectAsync(() => import('./passkey.service').then(m => m.PasskeyService),
