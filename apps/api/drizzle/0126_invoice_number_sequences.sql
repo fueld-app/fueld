@@ -15,7 +15,7 @@
 -- backwards, and cannot cause a collision. A production database with no
 -- invoices inserts nothing and the counter starts at zero.
 CREATE TABLE IF NOT EXISTS invoice_number_sequences (
-  tenant_id uuid PRIMARY KEY REFERENCES tenants(id),
+  tenant_id uuid PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
   last_seq integer NOT NULL DEFAULT 0,
   updated_at timestamptz NOT NULL DEFAULT now()
 );

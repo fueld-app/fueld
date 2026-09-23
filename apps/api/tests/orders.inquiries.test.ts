@@ -637,6 +637,9 @@ describe('orders: attachments, payments, and lookups', () => {
       .values({
         orderId: created.id,
         invoiceNumber: 'INV-TEST-0001',
+        // An issued invoice, not a DRAFT: only issued invoices are receivable
+        // and therefore the only ones a payment can settle.
+        status: 'SENT',
         dueDate: '2030-01-01',
         amount: '1000.00',
       })

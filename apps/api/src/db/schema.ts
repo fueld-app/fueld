@@ -1022,7 +1022,7 @@ export const orderNumberSequences = pgTable('order_number_sequences', {
 // and invoice numbers never share a counter (a cancelled order must not burn an
 // invoice number, and vice versa). Same atomic-upsert pattern as orders.
 export const invoiceNumberSequences = pgTable('invoice_number_sequences', {
-  tenantId: uuid('tenant_id').notNull().references(() => tenants.id).primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }).primaryKey(),
   lastSeq: integer('last_seq').notNull().default(0),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

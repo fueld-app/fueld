@@ -45,7 +45,7 @@ import {
   setOrderBunkerBookingSent,
 } from './orders.service';
 import { logActivity } from '../activity/activity.service';
-import { voidOrderInvoice, InvoiceNotFoundError, InvoiceAlreadyVoidError, MixedCurrencyInvoiceError, InternalTransferHasNoInvoiceError } from './invoice.service';
+import { voidOrderInvoice, InvoiceNotFoundError, InvoiceAlreadyVoidError, MixedCurrencyInvoiceError, InternalTransferHasNoInvoiceError, InvoiceLinesChangedError } from './invoice.service';
 import {
   SupplierCreditNoteError,
   createSupplierCreditNote,
@@ -1486,7 +1486,10 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           return { success: false, data: null, message: 'Order not found' };
         }
 
-        const result = await voidOrderInvoice(orderId, { reissue: body.reissue ?? true });
+        const result = await voidOrderInvoice(orderId, {
+          reissue: body.reissue ?? true,
+          ...(body.dueDate ? { dueDate: body.dueDate } : {}),
+        });
 
         await logActivity({
           userId: auth.sub,
@@ -1510,6 +1513,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         const isDomainRefusal = err instanceof InvoiceNotFoundError
           || err instanceof InvoiceAlreadyVoidError
           || err instanceof MixedCurrencyInvoiceError
+          || err instanceof InvoiceLinesChangedError
           || err instanceof InternalTransferHasNoInvoiceError;
         set.status = isDomainRefusal ? 400 : 500;
         const message = isDomainRefusal && err instanceof Error ? err.message : 'Failed to void invoice';
@@ -1521,6 +1525,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       body: t.Object({
         reissue: t.Optional(t.Boolean({ description: 'Issue a replacement invoice with a new number (default true)' })),
         reason: t.Optional(t.Nullable(t.String({ description: 'Why the invoice is being voided (audit log)' }))),
+        dueDate: t.Optional(t.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: 'Correct the replacement due date (YYYY-MM-DD); defaults to the original' })),
       }),
       detail: {
         tags: ['Orders'],

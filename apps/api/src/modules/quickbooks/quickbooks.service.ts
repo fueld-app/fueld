@@ -6,7 +6,7 @@
 //  using the same AES-256-GCM scheme as LLI credentials.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, or, desc, ne } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne, notInArray, or } from 'drizzle-orm';
 import { db } from '../../db';
 import { integrationCredentials, tenants, users, orders, invoices, orderItems, counterparties, type TenantSettings } from '../../db/schema';
 import { customerFacingItems } from '../documents/customer-facing-items';
@@ -846,6 +846,9 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
     .where(eq(invoices.id, invoiceId))
     .limit(1);
   if (!invoice) throw new Error(`Invoice ${invoiceId} not found`);
+  // A voided invoice is not a receivable; never push it to QuickBooks, whichever
+  // entry point was used.
+  if (invoice.status === 'VOID') throw new Error(`Invoice ${invoice.invoiceNumber} is void and cannot be synced`);
 
   const [order] = await db
     .select()
@@ -907,7 +910,9 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
   const lines = customerFacingItems(items).map((item) => {
     const qty = parseFloat(String(item.deliveredQuantity ?? item.quantity ?? '0')) || 0;
     const price = parseFloat(item.salesPrice?.toString() ?? '0') || 0;
-    const amount = qty * price;
+    // Rounded per line: QuickBooks totals the lines we send, so an unrounded
+    // float here (7dp prices) would push a total that disagrees with the invoice.
+    const amount = Number((qty * price).toFixed(2));
     const desc = [
       item.productType,
       item.description?.trim(),
@@ -925,7 +930,7 @@ export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId:
   // Lines that do not sum to the invoice (an all-hidden order, or a rounding
   // drift) would push a QB invoice that disagrees with the customer's copy.
   // Fall back to a single line carrying the invoice amount.
-  const lineTotal = Math.round(lines.reduce((sum, line) => sum + line.Amount, 0) * 100) / 100;
+  const lineTotal = lines.reduce((sum, line) => sum + line.Amount, 0);
   const invoiceTotal = parseFloat(invoice.amount?.toString() ?? '0') || 0;
   if (lines.length === 0 || Math.abs(lineTotal - invoiceTotal) > 0.005) {
     lines.length = 0;
@@ -1060,7 +1065,7 @@ export async function syncOrderToQuickBooks(orderId: string): Promise<{ qbInvoic
   const [invoice] = await db
     .select({ id: invoices.id })
     .from(invoices)
-    .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
     .orderBy(desc(invoices.createdAt))
     .limit(1);
 
@@ -1082,7 +1087,7 @@ export async function getOrderSyncStatus(orderId: string): Promise<{
   const [invoice] = await db
     .select({ id: invoices.id })
     .from(invoices)
-    .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
     .orderBy(desc(invoices.createdAt))
     .limit(1);
 

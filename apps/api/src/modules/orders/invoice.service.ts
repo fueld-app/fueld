@@ -31,8 +31,14 @@
  * `invoice_number` is globally UNIQUE, but each tenant runs its own Postgres,
  * so uniqueness is effectively per-tenant. Keep every query scoped via the order.
  */
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
-import { db } from '../../db';
+import { and, asc, desc, eq, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
+import { db, type Database } from '../../db';
+
+/**
+ * Either the pool or a transaction handle. Writes that must be atomic take this
+ * so the same helper works inside and outside `db.transaction`.
+ */
+type Executor = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
 import { customerPayments, invoices, invoiceNumberSequences, orderItems, orders, tenants, type TenantSettings } from '../../db/schema';
 import { customerFacingItems } from '../documents/customer-facing-items';
 
@@ -195,7 +201,7 @@ export async function voidOrderInvoice(
   const [current] = await db
     .select()
     .from(invoices)
-    .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
     .orderBy(asc(invoices.createdAt))
     .limit(1);
 
@@ -212,76 +218,179 @@ export async function voidOrderInvoice(
     throw new InvoiceNotFoundError(orderId);
   }
 
-  const [voided] = await db
-    .update(invoices)
-    .set({ status: 'VOID', updatedAt: new Date() })
-    .where(eq(invoices.id, current.id))
-    .returning();
-
-  if (options.reissue === false) {
-    // Park the order's payments (invoiceId -> NULL) rather than leaving them
-    // stamped on the voided row. The next issuance claims unallocated payments,
-    // so money already received is re-attached instead of being stranded on a
-    // void invoice and chased again by collections.
-    await db
-      .update(customerPayments)
-      .set({ invoiceId: null })
-      .where(and(eq(customerPayments.orderId, orderId), eq(customerPayments.invoiceId, current.id)));
-    return { voided: voided!, replacement: null };
-  }
-
-  // The per-order index is partial on `status <> 'VOID'`, so voiding frees the
-  // slot while the voided row stays on file for audit.
-  const [order] = await db
-    .select({
-      tenantId: orders.tenantId,
-      customerPaymentTermType: orders.customerPaymentTermType,
-      customerCreditDays: orders.customerCreditDays,
-      eta: orders.eta,
-      deliveredAt: orders.deliveredAt,
-    })
-    .from(orders)
-    .where(eq(orders.id, orderId))
-    .limit(1);
-  if (!order) throw new Error(`Order ${orderId} not found`);
-
-  const [replacement] = await db
-    .insert(invoices)
-    .values({
-      orderId,
-      invoiceNumber: await allocateInvoiceNumber(order.tenantId),
-      status: 'SENT',
-      // Keep the date the customer was already told to pay unless the caller is
-      // explicitly correcting it. Recomputing from the order's current terms
-      // would silently move a communicated deadline (the drift that freezing
-      // the due date at issuance exists to prevent).
+  // Resolve and validate everything the reissue needs BEFORE mutating anything:
+  // `computeInvoiceAmount` can refuse (mixed-currency lines) and that must not
+  // leave a voided invoice with nothing to replace it.
+  let reissueContext: { tenantId: string; dueDate: string; amount: string } | null = null;
+  if (options.reissue !== false) {
+    const [order] = await db
+      .select({ tenantId: orders.tenantId })
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .limit(1);
+    if (!order) throw new Error(`Order ${orderId} not found`);
+    reissueContext = {
+      tenantId: order.tenantId,
       dueDate: options.dueDate ?? current.dueDate,
       amount: await computeInvoiceAmount(orderId),
-      amountPaid: '0',
-    })
-    .returning();
+    };
+  }
 
-  if (!replacement) throw new Error(`Failed to reissue invoice for order ${orderId}`);
+  // ONE transaction for the whole correction. Voiding, reissuing and moving the
+  // money are a single business act: a failure part-way through used to leave a
+  // voided invoice with no replacement and its payments stranded, recoverable
+  // only out of band. Now it either all lands or nothing does.
+  return db.transaction(async (tx) => {
+    const [voided] = await tx
+      .update(invoices)
+      .set({ status: 'VOID', updatedAt: new Date() })
+      .where(eq(invoices.id, current.id))
+      .returning();
 
-  // Move ALL of the order's money onto the replacement: the rows stamped on the
-  // voided invoice, plus anything recorded while no live invoice existed (a
-  // payment taken in the void→reissue window lands with invoiceId null).
-  await db
+    // Park the payments as part of the same unit: if the reissue below fails,
+    // the rollback restores them onto the still-live original.
+    await parkInvoicePayments(tx, orderId, current.id);
+
+    if (options.reissue === false) {
+      return { voided: voided!, replacement: null };
+    }
+
+    // The per-order index is partial on `status <> 'VOID'`, so voiding freed the
+    // slot while the voided row stays on file for audit.
+    const context = reissueContext!;
+    const replacement = await insertInvoiceWithRetry({
+      executor: tx,
+      orderId,
+      tenantId: context.tenantId,
+      dueDate: context.dueDate,
+      amount: context.amount,
+    });
+    if (!replacement) {
+      // Lost the per-order slot to a concurrent issuer; re-read theirs.
+      const [concurrent] = await tx
+        .select()
+        .from(invoices)
+        .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
+        .orderBy(desc(invoices.createdAt))
+        .limit(1);
+      if (!concurrent) throw new InvoiceNumberAllocationError(orderId);
+      await claimUnallocatedPayments(tx, orderId, concurrent.id);
+      await recomputeInvoiceAmountPaid(concurrent.id, tx);
+      return { voided: voided!, replacement: concurrent };
+    }
+
+    await claimUnallocatedPayments(tx, orderId, replacement.id);
+    await recomputeInvoiceAmountPaid(replacement.id, tx);
+
+    const [settled] = await tx
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, replacement.id))
+      .limit(1);
+
+    return { voided: voided!, replacement: settled ?? replacement };
+  });
+}
+
+/**
+ * Park an invoice's payments (`invoiceId -> NULL`) so the next issuance, which
+ * claims unallocated payments, re-attaches them. Used whenever an invoice stops
+ * being the order's live one and no replacement exists yet.
+ */
+async function parkInvoicePayments(
+  executor: Executor,
+  orderId: string,
+  invoiceId: string,
+): Promise<void> {
+  await executor
     .update(customerPayments)
-    .set({ invoiceId: replacement.id })
-    .where(and(
-      eq(customerPayments.orderId, orderId),
-      or(eq(customerPayments.invoiceId, current.id), isNull(customerPayments.invoiceId)),
-    ));
-  await recomputeInvoiceAmountPaid(replacement.id);
+    .set({ invoiceId: null })
+    .where(and(eq(customerPayments.orderId, orderId), eq(customerPayments.invoiceId, invoiceId)));
+}
 
-  const [settled] = await db
-    .select()
-    .from(invoices)
-    .where(eq(invoices.id, replacement.id))
-    .limit(1);
+/** Attach the order's unallocated payments to the invoice that is now live. */
+async function claimUnallocatedPayments(
+  executor: Executor,
+  orderId: string,
+  invoiceId: string,
+): Promise<number> {
+  const claimed = await executor
+    .update(customerPayments)
+    .set({ invoiceId })
+    .where(and(eq(customerPayments.orderId, orderId), isNull(customerPayments.invoiceId)))
+    .returning({ id: customerPayments.id });
+  return claimed.length;
+}
 
-  return { voided: voided!, replacement: settled ?? replacement };
+/**
+ * Insert a new invoice row, retrying when the global `invoice_number` collides.
+ *
+ * `onConflictDoNothing()` cannot say WHICH unique constraint it swallowed, and
+ * there are two: the per-order index means another issuer already produced this
+ * order's invoice (return null, the caller re-reads theirs), while the global
+ * `invoice_number` means the counter and the table disagree (retry with a fresh
+ * number). Shared by issuance and reissue so the two cannot drift apart.
+ */
+async function insertInvoiceWithRetry(params: {
+  executor?: Executor;
+  orderId: string;
+  tenantId: string;
+  dueDate: string;
+  amount: string;
+}): Promise<typeof invoices.$inferSelect | null> {
+  const dbc = params.executor ?? db;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const [created] = await dbc
+      .insert(invoices)
+      .values({
+        orderId: params.orderId,
+        invoiceNumber: await allocateInvoiceNumber(params.tenantId),
+        status: 'SENT',
+        dueDate: params.dueDate,
+        amount: params.amount,
+        amountPaid: '0',
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (created) return created;
+
+    // No live row for this order ⇒ the conflict was the invoice number, not the
+    // per-order index, so a fresh number is the right response.
+    const [liveForOrder] = await dbc
+      .select()
+      .from(invoices)
+      .where(and(eq(invoices.orderId, params.orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
+      .orderBy(desc(invoices.createdAt))
+      .limit(1);
+    if (liveForOrder) return null;
+  }
+
+  throw new InvoiceNumberAllocationError(params.orderId);
+}
+
+/**
+ * The order's lines no longer add up to the amount frozen on its invoice.
+ *
+ * Rendering would produce a document whose visible lines do not sum to its own
+ * total, so the correction path (void + reissue) is required instead. Refusing
+ * is the honest outcome: a legal artifact must reconcile with itself.
+ */
+export class InvoiceLinesChangedError extends Error {
+  constructor(orderId: string, frozenTotal: string, linesTotal: string) {
+    super(
+      `The order's line items no longer match its issued invoice (invoice ${frozenTotal}, lines ${linesTotal}). Void and reissue the invoice to correct it.`,
+    );
+    this.name = 'InvoiceLinesChangedError';
+    void orderId;
+  }
+}
+
+/** The counter kept colliding with existing rows; a genuine error, not a flake. */
+export class InvoiceNumberAllocationError extends Error {
+  constructor(orderId: string) {
+    super(`Could not allocate a unique invoice number for order ${orderId} after 5 attempts`);
+    this.name = 'InvoiceNumberAllocationError';
+  }
 }
 
 /** Thrown when an order has no invoice to act on. */
@@ -347,10 +456,25 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
   const [existing] = await db
     .select()
     .from(invoices)
-    .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
     .orderBy(desc(invoices.createdAt))
     .limit(1);
-  if (existing) return existing;
+  if (existing) {
+    // Re-claim AND recompute on the idempotent path: both are idempotent, and if
+    // a previous issuance crashed between inserting the row and settling it,
+    // this is the only place that can recover the money and the stale amountPaid.
+    const claimed = await claimUnallocatedPayments(db, orderId, existing.id);
+    if (claimed > 0) {
+      await recomputeInvoiceAmountPaid(existing.id);
+      const [settled] = await db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, existing.id))
+        .limit(1);
+      return settled ?? existing;
+    }
+    return existing;
+  }
 
   const [order] = await db
     .select({
@@ -380,46 +504,12 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
   );
   const amount = await computeInvoiceAmount(orderId);
 
-  // `onConflictDoNothing()` cannot say WHICH unique constraint it swallowed, and
-  // there are two: the per-order index (another issuer won — nothing to do but
-  // return their row) and the global invoice_number (the counter and the table
-  // disagree — retry with a fresh number rather than failing). Retry a bounded
-  // number of times; a persistent collision is a genuine error, not a flake.
-  let created: typeof invoices.$inferSelect | undefined;
-  for (let attempt = 0; attempt < 5 && !created; attempt++) {
-    [created] = await db
-      .insert(invoices)
-      .values({
-        orderId,
-        invoiceNumber: await allocateInvoiceNumber(order.tenantId),
-        status: 'SENT',
-        dueDate,
-        amount,
-        amountPaid: '0',
-      })
-      .onConflictDoNothing()
-      .returning();
-    if (created) break;
-
-    // No row for this order ⇒ the conflict was the invoice number, not the
-    // per-order index, so a fresh number is the right response.
-    const [existingForOrder] = await db
-      .select()
-      .from(invoices)
-      .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
-      .orderBy(desc(invoices.createdAt))
-      .limit(1);
-    if (existingForOrder) return existingForOrder;
-  }
-
+  const created = await insertInvoiceWithRetry({ orderId, tenantId: order.tenantId, dueDate, amount });
   if (created) {
     // Claim payments recorded before this invoice existed (a trader can take
     // payment on delivery before issuing the PDF). Without this they stay
     // unallocated forever and collections chases money already received.
-    await db
-      .update(customerPayments)
-      .set({ invoiceId: created.id })
-      .where(and(eq(customerPayments.orderId, orderId), isNull(customerPayments.invoiceId)));
+    await claimUnallocatedPayments(db, orderId, created.id);
     await recomputeInvoiceAmountPaid(created.id);
 
     const [settled] = await db
@@ -430,18 +520,15 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
     return settled ?? created;
   }
 
-  // Exhausted the retries: the counter keeps colliding with existing rows.
-  // Surface what actually happened instead of a misleading race message.
+  // Another issuer won the per-order slot; theirs is this order's invoice.
   const [raced] = await db
     .select()
     .from(invoices)
-    .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
     .orderBy(desc(invoices.createdAt))
     .limit(1);
-  if (raced) return raced;
-  throw new Error(
-    `Could not allocate a unique invoice number for order ${orderId} after 5 attempts`,
-  );
+  if (!raced) throw new InvoiceNumberAllocationError(orderId);
+  return raced;
 }
 
 /**
@@ -463,22 +550,23 @@ export class InternalTransferHasNoInvoiceError extends Error {
  * invoice. Scoped by invoice id: a payment settles ONE invoice, so the
  * order-wide sum must never be written onto every row of the order.
  */
-export async function recomputeInvoiceAmountPaid(invoiceId: string): Promise<void> {
+export async function recomputeInvoiceAmountPaid(invoiceId: string, executor?: Executor): Promise<void> {
+  const dbc = executor ?? db;
   // Sum as numeric: routing numeric(14,2) through float64 and back can drift a
   // cent on a long payment history.
-  const [row] = await db
+  const [row] = await dbc
     .select({ total: sql<string>`COALESCE(SUM(amount), 0)::numeric(14,2)::text` })
     .from(sql`customer_payments`)
     .where(sql`invoice_id = ${invoiceId}`);
 
   const amountPaid = (parseFloat(row?.total ?? '0') || 0).toFixed(2);
-  const [invoice] = await db
+  const [invoice] = await dbc
     .select({ status: invoices.status, amount: invoices.amount })
     .from(invoices)
     .where(eq(invoices.id, invoiceId))
     .limit(1);
 
-  await db
+  await dbc
     .update(invoices)
     .set({
       amountPaid,
@@ -550,7 +638,7 @@ export async function resolvePaymentInvoiceTarget(
   const candidates = await db
     .select()
     .from(invoices)
-    .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
     .orderBy(asc(invoices.createdAt));
 
   if (!candidates.length) return null;

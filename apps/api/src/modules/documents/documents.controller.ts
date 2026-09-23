@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, desc, inArray, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, notInArray } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
-import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError } from '../orders/invoice.service';
+import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError, InvoiceLinesChangedError } from '../orders/invoice.service';
 import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, generateBrokerConfirmationPdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById, updateOrderStatus } from '../orders/orders.service';
@@ -492,7 +492,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         // A finalized internal transfer passes the gate above but has no
         // customer receivable, and a mixed-currency order has no single
         // invoiceable total. Both are user-fixable states, so they are 400s.
-        if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError)) throw err;
+        if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError)) throw err;
         set.status = 400;
         return { success: false, message: err.message };
       }
@@ -644,7 +644,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             // bears one.
             issuedInvoiceNumber = result.invoiceNumber;
           } catch (err) {
-            if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError)) throw err;
+            if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError)) throw err;
             set.status = 400;
             return { success: false, message: err.message };
           }
@@ -700,8 +700,15 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const sentSubject = issuedInvoiceNumber && !body.subject.includes(issuedInvoiceNumber)
         ? `${body.subject} (${issuedInvoiceNumber})`
         : body.subject;
-      const htmlBody = issuedInvoiceNumber && !rawHtmlBody.includes(issuedInvoiceNumber)
-        ? rawHtmlBody.replace(/<\/body>/i, `<p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Invoice number: <strong>${issuedInvoiceNumber}</strong></p></body>`)
+      const invoiceNumberNote = issuedInvoiceNumber
+        ? `<p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Invoice number: <strong>${issuedInvoiceNumber}</strong></p>`
+        : undefined;
+      const htmlBody = invoiceNumberNote !== undefined && !rawHtmlBody.includes(issuedInvoiceNumber!)
+        // Append when the composed body has no </body> (a fragment), rather than
+        // silently dropping the number the attachment carries.
+        ? (/<\/body>/i.test(rawHtmlBody)
+            ? rawHtmlBody.replace(/<\/body>/i, `${invoiceNumberNote}</body>`)
+            : `${rawHtmlBody}${invoiceNumberNote}`)
         : rawHtmlBody;
 
       // Send the email
@@ -975,7 +982,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         const [existing] = await db
           .select({ invoiceNumber: invoices.invoiceNumber })
           .from(invoices)
-          .where(and(eq(invoices.orderId, orderId), ne(invoices.status, 'VOID')))
+          .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))
           .orderBy(desc(invoices.createdAt))
           .limit(1);
         invoiceNumber = existing?.invoiceNumber ?? undefined;

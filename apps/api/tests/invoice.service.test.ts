@@ -35,6 +35,7 @@ import {
   InvoiceNotFoundError,
 } from '../src/modules/orders/invoice.service';
 import { seedBasics, truncateAll } from './helpers/db';
+import { __documentTestUtils } from '../src/modules/documents/document.service';
 
 type Basics = Awaited<ReturnType<typeof seedBasics>>;
 
@@ -245,6 +246,74 @@ describe('void without reissue', () => {
     expect(reattached[0]!.invoiceId).toBe(reissued.id);
   });
 
+  it('reissues despite a lagging number counter and keeps the payment attached', async () => {
+    const { tenant, order } = await seedOrderWithItems();
+    const original = await ensureOrderInvoice(order.id);
+    await db.insert(customerPayments).values({
+      tenantId: tenant.id, customerId: order.clientId, orderId: order.id, invoiceId: original.id,
+      amount: '500.00', currency: 'USD', receivedAt: new Date(),
+    });
+    await recomputeInvoiceAmountPaid(original.id);
+
+    // Counter behind the table: the reissue must retry, not fail. A failure here
+    // previously left the order with no live invoice at all.
+    await db.update(invoiceNumberSequences).set({ lastSeq: 0 }).where(eq(invoiceNumberSequences.tenantId, tenant.id));
+
+    const { voided, replacement } = await voidOrderInvoice(order.id);
+
+    expect(voided.status).toBe('VOID');
+    expect(replacement).not.toBeNull();
+    expect(replacement!.invoiceNumber).not.toBe(original.invoiceNumber);
+    // The money must end up on the live invoice, never on the voided one.
+    expect(replacement!.amountPaid).toBe('500.00');
+    const [payment] = await db.select().from(customerPayments).where(eq(customerPayments.orderId, order.id));
+    expect(payment!.invoiceId).toBe(replacement!.id);
+  });
+
+  it('leaves the invoice live and settled when the reissue would be refused', async () => {
+    const { tenant, order } = await seedOrderWithItems();
+    const original = await ensureOrderInvoice(order.id);
+    await db.insert(customerPayments).values({
+      tenantId: tenant.id, customerId: order.clientId, orderId: order.id, invoiceId: original.id,
+      amount: '250.00', currency: 'USD', receivedAt: new Date(),
+    });
+    await recomputeInvoiceAmountPaid(original.id);
+
+    // Make the order uninvoiceable AFTER issuance, then attempt a correction.
+    await db.update(orderItems)
+      .set({ salesCurrency: 'EUR' })
+      .where(and(eq(orderItems.orderId, order.id), eq(orderItems.productType, 'VLSFO')));
+
+    await expect(voidOrderInvoice(order.id)).rejects.toThrow(MixedCurrencyInvoiceError);
+
+    // Validation must precede the destructive write: no half-voided invoice.
+    const live = await db.select().from(invoices)
+      .where(and(eq(invoices.orderId, order.id), ne(invoices.status, 'VOID')));
+    expect(live.length).toBe(1);
+    expect(live[0]!.id).toBe(original.id);
+    const [payment] = await db.select().from(customerPayments).where(eq(customerPayments.orderId, order.id));
+    expect(payment!.invoiceId).toBe(original.id);
+  });
+
+  it('recovers payments stranded by a crashed issuance (idempotent path re-claims)', async () => {
+    const { tenant, order } = await seedOrderWithItems();
+
+    // Simulate: the invoice row was inserted, then the process died before the
+    // payment claim ran, leaving money unallocated against a live invoice.
+    const invoice = await ensureOrderInvoice(order.id);
+    await db.insert(customerPayments).values({
+      tenantId: tenant.id, customerId: order.clientId, orderId: order.id,
+      invoiceId: null, amount: '750.00', currency: 'USD', receivedAt: new Date(),
+    });
+
+    // The early return must still re-claim, not just hand back the row.
+    const again = await ensureOrderInvoice(order.id);
+    expect(again.id).toBe(invoice.id);
+    expect(again.amountPaid).toBe('750.00');
+    const [payment] = await db.select().from(customerPayments).where(eq(customerPayments.orderId, order.id));
+    expect(payment!.invoiceId).toBe(invoice.id);
+  });
+
   it('rejects a void when nothing is live, distinguishing never-issued from already-void', async () => {
     const { order } = await seedOrderWithItems();
 
@@ -396,5 +465,69 @@ describe('display status derivation', () => {
     expect(deriveInvoiceDisplayStatus({ status: 'VOID', amount: '100.00', amountPaid: '0.00' }, 30)).toBe('VOID');
     expect(deriveInvoiceDisplayStatus({ status: 'VOID', amount: '100.00', amountPaid: '100.00' }, 30)).toBe('VOID');
     expect(deriveInvoiceDisplayStatus({ status: 'DRAFT', amount: '100.00', amountPaid: '0.00' }, 30)).toBe('DRAFT');
+  });
+});
+
+describe('frozen total invariant', () => {
+  const lineItems = [
+    { productType: 'VLSFO', description: null, quantity: '100', unit: 'MT', salesPrice: '600', salesCurrency: 'USD' },
+  ];
+
+  /**
+   * Read the printed headline figure out of the built document.
+   *
+   * Target the "Total amount due to X" row specifically: its second column
+   * carries the invoice total. Matching numbers generically would pick up the
+   * per-line amount cells, which are a different figure.
+   */
+  function totalFrom(doc: unknown): number {
+    let found: number | null = null;
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (!node || typeof node !== 'object') return;
+      const record = node as Record<string, unknown>;
+      const columns = record.columns as Array<{ text?: string }> | undefined;
+      if (Array.isArray(columns) && columns.length === 2
+        && typeof columns[0]?.text === 'string' && /total amount due/i.test(columns[0]!.text!)) {
+        const amount = columns[1]?.text?.replace(/[^0-9.]/g, '');
+        if (amount) found = Number(amount);
+      }
+      Object.values(record).forEach(walk);
+    };
+    walk(doc);
+    expect(found).not.toBeNull();
+    return found!;
+  }
+
+  const baseData = {
+    orderNumber: 'ORD-1', clientName: 'Cust', clientCountry: null, clientAddress: null,
+    customerContactName: null, customerContactRole: null, customerContactPhone: null,
+    customerContactEmail: null, vesselName: 'Vessel', vesselImo: null, portName: 'Port',
+    eta: null, etd: null, timezone: null, dateFormat: 'ISO' as const,
+    costSalesDecimalPrecision: 2, currency: 'USD', fromName: null, fromEmail: null,
+    fromPhone: null, paymentTerms: null, customerNote: null, purchaseOrderNumber: null,
+    deliveredAt: null, termsAndConditions: null, placeRemark: null, companyName: 'OwnCo',
+    companyAddress: null, companyPhone: null, companyEmail: null,
+    companyRegistrationNumber: null, companyWebsite: null, companyLogoDataUrl: null,
+    itemNotes: [], createdAt: new Date('2026-09-22T00:00:00Z'), verifyUrl: null,
+    verifyLink: null, fraudPreventionText: null,
+    bank: { bankName: 'B', accountName: null, accountNumber: null, iban: null, swift: null,
+            currency: 'USD', branchAddress: null, sortCode: null, routingNumber: null,
+            intermediaryBank: null },
+    vatNumber: null, latePaymentInterest: null, docTitle: 'INVOICE', printMeta: null,
+  };
+
+  it('prints the frozen total rather than a fresh sum of the lines', () => {
+    // Lines sum to 60,000; the invoice froze 42,000 (a price edited after
+    // issuance). The document must show the invoiced figure, not the new one.
+    const doc = __documentTestUtils.buildProformaDocument({
+      ...baseData, items: lineItems, frozenTotal: '42000.00',
+    });
+    expect(totalFrom(doc)).toBe(42000);
+  });
+
+  it('prints the live line sum when no total is frozen (proforma)', () => {
+    const doc = __documentTestUtils.buildProformaDocument({ ...baseData, items: lineItems });
+    expect(totalFrom(doc)).toBe(60000);
   });
 });

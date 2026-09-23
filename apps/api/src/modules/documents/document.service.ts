@@ -1,7 +1,7 @@
 import pdfmake from 'pdfmake';
 import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
-import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
@@ -10,7 +10,7 @@ import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, priceReferences, type TenantSettings } from '../../db/schema';
 import { isIanaTimezone } from '../../utils/timezone';
 import { getDateFormatSettings, getCostSalesDecimalPrecision } from '../admin/settings.service';
-import { ensureOrderInvoice } from '../orders/invoice.service';
+import { ensureOrderInvoice, InvoiceLinesChangedError } from '../orders/invoice.service';
 import { customerFacingItems, isSupplierCreditPlaceholder } from './customer-facing-items';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -83,6 +83,32 @@ function formatIssuedAtUtc(date: Date, dateFormat?: string): string {
     case 'ISO':
     default:          return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
   }
+}
+
+
+/** Sum customer-facing lines as money, or null when any line is unbillable. */
+function computeInvoiceAmountForItems(
+  items: Array<{
+    productType: string;
+    hideOnDocuments?: boolean | null;
+    salesPrice?: string | number | null;
+    deliveredQuantity?: string | number | null;
+    quantity: string | number;
+  }>,
+): Promise<number | null> {
+  const billable = customerFacingItems(items);
+  const total = billable.reduce((sum, item) => {
+    const qty = parseFloat(String(item.deliveredQuantity ?? item.quantity ?? 0)) || 0;
+    const price = parseFloat(String(item.salesPrice ?? 0)) || 0;
+    return sum + qty * price;
+  }, 0);
+  return Promise.resolve(total);
+}
+
+function numberOrNull(value: string | null | undefined): number | null {
+  if (value == null) return null;
+  const parsed = parseFloat(String(value));
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function trimTrailingSlash(value: string): string {
@@ -339,7 +365,30 @@ export async function getLatestInvoiceRevisionForOrder(orderId: string): Promise
     .limit(1);
 
   if (revision) return mapRevisionInfo(revision.revision);
-  return getLatestDocumentRevisionByOrderId(orderId, 'INVOICE');
+
+  // Legacy order-keyed revisions predate invoice rows entirely, so they carry
+  // no invoiceId. Only those may be served from the fallback: an order-keyed
+  // revision that DOES belong to an invoice is either the live one (handled
+  // above) or the voided one, which must never be surfaced for verification.
+  return getLatestInvoicelessRevisionForOrder(orderId, 'INVOICE');
+}
+
+/** Latest revision for an order that belongs to no invoice (legacy issuance). */
+async function getLatestInvoicelessRevisionForOrder(
+  orderId: string,
+  documentType: DocumentType,
+): Promise<DocumentRevisionInfo | null> {
+  const [revision] = await db
+    .select()
+    .from(documentRevisions)
+    .where(and(
+      eq(documentRevisions.streamKey, buildDocumentStreamKey(documentType, orderId)),
+      isNull(documentRevisions.invoiceId),
+    ))
+    .orderBy(desc(documentRevisions.revisionNumber))
+    .limit(1);
+
+  return revision ? mapRevisionInfo(revision) : null;
 }
 
 export async function getLatestDocumentRevisionByStream(params: {
@@ -1544,6 +1593,21 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   // code path ever inserted into `invoices`, so the number was always a PREVIEW
   // placeholder and every reader (collections, aging, QuickBooks) saw nothing.
   const invoice = await ensureOrderInvoice(order.id);
+
+  // Refuse to render a document whose lines disagree with the frozen amount: it
+  // would not sum to itself. Only checked when nothing is persisted yet, so an
+  // already-issued artifact always keeps rendering.
+  const frozenAmount = numberOrNull(invoice.amount);
+  if (frozenAmount != null) {
+    const liveLinesTotal = (await computeInvoiceAmountForItems(order.items));
+    if (liveLinesTotal != null && Math.abs(liveLinesTotal - frozenAmount) > 0.005) {
+      throw new InvoiceLinesChangedError(
+        order.id,
+        frozenAmount.toFixed(2),
+        liveLinesTotal.toFixed(2),
+      );
+    }
+  }
 
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'INVOICE',
