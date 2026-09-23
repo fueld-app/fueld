@@ -319,6 +319,11 @@ async function allocateUnallocatedPayments(orderId: string, executor: Executor =
     // first tranche would leave the balance invoice reading 0 paid while
     // collections chases money already banked.
     const parts: Array<{ invoiceId: string; amount: number }> = [];
+    // The 0.004 epsilon exists because these are money amounts read back as
+    // floats: without it a residual of 1e-9 would spin the loop. Exiting on it
+    // can leave at most 0.004 unallocated, which is deliberately NOT chased —
+    // the columns are numeric(14,2), so a sub-half-cent residual cannot change
+    // any stored amount, any amountPaid comparison, or any reader's total.
     for (let index = 0; index < targets.length && remaining > 0.004; index++) {
       if (outstanding[index]! <= 0) continue;
       const applied = Math.min(remaining, outstanding[index]!);
