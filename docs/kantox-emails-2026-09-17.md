@@ -58,9 +58,15 @@ Nothing else needed from you today. Patrick
 
 ---
 
+> ⚠️ **Correction (2026-09-23)**: "Email 1" below shows the placeholder `clement@kantox.com`.
+> The real address is **`clement.sicart@kantox.com`**, cc `junior.flouhr@kantox.com` (he was on both
+> Kantox invites). Corrected in `kantox-emails-2026-09-23.md`. Pierre's address was correct.
+
+---
+
 ## Sending notes
 
-- Email 1 → `clement@kantox.com` (PM), `marin.demaisonrouge@kantox.com` (IM); cc `pierre@rivieramarine.mc`. Ask Clément to confirm the two-leg flow in writing — that's the written sign-off our plan requires.
+- Email 1 → `clement.sicart@kantox.com` (PM), `marin.demaisonrouge@kantox.com` (IM); cc `pierre@rivieramarine.mc`, `junior.flouhr@kantox.com`. Ask Clément to confirm the two-leg flow in writing — that's the written sign-off our plan requires.
 - Email 2 → `pierre@rivieramarine.mc`.
 - Both are structured so each question can be answered with one word/line — "spam-safe" per Patrick's instruction.
 - Any answers received before the meeting get folded into the agenda; anything unanswered stays on the meeting list (`kantox-meeting-prep-2026-09-17.md` §2).
