@@ -429,7 +429,10 @@ export async function getBackupCapabilities(): Promise<BackupCapabilitiesDto> {
   const paths = getManagedPaths();
   const databaseUrlConfigured = Boolean(process.env['DATABASE_URL']);
   const credentialsEncryptionKeyConfigured = Boolean(process.env['CREDENTIALS_ENCRYPTION_KEY']);
-  const credentialsEncryptionKeyRequired = isProductionRuntime();
+  // Always required now (see assertCredentialsEncryptionConfig). Reporting it
+  // as "required" on every runtime is what makes the backups UI warn when a
+  // key is missing, instead of only on deployments that set NODE_ENV.
+  const credentialsEncryptionKeyRequired = true;
 
   const commands = {
     pgDump: hasCommand('pg_dump'),

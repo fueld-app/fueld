@@ -15,24 +15,36 @@ export function isProductionRuntime(): boolean {
   return process.env['NODE_ENV'] === 'production';
 }
 
+/**
+ * The credentials key must be present, always.
+ *
+ * This deliberately does NOT gate on NODE_ENV. It used to
+ * (`isProductionRuntime() && !key`), and every deployed instance is a
+ * production deployment — but none of them set NODE_ENV, so the check never
+ * fired and the app silently fell through to the DATABASE_URL-derived key.
+ * That fallback ties every stored credential to the database URL, so a
+ * restore, migration or URL rotation quietly breaks SMTP, Microsoft 365,
+ * Kantox, LLM and banking credentials at once. Riviera Marine ran that way
+ * until 2026-09-23, and one credential (Kantox) ended up encrypted under a
+ * key that could not be reproduced.
+ *
+ * Requiring the key unconditionally is the property we actually want, and it
+ * cannot be defeated by an env var a deployment forgot to set.
+ */
 export function assertCredentialsEncryptionConfig(): void {
-  if (isProductionRuntime() && !process.env['CREDENTIALS_ENCRYPTION_KEY']) {
-    throw new Error('CREDENTIALS_ENCRYPTION_KEY must be set in production');
+  if (!process.env['CREDENTIALS_ENCRYPTION_KEY']) {
+    throw new Error(
+      'CREDENTIALS_ENCRYPTION_KEY must be set. Integration credentials are encrypted at rest with it; '
+      + 'running without one derives the key from DATABASE_URL, which breaks every stored credential on '
+      + 'any database restore or move. Generate one with: openssl rand -hex 32',
+    );
   }
 }
 
 function getKey(): Buffer {
   assertCredentialsEncryptionConfig();
-
-  const explicit = process.env['CREDENTIALS_ENCRYPTION_KEY'];
-  if (explicit) {
-    // SHA-256 to guarantee 32 bytes regardless of input length
-    return createHash('sha256').update(explicit).digest();
-  }
-  // Fallback: derive from DATABASE_URL
-  const dbUrl = process.env['DATABASE_URL'];
-  if (!dbUrl) throw new Error('CREDENTIALS_ENCRYPTION_KEY or DATABASE_URL must be set');
-  return createHash('sha256').update(`fueld-creds:${dbUrl}`).digest();
+  // SHA-256 to guarantee 32 bytes regardless of input length
+  return createHash('sha256').update(process.env['CREDENTIALS_ENCRYPTION_KEY']!).digest();
 }
 
 export function encrypt(plaintext: string): { encrypted: string; iv: string; authTag: string } {

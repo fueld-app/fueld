@@ -43,22 +43,18 @@ describe('crypto lib', () => {
     expect(decrypted).toBe(plaintext);
   });
 
-  test('fallback key derived from DATABASE_URL works', () => {
+  test('requires the key even when DATABASE_URL is present but no key is set', () => {
     delete process.env.CREDENTIALS_ENCRYPTION_KEY;
     process.env.DATABASE_URL = 'postgres://user:pass@localhost:5432/fueld_test';
 
-    const plaintext = 'fallback-secret';
-    const payload = encrypt(plaintext);
-    const decrypted = decrypt(payload.encrypted, payload.iv, payload.authTag);
-
-    expect(decrypted).toBe(plaintext);
+    expect(() => encrypt('fallback-secret')).toThrow(/CREDENTIALS_ENCRYPTION_KEY must be set/);
   });
 
-  test('throws when both key sources are missing', () => {
+  test('throws when the key is missing and DATABASE_URL is absent too', () => {
     delete process.env.CREDENTIALS_ENCRYPTION_KEY;
     delete process.env.DATABASE_URL;
 
-    expect(() => encrypt('x')).toThrow('CREDENTIALS_ENCRYPTION_KEY or DATABASE_URL must be set');
+    expect(() => encrypt('x')).toThrow(/CREDENTIALS_ENCRYPTION_KEY must be set/);
   });
 
   test('decrypt fails with tampered authTag', () => {
@@ -70,13 +66,32 @@ describe('crypto lib', () => {
     expect(() => decrypt(payload.encrypted, payload.iv, tamperedTag)).toThrow();
   });
 
-  test('production requires explicit credentials encryption key', () => {
-    process.env.NODE_ENV = 'production';
+  // Regression: the guard used to be gated on NODE_ENV === 'production', which
+  // no deployed instance set — so it never fired and the app silently used a
+  // DATABASE_URL-derived key. Riviera Marine ran that way until 2026-09-23 and
+  // ended up with a credential it could not decrypt.
+  test('requires the explicit key even when NODE_ENV is unset', () => {
+    delete process.env.NODE_ENV;
     delete process.env.CREDENTIALS_ENCRYPTION_KEY;
     process.env.DATABASE_URL = 'postgres://user:pass@localhost:5432/fueld_test';
 
-    expect(() => assertCredentialsEncryptionConfig()).toThrow(
-      'CREDENTIALS_ENCRYPTION_KEY must be set in production',
-    );
+    expect(() => assertCredentialsEncryptionConfig()).toThrow(/CREDENTIALS_ENCRYPTION_KEY must be set/);
+  });
+
+  test('requires the explicit key regardless of NODE_ENV value', () => {
+    for (const env of ['production', 'test', 'development', '']) {
+      process.env.NODE_ENV = env;
+      delete process.env.CREDENTIALS_ENCRYPTION_KEY;
+      process.env.DATABASE_URL = 'postgres://user:pass@localhost:5432/fueld_test';
+      expect(() => assertCredentialsEncryptionConfig()).toThrow(/CREDENTIALS_ENCRYPTION_KEY must be set/);
+    }
+  });
+
+  test('no longer falls back to a DATABASE_URL-derived key', () => {
+    delete process.env.NODE_ENV;
+    delete process.env.CREDENTIALS_ENCRYPTION_KEY;
+    process.env.DATABASE_URL = 'postgres://user:pass@localhost:5432/fueld_test';
+
+    expect(() => encrypt('x')).toThrow(/CREDENTIALS_ENCRYPTION_KEY must be set/);
   });
 });

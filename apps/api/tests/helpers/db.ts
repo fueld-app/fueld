@@ -68,6 +68,10 @@ try {
 
 process.env['NODE_ENV'] = 'test';
 process.env['DATABASE_URL'] = DATABASE_URL;
+// Credential encryption now requires an explicit key on every runtime (the
+// DATABASE_URL fallback was removed — see lib/crypto.ts). Tests get a fixed,
+// obviously-fake key; crypto.test.ts manipulates this var itself and restores it.
+process.env['CREDENTIALS_ENCRYPTION_KEY'] ??= 'test-credentials-key-not-a-secret';
 
 // NOTE: `var` intentionally avoids TDZ crashes that can occur under Bun's
 // coverage instrumentation + ESM module cycles.
