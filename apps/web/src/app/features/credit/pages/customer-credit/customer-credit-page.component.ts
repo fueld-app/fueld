@@ -76,6 +76,16 @@ interface CompanySearchResultOption {
                 <span class="mt-1 text-[10px] text-gray-400 dark:text-muted">
                   Cover updated {{ formatDate(last.createdAt) }} by {{ last.uploadedByName ?? '—' }}
                 </span>
+                @if (last.unmatchedCount > 0) {
+                  <!-- The column only covers MAPPED buyers, and most buyers are
+                       typically unmapped on a first upload. Saying so is the
+                       difference between a partial figure and a misleading one:
+                       "—" otherwise reads as "this client has no cover". -->
+                  <span class="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                    {{ last.rowCount - last.unmatchedCount }} of {{ last.rowCount }} Atradius buyers mapped
+                    — figures cover mapped clients only
+                  </span>
+                }
               }
             </div>
           }
@@ -403,6 +413,9 @@ interface CompanySearchResultOption {
                   <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-ink">{{ formatAmount(line.creditAmount, line.currency) }}</td>
                   @if (atradiusEnabled()) {
                     <td class="px-4 py-3 text-right">
+                      @if (!line.counterpartyIds.some((cpId) => atradiusCoverFor(cpId))) {
+                        <span class="text-xs text-gray-300 dark:text-muted" title="No Atradius cover mapped for this client — it may be an unmapped buyer in the latest import">not mapped</span>
+                      }
                       @for (cpId of line.counterpartyIds; track cpId; let first = $first) {
                         @if (atradiusCoverFor(cpId); as cover) {
                           <span class="text-sm tabular-nums" [class.text-gray-400]="cover.amount === '0.00' || cover.amount === '0'">
