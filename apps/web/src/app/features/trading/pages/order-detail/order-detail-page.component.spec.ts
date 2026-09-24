@@ -1141,6 +1141,59 @@ describe('OrderDetailPageComponent', () => {
     expect(component.canUseSupplierCredit()).toBe(true);
   });
 
+  it('labels a disabled Credit option by WHY it is unusable, not "no line"', async () => {
+    // A broker deal with a regular USD line showed a disabled "Credit (no line)"
+    // directly above the amber "the USD line on file is a regular line, which
+    // cannot back it" — the two texts contradicted, because a line plainly DOES
+    // exist. The label now distinguishes the two causes.
+    const { component, fixture } = await createComponent();
+
+    const line = (isBrokerCreditLine: boolean) => ({
+      id: 'line-1',
+      type: 'SUPPLIER',
+      counterpartyIds: ['supplier-1'],
+      counterpartyNames: ['ISLAND OIL LIMITED'],
+      creditAmount: '500000.00',
+      usedAmount: '0.00',
+      availableAmount: '500000.00',
+      currency: 'USD',
+      expires: null,
+      periodDays: 30,
+      fromDelivery: false,
+      qualified: false,
+      performanceDays: null,
+      notes: null,
+      isBrokerCreditLine,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    });
+
+    const creditOptionLabel = (): string => {
+      fixture.detectChanges();
+      // Two payment-terms cards render (customer then supplier); the credit state
+      // under test is the supplier side, so read that card's option.
+      const cards = Array.from(document.querySelectorAll('app-order-payment-terms-card'));
+      const supplierCard = cards[1];
+      const opts = Array.from(supplierCard?.querySelectorAll('option') ?? []) as HTMLOptionElement[];
+      return opts.find((o) => o.value === 'CREDIT')?.textContent?.trim() ?? '';
+    };
+
+    component.order.set({ id: 'order-1', currency: 'USD', isBrokerDeal: true } as any);
+
+    // Line exists but has the wrong broker flag -> "unusable", not "no line".
+    (component as any).financialSvc.supplierCreditLines.set([line(false)] as any);
+    expect(component.canUseSupplierCredit()).toBe(false);
+    expect(creditOptionLabel()).toBe('Credit (line unusable)');
+
+    // No lines at all -> "no line" is accurate here.
+    (component as any).financialSvc.supplierCreditLines.set([] as any);
+    expect(creditOptionLabel()).toBe('Credit (no line)');
+
+    // A usable line -> the option is not disabled and keeps its normal label.
+    (component as any).financialSvc.supplierCreditLines.set([line(true)] as any);
+    expect(component.canUseSupplierCredit()).toBe(true);
+  });
+
   it('persists isBrokerDeal and commissionPerMt through the autosave path', async () => {
     // Regression: the order-detail page has no manual Save button
     // ([showSave]="false"), so autosave is the only persistence path. The

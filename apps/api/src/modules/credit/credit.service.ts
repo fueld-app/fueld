@@ -353,9 +353,13 @@ export async function listCreditLines(query: {
 
 // ═════════════════════════════════════════════════════════════════
 //  SERVER-SIDE CREDIT ENFORCEMENT
-//  The deal UI filters lines by currency and gates the CREDIT option,
-//  but the API must not rely on that: direct API calls, scripts, or
-//  races could otherwise commit credit that doesn't exist.
+//  The deal UI filters lines by currency, broker flag and expiry, but
+//  it deliberately does NOT mirror the sufficiency check below (it
+//  cannot see the persisted exposure `required` is computed from), so
+//  this function remains the only authority on whether a line is
+//  actually sufficient. The API must not rely on the UI at all:
+//  direct API calls, scripts, or races could otherwise commit credit
+//  that doesn't exist.
 // ═════════════════════════════════════════════════════════════════
 
 export interface CreditAvailability {

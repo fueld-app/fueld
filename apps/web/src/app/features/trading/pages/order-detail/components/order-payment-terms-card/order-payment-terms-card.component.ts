@@ -45,7 +45,15 @@ export type PaymentSide = 'customer' | 'supplier';
                 [value]="opt.value"
                 [disabled]="(opt.value === 'CREDIT' && !canUseCredit())"
               >
-                {{ opt.value === 'CREDIT' && !canUseCredit() ? (creditFrozen() ? 'Credit (frozen)' : 'Credit (no line)') : opt.label }}
+                {{
+                  opt.value === 'CREDIT' && !canUseCredit()
+                    ? (creditFrozen()
+                        ? 'Credit (frozen)'
+                        : creditMismatch()
+                          ? 'Credit (line unusable)'
+                          : 'Credit (no line)')
+                    : opt.label
+                }}
               </option>
             }
           </select>

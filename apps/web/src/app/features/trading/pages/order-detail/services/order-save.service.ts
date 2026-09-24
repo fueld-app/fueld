@@ -179,7 +179,7 @@ export class OrderSaveService {
         // required — none found. Request a USD credit line…"), which is
         // actionable. A generic "Failed to save order." hid this and is why a
         // trader could sit on a repeatedly-failing autosave without knowing why.
-        orderError = orderRes.message ?? 'Failed to save order.';
+        orderError = orderRes.message?.trim() || 'Failed to save order.';
       } else {
         // Adopt server-refilled deal fields (trader commission snapshot is
         // auto-filled from the tenant scheme when the client sends null) so the
@@ -196,7 +196,7 @@ export class OrderSaveService {
     } catch (err: any) {
       // An HTTP-level failure (4xx/5xx) carries the server's message in the body.
       // Prefer it — same reason as above: the specific reason is actionable.
-      orderError = err?.error?.message ?? 'Failed to save order.';
+      orderError = err?.error?.message?.trim() || 'Failed to save order.';
     }
 
     try {
@@ -224,7 +224,7 @@ export class OrderSaveService {
           // refusal, and this one explains why the line items are still missing.
           onError?.(orderError
             ? `${orderError} (Line items also could not be saved: ${itemsRes.message ?? 'failed'})`
-            : (itemsRes.message ?? 'Failed to save items.'));
+            : (itemsRes.message?.trim() || 'Failed to save items.'));
           return false;
         }
 
@@ -246,7 +246,7 @@ export class OrderSaveService {
       const serverMessage = err?.error?.message;
       onError?.(orderError
         ? `${orderError} (Line items also could not be saved${serverMessage ? `: ${serverMessage}` : ''})`
-        : (serverMessage ?? 'Failed to save order.'));
+        : (serverMessage?.trim() || 'Failed to save order.'));
       return false;
     }
   }

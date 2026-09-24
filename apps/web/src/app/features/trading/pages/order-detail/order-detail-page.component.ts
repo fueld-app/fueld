@@ -901,16 +901,21 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   /**
    * Credit lines that can actually back THIS deal.
    *
-   * The server matches a line to a deal on BOTH currency and the broker flag
-   * (`line.isBrokerCreditLine === order.isBrokerDeal` — credit.service.ts,
-   * checkCreditAvailability), because broker-deal exposure and regular trade
-   * exposure must not draw on the same line. The page used to filter on
-   * currency alone, so on a broker deal it offered "Credit" whenever any USD
-   * line existed — including a regular one the server then refused. The trader
-   * saw a green "Credit OK", picked Credit, and autosave failed with a message
-   * the UI replaced by a generic one, repeatedly, until a refresh discarded the
-   * unsaved choice. Matching the server's rule here is what makes the option
-   * honest.
+   * The server matches a line to a deal on currency, the broker flag AND
+   * non-expiry (`checkCreditAvailability` in credit.service.ts). This mirrors the
+   * first two plus expiry — the axes that decide whether a line EXISTS for the
+   * deal. It deliberately does NOT mirror the server's fourth condition,
+   * `available + 1e-9 >= required`: the client cannot know the persisted exposure
+   * the server compares against, so replicating it here would block deals the
+   * server accepts — worse than the green state it would replace. Sufficiency is
+   * therefore still enforced by the server alone and surfaced via its message.
+   *
+   * The page used to filter on the broker flag only (and, before that, on
+   * currency alone), so on a broker deal it offered "Credit" whenever any line
+   * existed — including one the server then refused. The trader saw a green
+   * "Credit OK", picked Credit, and autosave failed with a message the UI
+   * replaced by a generic one, repeatedly, until a refresh discarded the unsaved
+   * choice. Matching the existence predicates is what makes the option honest.
    */
   private usableCreditLines(lines: CreditLineDto[]): CreditLineDto[] {
     const isBrokerDeal = this.order()?.isBrokerDeal === true;
