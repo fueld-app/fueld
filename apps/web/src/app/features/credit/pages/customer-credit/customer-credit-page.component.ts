@@ -661,10 +661,8 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
    * parts are shown with a note rather than a total.
    */
   coverPartsLabel(cover: { byCurrency: Array<{ currency: string; amount: string }> }): string {
-    const parts = cover.byCurrency
-      .map((p) => `${p.currency} ${this.formatAmount(p.amount, p.currency).replace(`${p.currency} `, '')}`)
-      .join(' + ');
-    return `${parts} (mixed)`;
+    // formatAmount already renders "<CUR> <amount>", so no reassembly is needed.
+    return `${cover.byCurrency.map((p) => this.formatAmount(p.amount, p.currency)).join(' + ')} (mixed)`;
   }
 
   ngOnDestroy(): void {

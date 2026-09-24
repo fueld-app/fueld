@@ -19,14 +19,6 @@ import type {
   ApiResponse,
 } from '@fueld/types';
 
-interface CompanySearchResult {
-  source: 'local' | 'seasearcher';
-  localId?: string;
-  seasearcherId?: string;
-  name: string;
-  country?: string | null;
-}
-
 /**
  * Monthly Atradius policy export upload.
  * Flow: pick file → server parses → review summary + map unmatched buyers →
@@ -113,6 +105,16 @@ interface CompanySearchResult {
                     <div class="min-w-0 flex-1">
                       <div class="truncate text-sm font-medium text-gray-900 dark:text-ink">{{ row.buyerName }}</div>
                       <div class="text-xs text-gray-400">#{{ row.buyerNumber }} · {{ row.statusRaw }}</div>
+                      @if (suggestions()[row.id]; as hint) {
+                        <div class="text-xs text-gray-400">
+                          name suggests
+                          <button
+                            type="button"
+                            class="text-brand-600 hover:underline"
+                            (click)="acceptSuggestion(row.id, hint.id)"
+                          >{{ suggestedName(row.id) }}</button>
+                        </div>
+                      }
                     </div>
                     <div class="w-[240px] shrink-0">
                       <!-- Searchable typeahead, not a <select>: the client list runs
@@ -121,7 +123,7 @@ interface CompanySearchResult {
                            fetched per search term, so the list never truncates. -->
                       <app-searchable-dropdown
                         [options]="counterpartyOptions()"
-                        [selected]="selections()[row.id] ?? row.suggestedCounterpartyId ?? ''"
+                        [selected]="selections()[row.id] ?? ''"
                         [asyncSearch]="true"
                         [loading]="counterpartySearchLoading()"
                         [clearable]="true"
@@ -175,6 +177,12 @@ export class AtradiusImportModalComponent {
   readonly summary = signal<AtradiusImportSummaryDto | null>(null);
   readonly unmatched = signal<AtradiusUnmatchedBuyerDto[]>([]);
   readonly selections = signal<Record<string, string>>({});
+  /**
+   * Server name-match suggestions by unmatched row id. Offered as a one-click hint
+   * under each row, never applied on its own — the guess is often wrong between
+   * differing spellings, and applying it silently puts cover on the wrong client.
+   */
+  readonly suggestions = signal<Record<string, { id: string; name: string }>>({});
   readonly counterpartyOptions = signal<DropdownOption[]>([]);
   readonly counterpartySearchLoading = signal(false);
   readonly counterpartiesError = signal('');
@@ -184,6 +192,8 @@ export class AtradiusImportModalComponent {
    * label would blank out as soon as the list was refiltered.
    */
   private readonly chosenLabels = new Map<string, string>();
+  /** Monotonic token guarding against out-of-order search responses. */
+  private searchSeq = 0;
 
   constructor() {
     // Seed with the unfiltered first page so a dropdown opened without typing
@@ -201,6 +211,11 @@ export class AtradiusImportModalComponent {
    * mapped. Searching server-side means the options are never a truncated slice.
    */
   async onCounterpartySearch(term: string): Promise<void> {
+    // Sequence token: ~150 pickers each fire a search (the component emits '' on
+    // open) and keystrokes are debounced but not serialized, so a slow response
+    // can land after a newer one and repopulate the list with the wrong options.
+    // Only the newest response may write.
+    const seq = ++this.searchSeq;
     this.counterpartySearchLoading.set(true);
     this.counterpartiesError.set('');
     try {
@@ -210,7 +225,20 @@ export class AtradiusImportModalComponent {
           { params: { type: 'CLIENT', limit: '50', ...(term ? { search: term } : {}) } },
         ),
       );
+      if (seq !== this.searchSeq) return; // a newer search superseded this one
       const list = res.data?.companies ?? [];
+      // A broad or empty term still returns at most 50; say so rather than
+      // pretending the list is complete. Typing narrows it, which is what the
+      // search is for.
+      const total = res.data?.total ?? list.length;
+      if (total > list.length) {
+        this.counterpartiesError.set(
+          `Showing ${list.length} of ${total} clients — type part of the name to narrow the list.`,
+        );
+      }
+      // Refresh cached labels from the server's own answer, so a client renamed
+      // mid-session stops being offered under its old name.
+      for (const cp of list) this.chosenLabels.set(cp.id, cp.name);
       const seen = new Set<string>();
       const options: DropdownOption[] = [];
       for (const cp of [...list, ...[...this.chosenLabels].map(([id, label]) => ({ id, name: label }))]) {
@@ -223,9 +251,13 @@ export class AtradiusImportModalComponent {
         this.counterpartiesError.set(`No Fueld client matches "${term}" — check the client list, or leave it unmapped.`);
       }
     } catch {
-      this.counterpartiesError.set('Could not search the Fueld client list — mapping is unavailable. Reload the page to retry.');
+      if (seq === this.searchSeq) {
+        this.counterpartiesError.set('Could not search the Fueld client list — mapping is unavailable. Reload the page to retry.');
+      }
     } finally {
-      this.counterpartySearchLoading.set(false);
+      // Only the latest call clears the spinner; an older one finishing late must
+      // not hide the fact that a request is still in flight.
+      if (seq === this.searchSeq) this.counterpartySearchLoading.set(false);
     }
   }
 
@@ -245,17 +277,47 @@ export class AtradiusImportModalComponent {
       if (!res.success || !res.data) throw new Error(res.message ?? 'Import failed');
       this.summary.set(res.data);
       this.unmatched.set(res.data.unmatched ?? []);
-      const selections: Record<string, string> = {};
+      // Deliberately NOT pre-filling from the server name-match suggestion.
+      //
+      // A suggestion is a guess between spellings that frequently disagree
+      // (`GEFO GESELLSCHAFT FÜROELTRANSPORTE MBH` vs `GEFO Gesellschaft fur
+      // Oeltransporte mbH`), and a wrong guess becomes a MANUAL mapping putting
+      // one client's insured cover on another — silently, since Save applies
+      // whatever is selected. It is offered as a one-click hint instead, so
+      // accepting it is an act rather than an omission.
+      this.selections.set({});
+      // Keep the server's guesses for the one-click hint under each row.
+      const hints: Record<string, { id: string; name: string }> = {};
       for (const row of res.data.unmatched ?? []) {
-        if (row.suggestedCounterpartyId) selections[row.id] = row.suggestedCounterpartyId;
+        if (row.suggestedCounterpartyId) {
+          hints[row.id] = { id: row.suggestedCounterpartyId, name: row.buyerName };
+        }
       }
-      this.selections.set(selections);
+      this.suggestions.set(hints);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Import failed');
     } finally {
       this.busy.set(false);
       input.value = '';
     }
+  }
+
+  /**
+   * Accept the server's name-match suggestion. An explicit click, because the
+   * guess is often wrong between differing spellings and applying it silently
+   * would put cover on the wrong client.
+   */
+  acceptSuggestion(rowId: string, counterpartyId: string): void {
+    this.setSelection(rowId, counterpartyId);
+  }
+
+  /** Label for the suggested counterparty, resolved from options or the cache. */
+  suggestedName(rowId: string): string {
+    const id = this.suggestions()[rowId]?.id;
+    if (!id) return '';
+    return this.counterpartyOptions().find((o) => o.value === id)?.label
+      ?? this.chosenLabels.get(id)
+      ?? 'suggested client';
   }
 
   setSelection(rowId: string, counterpartyId: string): void {
@@ -266,6 +328,10 @@ export class AtradiusImportModalComponent {
   }
 
   async saveMappings(): Promise<void> {
+    // Guard re-entry: the button is disabled while busy, but a click landing in
+    // the gap before the re-render would otherwise run the whole 150-PUT loop
+    // twice.
+    if (this.busy()) return;
     this.busy.set(true);
     this.error.set('');
     try {
