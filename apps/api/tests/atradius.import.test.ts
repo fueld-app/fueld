@@ -150,3 +150,70 @@ describe('atradius import', () => {
     expect(new Set(numbers).size).toBe(numbers.length);
   });
 });
+
+describe('atradius status classification (verified against the real export)', () => {
+  /**
+   * Two statuses were classified inactive and so dropped from cover entirely.
+   * The real 17/09 file settles both questions rather than leaving them to
+   * judgement:
+   *  - "Annulation future" is a cancellation dated AHEAD. Telford Marine cancels
+   *    2026-10-16 (in force today) while Flex Commodities cancelled 2026-09-19
+   *    (already lapsed). So the status is active, retired by its cancellation
+   *    date — not dead on arrival.
+   *  - "Pas d'augmentation de couverture" means an INCREASE was refused; the
+   *    standing cover holds. Team Bulk asked for €300k and holds €100k; Hilf
+   *    asked €300k and holds €150k; REFUSED rows carry 0. So the AE amount is
+   *    the maintained cover, and treating the row as inactive hid real cover.
+   */
+  test('keeps future cancellations with cover, and drops the lapsed one', async () => {
+    await importAtradiusFile({ tenantId: TENANT, userId, ...makeUpload() });
+    const rows = await db.select().from(atradiusBuyers).where(eq(atradiusBuyers.tenantId, TENANT));
+
+    const telford = rows.find((r) => r.buyerName.includes('TELFORD'));
+    const flex = rows.find((r) => r.buyerName.includes('FLEX COMMODITIES'));
+    expect(telford).toBeTruthy();
+    expect(flex).toBeTruthy();
+
+    // Cancellation still ahead -> the cover is in force.
+    expect(telford!.isActive).toBeTrue();
+    expect(Number(telford!.coverAmount)).toBeGreaterThan(0);
+    // Cancellation already passed -> not in force.
+    expect(flex!.isActive).toBeFalse();
+  });
+
+  test('treats a refused increase as standing cover, not as nothing', async () => {
+    await importAtradiusFile({ tenantId: TENANT, userId, ...makeUpload() });
+    const rows = await db.select().from(atradiusBuyers).where(eq(atradiusBuyers.tenantId, TENANT));
+    const noIncrease = rows.filter((r) => r.statusRaw.includes("Pas d'augmentation"));
+    expect(noIncrease.length).toBeGreaterThan(0);
+    for (const row of noIncrease) {
+      expect(row.isActive).toBeTrue();
+      // The amount is the maintained cover, never 0.
+      expect(Number(row.coverAmount)).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('atradius mapping is tenant-isolated', () => {
+  test('refuses to map a buyer to another tenant\'s counterparty', async () => {
+    await importAtradiusFile({ tenantId: TENANT, userId, ...makeUpload() });
+    const rows = await db.select().from(atradiusBuyers).where(eq(atradiusBuyers.tenantId, TENANT));
+    const buyer = rows.find((r) => !r.matchedCounterpartyId);
+    expect(buyer).toBeTruthy();
+
+    // A counterparty belonging to a DIFFERENT tenant.
+    const [otherTenant] = await db.insert(tenants).values({ name: `Other-${Date.now()}`, domain: `other-${Date.now()}.local` }).returning();
+    const [foreign] = await db.insert(counterparties).values({ tenantId: otherTenant!.id, name: 'Foreign Client', type: 'CLIENT' }).returning();
+
+    const ok = await mapBuyerToCounterparty({ tenantId: TENANT, buyerNumber: buyer!.buyerNumber, counterpartyId: foreign!.id });
+    expect(ok).toBeFalse();
+
+    // And nothing was written.
+    const after = await db.select().from(atradiusBuyers)
+      .where(eq(atradiusBuyers.tenantId, TENANT));
+    expect(after.find((r) => r.buyerNumber === buyer!.buyerNumber)?.matchedCounterpartyId ?? null).toBeNull();
+
+    await db.delete(counterparties).where(eq(counterparties.tenantId, otherTenant!.id));
+    await db.delete(tenants).where(eq(tenants.id, otherTenant!.id));
+  });
+});

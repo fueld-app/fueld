@@ -30,8 +30,17 @@ const STATUS_MAP: Record<string, { normalized: string; active: boolean }> = {
   'conditions de couverture modifiées': { normalized: 'MODIFIED', active: true },
   'refusée': { normalized: 'REFUSED', active: false },
   'annulée': { normalized: 'CANCELLED', active: false },
-  'annulation future': { normalized: 'FUTURE_CANCEL', active: false },
-  "pas d'augmentation de couverture": { normalized: 'NO_INCREASE', active: false },
+  // Both of these carry cover that is still in force, verified against the real
+  // 17/09 export rather than assumed:
+  //  - FUTURE_CANCEL is a cancellation scheduled ahead; Atradius still pays a
+  //    claim until that date (Telford Marine: cancel 2026-10-16, in force today).
+  //    It is expired by its cancellation date below, not treated as dead now.
+  //  - NO_INCREASE means an INCREASE was refused, so the standing cover holds.
+  //    The file settles the ambiguity: Team Bulk asked for €300k and holds €100k,
+  //    Hilf asked €300k and holds €150k, while REFUSED rows carry AE=0 — so AE is
+  //    the maintained cover, not the refused delta. One row per buyer_number.
+  'annulation future': { normalized: 'FUTURE_CANCEL', active: true },
+  "pas d'augmentation de couverture": { normalized: 'NO_INCREASE', active: true },
 };
 
 const HEADER_ALIASES: Record<string, string[]> = {
@@ -40,7 +49,12 @@ const HEADER_ALIASES: Record<string, string[]> = {
   coverAmount: ['montant total de la décision dans la devise de la police'],
   status: ['statut de la couverture'],
   decisionDate: ['date de la décision'],
+  // "Date de fin" exists in the export but is EMPTY on every row; the date that
+  // actually governs a future cancellation is "Date d'annulation" (populated on
+  // the 14 rows that have one). Both are mapped: end date first if ever filled,
+  // cancellation date as the working expiry.
   endDate: ['date de fin'],
+  cancelDate: ["date d'annulation"],
   currency: ['code devise de la police', 'devise de la police'],
 };
 
@@ -57,7 +71,12 @@ function resolveColumns(headerRow: Record<string, unknown>): Record<string, stri
   const letters = Object.keys(headerRow);
   const byNormalized = new Map<string, string>();
   for (const letter of letters) {
-    byNormalized.set(normalizeHeader(headerRow[letter]), letter);
+    const key = normalizeHeader(headerRow[letter]);
+    // FIRST occurrence wins. The export genuinely contains duplicate header
+    // names — "Date d'annulation" is populated while "Date d'annulation_1" is
+    // empty on every row — and the previous last-wins write bound the EMPTY one,
+    // which would have made the cancellation date silently always null.
+    if (key && !byNormalized.has(key)) byNormalized.set(key, letter);
   }
   const resolved: Record<string, string> = {};
   for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
@@ -194,6 +213,7 @@ export async function importAtradiusFile(opts: {
     const statusInfo = STATUS_MAP[statusKey] ?? { normalized: 'UNKNOWN', active: false };
     const decisionDate = toIsoDate(get('decisionDate'));
     const endDate = toIsoDate(get('endDate'));
+    const cancelDate = toIsoDate(get('cancelDate'));
     const amountRaw = get('coverAmount');
     // Numeric cells come through as numbers; TEXT cells may be French-locale
     // ("1 234,56") — normalize before stripping, don't silently mangle.
@@ -204,8 +224,13 @@ export async function importAtradiusFile(opts: {
     const coverAmount = String(parseFloat(amountText.replace(/[^0-9.\-]/g, '')) || 0);
     const currency = String(get('currency') ?? 'EUR').trim() || 'EUR';
 
-    // End date passed → inactive regardless of status.
-    const expired = !!endDate && endDate < today;
+    // A passed end date OR cancellation date makes the row inactive regardless
+    // of status. "Date de fin" is empty throughout this export, so the
+    // cancellation date is what actually retires a future cancellation: it keeps
+    // Telford Marine in force until 2026-10-16 and drops Flex Commodities, whose
+    // cancellation already happened on 2026-09-19.
+    const expiry = endDate ?? cancelDate;
+    const expired = !!expiry && expiry < today;
     const isActive = statusInfo.active && !expired;
 
     // Matching: persisted mapping (stable buyer number) > exact name.
@@ -320,6 +345,21 @@ export async function mapBuyerToCounterparty(opts: {
   buyerNumber: string;
   counterpartyId: string | null;
 }): Promise<boolean> {
+  // The counterparty must belong to the CALLER'S tenant. The buyer rows are
+  // already tenant-scoped, but the id came straight from the request body, so
+  // without this a privileged user of one tenant could attribute their cover to
+  // another tenant's counterparty — and it would then surface in that tenant's
+  // cover map. Tenant isolation is not something to derive from "the caller
+  // would not do that".
+  if (opts.counterpartyId) {
+    const [owned] = await db
+      .select({ id: counterparties.id })
+      .from(counterparties)
+      .where(and(eq(counterparties.id, opts.counterpartyId), eq(counterparties.tenantId, opts.tenantId)))
+      .limit(1);
+    if (!owned) return false;
+  }
+
   const result = await db
     .update(atradiusBuyers)
     .set({
@@ -442,7 +482,16 @@ export async function listUnmatchedBuyers(tenantId: string): Promise<
       statusRaw: atradiusBuyers.statusRaw,
     })
     .from(atradiusBuyers)
-    .where(and(eq(atradiusBuyers.tenantId, tenantId), eq(atradiusBuyers.importId, importRow.id)));
+    // The endpoint's whole contract is "buyers WITHOUT a counterparty mapping",
+    // and it was returning every row of the latest import — the name and the
+    // JSDoc said unmatched, the query did not. The modal does not hit this path
+    // (it uses the import summary's own filtered list), so the bug was latent
+    // rather than user-visible, which is exactly why it survived.
+    .where(and(
+      eq(atradiusBuyers.tenantId, tenantId),
+      eq(atradiusBuyers.importId, importRow.id),
+      isNull(atradiusBuyers.matchedCounterpartyId),
+    ));
   const seen = new Set<string>();
   return rows.filter((r) => {
     if (seen.has(r.buyerNumber)) return false;

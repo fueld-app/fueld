@@ -406,7 +406,7 @@ interface CompanySearchResultOption {
                       @for (cpId of line.counterpartyIds; track cpId; let first = $first) {
                         @if (atradiusCoverFor(cpId); as cover) {
                           <span class="text-sm tabular-nums" [class.text-gray-400]="cover.amount === '0.00' || cover.amount === '0'">
-                            {{ cover.currency === 'EUR' ? '€' : cover.currency + ' ' }}{{ cover.amount === '0.00' || cover.amount === '0' ? '0' : formatAmount(cover.amount, cover.currency) }}{{ $last ? '' : ', ' }}
+                            {{ cover.amount === '0.00' || cover.amount === '0' ? ('0 ' + cover.currency) : formatAmount(cover.amount, cover.currency) }}{{ $last ? '' : ', ' }}
                           </span>
                         }
                       }
