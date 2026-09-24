@@ -128,6 +128,13 @@ export class OrderSaveService {
       // Fall through to the order-fields PUT below, but skip the items PUT.
     }
 
+    // A rejection of the ORDER payload (e.g. a credit term the server refuses)
+    // must not discard the line items the trader just entered. Previously the
+    // early return skipped the items PUT entirely, so items added in that window
+    // never persisted — the "I added two line items but it's still acting up"
+    // half of the reported incident. The two writes are independent, so the
+    // items are saved regardless and the order error is reported at the end.
+    let orderError: string | null = null;
     try {
       const orderRes = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}`, {
@@ -172,22 +179,33 @@ export class OrderSaveService {
         // required — none found. Request a USD credit line…"), which is
         // actionable. A generic "Failed to save order." hid this and is why a
         // trader could sit on a repeatedly-failing autosave without knowing why.
-        onError?.(orderRes.message ?? 'Failed to save order.');
-        return false;
+        orderError = orderRes.message ?? 'Failed to save order.';
+      } else {
+        // Adopt server-refilled deal fields (trader commission snapshot is
+        // auto-filled from the tenant scheme when the client sends null) so the
+        // local signal does not drift from the persisted row and re-trigger
+        // autosave with stale values.
+        const saved = (orderRes.data ?? {}) as Record<string, unknown> | null;
+        if (saved && ('traderCommissionPct' in saved || 'dealType' in saved)) {
+          options.onDealFieldsSaved?.({
+            dealType: (saved['dealType'] as string | null) ?? null,
+            traderCommissionPct: (saved['traderCommissionPct'] as string | null) ?? null,
+          });
+        }
       }
-      // Adopt server-refilled deal fields (trader commission snapshot is
-      // auto-filled from the tenant scheme when the client sends null) so the
-      // local signal does not drift from the persisted row and re-trigger
-      // autosave with stale values.
-      const saved = (orderRes.data ?? {}) as Record<string, unknown> | null;
-      if (saved && ('traderCommissionPct' in saved || 'dealType' in saved)) {
-        options.onDealFieldsSaved?.({
-          dealType: (saved['dealType'] as string | null) ?? null,
-          traderCommissionPct: (saved['traderCommissionPct'] as string | null) ?? null,
-        });
-      }
+    } catch (err: any) {
+      // An HTTP-level failure (4xx/5xx) carries the server's message in the body.
+      // Prefer it — same reason as above: the specific reason is actionable.
+      orderError = err?.error?.message ?? 'Failed to save order.';
+    }
 
-      await options.syncSupplierRecords(id);
+    try {
+      // Only sync legs when the order itself was accepted — the leg payload
+      // mirrors order fields, so syncing after a rejected order write would
+      // push half of the rejected state.
+      if (!orderError) {
+        await options.syncSupplierRecords(id);
+      }
 
       // Skip the items PUT when every row is an incomplete draft — an empty
       // payload would REPLACE (wipe) the order's persisted line items.
@@ -201,18 +219,34 @@ export class OrderSaveService {
         const itemsRes = await firstValueFrom(
           this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
         );
-        if (!itemsRes.success) { onError?.(itemsRes.message ?? 'Failed to save items.'); return false; }
+        if (!itemsRes.success) {
+          // Report both if both failed: the order error explains the credit
+          // refusal, and this one explains why the line items are still missing.
+          onError?.(orderError
+            ? `${orderError} (Line items also could not be saved: ${itemsRes.message ?? 'failed'})`
+            : (itemsRes.message ?? 'Failed to save items.'));
+          return false;
+        }
 
         options.clearSavedDraftIds(autoSaveRows);
       }
 
       await options.loadCustomerCreditLines(o.clientId);
       await options.loadSupplierCreditLines(options.activeSupplierCompanyId() ?? o.supplierId);
+
+      // Surface the order-level rejection last, after the line items are safely
+      // persisted, so the trader learns the terms did not save without also
+      // losing the work they just entered.
+      if (orderError) {
+        onError?.(orderError);
+        return false;
+      }
       return true;
     } catch (err: any) {
-      // An HTTP-level failure (4xx/5xx) carries the server's message in the body.
-      // Prefer it — same reason as above: the specific reason is actionable.
-      onError?.(err?.error?.message ?? 'Failed to save order.');
+      const serverMessage = err?.error?.message;
+      onError?.(orderError
+        ? `${orderError} (Line items also could not be saved${serverMessage ? `: ${serverMessage}` : ''})`
+        : (serverMessage ?? 'Failed to save order.'));
       return false;
     }
   }

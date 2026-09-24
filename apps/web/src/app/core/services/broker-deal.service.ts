@@ -39,7 +39,6 @@ export class BrokerDealService {
   /** Load broker deal settings from the API (non-admin endpoint). */
   async load(): Promise<void> {
     if (this._loaded) return;
-    this._loaded = true;
     try {
       const res = await firstValueFrom(
         this.http.get<{ success: boolean; data: BrokerDealSettings }>(
@@ -48,9 +47,15 @@ export class BrokerDealService {
       );
       if (res.success && res.data) {
         this.settings.set(res.data);
+        // Only latch on SUCCESS. Marking loaded before the request (or on
+        // failure) poisoned the cache for the life of the page: one transient
+        // error left `skipCustomerCreditCheckOnBrokerDeals` at its default false,
+        // so a tenant that opts out kept seeing the customer credit gate — the
+        // exact gate the server does not enforce for them.
+        this._loaded = true;
       }
     } catch {
-      // default settings work fine — feature is off
+      // Leave _loaded false so the next load() retries, and keep defaults.
     }
   }
 

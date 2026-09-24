@@ -1098,7 +1098,14 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         return { success: true, data: items } satisfies ApiResponse<typeof items>;
       } catch (err) {
         console.error('[Orders] Save items failed:', err);
-        return { success: false, data: [], message: 'Failed to save items' };
+        // Forward the thrower's message, as the order-PUT handler does. The
+        // hard-coded string made the client's own message-surfacing inert for
+        // this path: saveOrderItems throws actionable reasons (e.g. "Order item
+        // supplier must belong to the same order", "Each order item must specify
+        // a supplier when an order has multiple suppliers", the CREDIT_NOTE
+        // negative-cost rule) and all of them were flattened to one generic line.
+        const message = err instanceof Error ? err.message : 'Failed to save items';
+        return { success: false, data: [], message };
       }
     },
     {

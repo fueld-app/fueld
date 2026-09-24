@@ -952,6 +952,117 @@ describe('OrderDetailPageComponent', () => {
     expect(toasts).toEqual([{ type: 'error', message: serverMessage }]);
   });
 
+  it('still persists line items when the order payload is rejected', async () => {
+    // Regression: saveOrder returned early on a rejected order PUT, so the items
+    // PUT never ran and freshly-typed line items were silently lost on refresh.
+    // That is the "I added two line items but it's still acting up" half of the
+    // reported incident. The two writes are independent — a rejected order
+    // payload (e.g. a credit term the server refuses) must not discard the work.
+    const putCalls: Array<{ url: string }> = [];
+    const toasts: Array<{ type: string; message: string }> = [];
+    const { component } = await createComponent({
+      onPut: (url) => {
+        putCalls.push({ url: String(url) });
+        if (/\/orders\/order-1$/.test(String(url))) {
+          return { success: false, data: null, message: 'Supplier credit line is required.' };
+        }
+        return { success: true, data: {} };
+      },
+    });
+    (component as any).showToast = (type: string, message: string) => toasts.push({ type, message });
+
+    component.order.set({
+      id: 'order-1',
+      clientId: 'client-1',
+      currency: 'USD',
+      status: 'CONFIRMED',
+      isBrokerDeal: true,
+    } as any);
+    component.itemRows.set([
+      {
+        id: 'item-1',
+        orderSupplierId: null,
+        productType: 'VLSFO',
+        description: '0.5%',
+        quantity: 500,
+        quantityMin: null,
+        quantityMax: 500,
+        unit: 'MT',
+        costUnit: 'MT',
+        salesUnit: 'MT',
+        costConversionFactor: 1,
+        unitConversionFactor: 1,
+        costPrice: 849,
+        costCurrency: 'USD',
+        salesPrice: 849,
+        salesCurrency: 'USD',
+        profit: 0,
+        paymentTerms: '',
+        customerNote: null,
+        deliveredQuantity: null,
+        costPricingModel: 'FIXED',
+        costReferenceId: null,
+        costPlattsEntryId: null,
+        costPremium: null,
+        costBarging: null,
+        costBargingUnit: null,
+        costCreditDays: null,
+        costPriceFinalized: false,
+        salesPricingModel: 'FIXED',
+        salesReferenceId: null,
+        salesPlattsEntryId: null,
+        salesPremium: null,
+        salesBarging: null,
+        salesBargingUnit: null,
+        salesCreditDays: null,
+        salesPriceFinalized: false,
+      },
+    ] as any);
+
+    const ok = await (component as any).performAutoSave();
+
+    // The items write must still have happened...
+    expect(putCalls.some((c) => c.url.includes('/orders/order-1/items'))).toBe(true);
+    // ...and the order rejection must still be reported to the trader.
+    expect(toasts.some((t) => t.message.includes('Supplier credit line is required'))).toBe(true);
+    expect(ok).toBeUndefined(); // performAutoSave returns void
+  });
+
+  it('ignores expired credit lines, as the server does', async () => {
+    // The server excludes expired lines from its matching set
+    // (credit.service.ts: `!line.expires || line.expires >= today`). Counting an
+    // expired line here would offer a Credit the server refuses — the same
+    // false-green class as the broker-flag bug.
+    const { component } = await createComponent();
+    const expired = {
+      id: 'line-1',
+      type: 'SUPPLIER',
+      counterpartyIds: ['supplier-1'],
+      counterpartyNames: ['ISLAND OIL LIMITED'],
+      creditAmount: '500000.00',
+      usedAmount: '0.00',
+      availableAmount: '500000.00',
+      currency: 'USD',
+      expires: '2020-01-01',
+      periodDays: 30,
+      fromDelivery: false,
+      qualified: false,
+      performanceDays: null,
+      notes: null,
+      isBrokerCreditLine: true,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    };
+
+    component.order.set({ id: 'order-1', currency: 'USD', isBrokerDeal: true } as any);
+    (component as any).financialSvc.supplierCreditLines.set([expired] as any);
+    expect(component.canUseSupplierCredit()).toBe(false);
+
+    // A future expiry is honoured.
+    (component as any).financialSvc.supplierCreditLines.set([{ ...expired, expires: '2099-01-01' }] as any);
+    expect(component.canUseSupplierCredit()).toBe(true);
+  });
+
   it('persists isBrokerDeal and commissionPerMt through the autosave path', async () => {
     // Regression: the order-detail page has no manual Save button
     // ([showSave]="false"), so autosave is the only persistence path. The

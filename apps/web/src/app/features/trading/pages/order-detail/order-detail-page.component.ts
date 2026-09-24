@@ -914,7 +914,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
    */
   private usableCreditLines(lines: CreditLineDto[]): CreditLineDto[] {
     const isBrokerDeal = this.order()?.isBrokerDeal === true;
-    return lines.filter((line) => (line.isBrokerCreditLine ?? false) === isBrokerDeal);
+    // Expiry matters: the server excludes expired lines from `matching`
+    // (credit.service.ts — `!line.expires || line.expires >= today`), so an
+    // expired line must not make the client offer a Credit the server refuses.
+    const today = new Date().toISOString().slice(0, 10);
+    return lines.filter(
+      (line) =>
+        (line.isBrokerCreditLine ?? false) === isBrokerDeal &&
+        (!line.expires || line.expires >= today),
+    );
   }
 
   readonly customerCreditSummary = computed(() => {
