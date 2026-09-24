@@ -98,6 +98,11 @@ interface CompanySearchResult {
               <p class="mt-0.5 text-xs text-gray-500 dark:text-muted">
                 Pick the Fueld client for each buyer. Mappings are remembered for future uploads.
               </p>
+              @if (counterpartiesError()) {
+                <div class="mt-2 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                  {{ counterpartiesError() }}
+                </div>
+              }
               <div class="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
                 @for (row of unmatched(); track row.id) {
                   <div class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-line px-3 py-2">
@@ -160,21 +165,36 @@ export class AtradiusImportModalComponent {
   readonly unmatched = signal<AtradiusUnmatchedBuyerDto[]>([]);
   readonly selections = signal<Record<string, string>>({});
   readonly counterparties = signal<Array<{ id: string; name: string }>>([]);
+  readonly counterpartiesError = signal('');
 
   constructor() {
     void this.loadCounterparties();
   }
 
+  /**
+   * Load the Fueld clients the unmatched buyers can be mapped to.
+   *
+   * `/companies/local` is a PAGINATED list — its payload is `{ companies, total }`,
+   * not a bare array. Reading it as an array left the dropdown with nothing to
+   * render (the exact "empty select" reported on Riviera), so the shape is now
+   * matched and a failure is surfaced instead of swallowed: an empty mapping box
+   * with no explanation is worse than an error message.
+   */
   private async loadCounterparties(): Promise<void> {
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ id: string; name: string }[]>>(`${API}/companies/local`, {
-          params: { type: 'CLIENT', limit: '500' },
-        }),
+        this.http.get<ApiResponse<{ companies: Array<{ id: string; name: string }>; total: number }>>(
+          `${API}/companies/local`,
+          { params: { type: 'CLIENT', limit: '500' } },
+        ),
       );
-      if (res.success && res.data) this.counterparties.set(res.data);
+      const list = res.data?.companies ?? [];
+      this.counterparties.set(list);
+      if (res.success && list.length === 0) {
+        this.counterpartiesError.set('No Fueld clients were returned — check the client list before mapping.');
+      }
     } catch {
-      // mapping dropdown stays empty; server-side matching still works
+      this.counterpartiesError.set('Could not load the Fueld client list — mapping is unavailable. Reload the page to retry.');
     }
   }
 
