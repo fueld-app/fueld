@@ -31,14 +31,22 @@ same company is spelled in Fueld. For example:
 
 So on the first upload some buyers will be matched automatically (by exact name —
 17 of your 158 in the file you sent) and the rest appear in a "map unmatched
-buyers" list where you pick the Fueld client for each. **That mapping is remembered
-by Atradius buyer number, which is stable**, so you do it once and future monthly
-uploads match by themselves — you should not need to revisit it.
+buyers" list. Each row has a search box: type a few letters of the client name and
+it finds them, so you do not have to scroll a long list. Where the system thinks it
+recognises a buyer it shows a "name suggests …" link under the row — click it to
+accept, or search for the right client instead. A suggestion is never applied on
+its own, because these name guesses are exactly the ones that can be wrong, and a
+wrong one would put one client's cover against another.
+
+**That mapping is remembered by Atradius buyer number, which is stable**, so you do
+it once and future monthly uploads match by themselves — you should not need to
+revisit it.
 
 Until a buyer is mapped, that client's cover shows as "not mapped" rather than a
-figure, and the page states how many buyers are mapped ("N of 158 — figures cover
-mapped clients only"). So the column never silently presents a partial picture as
-if it were complete.
+figure — so please read the column as partial until the mapping is done, and the
+page header states how many buyers are mapped ("N of 158 — figures cover mapped
+clients only"). It never presents a partial picture as if it were complete, but
+the total will be low on the first pass for that reason.
 
 **On the API**
 
@@ -49,9 +57,10 @@ about buyer identity rather than file transfer. If they do offer one, we can
 revisit; it would be a straightforward swap on our side since the import is
 already a single entry point.
 
-Please give the first upload a go and tell me if anything reads oddly. In
-particular I would be interested whether the "not mapped" list is manageable —
-if it is a long list, we can make that step quicker.
+Please give the first upload a go and tell me if anything reads oddly — the
+mapping step in particular, since that is the one part that is yours to do. If
+working through the list feels slow at 150-odd buyers, tell me and I will look at
+making it faster.
 
 Best,
 Patrick

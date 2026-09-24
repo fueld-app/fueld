@@ -18,9 +18,14 @@
  */
 
 import nodemailer from "nodemailer";
-import MailComposer from "nodemailer/lib/mail-composer";
+// The bare "nodemailer/lib/mail-composer" specifier is a directory import, which
+// standard ESM resolution rejects with ERR_UNSUPPORTED_DIR_IMPORT. Bun tolerates
+// it (and so this server happened to work under the configured `bun run`), but
+// node does not — spell out /index.js so the module loads under either runtime.
+import MailComposer from "nodemailer/lib/mail-composer/index.js";
 import { ImapFlow } from "imapflow";
 import { execSync } from "child_process";
+import { randomUUID } from "crypto";
 
 const MAIL_HOST = "mail.fueld.app";
 const MAIL_USER = "patrick@fueld.app";
@@ -116,12 +121,18 @@ async function sendEmail(args) {
     secure: true,
     auth: { user: MAIL_USER, pass: mailPassword },
   });
+  // Pin the Message-ID ourselves. Without it, MailComposer mints one for the raw
+  // bytes while SMTP mints a *different* one for the delivered copy, so the
+  // `messageId` we report is not the id on the wire and the Sent copy cannot be
+  // matched back to the send.
+  const messageId = `<${randomUUID()}@${MAIL_HOST}>`;
   const mail = {
     from: `"Patrick Pereira" <${MAIL_USER}>`,
     to,
     ...(cc ? { cc } : {}),
     ...(bcc ? { bcc } : {}),
     subject,
+    messageId,
     text: body,
     ...(html ? { html } : {}),
     ...(inReplyTo ? { inReplyTo, references: inReplyTo } : {}),
@@ -134,23 +145,37 @@ async function sendEmail(args) {
   });
   const info = await transporter.sendMail({ ...mail, raw });
 
-  // Failure to file the Sent copy must not fail the send itself.
+  // Failure to file the Sent copy must not fail the send itself — but it must be
+  // visible in the result, because "did this actually get sent?" is precisely the
+  // question the Sent copy exists to answer.
   let filedToSent = false;
+  let sentMailbox = null;
+  let filingError = null;
   try {
     await withImap(async (client) => {
       const sentBox = await findSentMailbox(client);
       if (!sentBox) {
+        filingError = "no Sent mailbox found on the server";
         process.stderr.write("[email] no Sent mailbox found — sent copy not filed\n");
         return;
       }
       await client.append(sentBox, raw, ["\\Seen"], new Date());
       filedToSent = true;
+      sentMailbox = sentBox;
     });
   } catch (err) {
-    process.stderr.write(`[email] sent-copy filing failed (email WAS sent): ${err?.message ?? err}\n`);
+    filingError = err?.message ?? String(err);
+    process.stderr.write(`[email] sent-copy filing failed (email WAS sent): ${filingError}\n`);
   }
 
-  return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected, filedToSent };
+  return {
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
+    filedToSent,
+    ...(sentMailbox ? { sentMailbox } : {}),
+    ...(filingError ? { filingError } : {}),
+  };
 }
 
 /** Locate the Sent mailbox (RFC 6154 \Sent attribute first, then name match). */

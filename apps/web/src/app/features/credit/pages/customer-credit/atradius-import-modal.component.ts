@@ -120,7 +120,8 @@ import type {
                       <!-- Searchable typeahead, not a <select>: the client list runs
                            to hundreds and a native select cannot be searched, which
                            made mapping 141 buyers in a row impractical. Options are
-                           fetched per search term, so the list never truncates. -->
+                           fetched per search term; a broad term is still capped and
+                           the row says so, so typing is what narrows it. -->
                       <app-searchable-dropdown
                         [options]="counterpartyOptions()"
                         [selected]="selections()[row.id] ?? ''"
