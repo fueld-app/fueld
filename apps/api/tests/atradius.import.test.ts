@@ -151,6 +151,62 @@ describe('atradius import', () => {
   });
 });
 
+describe('atradius cover is never summed across currencies', () => {
+  test('keeps currencies apart instead of adding them into one figure', async () => {
+    await importAtradiusFile({ tenantId: TENANT, userId, ...makeUpload() });
+
+    // Two buyer numbers for ONE counterparty, insured in different currencies —
+    // the case where "total cover" has no meaning.
+    const [cp] = await db.insert(counterparties).values({ tenantId: TENANT, name: `Mixed ${Date.now()}`, type: 'CLIENT' }).returning();
+    const [imp] = await db.select().from(atradiusImports).where(eq(atradiusImports.tenantId, TENANT)).limit(1);
+    await db.insert(atradiusBuyers).values([
+      { tenantId: TENANT, importId: imp!.id, buyerNumber: `MIX-A-${Date.now()}`, buyerName: 'Mixed A', coverAmount: '100', currency: 'EUR', statusRaw: 'Approuvée', statusNormalized: 'APPROVED', isActive: true, matchedCounterpartyId: cp!.id, matchSource: 'MANUAL' },
+      { tenantId: TENANT, importId: imp!.id, buyerNumber: `MIX-B-${Date.now()}`, buyerName: 'Mixed B', coverAmount: '200', currency: 'USD', statusRaw: 'Approuvée', statusNormalized: 'APPROVED', isActive: true, matchedCounterpartyId: cp!.id, matchSource: 'MANUAL' },
+    ]);
+
+    const cover = await getAtradiusCover(TENANT);
+    const entry = cover.covers[cp!.id]!;
+    // No single figure: 300 would be a meaningless sum of EUR and USD.
+    expect(entry.amount).toBe('');
+    expect(entry.currency).toBe('');
+    expect(entry.byCurrency).toHaveLength(2);
+    expect(entry.byCurrency).toContainEqual({ currency: 'USD', amount: '200.00' });
+    expect(entry.byCurrency).toContainEqual({ currency: 'EUR', amount: '100.00' });
+
+    await db.delete(atradiusBuyers).where(eq(atradiusBuyers.matchedCounterpartyId, cp!.id));
+    await db.delete(counterparties).where(eq(counterparties.id, cp!.id));
+  });
+
+  test('still states a single amount when the cover is in one currency', async () => {
+    await importAtradiusFile({ tenantId: TENANT, userId, ...makeUpload() });
+    const cover = await getAtradiusCover(TENANT);
+    const single = Object.values(cover.covers).find((c) => c.byCurrency.length === 1);
+    expect(single).toBeTruthy();
+    expect(single!.amount).not.toBe('');
+    expect(single!.currency).not.toBe('');
+  });
+});
+
+describe('atradius concurrent uploads are serialized per tenant', () => {
+  test('two simultaneous uploads leave ONE buyer set, not a doubled one', async () => {
+    // Replace semantics are delete-then-insert; without a lock both uploads read
+    // the same "last import", both delete, both insert, and the buyer rows double.
+    const [a, b] = await Promise.all([
+      importAtradiusFile({ tenantId: TENANT, userId, ...makeUpload() }),
+      importAtradiusFile({ tenantId: TENANT, userId, ...makeUpload() }),
+    ]);
+    expect(a.rowCount).toBe(b.rowCount);
+
+    const rows = await db.select().from(atradiusBuyers).where(eq(atradiusBuyers.tenantId, TENANT));
+    expect(rows.length).toBe(a.rowCount);
+
+    // Every surviving row belongs to a single import — the later one replaced the
+    // earlier cleanly rather than interleaving.
+    const importIds = new Set(rows.map((r) => r.importId));
+    expect(importIds.size).toBe(1);
+  });
+});
+
 describe('atradius status classification (verified against the real export)', () => {
   /**
    * Two statuses were classified inactive and so dropped from cover entirely.

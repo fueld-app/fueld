@@ -418,8 +418,15 @@ interface CompanySearchResultOption {
                       }
                       @for (cpId of line.counterpartyIds; track cpId; let first = $first) {
                         @if (atradiusCoverFor(cpId); as cover) {
-                          <span class="text-sm tabular-nums" [class.text-gray-400]="cover.amount === '0.00' || cover.amount === '0'">
-                            {{ cover.amount === '0.00' || cover.amount === '0' ? ('0 ' + cover.currency) : formatAmount(cover.amount, cover.currency) }}{{ $last ? '' : ', ' }}
+                          <span class="text-sm tabular-nums" [class.text-gray-400]="cover.amount === '0.00' || cover.amount === '0' || cover.amount === ''">
+                            @if (cover.amount !== '') {
+                              {{ cover.amount === '0.00' || cover.amount === '0' ? ('0 ' + cover.currency) : formatAmount(cover.amount, cover.currency) }}
+                            } @else {
+                              <!-- Insured in several currencies, so there is no single
+                                   figure to state. Show the parts rather than a sum
+                                   that would mean nothing. -->
+                              {{ coverPartsLabel(cover) }}
+                            }{{ $last ? '' : ', ' }}
                           </span>
                         }
                       }
@@ -602,7 +609,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
 
   // Atradius insurance cover (tenant-gated feature)
   readonly atradiusEnabled = signal(false);
-  readonly atradiusCover = signal<Record<string, { amount: string; currency: string }>>({});
+  readonly atradiusCover = signal<Record<string, { amount: string; currency: string; byCurrency: Array<{ currency: string; amount: string }> }>>({});
   readonly atradiusLastImport = signal<AtradiusCoverDto['lastImport']>(null);
   readonly atradiusUploading = signal(false);
 
@@ -640,8 +647,24 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
     await this.loadAtradiusState();
   }
 
-  atradiusCoverFor(counterpartyId: string): { amount: string; currency: string } | null {
+  atradiusCoverFor(counterpartyId: string): {
+    amount: string;
+    currency: string;
+    byCurrency: Array<{ currency: string; amount: string }>;
+  } | null {
     return this.atradiusCover()[counterpartyId] ?? null;
+  }
+
+  /**
+   * Label for cover held in more than one currency. There is no single figure to
+   * state — summing EUR and USD would produce a number that means nothing — so the
+   * parts are shown with a note rather than a total.
+   */
+  coverPartsLabel(cover: { byCurrency: Array<{ currency: string; amount: string }> }): string {
+    const parts = cover.byCurrency
+      .map((p) => `${p.currency} ${this.formatAmount(p.amount, p.currency).replace(`${p.currency} `, '')}`)
+      .join(' + ');
+    return `${parts} (mixed)`;
   }
 
   ngOnDestroy(): void {

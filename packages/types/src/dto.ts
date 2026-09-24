@@ -2264,7 +2264,16 @@ export interface AtradiusBuyerDto {
 }
 
 export interface AtradiusCoverDto {
-  covers: Record<string, { amount: string; currency: string }>;
+  /**
+   * Per counterparty. `amount`/`currency` describe single-currency cover — the
+   * common case. A counterparty insured in several currencies has no single
+   * amount, so those two are empty and `byCurrency` holds the parts.
+   */
+  covers: Record<string, {
+    amount: string;
+    currency: string;
+    byCurrency: Array<{ currency: string; amount: string }>;
+  }>;
   lastImport: {
     fileName: string;
     uploadedByName: string | null;

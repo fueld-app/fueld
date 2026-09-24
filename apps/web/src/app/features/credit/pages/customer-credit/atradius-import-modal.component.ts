@@ -6,6 +6,10 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import {
+  SearchableDropdownComponent,
+  type DropdownOption,
+} from '@app/shared/components/searchable-dropdown/searchable-dropdown.component';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API } from '@app/core/config/api';
@@ -32,7 +36,7 @@ interface CompanySearchResult {
 @Component({
   selector: 'app-atradius-import-modal',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, SearchableDropdownComponent],
   template: `
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="close.emit()">
       <div class="w-full max-w-2xl rounded-2xl bg-white dark:bg-surface shadow-xl" (click)="$event.stopPropagation()">
@@ -110,16 +114,23 @@ interface CompanySearchResult {
                       <div class="truncate text-sm font-medium text-gray-900 dark:text-ink">{{ row.buyerName }}</div>
                       <div class="text-xs text-gray-400">#{{ row.buyerNumber }} · {{ row.statusRaw }}</div>
                     </div>
-                    <select
-                      class="max-w-[220px] rounded-md border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-2 py-1.5 text-xs text-gray-700 dark:text-ink-dim"
-                      [ngModel]="selections()[row.id] ?? row.suggestedCounterpartyId ?? ''"
-                      (ngModelChange)="setSelection(row.id, $event)"
-                    >
-                      <option value="">— not a Fueld client —</option>
-                      @for (cp of counterparties(); track cp.id) {
-                        <option [value]="cp.id">{{ cp.name }}</option>
-                      }
-                    </select>
+                    <div class="w-[240px] shrink-0">
+                      <!-- Searchable typeahead, not a <select>: the client list runs
+                           to hundreds and a native select cannot be searched, which
+                           made mapping 141 buyers in a row impractical. Options are
+                           fetched per search term, so the list never truncates. -->
+                      <app-searchable-dropdown
+                        [options]="counterpartyOptions()"
+                        [selected]="selections()[row.id] ?? row.suggestedCounterpartyId ?? ''"
+                        [asyncSearch]="true"
+                        [loading]="counterpartySearchLoading()"
+                        [clearable]="true"
+                        [minSearchLength]="1"
+                        placeholder="— not a Fueld client —"
+                        (searchChange)="onCounterpartySearch($event)"
+                        (selectionChange)="setSelection(row.id, $event)"
+                      />
+                    </div>
                   </div>
                 }
               </div>
@@ -164,37 +175,57 @@ export class AtradiusImportModalComponent {
   readonly summary = signal<AtradiusImportSummaryDto | null>(null);
   readonly unmatched = signal<AtradiusUnmatchedBuyerDto[]>([]);
   readonly selections = signal<Record<string, string>>({});
-  readonly counterparties = signal<Array<{ id: string; name: string }>>([]);
+  readonly counterpartyOptions = signal<DropdownOption[]>([]);
+  readonly counterpartySearchLoading = signal(false);
   readonly counterpartiesError = signal('');
+  /**
+   * Options already resolved, so a dropdown keeps showing the name of a choice
+   * made earlier even after the search term changes. Without this the selected
+   * label would blank out as soon as the list was refiltered.
+   */
+  private readonly chosenLabels = new Map<string, string>();
 
   constructor() {
-    void this.loadCounterparties();
+    // Seed with the unfiltered first page so a dropdown opened without typing
+    // offers something immediately.
+    void this.onCounterpartySearch('');
   }
 
   /**
-   * Load the Fueld clients the unmatched buyers can be mapped to.
+   * Typeahead for the counterparty picker.
    *
-   * `/companies/local` is a PAGINATED list — its payload is `{ companies, total }`,
-   * not a bare array. Reading it as an array left the dropdown with nothing to
-   * render (the exact "empty select" reported on Riviera), so the shape is now
-   * matched and a failure is surfaced instead of swallowed: an empty mapping box
-   * with no explanation is worse than an error message.
+   * `/companies/local` is PAGINATED — `{ companies, total }`, not a bare array —
+   * and reading it as an array is what left the picker empty on Riviera. It has
+   * also always been a capped list: 500 rows was a silent truncation for any
+   * tenant with more clients, and an unmatchable client is one that can never be
+   * mapped. Searching server-side means the options are never a truncated slice.
    */
-  private async loadCounterparties(): Promise<void> {
+  async onCounterpartySearch(term: string): Promise<void> {
+    this.counterpartySearchLoading.set(true);
+    this.counterpartiesError.set('');
     try {
       const res = await firstValueFrom(
         this.http.get<ApiResponse<{ companies: Array<{ id: string; name: string }>; total: number }>>(
           `${API}/companies/local`,
-          { params: { type: 'CLIENT', limit: '500' } },
+          { params: { type: 'CLIENT', limit: '50', ...(term ? { search: term } : {}) } },
         ),
       );
       const list = res.data?.companies ?? [];
-      this.counterparties.set(list);
-      if (res.success && list.length === 0) {
-        this.counterpartiesError.set('No Fueld clients were returned — check the client list before mapping.');
+      const seen = new Set<string>();
+      const options: DropdownOption[] = [];
+      for (const cp of [...list, ...[...this.chosenLabels].map(([id, label]) => ({ id, name: label }))]) {
+        if (seen.has(cp.id)) continue;
+        seen.add(cp.id);
+        options.push({ value: cp.id, label: cp.name });
+      }
+      this.counterpartyOptions.set(options);
+      if (res.success && list.length === 0 && term) {
+        this.counterpartiesError.set(`No Fueld client matches "${term}" — check the client list, or leave it unmapped.`);
       }
     } catch {
-      this.counterpartiesError.set('Could not load the Fueld client list — mapping is unavailable. Reload the page to retry.');
+      this.counterpartiesError.set('Could not search the Fueld client list — mapping is unavailable. Reload the page to retry.');
+    } finally {
+      this.counterpartySearchLoading.set(false);
     }
   }
 
@@ -229,6 +260,9 @@ export class AtradiusImportModalComponent {
 
   setSelection(rowId: string, counterpartyId: string): void {
     this.selections.update((s) => ({ ...s, [rowId]: counterpartyId }));
+    const label = this.counterpartyOptions().find((o) => o.value === counterpartyId)?.label;
+    if (label) this.chosenLabels.set(counterpartyId, label);
+    this.counterpartiesError.set('');
   }
 
   async saveMappings(): Promise<void> {

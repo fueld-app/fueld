@@ -264,8 +264,17 @@ export async function importAtradiusFile(opts: {
   }
   if (parsed.length === 0) throw new Error('No buyer rows found in the file');
 
-  // Replace-semantics transaction: one import at a time per tenant.
+  // Replace-semantics transaction, serialized per tenant.
+  //
+  // The comment here used to claim "one import at a time" while nothing enforced
+  // it: two uploads could both read `last`, both delete, both insert, leaving two
+  // import rows and a doubled buyer set. A transaction-scoped advisory lock makes
+  // the claim true — the second upload waits, then replaces the first, which is
+  // the intended semantics. The lock releases with the transaction, so a crash
+  // cannot strand it.
   const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'atradius:' + opts.tenantId}))`);
+
     const [last] = await tx
       .select({ id: atradiusImports.id })
       .from(atradiusImports)
@@ -372,7 +381,15 @@ export async function mapBuyerToCounterparty(opts: {
 }
 
 export interface CoverResponse {
-  covers: Record<string, { amount: string; currency: string }>;
+  /**
+   * `amount`/`currency` describe a counterparty whose cover is in ONE currency —
+   * the overwhelmingly common case, and what the column shows. `byCurrency` is
+   * always the full breakdown. A counterparty with cover in several currencies
+   * has no single amount: previously the totals were added as bare numbers and
+   * labelled "EUR/USD", which is a meaningless figure on a credit surface. Those
+   * now leave `amount` empty and carry the parts in `byCurrency` instead.
+   */
+  covers: Record<string, { amount: string; currency: string; byCurrency: Array<{ currency: string; amount: string }> }>;
   lastImport: {
     fileName: string;
     uploadedByName: string | null;
@@ -429,24 +446,36 @@ export async function getAtradiusCover(tenantId: string): Promise<CoverResponse>
     if (!winning.has(row.buyerNumber)) winning.set(row.buyerNumber, row);
   }
 
-  const covers: Record<string, { amount: string; currency: string }> = {};
+  // Accumulate per CURRENCY. Adding EUR and USD together produces a number that
+  // means nothing, so the totals are kept apart and a single figure is only
+  // stated when the currencies agree.
+  const totals = new Map<string, Map<string, number>>();
+  const currencyOf = new Map<string, string>();
   for (const row of winning.values()) {
     if (!row.matchedCounterpartyId) continue;
-    const existing = covers[row.matchedCounterpartyId];
-    if (!row.isActive) {
-      covers[row.matchedCounterpartyId] = existing ?? { amount: '0', currency: row.currency };
-      continue;
-    }
+    const id = row.matchedCounterpartyId;
+    if (!totals.has(id)) totals.set(id, new Map());
+    if (!currencyOf.has(id)) currencyOf.set(id, row.currency);
+    if (!row.isActive) continue; // inactive rows contribute no cover
+    const bucket = totals.get(id)!;
     const add = parseFloat(row.coverAmount) || 0;
-    if (existing) {
-      const base = parseFloat(existing.amount) || 0;
-      covers[row.matchedCounterpartyId] = {
-        amount: (base + add).toFixed(2),
-        currency: existing.currency === row.currency ? existing.currency : `${existing.currency}/${row.currency}`,
-      };
-    } else {
-      covers[row.matchedCounterpartyId] = { amount: add.toFixed(2), currency: row.currency };
-    }
+    bucket.set(row.currency, (bucket.get(row.currency) ?? 0) + add);
+  }
+
+  const covers: CoverResponse['covers'] = {};
+  for (const [id, bucket] of totals) {
+    const byCurrency = [...bucket.entries()]
+      .map(([currency, amount]) => ({ currency, amount: amount.toFixed(2) }))
+      .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount));
+    // A counterparty with no cover at all still needs to be present so the column
+    // can distinguish "mapped, zero cover" from "not mapped".
+    const parts = byCurrency.length > 0 ? byCurrency : [{ currency: currencyOf.get(id) ?? 'EUR', amount: '0.00' }];
+    const single = parts.length === 1 ? parts[0]! : null;
+    covers[id] = {
+      amount: single?.amount ?? '',
+      currency: single?.currency ?? '',
+      byCurrency: parts,
+    };
   }
 
   return {
