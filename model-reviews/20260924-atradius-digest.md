@@ -54,6 +54,21 @@ Seeded a local tenant with Pierre's real fixture and three real clients, ran the
 - **Concurrent uploads** have no tenant lock; single uploader today.
 - **Per-currency aggregation** — EUR and USD would currently be summed as bare numbers and labelled "EUR/USD". Unreachable with an all-EUR policy, latent otherwise.
 
+
+## Round 3 — the deferred usability items (`3a299e4f` → `6eefeb32`)
+
+Panel: kimi-k3 and deepseek-v4-pro **needs-fixes** on a defect in the swap I had just written; glm-5.3 needs-fixes, noting all three top items were already fixed in the working tree.
+
+**The defect worth recording: a name-match guess was being applied by default.** The import response carries a normalized-name suggestion per unmatched buyer, and the modal pre-filled `selections` from it. Since Save applies whatever is selected, every guessed match became a MANUAL mapping without the user confirming anything — and those guesses are precisely the ones that are often wrong (`GEFO GESELLSCHAFT FÜROELTRANSPORTE MBH` vs `GEFO Gesellschaft fur Oeltransporte mbH`). A wrong guess writes one client's insured cover onto another. It existed in the old `<select>` too, which is why it survived two rounds; the swap made it more discoverable. Now a one-click hint ("name suggests X") that must be taken deliberately. Riviera's live data confirms nothing was mis-applied: 17 mappings, all EXACT.
+
+Also fixed: `limit=50` truncation on broad/unfiltered searches (my "never truncated" comment was false), an out-of-order async-search race across ~150 shared pickers (sequence token), `chosenLabels` never refreshing so a renamed client stayed offered under its old name, and a `saveMappings` re-entry guard.
+
+**A self-inflicted regression, caught only by browser verification:** my block edit deleted the two lines storing the import response, so the summary stopped rendering while the upload still returned 201. Tests and typecheck were green; only driving the real UI caught it. Restored and re-verified: 158 pickers, zero native selects, `admiral` narrowed to one client, selection and clear both work.
+
+**GLM raised `/companies/local` as tenant-blind.** Not a defect here: each tenant has its own Postgres (recorded in project memory, and the reason `invoices` carries no `tenantId`), so an unscoped query cannot cross tenants. Verified rather than assumed.
+
+**Deferred, unchanged:** the picker should arguably use the component's async `selectedLabel` rather than a local label cache; the concurrency test is timing-dependent (a fully-serialized run would pass even without the lock, so it is a smoke test rather than proof).
+
 ## Reply to Pierre
 
 His email asked for: (1) the cover column on the credit limits page — done; (2) monthly Excel upload with replace — done, and it survives re-upload through persisted mapping; (3) whether to ask Atradius for an API — his call, and worth answering directly. The honest answer includes the mapping step: his file's buyer names do not match Fueld's spellings (`GEFO GESELLSCHAFT FÜROELTRANSPORTE MBH` vs `GEFO Gesellschaft fur Oeltransporte mbH`), so 141 buyers need mapping ONCE and are then remembered by buyer number.
