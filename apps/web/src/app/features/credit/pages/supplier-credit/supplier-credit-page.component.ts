@@ -643,6 +643,12 @@ export class SupplierCreditPageComponent implements OnInit {
             notes: f.notes || null,
             counterpartyIds,
             ownCompanyIds,
+            // Must be sent on update too. The PATCH omitting it meant toggling
+            // "Broker Credit" on an existing line silently did nothing — the
+            // server only writes fields present in the body — so a line could
+            // never be converted, and broker deals kept failing with "no broker
+            // credit line found" even after the user set the flag.
+            isBrokerCreditLine: f.isBrokerCreditLine,
           }),
         );
       } else {

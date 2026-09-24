@@ -9,6 +9,12 @@ export interface BrokerDealSettings {
   reportStatuses: string[];
   autoReleaseCredit: boolean;
   autoReleaseBufferDays: number;
+  /**
+   * When true, a broker deal's CUSTOMER credit is not enforced server-side (the
+   * risk sits with the supplier leg). Mirrored here so the order page does not
+   * gate on a customer line the server would never require.
+   */
+  skipCustomerCreditCheckOnBrokerDeals: boolean;
 }
 
 const DEFAULT_SETTINGS: BrokerDealSettings = {
@@ -17,6 +23,7 @@ const DEFAULT_SETTINGS: BrokerDealSettings = {
   reportStatuses: ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'],
   autoReleaseCredit: true,
   autoReleaseBufferDays: 0,
+  skipCustomerCreditCheckOnBrokerDeals: false,
 };
 
 /** Shared service for tenant-configurable broker deal settings. */

@@ -166,7 +166,15 @@ export class OrderSaveService {
           traderCommissionPct: (o as any).traderCommissionPct ?? null,
         }),
       );
-      if (!orderRes.success) { onError?.('Failed to save order.'); return false; }
+      if (!orderRes.success) {
+        // Surface the SERVER'S message. It names the actual blocker (e.g. "ISLAND
+        // OIL LIMITED: Supplier credit line on file in USD for a broker deal is
+        // required — none found. Request a USD credit line…"), which is
+        // actionable. A generic "Failed to save order." hid this and is why a
+        // trader could sit on a repeatedly-failing autosave without knowing why.
+        onError?.(orderRes.message ?? 'Failed to save order.');
+        return false;
+      }
       // Adopt server-refilled deal fields (trader commission snapshot is
       // auto-filled from the tenant scheme when the client sends null) so the
       // local signal does not drift from the persisted row and re-trigger
@@ -193,7 +201,7 @@ export class OrderSaveService {
         const itemsRes = await firstValueFrom(
           this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
         );
-        if (!itemsRes.success) { onError?.('Failed to save items.'); return false; }
+        if (!itemsRes.success) { onError?.(itemsRes.message ?? 'Failed to save items.'); return false; }
 
         options.clearSavedDraftIds(autoSaveRows);
       }
@@ -201,8 +209,10 @@ export class OrderSaveService {
       await options.loadCustomerCreditLines(o.clientId);
       await options.loadSupplierCreditLines(options.activeSupplierCompanyId() ?? o.supplierId);
       return true;
-    } catch {
-      onError?.('Failed to save order.');
+    } catch (err: any) {
+      // An HTTP-level failure (4xx/5xx) carries the server's message in the body.
+      // Prefer it — same reason as above: the specific reason is actionable.
+      onError?.(err?.error?.message ?? 'Failed to save order.');
       return false;
     }
   }

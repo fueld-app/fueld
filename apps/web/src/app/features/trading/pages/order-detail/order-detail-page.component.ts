@@ -898,16 +898,46 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly supplierPaidAt = computed(() => this.activeOrderSupplier()?.paidAt ?? null);
 
+  /**
+   * Credit lines that can actually back THIS deal.
+   *
+   * The server matches a line to a deal on BOTH currency and the broker flag
+   * (`line.isBrokerCreditLine === order.isBrokerDeal` — credit.service.ts,
+   * checkCreditAvailability), because broker-deal exposure and regular trade
+   * exposure must not draw on the same line. The page used to filter on
+   * currency alone, so on a broker deal it offered "Credit" whenever any USD
+   * line existed — including a regular one the server then refused. The trader
+   * saw a green "Credit OK", picked Credit, and autosave failed with a message
+   * the UI replaced by a generic one, repeatedly, until a refresh discarded the
+   * unsaved choice. Matching the server's rule here is what makes the option
+   * honest.
+   */
+  private usableCreditLines(lines: CreditLineDto[]): CreditLineDto[] {
+    const isBrokerDeal = this.order()?.isBrokerDeal === true;
+    return lines.filter((line) => (line.isBrokerCreditLine ?? false) === isBrokerDeal);
+  }
+
   readonly customerCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
-    return this.summarizeLines(this.customerCreditLines(), currency);
+    return this.summarizeLines(this.usableCreditLines(this.customerCreditLines()), currency);
   });
 
-  readonly canUseCustomerCredit = computed(() => !!this.customerCreditSummary() && !this.customerCreditFrozen());
+  /**
+   * A broker deal's customer side is not enforced when the tenant opts out
+   * (brokerDeals.skipCustomerCreditCheckOnBrokerDeals) — the risk sits with the
+   * supplier leg. Gating it here would block a deal the server accepts.
+   */
+  private readonly customerCreditGated = computed(
+    () => !(this.order()?.isBrokerDeal === true && this.brokerDealSvc.settings().skipCustomerCreditCheckOnBrokerDeals),
+  );
+
+  readonly canUseCustomerCredit = computed(
+    () => !this.customerCreditGated() || (!!this.customerCreditSummary() && !this.customerCreditFrozen()),
+  );
 
   readonly supplierCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
-    return this.summarizeLines(this.supplierCreditLines(), currency);
+    return this.summarizeLines(this.usableCreditLines(this.supplierCreditLines()), currency);
   });
 
   readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());
@@ -920,10 +950,34 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return { currency, available, maxDays };
   }
 
-  /** Set when a side has credit lines but none in the deal currency (e.g. EUR line on a USD deal). */
+  /**
+   * Explains why a side has no usable line. Two distinct causes, and they need
+   * different words because the remedy differs:
+   *
+   *  - CURRENCY: lines exist, none in the deal currency → request a line in it.
+   *  - BROKER_LINE: lines exist in the deal currency, but their broker flag does
+   *    not match the deal's, so the server will not accept them
+   *    (broker exposure and regular trade exposure draw on separate lines) →
+   *    flag the line, or request one, not chase the currency.
+   */
   private creditMismatchFor(lines: () => CreditLineDto[]) {
     const dealCurrency = this.order()?.currency ?? 'USD';
-    const others = lines().filter((line) => line.currency !== dealCurrency);
+    const isBrokerDeal = this.order()?.isBrokerDeal === true;
+    const all = lines();
+
+    const inDealCurrency = all.filter((line) => line.currency === dealCurrency);
+    if (inDealCurrency.length > 0) {
+      // Right currency, wrong broker flag — the server's exact rejection.
+      const available = inDealCurrency.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
+      return {
+        reason: 'BROKER_LINE' as const,
+        currency: dealCurrency,
+        available,
+        needsBrokerLine: isBrokerDeal,
+      };
+    }
+
+    const others = all.filter((line) => line.currency !== dealCurrency);
     if (!others.length) return null;
     const byCurrency = new Map<string, number>();
     for (const line of others) {
@@ -931,9 +985,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       byCurrency.set(line.currency, (byCurrency.get(line.currency) ?? 0) + available);
     }
     const entries = [...byCurrency.entries()];
-    return entries.length === 1
-      ? { currency: entries[0][0], available: entries[0][1] }
-      : { currency: entries.map(([currency]) => currency).join(', '), available: null };
+    return {
+      reason: 'CURRENCY' as const,
+      currency: entries.length === 1 ? entries[0][0] : entries.map(([currency]) => currency).join(', '),
+      available: entries.length === 1 ? entries[0][1] : null,
+      needsBrokerLine: false,
+    };
   }
 
   readonly customerCreditMismatch = computed(() => {
@@ -1765,7 +1822,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       return;
     }
     if (value === 'CREDIT' && !this.canUseCustomerCredit()) {
-      this.showToast('error', 'No customer credit line is available.');
+      const mismatch = this.customerCreditMismatch();
+      this.showToast(
+        'error',
+        mismatch?.reason === 'BROKER_LINE'
+          ? `The ${mismatch.currency} customer line on file is ${mismatch.needsBrokerLine ? 'a regular' : 'a broker'} line, which cannot back ${mismatch.needsBrokerLine ? 'a broker' : 'a regular'} deal. Request ${mismatch.needsBrokerLine ? 'a broker' : 'a regular'} ${mismatch.currency} line.`
+          : mismatch
+            ? `Customer credit line is in ${mismatch.currency} — this deal is ${this.order()?.currency ?? 'USD'}. Request a ${this.order()?.currency ?? 'USD'} line.`
+            : 'No customer credit line is available.',
+      );
       return;
     }
     this.order.update((o) => {
@@ -1824,9 +1889,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       const mismatch = this.supplierCreditMismatch();
       this.showToast(
         'error',
-        mismatch
-          ? `Supplier credit line is in ${mismatch.currency} — this deal is ${this.order()?.currency ?? 'USD'}. Request a ${this.order()?.currency ?? 'USD'} line.`
-          : 'No supplier credit line is available.',
+        mismatch?.reason === 'BROKER_LINE'
+          ? `The ${mismatch.currency} supplier line on file is ${mismatch.needsBrokerLine ? 'a regular' : 'a broker'} line, which cannot back ${mismatch.needsBrokerLine ? 'a broker' : 'a regular'} deal. Request ${mismatch.needsBrokerLine ? 'a broker' : 'a regular'} ${mismatch.currency} line.`
+          : mismatch
+            ? `Supplier credit line is in ${mismatch.currency} — this deal is ${this.order()?.currency ?? 'USD'}. Request a ${this.order()?.currency ?? 'USD'} line.`
+            : 'No supplier credit line is available.',
       );
       return;
     }

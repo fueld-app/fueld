@@ -870,6 +870,88 @@ describe('OrderDetailPageComponent', () => {
     expect(itemsCall?.body.items).toBeDefined();
   });
 
+  it('treats a regular credit line as unusable on a broker deal, matching the server', async () => {
+    // Regression: the page filtered credit lines by CURRENCY only, while the
+    // server matches on currency AND the broker flag
+    // (line.isBrokerCreditLine === order.isBrokerDeal). On a broker deal the UI
+    // therefore offered "Credit" for a regular USD line, showed a green
+    // "Credit OK", and autosave failed server-side with "Supplier credit line on
+    // file in USD for a broker deal is required" — repeatedly, until a refresh
+    // discarded the unsaved choice. The option must reflect the server's rule.
+    const { component } = await createComponent();
+
+    const line = (isBrokerCreditLine: boolean) => ({
+      id: 'line-1',
+      type: 'SUPPLIER',
+      counterpartyIds: ['supplier-1'],
+      counterpartyNames: ['ISLAND OIL LIMITED'],
+      creditAmount: '500000.00',
+      usedAmount: '0.00',
+      availableAmount: '500000.00',
+      currency: 'USD',
+      expires: null,
+      periodDays: 30,
+      fromDelivery: false,
+      qualified: false,
+      performanceDays: null,
+      notes: null,
+      isBrokerCreditLine,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    });
+
+    // Broker deal + a REGULAR USD line: the exact state that failed in production.
+    component.order.set({ id: 'order-1', currency: 'USD', isBrokerDeal: true } as any);
+    (component as any).financialSvc.supplierCreditLines.set([line(false)] as any);
+    expect(component.canUseSupplierCredit()).toBe(false);
+    expect(component.supplierCreditMismatch()?.reason).toBe('BROKER_LINE');
+
+    // Same deal with a BROKER line: usable.
+    (component as any).financialSvc.supplierCreditLines.set([line(true)] as any);
+    expect(component.canUseSupplierCredit()).toBe(true);
+    expect(component.supplierCreditSummary()?.available).toBe(500000);
+
+    // A regular (non-broker) deal is the mirror image.
+    component.order.set({ id: 'order-1', currency: 'USD', isBrokerDeal: false } as any);
+    (component as any).financialSvc.supplierCreditLines.set([line(false)] as any);
+    expect(component.canUseSupplierCredit()).toBe(true);
+
+    (component as any).financialSvc.supplierCreditLines.set([line(true)] as any);
+    expect(component.canUseSupplierCredit()).toBe(false);
+    expect(component.supplierCreditMismatch()?.reason).toBe('BROKER_LINE');
+  });
+
+  it('surfaces the server credit error on autosave instead of a generic failure', async () => {
+    // The server's message names the actual blocker and the remedy. Replacing it
+    // with "Failed to save order." is what let an autosave fail on a loop with no
+    // visible reason — the trader only knew "it's acting up".
+    const serverMessage =
+      'ISLAND OIL LIMITED: Supplier credit line on file in USD for a broker deal is required — none found. Request a USD credit line or choose another payment term.';
+    const toasts: Array<{ type: string; message: string }> = [];
+    const { component } = await createComponent({
+      onPut: (url) => {
+        if (/\/orders\/order-1$/.test(String(url))) {
+          return { success: false, data: null, message: serverMessage };
+        }
+        return { success: true, data: {} };
+      },
+    });
+    (component as any).showToast = (type: string, message: string) => toasts.push({ type, message });
+
+    component.order.set({
+      id: 'order-1',
+      clientId: 'client-1',
+      currency: 'USD',
+      status: 'CONFIRMED',
+      isBrokerDeal: true,
+    } as any);
+    component.itemRows.set([] as any);
+
+    await (component as any).performAutoSave();
+
+    expect(toasts).toEqual([{ type: 'error', message: serverMessage }]);
+  });
+
   it('persists isBrokerDeal and commissionPerMt through the autosave path', async () => {
     // Regression: the order-detail page has no manual Save button
     // ([showSave]="false"), so autosave is the only persistence path. The

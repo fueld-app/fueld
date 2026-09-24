@@ -507,6 +507,11 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
           reportStatuses: bd.reportStatuses ?? ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'],
           autoReleaseCredit: bd.autoReleaseCredit ?? true,
           autoReleaseBufferDays: bd.autoReleaseBufferDays ?? 0,
+          // The order page needs this to mirror the server's credit gate: on a
+          // broker deal the customer side is not enforced at all when the tenant
+          // opts out, so the UI must not demand a broker-flagged customer line
+          // the server would never ask for.
+          skipCustomerCreditCheckOnBrokerDeals: bd.skipCustomerCreditCheckOnBrokerDeals === true,
         },
       } satisfies ApiResponse<unknown>;
     } catch (err) {
