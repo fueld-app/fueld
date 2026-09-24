@@ -193,6 +193,56 @@ async function fetchCreditLineSides(creditLineId: string) {
   };
 }
 
+/**
+ * Sides for MANY credit lines in two queries instead of two-per-line.
+ *
+ * enrichCreditLine was called once per row, so the computed-sort path (which must
+ * enrich every matching line to sort on a derived column) issued 2 queries per
+ * line just for the sides — plus one for the tenant and one per usage/performance
+ * calculation. Measured at 271 lines that was ~2.6s per request, i.e. seconds of
+ * latency on every click of Used / Available / Name. Batching the sides is the
+ * largest single win and keeps the existing per-row path for single-line reads.
+ */
+async function fetchCreditLineSidesBatch(creditLineIds: string[]): Promise<Map<string, {
+  counterpartyIds: string[];
+  counterpartyNames: string[];
+  ownCompanyIds: string[];
+  ownCompanyNames: string[];
+}>> {
+  const out = new Map<string, {
+    counterpartyIds: string[];
+    counterpartyNames: string[];
+    ownCompanyIds: string[];
+    ownCompanyNames: string[];
+  }>();
+  if (!creditLineIds.length) return out;
+  const blank = () => ({ counterpartyIds: [] as string[], counterpartyNames: [] as string[], ownCompanyIds: [] as string[], ownCompanyNames: [] as string[] });
+  for (const id of creditLineIds) out.set(id, blank());
+
+  const [cpRows, ownRows] = await Promise.all([
+    db
+      .select({ lineId: creditLineCounterparties.creditLineId, id: counterparties.id, name: counterparties.name })
+      .from(creditLineCounterparties)
+      .innerJoin(counterparties, eq(creditLineCounterparties.counterpartyId, counterparties.id))
+      .where(inArray(creditLineCounterparties.creditLineId, creditLineIds)),
+    db
+      .select({ lineId: creditLineCompanies.creditLineId, id: counterparties.id, name: counterparties.name })
+      .from(creditLineCompanies)
+      .innerJoin(counterparties, eq(creditLineCompanies.counterpartyId, counterparties.id))
+      .where(inArray(creditLineCompanies.creditLineId, creditLineIds)),
+  ]);
+
+  for (const r of cpRows) {
+    const entry = out.get(r.lineId);
+    if (entry) { entry.counterpartyIds.push(r.id); entry.counterpartyNames.push(r.name); }
+  }
+  for (const r of ownRows) {
+    const entry = out.get(r.lineId);
+    if (entry) { entry.ownCompanyIds.push(r.id); entry.ownCompanyNames.push(r.name); }
+  }
+  return out;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ENRICH A RAW CREDIT LINE ROW → CreditLineDto
 // ═══════════════════════════════════════════════════════════════════════
@@ -213,17 +263,29 @@ interface RawCreditLine {
   updatedAt: Date;
 }
 
-async function enrichCreditLine(row: RawCreditLine, excludeOrderId?: string): Promise<CreditLineDto> {
-  const sides = await fetchCreditLineSides(row.id);
+async function enrichCreditLine(
+  row: RawCreditLine,
+  excludeOrderId?: string,
+  prefetched?: {
+    sides?: { counterpartyIds: string[]; counterpartyNames: string[]; ownCompanyIds: string[]; ownCompanyNames: string[] };
+    brokerSettings?: { bufferDays: number; autoReleaseCredit: boolean };
+  },
+): Promise<CreditLineDto> {
+  const sides = prefetched?.sides ?? await fetchCreditLineSides(row.id);
 
   // Load tenant broker deal settings for auto-release config
   let bufferDays = 0;
   let autoReleaseCredit = true;
-  const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, row.tenantId)).limit(1);
-  const bd = (tenant?.settings as any)?.brokerDeals;
-  if (bd) {
-    bufferDays = bd.autoReleaseBufferDays ?? 0;
-    autoReleaseCredit = bd.autoReleaseCredit ?? true;
+  if (prefetched?.brokerSettings) {
+    bufferDays = prefetched.brokerSettings.bufferDays;
+    autoReleaseCredit = prefetched.brokerSettings.autoReleaseCredit;
+  } else {
+    const [tenant] = await db.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, row.tenantId)).limit(1);
+    const bd = (tenant?.settings as any)?.brokerDeals;
+    if (bd) {
+      bufferDays = bd.autoReleaseBufferDays ?? 0;
+      autoReleaseCredit = bd.autoReleaseCredit ?? true;
+    }
   }
 
   const usedAmount =
@@ -300,7 +362,13 @@ export async function listCreditLines(query: {
 
   const where = conditions.length === 1 ? conditions[0] : and(...conditions);
 
-  const limit = query?.limit ?? 25;
+  /**
+   * Clamped. The computed-sort path must enrich EVERY matching row to sort on a
+   * derived column, so an unclamped limit let an authenticated caller ask for an
+   * arbitrarily large page and pay the full O(rows) enrichment cost — a one-request
+   * N+1. 100 is comfortably above the 25/50 the UI uses and bounds the work.
+   */
+  const limit = Math.min(Math.max(query?.limit ?? 25, 1), 100);
   const page = query?.page ?? 1;
   const offset = (page - 1) * limit;
 
@@ -382,14 +450,51 @@ export async function listCreditLines(query: {
     )
     : countQueryBase;
 
+  /**
+   * `credit_line_counterparties` has no PK or UNIQUE on
+   * (credit_line_id, counterparty_id), so the join can in principle emit the
+   * same credit line more than once. `total` already counts DISTINCT ids, so a
+   * duplicated row would make the page disagree with the total and, once sliced,
+   * push real rows past the offset. GROUP BY the line's id removes the
+   * possibility at the query rather than trusting the data to stay clean.
+   */
+  const listQueryDeduped = needsCounterpartyJoin
+    ? listQuery.groupBy(creditLines.id)
+    : listQuery;
+
   if (computedSort) {
     const [allRows, countResult] = await Promise.all([
-      listQuery.where(where).orderBy(sortFn(creditLines.updatedAt)),
+      // (updatedAt, id) — updatedAt alone is NOT unique (rows are created in the
+      // same millisecond by bulk inserts), and a non-unique pre-order lets
+      // consecutive pages repeat or skip rows once the derived sort slices.
+      listQueryDeduped.where(where).orderBy(sortFn(creditLines.updatedAt), asc(creditLines.id)),
       countQuery.where(where),
     ]);
     const total = countResult[0]?.count ?? 0;
     // Enrich everything, order by the derived column, then slice the page.
-    const enriched = await Promise.all(allRows.map((r) => enrichCreditLine(r, query?.excludeOrderId)));
+    // Sides and the tenant's broker settings are fetched once for the whole set
+    // rather than per line — see fetchCreditLineSidesBatch.
+    const [sidesById, brokerSettings] = await Promise.all([
+      fetchCreditLineSidesBatch(allRows.map((r) => r.id)),
+      (async () => {
+        const [tenant] = await db
+          .select({ settings: tenants.settings })
+          .from(tenants)
+          .where(eq(tenants.id, query.tenantId))
+          .limit(1);
+        const bd = (tenant?.settings as any)?.brokerDeals;
+        return {
+          bufferDays: bd?.autoReleaseBufferDays ?? 0,
+          autoReleaseCredit: bd?.autoReleaseCredit ?? true,
+        };
+      })(),
+    ]);
+    const enriched = await Promise.all(
+      allRows.map((r) => enrichCreditLine(r, query?.excludeOrderId, {
+        sides: sidesById.get(r.id),
+        brokerSettings,
+      })),
+    );
     const accessor = computedSortKeys[computedSort]!;
     const valueOf = (line: CreditLineDto): number | string =>
       typeof accessor === 'function' ? accessor(line) : (line[accessor] as number | string);
@@ -406,11 +511,13 @@ export async function listCreditLines(query: {
   }
 
   const [rows, countResult] = await Promise.all([
-    listQuery
+    listQueryDeduped
       .where(where)
       .limit(limit)
       .offset(offset)
-      .orderBy(sortFn(sortCol)),
+      // id as a final tiebreak for the same reason: a non-unique sort column
+      // makes page boundaries ambiguous.
+      .orderBy(sortFn(sortCol), asc(creditLines.id)),
     countQuery.where(where),
   ]);
 

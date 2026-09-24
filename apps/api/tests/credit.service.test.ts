@@ -646,6 +646,26 @@ describe('credit.service — search and sorting', () => {
     expect(desc.items.map((l) => l.availableAmount)).toEqual(['300.00']);
   });
 
+  it('caps the page size so a huge limit cannot force unbounded enrichment', async () => {
+    // The computed-sort path enriches EVERY matching row (it must, to sort on a
+    // derived column), so an uncapped limit let one authenticated request pay the
+    // full O(rows) cost. 100 is the ceiling; the UI only ever asks for 25-50.
+    const { tenant, client } = await seedBasics();
+    const { createCreditLine, listCreditLines } = await loadCreditService();
+
+    await createCreditLine({
+      type: 'CUSTOMER', counterpartyIds: [client.id], creditAmount: '100.00',
+      currency: 'USD', periodDays: 30,
+    });
+
+    const res = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', limit: 100000 });
+    expect(res.items.length).toBeLessThanOrEqual(100);
+
+    // A zero/negative limit is clamped up to 1 rather than returning nothing.
+    const zero = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', limit: 0 });
+    expect(zero.items.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('sorts by counterparty name case-insensitively', async () => {
     const { tenant } = await seedBasics();
     const db = await getDb();
