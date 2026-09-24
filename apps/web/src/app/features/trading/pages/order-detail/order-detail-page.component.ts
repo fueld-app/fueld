@@ -950,11 +950,21 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());
 
-  /** Aggregates same-currency lines for a side into a CreditSummary. */
+  /**
+   * Aggregates the usable lines for a side, in the deal currency.
+   *
+   * The currency filter belongs HERE, not just in the label: the server matches
+   * on currency AND the broker flag AND non-expiry, and this used to sum the
+   * available amounts of every usable line regardless of currency while
+   * labelling the total with the deal currency. A EUR-only line could therefore
+   * present as green "Credit OK" on a USD deal with a meaningless USD label, and
+   * the server would refuse it.
+   */
   private summarizeLines(lines: CreditLineDto[], currency: string) {
-    if (!lines.length) return null;
-    const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
-    const maxDays = Math.max(...lines.map((line) => line.periodDays));
+    const inCurrency = lines.filter((line) => line.currency === currency);
+    if (!inCurrency.length) return null;
+    const available = inCurrency.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
+    const maxDays = Math.max(...inCurrency.map((line) => line.periodDays));
     return { currency, available, maxDays };
   }
 
@@ -1002,6 +1012,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   readonly customerCreditMismatch = computed(() => {
+    // Nothing to warn about when the customer side is not gated at all: on a
+    // broker deal with skipCustomerCreditCheckOnBrokerDeals the server does not
+    // enforce a broker-flagged customer line, so showing "the USD line on file
+    // is a regular line, which cannot back it" would be alarming and wrong.
+    // (This is a regression from b06d2393 — the state used to read "Credit OK",
+    // which was correct for these tenants.)
+    if (!this.customerCreditGated()) return null;
     if (this.customerCreditSummary()) return null;
     return this.creditMismatchFor(() => this.customerCreditLines());
   });

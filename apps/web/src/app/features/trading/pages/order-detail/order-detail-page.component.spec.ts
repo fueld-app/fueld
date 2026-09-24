@@ -1063,6 +1063,84 @@ describe('OrderDetailPageComponent', () => {
     expect(component.canUseSupplierCredit()).toBe(true);
   });
 
+  it('does not warn about the customer broker flag when the tenant skips the customer gate', async () => {
+    // Regression from b06d2393: customerCreditMismatch ignored the skip gate, so
+    // on a broker deal (Moxie sets skipCustomerCreditCheckOnBrokerDeals) a
+    // regular customer line produced the alarming "cannot back it" warning even
+    // though the server does not enforce a broker line for that side. It used to
+    // read "Credit OK", which was correct.
+    const { component } = await createComponent();
+    const regularCustomerLine = {
+      id: 'line-1',
+      type: 'CUSTOMER',
+      counterpartyIds: ['client-1'],
+      counterpartyNames: ['Ocean7 Shipping ApS'],
+      creditAmount: '5000000.00',
+      usedAmount: '0.00',
+      availableAmount: '5000000.00',
+      currency: 'USD',
+      expires: null,
+      periodDays: 30,
+      fromDelivery: false,
+      qualified: false,
+      performanceDays: null,
+      notes: null,
+      isBrokerCreditLine: false,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    };
+    (component as any).financialSvc.customerCreditLines.set([regularCustomerLine] as any);
+    component.order.set({ id: 'order-1', currency: 'USD', isBrokerDeal: true } as any);
+
+    // Skip the customer gate (the Moxie configuration).
+    (component as any).brokerDealSvc.settings.set({
+      enabled: true,
+      defaultCommissionRate: 3,
+      reportStatuses: ['CONFIRMED'],
+      autoReleaseCredit: true,
+      autoReleaseBufferDays: 0,
+      skipCustomerCreditCheckOnBrokerDeals: true,
+    });
+
+    expect(component.canUseCustomerCredit()).toBe(true);
+    expect(component.customerCreditMismatch()).toBeNull();
+  });
+
+  it('does not count a credit line in another currency as usable', async () => {
+    // summarizeLines summed every usable line and labelled the total with the
+    // deal currency, so a EUR-only line presented as green "Credit OK" on a USD
+    // deal with a meaningless USD label — and the server refused it.
+    const { component } = await createComponent();
+    const eurLine = {
+      id: 'line-1',
+      type: 'SUPPLIER',
+      counterpartyIds: ['supplier-1'],
+      counterpartyNames: ['ISLAND OIL LIMITED'],
+      creditAmount: '900000.00',
+      usedAmount: '0.00',
+      availableAmount: '900000.00',
+      currency: 'EUR',
+      expires: null,
+      periodDays: 30,
+      fromDelivery: false,
+      qualified: false,
+      performanceDays: null,
+      notes: null,
+      isBrokerCreditLine: true,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    };
+    component.order.set({ id: 'order-1', currency: 'USD', isBrokerDeal: true } as any);
+    (component as any).financialSvc.supplierCreditLines.set([eurLine] as any);
+
+    expect(component.canUseSupplierCredit()).toBe(false);
+    expect(component.supplierCreditMismatch()?.reason).toBe('CURRENCY');
+
+    // The same line in the deal currency IS usable.
+    (component as any).financialSvc.supplierCreditLines.set([{ ...eurLine, currency: 'USD' }] as any);
+    expect(component.canUseSupplierCredit()).toBe(true);
+  });
+
   it('persists isBrokerDeal and commissionPerMt through the autosave path', async () => {
     // Regression: the order-detail page has no manual Save button
     // ([showSave]="false"), so autosave is the only persistence path. The
