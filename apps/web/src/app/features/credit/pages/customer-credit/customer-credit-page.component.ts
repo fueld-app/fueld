@@ -25,6 +25,7 @@ import type {
 } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { BrokerDealService } from '@app/core/services/broker-deal.service';
 import { AuthService } from '@app/core/auth/auth.service';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 import { CustomerCreditModalComponent } from './customer-credit-modal.component';
@@ -337,6 +338,23 @@ interface CompanySearchResultOption {
         </div>
       }
 
+      <!-- Search -->
+      <div class="mb-4">
+        <div class="relative max-w-md">
+          <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+          </svg>
+          <input
+            type="search"
+            [ngModel]="search()"
+            (ngModelChange)="onSearch($event)"
+            placeholder="Search customers by name..."
+            aria-label="Search customer credit lines by name"
+            class="w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2 pl-9 pr-3 text-sm text-gray-700 dark:text-ink-dim shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+          />
+        </div>
+      </div>
+
       <!-- Table -->
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
@@ -351,19 +369,19 @@ interface CompanySearchResultOption {
             <thead>
               <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                 <th app-sort-header field="updatedAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Updated</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Customer(s)</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Our Companies</th>
+                <th app-sort-header field="counterpartyNames" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Customer(s)</th>
+                <th app-sort-header field="ownCompanyNames" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Our Companies</th>
                 <th app-sort-header field="expires" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Expires</th>
                 <th app-sort-header field="periodDays" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Period</th>
                 <th app-sort-header field="creditAmount" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Credit</th>
                 @if (atradiusEnabled()) {
                   <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Atradius Cover</th>
                 }
-                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Used</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Available</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Performance</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">From Delivery</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Qualified</th>
+                <th app-sort-header field="used" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Used</th>
+                <th app-sort-header field="available" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Available</th>
+                <th app-sort-header field="performanceDays" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Performance</th>
+                <th app-sort-header field="fromDelivery" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">From Delivery</th>
+                <th app-sort-header field="qualified" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Qualified</th>
                 <th class="px-4 py-3 w-20"></th>
               </tr>
             </thead>
@@ -386,6 +404,9 @@ interface CompanySearchResultOption {
                         }
                       } @empty {
                         <span class="text-gray-400 dark:text-muted">-</span>
+                      }
+                      @if (line.isBrokerCreditLine) {
+                        <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">Broker Credit</span>
                       }
                     </div>
                   </td>
@@ -551,6 +572,7 @@ interface CompanySearchResultOption {
 })
 export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  protected readonly brokerDealSvc = inject(BrokerDealService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly authService = inject(AuthService);
@@ -567,6 +589,9 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   readonly loading = signal(true);
   readonly sortBy = signal('');
   readonly sortDir = signal<'asc' | 'desc'>('asc');
+  /** Free-text filter on customer names, applied server-side. */
+  readonly search = signal('');
+  private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
   // Own companies
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
@@ -577,7 +602,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   readonly editingId = signal<string | null>(null);
   readonly saving = signal(false);
   readonly formError = signal('');
-  readonly form = signal<CreditLineForm>({ creditAmount: '', currency: 'USD', expires: '', periodDays: 30, fromDelivery: false, qualified: false, notes: '' });
+  readonly form = signal<CreditLineForm>({ creditAmount: '', currency: 'USD', expires: '', periodDays: 30, fromDelivery: false, qualified: false, isBrokerCreditLine: false, notes: '' });
 
   // Counterparty multi-select
   readonly selectedCounterparties = signal<CounterpartyOption[]>([]);
@@ -622,6 +647,8 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
     if (page > 0) this.currentPage.set(page);
     this.loadData();
     void this.loadAtradiusState();
+    // The modal's Broker Credit toggle is gated on the tenant feature flag.
+    void this.brokerDealSvc.load();
   }
 
   private async loadAtradiusState(): Promise<void> {
@@ -681,6 +708,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
         limit: String(this.pageSize),
       });
       if (this.sortBy()) { params.set('sortBy', this.sortBy()); params.set('sortDir', this.sortDir()); }
+      if (this.search().trim()) params.set('search', this.search().trim());
       const [res, ownRes, currenciesRes, pendingOverridesResult] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(`${API}/credit/lines?${params}`),
@@ -821,6 +849,19 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
     this.loadData();
   }
 
+  /**
+   * Search is server-side (the list is paginated, so filtering the loaded page
+   * client-side would miss matches on other pages). Debounced.
+   */
+  onSearch(term: string): void {
+    this.search.set(term);
+    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+    this.searchDebounce = setTimeout(() => {
+      this.currentPage.set(1);
+      void this.loadData();
+    }, 300);
+  }
+
   // --- Company search ---
   onCompanySearch(term: string): void {
     this.companySearch.set(term);
@@ -941,7 +982,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   // --- Create / Edit ---
   openCreateModal(): void {
     this.editingId.set(null);
-    this.form.set({ creditAmount: '', currency: 'USD', expires: '', periodDays: 30, fromDelivery: false, qualified: false, notes: '' });
+    this.form.set({ creditAmount: '', currency: 'USD', expires: '', periodDays: 30, fromDelivery: false, qualified: false, isBrokerCreditLine: false, notes: '' });
     this.selectedCounterparties.set([]);
     this.selectedOwnCompanyIds.set(new Set());
     this.companySearch.set('');
@@ -959,6 +1000,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
       periodDays: line.periodDays,
       fromDelivery: line.fromDelivery,
       qualified: line.qualified,
+      isBrokerCreditLine: line.isBrokerCreditLine ?? false,
       notes: line.notes ?? '',
     });
     this.selectedCounterparties.set(
@@ -1016,6 +1058,9 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
             periodDays: f.periodDays,
             fromDelivery: f.fromDelivery,
             qualified: f.qualified,
+            // Must be sent on update too: the server only writes fields present in
+            // the body, so omitting it silently discarded a broker-flag change.
+            isBrokerCreditLine: f.isBrokerCreditLine,
             notes: f.notes || null,
             counterpartyIds,
             ownCompanyIds,
@@ -1032,6 +1077,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
             periodDays: f.periodDays,
             fromDelivery: f.fromDelivery,
             qualified: f.qualified,
+            isBrokerCreditLine: f.isBrokerCreditLine,
             notes: f.notes || undefined,
             ownCompanyIds: ownCompanyIds.length ? ownCompanyIds : undefined,
           } satisfies CreateCreditLineDto),

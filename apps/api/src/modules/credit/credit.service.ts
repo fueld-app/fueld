@@ -272,6 +272,8 @@ export async function listCreditLines(query: {
   type?: CreditLineType;
   counterpartyId?: string;
   excludeOrderId?: string;
+  /** Free-text filter over the linked counterparty names. */
+  search?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   page?: number;
@@ -282,6 +284,19 @@ export async function listCreditLines(query: {
   if (query?.counterpartyId) {
     conditions.push(eq(creditLineCounterparties.counterpartyId, query.counterpartyId));
   }
+  // Name search is expressed as an EXISTS subquery (below) precisely so it does
+  // NOT need the join: joining the link table would emit one row per linked
+  // counterparty, duplicating a line that covers several clients into the page.
+  const needsCounterpartyJoin = !!query?.counterpartyId;
+  if (query?.search?.trim()) {
+    // Match ANY linked counterparty name (a line can cover several clients).
+    conditions.push(sql`EXISTS (
+      SELECT 1 FROM ${creditLineCounterparties} clc
+      JOIN ${counterparties} cp ON cp.id = clc.counterparty_id
+      WHERE clc.credit_line_id = ${creditLines.id}
+        AND cp.name ILIKE ${'%' + query.search.trim() + '%'}
+    )`);
+  }
 
   const where = conditions.length === 1 ? conditions[0] : and(...conditions);
 
@@ -289,17 +304,47 @@ export async function listCreditLines(query: {
   const page = query?.page ?? 1;
   const offset = (page - 1) * limit;
 
-  // Sortable columns
+  // Columns that exist on the row and can be ordered in SQL.
   const sortMap: Record<string, any> = {
     updatedAt: creditLines.updatedAt,
     expires: creditLines.expires,
     periodDays: creditLines.periodDays,
     creditAmount: creditLines.creditAmount,
+    currency: creditLines.currency,
     createdAt: creditLines.createdAt,
+    isBrokerCreditLine: creditLines.isBrokerCreditLine,
+    fromDelivery: creditLines.fromDelivery,
+    qualified: creditLines.qualified,
   };
-  const sortCol = sortMap[query?.sortBy ?? ''] ?? creditLines.updatedAt;
+  /**
+   * Columns that cannot be ordered by a plain SQL ORDER BY.
+   *
+   * `used`/`available` are derived in JS by enrichCreditLine from the
+   * counterparties' open orders (available = creditAmount - used, floored at 0),
+   * and the name/performance columns are aggregates or separate queries. Ordering
+   * the raw rows by creditAmount while the UI labels the column "Available" would
+   * sort by a different number than the one displayed; ordering by updatedAt for a
+   * name click would silently ignore the user's intent entirely. So these are
+   * sorted after enrichment, over the whole filtered set rather than the page —
+   * sorting only the page would order the page, not the list.
+   *
+   * That is O(all matching lines) enrichment calls. Acceptable at the real scale
+   * (≤271 lines even on the largest tenant) and the honest way to sort a derived
+   * column. Anything larger should push these into SQL, not fake them here.
+   */
+  const computedSortKeys: Record<string, keyof CreditLineDto | ((l: CreditLineDto) => number | string)> = {
+    used: 'usedAmount',
+    available: 'availableAmount',
+    performanceDays: (l) => l.performanceDays ?? -1,
+    counterpartyNames: (l) => l.counterpartyNames.join(', ').toLowerCase(),
+    ownCompanyNames: (l) => l.ownCompanyNames.join(', ').toLowerCase(),
+  };
+  const requestedSort = query?.sortBy ?? '';
+  const computedSort = requestedSort in computedSortKeys ? requestedSort : null;
+  const sortCol = sortMap[computedSort ? '' : requestedSort] ?? creditLines.updatedAt;
   const defaultDir = query?.sortBy ? 'asc' : 'desc';
-  const sortFn = (query?.sortDir ?? defaultDir) === 'desc' ? desc : asc;
+  const sortDir = query?.sortDir ?? defaultDir;
+  const sortFn = sortDir === 'desc' ? desc : asc;
 
   const listQueryBase = db
     .select({
@@ -323,19 +368,42 @@ export async function listCreditLines(query: {
     .select({ count: sql<number>`count(distinct ${creditLines.id})::int` })
     .from(creditLines);
 
-  const listQuery = query?.counterpartyId
+  const listQuery = needsCounterpartyJoin
     ? listQueryBase.innerJoin(
       creditLineCounterparties,
       eq(creditLineCounterparties.creditLineId, creditLines.id),
     )
     : listQueryBase;
 
-  const countQuery = query?.counterpartyId
+  const countQuery = needsCounterpartyJoin
     ? countQueryBase.innerJoin(
       creditLineCounterparties,
       eq(creditLineCounterparties.creditLineId, creditLines.id),
     )
     : countQueryBase;
+
+  if (computedSort) {
+    const [allRows, countResult] = await Promise.all([
+      listQuery.where(where).orderBy(sortFn(creditLines.updatedAt)),
+      countQuery.where(where),
+    ]);
+    const total = countResult[0]?.count ?? 0;
+    // Enrich everything, order by the derived column, then slice the page.
+    const enriched = await Promise.all(allRows.map((r) => enrichCreditLine(r, query?.excludeOrderId)));
+    const accessor = computedSortKeys[computedSort]!;
+    const valueOf = (line: CreditLineDto): number | string =>
+      typeof accessor === 'function' ? accessor(line) : (line[accessor] as number | string);
+    const dir = sortDir === 'desc' ? -1 : 1;
+    enriched.sort((a, b) => {
+      const x = valueOf(a);
+      const y = valueOf(b);
+      if (typeof x === 'string' || typeof y === 'string') {
+        return dir * String(x).localeCompare(String(y));
+      }
+      return dir * ((parseFloat(String(x)) || 0) - (parseFloat(String(y)) || 0));
+    });
+    return { items: enriched.slice(offset, offset + limit), total };
+  }
 
   const [rows, countResult] = await Promise.all([
     listQuery

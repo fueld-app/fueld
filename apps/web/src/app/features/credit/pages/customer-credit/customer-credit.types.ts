@@ -6,6 +6,13 @@ export interface CreditLineForm {
   notes: string;
   fromDelivery: boolean;
   qualified: boolean;
+  /**
+   * Broker credit line: tracks broker-deal exposure on behalf of counterparties.
+   * The server matches a line to a deal on this flag, so a regular line cannot
+   * back a broker deal (and vice versa) — without this toggle a broker deal's
+   * customer side could never be given a usable line.
+   */
+  isBrokerCreditLine: boolean;
 }
 
 export function emptyCreditLineForm(): CreditLineForm {
@@ -17,6 +24,7 @@ export function emptyCreditLineForm(): CreditLineForm {
     notes: '',
     fromDelivery: false,
     qualified: false,
+    isBrokerCreditLine: false,
   };
 }
 

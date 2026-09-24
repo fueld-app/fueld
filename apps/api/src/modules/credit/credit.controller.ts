@@ -30,6 +30,7 @@ export const creditController = new Elysia({ prefix: '/credit' })
         tenantId: auth.tenantId,
         type: query.type as 'SUPPLIER' | 'CUSTOMER' | undefined,
         counterpartyId: query.counterpartyId,
+        search: query.search,
         sortBy: query.sortBy,
         sortDir: query.sortDir as 'asc' | 'desc' | undefined,
         page: query.page ? parseInt(query.page, 10) : undefined,
@@ -41,6 +42,7 @@ export const creditController = new Elysia({ prefix: '/credit' })
       query: t.Object({
         type: t.Optional(t.String()),
         counterpartyId: t.Optional(t.String()),
+        search: t.Optional(t.String()),
         sortBy: t.Optional(t.String()),
         sortDir: t.Optional(t.String()),
         page: t.Optional(t.String()),
@@ -48,7 +50,7 @@ export const creditController = new Elysia({ prefix: '/credit' })
       }),
       detail: {
         tags: ['Credit'],
-        summary: 'List credit lines (paginated, filtered by type)',
+        summary: 'List credit lines (paginated, filtered by type, searchable by counterparty name)',
       },
     },
   )

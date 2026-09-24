@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { CompanyDetailStore } from '../company-detail.store';
 import { CompanyInfoCardComponent } from '../components/company-info-card/company-info-card.component';
 import { ContactsCardComponent } from '../components/contacts-card/contacts-card.component';
+import { CompanyCreditCardComponent } from '../components/company-credit-card/company-credit-card.component';
 
 @Component({
   selector: 'app-overview-tab',
@@ -9,6 +10,7 @@ import { ContactsCardComponent } from '../components/contacts-card/contacts-card
   imports: [
     CompanyInfoCardComponent,
     ContactsCardComponent,
+    CompanyCreditCardComponent,
   ],
   styles: [':host { display: block }'],
   template: `
@@ -36,6 +38,8 @@ import { ContactsCardComponent } from '../components/contacts-card/contacts-card
       />
 
       <div class="flex flex-col gap-6">
+        <app-company-credit-card [companyId]="company.id" />
+
         <app-contacts-card
           [contacts]="store.contacts()"
           [contactsLoading]="store.contactsLoading()"

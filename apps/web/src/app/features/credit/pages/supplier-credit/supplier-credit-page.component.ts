@@ -64,6 +64,23 @@ interface CompanySearchResultOption {
         </button>
       </div>
 
+      <!-- Search -->
+      <div class="mb-4">
+        <div class="relative max-w-md">
+          <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+          </svg>
+          <input
+            type="search"
+            [ngModel]="search()"
+            (ngModelChange)="onSearch($event)"
+            placeholder="Search suppliers by name..."
+            aria-label="Search supplier credit lines by name"
+            class="w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2 pl-9 pr-3 text-sm text-gray-700 dark:text-ink-dim shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+          />
+        </div>
+      </div>
+
       <!-- Table -->
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
@@ -78,13 +95,13 @@ interface CompanySearchResultOption {
             <thead>
               <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                 <th app-sort-header field="updatedAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Updated</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Supplier(s)</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Our Companies</th>
+                <th app-sort-header field="counterpartyNames" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Supplier(s)</th>
+                <th app-sort-header field="ownCompanyNames" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Our Companies</th>
                 <th app-sort-header field="expires" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Expires</th>
                 <th app-sort-header field="periodDays" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Period</th>
                 <th app-sort-header field="creditAmount" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Credit</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Used</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Available</th>
+                <th app-sort-header field="used" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Used</th>
+                <th app-sort-header field="available" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Available</th>
                 <th class="px-4 py-3 w-20"></th>
               </tr>
             </thead>
@@ -358,6 +375,9 @@ export class SupplierCreditPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly sortBy = signal('');
   readonly sortDir = signal<'asc' | 'desc'>('asc');
+  /** Free-text filter on supplier names, applied server-side. */
+  readonly search = signal('');
+  private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
   // Own companies
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
@@ -409,6 +429,7 @@ export class SupplierCreditPageComponent implements OnInit {
         limit: String(this.pageSize),
       });
       if (this.sortBy()) { params.set('sortBy', this.sortBy()); params.set('sortDir', this.sortDir()); }
+      if (this.search().trim()) params.set('search', this.search().trim());
       const [res, ownRes, currenciesRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(`${API}/credit/lines?${params}`),
@@ -449,6 +470,20 @@ export class SupplierCreditPageComponent implements OnInit {
     this.sortDir.set(event.dir);
     this.currentPage.set(1);
     this.loadData();
+  }
+
+  /**
+   * Search is server-side (the list is paginated, so filtering the current page
+   * client-side would only search the 25 rows already loaded and silently miss
+   * matches on other pages). Debounced so typing does not fire a request per key.
+   */
+  onSearch(term: string): void {
+    this.search.set(term);
+    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+    this.searchDebounce = setTimeout(() => {
+      this.currentPage.set(1);
+      void this.loadData();
+    }, 300);
   }
 
   // --- Company search ---

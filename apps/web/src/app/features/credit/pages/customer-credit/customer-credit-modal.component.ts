@@ -4,8 +4,10 @@ import {
   signal,
   input,
   output,
+  inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { BrokerDealService } from '@app/core/services/broker-deal.service';
 import type { CreditLineForm, CounterpartyOption, OwnCompanyOption } from './customer-credit.types';
 import { emptyCreditLineForm } from './customer-credit.types';
 
@@ -137,6 +139,23 @@ import { emptyCreditLineForm } from './customer-credit.types';
               </label>
             </div>
 
+            @if (brokerDealSvc.enabled()) {
+              <div>
+                <!-- Without this the customer side of a broker deal could never be
+                     given a line the server accepts: it matches a line to a deal
+                     on the broker flag. -->
+                <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-ink-dim cursor-pointer">
+                  <input type="checkbox"
+                    [ngModel]="form().isBrokerCreditLine"
+                    (ngModelChange)="updateForm('isBrokerCreditLine', $event)"
+                    class="h-4 w-4 rounded border-gray-300 dark:border-line-strong text-brand-600 dark:text-brand-400 focus:ring-brand-600"
+                  />
+                  Broker Credit
+                  <span class="text-gray-400 dark:text-muted font-normal">(tracks broker deal exposure on behalf of counterparties)</span>
+                </label>
+              </div>
+            }
+
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Notes</label>
               <textarea [ngModel]="form().notes" (ngModelChange)="updateForm('notes', $event)" rows="2"
@@ -164,6 +183,9 @@ export class CustomerCreditModalComponent {
   readonly saving = input(false);
   readonly error = input('');
   readonly currencies = input<string[]>(['USD', 'EUR', 'DKK', 'AED']);
+  /** Tenant feature flag — the broker flag is only meaningful where broker deals exist. */
+  protected readonly brokerDealSvc = inject(BrokerDealService);
+
   readonly form = input<CreditLineForm>(emptyCreditLineForm());
   readonly companySearch = input('');
   readonly searchResults = input<CounterpartyOption[]>([]);

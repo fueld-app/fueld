@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { counterparties, creditLineCounterparties } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
@@ -536,5 +536,133 @@ describe('credit.service', () => {
     const full = await getCreditLineById(credit!.id);
     expect(full?.usedAmount).toBe('0.00');
     expect(full?.availableAmount).toBe('1000.00');
+  });
+});
+
+describe('credit.service — search and sorting', () => {
+  it('searches by counterparty NAME, not just by id', async () => {
+    const { tenant, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, listCreditLines } = await loadCreditService();
+
+    const [other] = await db
+      .insert(counterparties)
+      .values({ tenantId: tenant.id, name: 'Zenith Bunkers Ltd', type: 'CLIENT', types: ['CLIENT'] })
+      .returning();
+
+    await createCreditLine({
+      type: 'CUSTOMER', counterpartyIds: [client.id], creditAmount: '100.00',
+      currency: 'USD', periodDays: 30,
+    });
+    await createCreditLine({
+      type: 'CUSTOMER', counterpartyIds: [other!.id], creditAmount: '200.00',
+      currency: 'USD', periodDays: 30,
+    });
+
+    // Case-insensitive partial match, on the real client's name.
+    const hit = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', search: client.name.slice(0, 4).toUpperCase() });
+    expect(hit.total).toBe(1);
+    expect(hit.items[0]!.counterpartyNames).toContain(client.name);
+
+    const miss = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', search: 'no-such-company-xyz' });
+    expect(miss.total).toBe(0);
+  });
+
+  it('does not duplicate a line that covers several counterparties when searching', async () => {
+    // The search is an EXISTS subquery rather than a join precisely because a
+    // join would emit one row per linked counterparty, inflating the page and
+    // the count for a multi-client line.
+    const { tenant, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, listCreditLines } = await loadCreditService();
+
+    const [second] = await db
+      .insert(counterparties)
+      .values({ tenantId: tenant.id, name: 'Second Client Ltd', type: 'CLIENT', types: ['CLIENT'] })
+      .returning();
+
+    await createCreditLine({
+      type: 'CUSTOMER', counterpartyIds: [client.id, second!.id], creditAmount: '500.00',
+      currency: 'USD', periodDays: 30,
+    });
+
+    const shared = client.name.slice(0, 3).toUpperCase();
+    const both = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', search: shared });
+    // Whatever the term matches, each credit line appears exactly once.
+    const ids = both.items.map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(both.total).toBe(both.items.length);
+  });
+
+  it('sorts by the DERIVED available column over the whole set, not just the page', async () => {
+    // `available` is computed in JS after the query, so it cannot be a SQL ORDER
+    // BY. The bug this guards is sorting only the FETCHED PAGE: that orders the
+    // page rather than the list, so page 1 shows a different set of rows than a
+    // true sort would, and paging restarts the order.
+    //
+    // The rows' updatedAt values are set so that the updatedAt order is the
+    // REVERSE of the available order. Otherwise the two orderings coincide for
+    // freshly-created rows (all within the same millisecond) and a page-local
+    // sort would pass by luck — which is exactly how the first version of this
+    // test failed to catch it.
+    const { tenant } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, listCreditLines } = await loadCreditService();
+
+    // updatedAt DESC and available ASC must be OPPOSITE orders, otherwise a
+    // page-local sort coincides with the true one and passes by luck — which is
+    // exactly how an earlier version of this test failed to catch the bug.
+    // Rows come back updatedAt DESC, so newest first. Make newest = SMALLEST
+    // available, i.e. available DESC by updatedAt order.
+    const spec: Array<[string, string, string]> = [
+      ['Reverse A', '300.00', '2026-03-01T00:00:00.000Z'], // newest, largest
+      ['Reverse B', '200.00', '2026-02-01T00:00:00.000Z'],
+      ['Reverse C', '100.00', '2026-01-01T00:00:00.000Z'], // oldest, smallest
+    ];
+    for (const [name, amount, updatedAt] of spec) {
+      const [cp] = await db
+        .insert(counterparties)
+        .values({ tenantId: tenant.id, name, type: 'CLIENT', types: ['CLIENT'] })
+        .returning();
+      const line = await createCreditLine({
+        type: 'CUSTOMER', counterpartyIds: [cp!.id], creditAmount: amount,
+        currency: 'USD', periodDays: 30,
+      });
+      await db.execute(
+        sql`UPDATE credit_lines SET updated_at = ${updatedAt}::timestamptz WHERE id = ${line!.id}`,
+      );
+    }
+
+    // Nothing is used, so available == creditAmount: 100, 200, 300.
+    const asc = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', sortBy: 'available', sortDir: 'asc', limit: 2 });
+    expect(asc.items.map((l) => l.availableAmount)).toEqual(['100.00', '200.00']);
+    expect(asc.total).toBe(3);
+
+    // Page 2 must CONTINUE the order, not restart it.
+    const ascP2 = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', sortBy: 'available', sortDir: 'asc', page: 2, limit: 2 });
+    expect(ascP2.items.map((l) => l.availableAmount)).toEqual(['300.00']);
+
+    const desc = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', sortBy: 'available', sortDir: 'desc', limit: 1 });
+    expect(desc.items.map((l) => l.availableAmount)).toEqual(['300.00']);
+  });
+
+  it('sorts by counterparty name case-insensitively', async () => {
+    const { tenant } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, listCreditLines } = await loadCreditService();
+
+    for (const name of ['beta Marine', 'Alpha Marine', 'gamma Marine']) {
+      const [cp] = await db
+        .insert(counterparties)
+        .values({ tenantId: tenant.id, name, type: 'CLIENT', types: ['CLIENT'] })
+        .returning();
+      await createCreditLine({
+        type: 'CUSTOMER', counterpartyIds: [cp!.id], creditAmount: '100.00',
+        currency: 'USD', periodDays: 30,
+      });
+    }
+
+    const res = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', sortBy: 'counterpartyNames', sortDir: 'asc' });
+    expect(res.items.map((l) => l.counterpartyNames[0])).toEqual(['Alpha Marine', 'beta Marine', 'gamma Marine']);
   });
 });
