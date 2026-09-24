@@ -152,11 +152,12 @@ describe('createCreditApplication', () => {
   });
 
   it('creates application linked to an existing credit line', async () => {
-    const { user, client } = await seedBasics();
+    const { tenant, user, client } = await seedBasics();
     const { createCreditApplication } = await loadService();
     const { createCreditLine } = await import('../src/modules/credit/credit.service');
 
     const creditLine = await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER',
       counterpartyIds: [client.id],
       creditAmount: '1000.00',
@@ -950,6 +951,7 @@ describe('auto-apply credit line on approval', () => {
     const { createCreditLine } = await import('../src/modules/credit/credit.service');
 
     const existingLine = await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER',
       counterpartyIds: [client.id],
       creditAmount: '1000.00',
@@ -1111,6 +1113,7 @@ describe('auto-apply credit line on approval', () => {
     const { createCreditLine } = await import('../src/modules/credit/credit.service');
 
     const existingLine = await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER',
       counterpartyIds: [client.id],
       creditAmount: '1000.00',

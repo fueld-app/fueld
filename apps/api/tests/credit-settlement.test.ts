@@ -64,8 +64,8 @@ describe('two-sided settlement — credit line sensitivity', () => {
     const supplierA = await createSupplier(tenant.id, 'Supplier A');
     const supplierB = await createSupplier(tenant.id, 'Supplier B');
 
-    const creditA = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplierA.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
-    const creditB = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplierB.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const creditA = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplierA.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const creditB = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplierB.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
 
     const { createOrder } = await loadOrdersService();
     const order = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id, supplierId: supplierA.id, supplierPaymentTermType: 'CREDIT' });
@@ -101,7 +101,7 @@ describe('two-sided settlement — credit line sensitivity', () => {
     const { createSupplierPayment } = await loadOrdersService();
 
     const supplier = await createSupplier(tenant.id, 'Shared Supplier');
-    const credit = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '2000', currency: 'USD', periodDays: 30 });
+    const credit = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '2000', currency: 'USD', periodDays: 30 });
 
     const { order: order1, leg: leg1 } = await createOrderWithLeg(tenant.id, client.id, vessel.id, place.id, user.id, supplier.id, [
       { productType: 'VLSFO', quantity: '2', costPrice: '100', salesPrice: '150' },
@@ -133,7 +133,7 @@ describe('two-sided settlement — credit line sensitivity', () => {
     const { createSupplierPayment, deleteSupplierPayment } = await loadOrdersService();
 
     const supplier = await createSupplier(tenant.id, 'Round-trip Supplier');
-    const credit = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const credit = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
 
     const { leg } = await createOrderWithLeg(tenant.id, client.id, vessel.id, place.id, user.id, supplier.id, [
       { productType: 'VLSFO', quantity: '5', costPrice: '100', salesPrice: '140' },
@@ -165,8 +165,8 @@ describe('two-sided settlement — credit line sensitivity', () => {
     const { createSupplierPayment } = await loadOrdersService();
 
     const supplier = await createSupplier(tenant.id, 'Supplier X');
-    const customerCredit = await createCreditLine({ type: 'CUSTOMER', counterpartyIds: [client.id], creditAmount: '2000', currency: 'USD', periodDays: 30 });
-    const supplierCredit = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const customerCredit = await createCreditLine({ tenantId: tenant.id, type: 'CUSTOMER', counterpartyIds: [client.id], creditAmount: '2000', currency: 'USD', periodDays: 30 });
+    const supplierCredit = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
 
     const { leg } = await createOrderWithLeg(tenant.id, client.id, vessel.id, place.id, user.id, supplier.id, [
       { productType: 'VLSFO', quantity: '4', costPrice: '100', salesPrice: '150' },
@@ -194,8 +194,8 @@ describe('two-sided settlement — credit line sensitivity', () => {
 
     const supplierA = await createSupplier(tenant.id, 'Supplier Cross-A');
     const supplierB = await createSupplier(tenant.id, 'Supplier Cross-B');
-    const creditA = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplierA.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
-    const creditB = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplierB.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const creditA = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplierA.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const creditB = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplierB.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
 
     const { leg: legA } = await createOrderWithLeg(tenant.id, client.id, vessel.id, place.id, user.id, supplierA.id, [
       { productType: 'VLSFO', quantity: '3', costPrice: '100', salesPrice: '130' },
@@ -222,8 +222,8 @@ describe('two-sided settlement — credit line sensitivity', () => {
 
     const supplierA = await createSupplier(tenant.id, 'Supplier All-Settled A');
     const supplierB = await createSupplier(tenant.id, 'Supplier All-Settled B');
-    const creditA = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplierA.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
-    const creditB = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplierB.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const creditA = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplierA.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const creditB = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplierB.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
 
     const order = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id, supplierId: supplierA.id, supplierPaymentTermType: 'CREDIT' });
     await updateOrderStatus(order.id, 'CONFIRMED', user.id);
@@ -259,8 +259,8 @@ describe('two-sided settlement — credit line sensitivity', () => {
 
     const supplierA = await createSupplier(tenant.id, 'Supplier Partial-Settle A');
     const supplierB = await createSupplier(tenant.id, 'Supplier Partial-Settle B');
-    const creditA = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplierA.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
-    const creditB = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplierB.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const creditA = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplierA.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const creditB = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplierB.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
 
     const order = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id, supplierId: supplierA.id, supplierPaymentTermType: 'CREDIT' });
     await updateOrderStatus(order.id, 'CONFIRMED', user.id);
@@ -289,7 +289,7 @@ describe('two-sided settlement — credit line sensitivity', () => {
     const { createSupplierPayment } = await loadOrdersService();
 
     const supplier = await createSupplier(tenant.id, 'Zero-cost Supplier');
-    const credit = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const credit = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
 
     const { leg } = await createOrderWithLeg(tenant.id, client.id, vessel.id, place.id, user.id, supplier.id, [
       { productType: 'VLSFO', quantity: '0', costPrice: '100', salesPrice: '130' },
@@ -316,7 +316,7 @@ describe('two-sided settlement — credit line sensitivity', () => {
     const { createSupplierPayment, deleteSupplierPayment } = await loadOrdersService();
 
     const supplier = await createSupplier(tenant.id, 'Multi-payment Supplier');
-    const credit = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const credit = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
 
     const { leg } = await createOrderWithLeg(tenant.id, client.id, vessel.id, place.id, user.id, supplier.id, [
       { productType: 'VLSFO', quantity: '5', costPrice: '100', salesPrice: '140' },
@@ -345,7 +345,7 @@ describe('two-sided settlement — credit line sensitivity', () => {
     const { createSupplierPayment, updateOrderStatus } = await loadOrdersService();
 
     const supplier = await createSupplier(tenant.id, 'Cancel-after-settle Supplier');
-    const credit = await createCreditLine({ type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
+    const credit = await createCreditLine({ tenantId: tenant.id, type: 'SUPPLIER', counterpartyIds: [supplier.id], creditAmount: '1000', currency: 'USD', periodDays: 30 });
 
     const { order, leg } = await createOrderWithLeg(tenant.id, client.id, vessel.id, place.id, user.id, supplier.id, [
       { productType: 'VLSFO', quantity: '4', costPrice: '100', salesPrice: '140' },

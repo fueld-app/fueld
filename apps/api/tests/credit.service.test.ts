@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
-import { counterparties, creditLineCounterparties } from '../src/db/schema';
+import { counterparties, creditLineCounterparties, tenants } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
 async function loadCreditService() {
@@ -34,6 +34,7 @@ describe('credit.service', () => {
       .returning();
 
     const created = await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER',
       counterpartyIds: [client.id],
       ownCompanyIds: [ownCompany!.id],
@@ -69,7 +70,7 @@ describe('credit.service', () => {
       })
       .returning();
 
-    const updated = await updateCreditLine(created!.id, {
+    const updated = await updateCreditLine(created!.id, tenant.id, {
       creditAmount: '2500.00',
       periodDays: 45,
       notes: 'Updated',
@@ -90,7 +91,7 @@ describe('credit.service', () => {
     expect(links.length).toBe(1);
     expect(links[0]?.counterpartyId).toBe(client2!.id);
 
-    const deleted = await deleteCreditLine(created!.id);
+    const deleted = await deleteCreditLine(created!.id, tenant.id);
     expect(deleted?.id).toBe(created!.id);
 
     const missing = await getCreditLineById(created!.id);
@@ -103,6 +104,7 @@ describe('credit.service', () => {
     const { createOrder, updateOrder, saveOrderItems, updateOrderStatus } = await loadOrdersService();
 
     const credit = await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER',
       counterpartyIds: [client.id],
       creditAmount: '2000.00',
@@ -147,16 +149,66 @@ describe('credit.service', () => {
     expect(enriched?.performanceDays).not.toBeNull();
   });
 
-  it('throws when creating credit line without tenant', async () => {
-    const { createCreditLine } = await loadCreditService();
+  it('creates the line in the CALLER tenant, never an arbitrary one', async () => {
+    // Regression guard for the cross-tenant write hole: the service used to do
+    // `tenants.findFirst()` (no filter), so a user in tenant B could create a
+    // line that landed in whichever tenant happened to sort first. The line must
+    // belong to the tenant the caller passed.
+    const { tenant } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, getCreditLineById } = await loadCreditService();
 
-    await expect(createCreditLine({
-      type: 'SUPPLIER',
-      counterpartyIds: [],
+    // A second tenant, inserted FIRST so a findFirst() regression would pick it.
+    const [otherTenant] = await db
+      .insert(tenants)
+      .values({ name: 'Aardvark Shipping', domain: 'aardvark.test' })
+      .returning();
+    const [otherCp] = await db
+      .insert(counterparties)
+      .values({ tenantId: otherTenant!.id, name: 'Other Co', type: 'CLIENT', types: ['CLIENT'] })
+      .returning();
+
+    const created = await createCreditLine({
+      tenantId: tenant.id,
+      type: 'CUSTOMER',
+      counterpartyIds: [otherCp!.id],
       creditAmount: '100.00',
       currency: 'USD',
       periodDays: 10,
-    })).rejects.toThrow('No tenant found');
+    });
+
+    expect(created?.tenantId).toBe(tenant.id);
+    const reread = await getCreditLineById(created!.id);
+    expect(reread?.tenantId).toBe(tenant.id);
+  });
+
+  it('does not let one tenant update or delete another tenant\'s line', async () => {
+    // The mutation must be scoped IN THE WHERE, not checked after: an unscoped
+    // UPDATE/DELETE commits and then reports 404, so the write lands anyway.
+    const { tenant, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, updateCreditLine, deleteCreditLine, getCreditLineById } = await loadCreditService();
+
+    const [otherTenant] = await db.insert(tenants).values({ name: 'Other Tenant', domain: 'other.test' }).returning();
+    const owned = await createCreditLine({
+      tenantId: tenant.id,
+      type: 'CUSTOMER',
+      counterpartyIds: [client.id],
+      creditAmount: '100.00',
+      currency: 'USD',
+      periodDays: 10,
+    });
+
+    // The other tenant tries to mutate it: both must be no-ops.
+    const crossUpdate = await updateCreditLine(owned!.id, otherTenant!.id, { creditAmount: '999999.00' });
+    expect(crossUpdate).toBeNull();
+    const crossDelete = await deleteCreditLine(owned!.id, otherTenant!.id);
+    expect(crossDelete).toBeNull();
+
+    // The row is untouched and still owned by the original tenant.
+    const after = await getCreditLineById(owned!.id);
+    expect(after?.creditAmount).toBe('100.00');
+    expect(after?.tenantId).toBe(tenant.id);
   });
 
   it('computes used amount for supplier credit lines from cost side', async () => {
@@ -176,6 +228,7 @@ describe('credit.service', () => {
       .returning();
 
     const credit = await createCreditLine({
+      tenantId: tenant.id,
       type: 'SUPPLIER',
       counterpartyIds: [supplier!.id],
       creditAmount: '900.00',
@@ -211,7 +264,7 @@ describe('credit.service', () => {
     expect(enriched?.availableAmount).toBe('600.00');
     expect(enriched?.performanceDays).toBeNull();
 
-    const missingUpdate = await updateCreditLine('123e4567-e89b-12d3-a456-426614174000', {
+    const missingUpdate = await updateCreditLine('123e4567-e89b-12d3-a456-426614174000', tenant.id, {
       notes: 'missing',
     });
     expect(missingUpdate).toBeNull();
@@ -244,6 +297,7 @@ describe('credit.service', () => {
       .returning();
 
     const creditA = await createCreditLine({
+      tenantId: tenant.id,
       type: 'SUPPLIER',
       counterpartyIds: [supplierA!.id],
       creditAmount: '1000.00',
@@ -252,6 +306,7 @@ describe('credit.service', () => {
     });
 
     const creditB = await createCreditLine({
+      tenantId: tenant.id,
       type: 'SUPPLIER',
       counterpartyIds: [supplierB!.id],
       creditAmount: '1000.00',
@@ -326,6 +381,7 @@ describe('credit.service', () => {
       .returning();
 
     const customerCredit = await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER',
       counterpartyIds: [client.id],
       creditAmount: '1000.00',
@@ -334,6 +390,7 @@ describe('credit.service', () => {
     });
 
     const supplierCredit = await createCreditLine({
+      tenantId: tenant.id,
       type: 'SUPPLIER',
       counterpartyIds: [supplier!.id],
       creditAmount: '1000.00',
@@ -397,6 +454,7 @@ describe('credit.service', () => {
       .returning();
 
     const credit = await createCreditLine({
+      tenantId: tenant.id,
       type: 'SUPPLIER',
       counterpartyIds: [supplier!.id],
       creditAmount: '1000.00',
@@ -448,6 +506,7 @@ describe('credit.service', () => {
       .returning();
 
     const credit = await createCreditLine({
+      tenantId: tenant.id,
       type: 'SUPPLIER',
       counterpartyIds: [supplier!.id],
       creditAmount: '1000.00',
@@ -500,6 +559,7 @@ describe('credit.service', () => {
       .returning();
 
     const credit = await createCreditLine({
+      tenantId: tenant.id,
       type: 'SUPPLIER',
       counterpartyIds: [supplier!.id],
       creditAmount: '1000.00',
@@ -551,10 +611,12 @@ describe('credit.service — search and sorting', () => {
       .returning();
 
     await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER', counterpartyIds: [client.id], creditAmount: '100.00',
       currency: 'USD', periodDays: 30,
     });
     await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER', counterpartyIds: [other!.id], creditAmount: '200.00',
       currency: 'USD', periodDays: 30,
     });
@@ -582,16 +644,21 @@ describe('credit.service — search and sorting', () => {
       .returning();
 
     await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER', counterpartyIds: [client.id, second!.id], creditAmount: '500.00',
       currency: 'USD', periodDays: 30,
     });
 
-    const shared = client.name.slice(0, 3).toUpperCase();
-    const both = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', search: shared });
-    // Whatever the term matches, each credit line appears exactly once.
-    const ids = both.items.map((l) => l.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    expect(both.total).toBe(both.items.length);
+    // The term must match MORE THAN ONE linked counterparty, or the test cannot
+    // distinguish the EXISTS subquery from the join it replaced: with a
+    // single-match term the join also emits one row and passes. 'Client' is
+    // shared by both names below, so a join-based implementation would emit the
+    // line TWICE (page 2 rows, count 1) and fail the assertions.
+    const both = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', search: 'client' });
+    expect(both.total).toBe(1);
+    expect(both.items.length).toBe(1);
+    // Case-insensitive too (ILIKE, not LIKE).
+    expect(both.items[0]?.counterpartyNames.length).toBe(2);
   });
 
   it('sorts by the DERIVED available column over the whole set, not just the page', async () => {
@@ -609,15 +676,23 @@ describe('credit.service — search and sorting', () => {
     const db = await getDb();
     const { createCreditLine, listCreditLines } = await loadCreditService();
 
-    // updatedAt DESC and available ASC must be OPPOSITE orders, otherwise a
-    // page-local sort coincides with the true one and passes by luck — which is
-    // exactly how an earlier version of this test failed to catch the bug.
-    // Rows come back updatedAt DESC, so newest first. Make newest = SMALLEST
-    // available, i.e. available DESC by updatedAt order.
+    // Two independent failure modes to defeat, with ONE fixture:
+    //
+    //  1. A page-local sort (order rows by updatedAt, slice the page, then sort
+    //     the page) coincides with the true sort whenever updatedAt order equals
+    //     available order. So make them OPPOSITE: newest = SMALLEST available.
+    //
+    //  2. Lexicographic comparison: 90/100/1000 are NOT digit-aligned, so
+    //     localeCompare puts "100.00" before "90.00" and "1000.00" before
+    //     "100.00". A numeric comparator is the only thing that yields 90<100<1000.
+    //
+    // With updatedAt DESC = [90, 1000, 100] and available ASC = [90, 100, 1000],
+    // a page-local sort returns the wrong page and a string sort returns the
+    // wrong page — both now fail the assertions below.
     const spec: Array<[string, string, string]> = [
-      ['Reverse A', '300.00', '2026-03-01T00:00:00.000Z'], // newest, largest
-      ['Reverse B', '200.00', '2026-02-01T00:00:00.000Z'],
-      ['Reverse C', '100.00', '2026-01-01T00:00:00.000Z'], // oldest, smallest
+      ['Reverse A', '90.00', '2026-03-01T00:00:00.000Z'], // newest, SMALLEST
+      ['Reverse B', '1000.00', '2026-02-01T00:00:00.000Z'],
+      ['Reverse C', '100.00', '2026-01-01T00:00:00.000Z'], // oldest, middle
     ];
     for (const [name, amount, updatedAt] of spec) {
       const [cp] = await db
@@ -625,6 +700,7 @@ describe('credit.service — search and sorting', () => {
         .values({ tenantId: tenant.id, name, type: 'CLIENT', types: ['CLIENT'] })
         .returning();
       const line = await createCreditLine({
+      tenantId: tenant.id,
         type: 'CUSTOMER', counterpartyIds: [cp!.id], creditAmount: amount,
         currency: 'USD', periodDays: 30,
       });
@@ -633,17 +709,18 @@ describe('credit.service — search and sorting', () => {
       );
     }
 
-    // Nothing is used, so available == creditAmount: 100, 200, 300.
+    // Nothing is used, so available == creditAmount. Numeric order: 90, 100, 1000.
+    // Lexicographic order would be "100.00" < "1000.00" < "90.00" — wrong.
     const asc = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', sortBy: 'available', sortDir: 'asc', limit: 2 });
-    expect(asc.items.map((l) => l.availableAmount)).toEqual(['100.00', '200.00']);
+    expect(asc.items.map((l) => l.availableAmount)).toEqual(['90.00', '100.00']);
     expect(asc.total).toBe(3);
 
     // Page 2 must CONTINUE the order, not restart it.
     const ascP2 = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', sortBy: 'available', sortDir: 'asc', page: 2, limit: 2 });
-    expect(ascP2.items.map((l) => l.availableAmount)).toEqual(['300.00']);
+    expect(ascP2.items.map((l) => l.availableAmount)).toEqual(['1000.00']);
 
-    const desc = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', sortBy: 'available', sortDir: 'desc', limit: 1 });
-    expect(desc.items.map((l) => l.availableAmount)).toEqual(['300.00']);
+    const desc = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', sortBy: 'available', sortDir: 'desc', limit: 3 });
+    expect(desc.items.map((l) => l.availableAmount)).toEqual(['1000.00', '100.00', '90.00']);
   });
 
   it('caps the page size so a huge limit cannot force unbounded enrichment', async () => {
@@ -654,6 +731,7 @@ describe('credit.service — search and sorting', () => {
     const { createCreditLine, listCreditLines } = await loadCreditService();
 
     await createCreditLine({
+      tenantId: tenant.id,
       type: 'CUSTOMER', counterpartyIds: [client.id], creditAmount: '100.00',
       currency: 'USD', periodDays: 30,
     });
@@ -671,18 +749,24 @@ describe('credit.service — search and sorting', () => {
     const db = await getDb();
     const { createCreditLine, listCreditLines } = await loadCreditService();
 
-    for (const name of ['beta Marine', 'Alpha Marine', 'gamma Marine']) {
+    // The discriminating pair is lowercase 'alpha' vs uppercase 'Beta': a
+    // case-SENSITIVE ASCII compare puts 'B' (66) before 'a' (97), so it would
+    // order 'Beta Marine' FIRST. Case-insensitive ordering puts 'alpha' first.
+    // Declared in the case-sensitive order, so only a case-folding comparator
+    // produces the expected case-insensitive result.
+    for (const name of ['Beta Marine', 'gamma Marine', 'alpha Marine']) {
       const [cp] = await db
         .insert(counterparties)
         .values({ tenantId: tenant.id, name, type: 'CLIENT', types: ['CLIENT'] })
         .returning();
       await createCreditLine({
+        tenantId: tenant.id,
         type: 'CUSTOMER', counterpartyIds: [cp!.id], creditAmount: '100.00',
         currency: 'USD', periodDays: 30,
       });
     }
 
     const res = await listCreditLines({ tenantId: tenant.id, type: 'CUSTOMER', sortBy: 'counterpartyNames', sortDir: 'asc' });
-    expect(res.items.map((l) => l.counterpartyNames[0])).toEqual(['Alpha Marine', 'beta Marine', 'gamma Marine']);
+    expect(res.items.map((l) => l.counterpartyNames[0])).toEqual(['alpha Marine', 'Beta Marine', 'gamma Marine']);
   });
 });

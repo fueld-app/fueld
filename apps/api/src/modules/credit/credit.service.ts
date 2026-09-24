@@ -352,11 +352,19 @@ export async function listCreditLines(query: {
   const needsCounterpartyJoin = !!query?.counterpartyId;
   if (query?.search?.trim()) {
     // Match ANY linked counterparty name (a line can cover several clients).
+    //
+    // ILIKE wildcards in the user's term are ESCAPED: without this, a search for
+    // "100%" matches every name ending in anything (the pattern degrades to
+    // '%100%%'), and "a_b" matches "axb". The term is already a bind parameter
+    // (no injection), but literal-substring semantics still require escaping the
+    // pattern metacharacters. Backslash first, or it would escape the escapes.
+    const term = query.search.trim().replace(/[\\%_]/g, (c) => `\\${c}`);
     conditions.push(sql`EXISTS (
       SELECT 1 FROM ${creditLineCounterparties} clc
       JOIN ${counterparties} cp ON cp.id = clc.counterparty_id
       WHERE clc.credit_line_id = ${creditLines.id}
-        AND cp.name ILIKE ${'%' + query.search.trim() + '%'}
+        AND cp.tenant_id = ${query.tenantId}
+        AND cp.name ILIKE ${'%' + term + '%'}
     )`);
   }
 
@@ -399,10 +407,17 @@ export async function listCreditLines(query: {
    * That is O(all matching lines) enrichment calls. Acceptable at the real scale
    * (≤271 lines even on the largest tenant) and the honest way to sort a derived
    * column. Anything larger should push these into SQL, not fake them here.
+   *
+   * Each key returns a NUMBER or a STRING, and the distinction is load-bearing:
+   * `usedAmount`/`availableAmount` are `.toFixed(2)` STRINGS on the DTO, so a
+   * comparator that just reads the field falls into localeCompare and sorts
+   * lexicographically — "100.00" before "90.00", and "950.00" before "1000.00".
+   * Any tenant with a $90 line beside a $100 line got the wrong order on the two
+   * most prominent columns. They are parsed here so the numeric branch is taken.
    */
-  const computedSortKeys: Record<string, keyof CreditLineDto | ((l: CreditLineDto) => number | string)> = {
-    used: 'usedAmount',
-    available: 'availableAmount',
+  const computedSortKeys: Record<string, (l: CreditLineDto) => number | string> = {
+    used: (l) => parseFloat(l.usedAmount) || 0,
+    available: (l) => parseFloat(l.availableAmount) || 0,
     performanceDays: (l) => l.performanceDays ?? -1,
     counterpartyNames: (l) => l.counterpartyNames.join(', ').toLowerCase(),
     ownCompanyNames: (l) => l.ownCompanyNames.join(', ').toLowerCase(),
@@ -496,16 +511,16 @@ export async function listCreditLines(query: {
       })),
     );
     const accessor = computedSortKeys[computedSort]!;
-    const valueOf = (line: CreditLineDto): number | string =>
-      typeof accessor === 'function' ? accessor(line) : (line[accessor] as number | string);
     const dir = sortDir === 'desc' ? -1 : 1;
     enriched.sort((a, b) => {
-      const x = valueOf(a);
-      const y = valueOf(b);
+      const x = accessor(a);
+      const y = accessor(b);
+      // Every key returns a number or a string, never a numeric string: the
+      // amount accessors parse, so the localeCompare branch is only for names.
       if (typeof x === 'string' || typeof y === 'string') {
         return dir * String(x).localeCompare(String(y));
       }
-      return dir * ((parseFloat(String(x)) || 0) - (parseFloat(String(y)) || 0));
+      return dir * (x - y);
     });
     return { items: enriched.slice(offset, offset + limit), total };
   }
@@ -632,6 +647,8 @@ export async function getCreditLineById(id: string): Promise<CreditLineDto | nul
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function createCreditLine(data: {
+  /** The caller's tenant. Required: a line must never land in another tenant. */
+  tenantId: string;
   counterpartyIds: string[];
   type: CreditLineType;
   creditAmount: string;
@@ -644,13 +661,10 @@ export async function createCreditLine(data: {
   ownCompanyIds?: string[];
   isBrokerCreditLine?: boolean;
 }) {
-  const tenantRow = await db.query.tenants.findFirst();
-  if (!tenantRow) throw new Error('No tenant found');
-
   const [created] = await db
     .insert(creditLines)
     .values({
-      tenantId: tenantRow.id,
+      tenantId: data.tenantId,
       type: data.type,
       creditAmount: data.creditAmount,
       currency: data.currency,
@@ -692,6 +706,7 @@ export async function createCreditLine(data: {
 
 export async function updateCreditLine(
   id: string,
+  tenantId: string,
   data: {
     creditAmount?: string;
     currency?: string;
@@ -718,7 +733,10 @@ export async function updateCreditLine(
   const [updated] = await db
     .update(creditLines)
     .set(setFields)
-    .where(eq(creditLines.id, id))
+    // Tenant-scoped IN THE WHERE, not checked after: an unscoped UPDATE
+    // commits before the controller's 404 check, so a cross-tenant PATCH would
+    // apply the write and merely report "not found".
+    .where(and(eq(creditLines.id, id), eq(creditLines.tenantId, tenantId)))
     .returning();
 
   if (!updated) return null;
@@ -756,10 +774,12 @@ export async function updateCreditLine(
 //  DELETE CREDIT LINE
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function deleteCreditLine(id: string) {
+export async function deleteCreditLine(id: string, tenantId: string) {
   const [deleted] = await db
     .delete(creditLines)
-    .where(eq(creditLines.id, id))
+    // Tenant-scoped IN THE WHERE for the same reason as update: a DELETE that
+    // matched on id alone would remove another tenant's row and then report 404.
+    .where(and(eq(creditLines.id, id), eq(creditLines.tenantId, tenantId)))
     .returning({ id: creditLines.id, tenantId: creditLines.tenantId });
   return deleted ?? null;
 }

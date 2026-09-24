@@ -84,7 +84,7 @@ export const creditController = new Elysia({ prefix: '/credit' })
         return { success: false, data: null, message: 'Forbidden: insufficient role' };
       }
       try {
-        const line = await createCreditLine(body);
+        const line = await createCreditLine({ ...body, tenantId: auth.tenantId });
         return { success: true, data: line } satisfies ApiResponse<typeof line>;
       } catch (err) {
         console.error('[Credit] Create failed:', err);
@@ -120,8 +120,8 @@ export const creditController = new Elysia({ prefix: '/credit' })
         set.status = 403;
         return { success: false, data: null, message: 'Forbidden: insufficient role' };
       }
-      const updated = await updateCreditLine(params.id, body);
-      if (!updated || updated.tenantId !== auth.tenantId) {
+      const updated = await updateCreditLine(params.id, auth.tenantId, body);
+      if (!updated) {
         set.status = 404;
         return { success: false, data: null, message: 'Credit line not found' };
       }
@@ -156,8 +156,8 @@ export const creditController = new Elysia({ prefix: '/credit' })
         set.status = 403;
         return { success: false, data: null, message: 'Forbidden: insufficient role' };
       }
-      const deleted = await deleteCreditLine(params.id);
-      if (!deleted || deleted.tenantId !== auth.tenantId) {
+      const deleted = await deleteCreditLine(params.id, auth.tenantId);
+      if (!deleted) {
         set.status = 404;
         return { success: false, data: null, message: 'Credit line not found' };
       }

@@ -1,8 +1,9 @@
-import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject } from '@angular/core';
 import { CompanyDetailStore } from '../company-detail.store';
 import { CompanyInfoCardComponent } from '../components/company-info-card/company-info-card.component';
 import { ContactsCardComponent } from '../components/contacts-card/contacts-card.component';
 import { CompanyCreditCardComponent } from '../components/company-credit-card/company-credit-card.component';
+import { AuthService } from '@app/core/auth/auth.service';
 
 @Component({
   selector: 'app-overview-tab',
@@ -38,7 +39,9 @@ import { CompanyCreditCardComponent } from '../components/company-credit-card/co
       />
 
       <div class="flex flex-col gap-6">
-        <app-company-credit-card [companyId]="company.id" />
+        @if (canSeeAnyCredit()) {
+          <app-company-credit-card [companyId]="company.id" />
+        }
 
         <app-contacts-card
           [contacts]="store.contacts()"
@@ -60,4 +63,13 @@ import { CompanyCreditCardComponent } from '../components/company-credit-card/co
 })
 export class OverviewTabComponent {
   readonly store = inject(CompanyDetailStore);
+  private readonly auth = inject(AuthService);
+
+  /**
+   * The company page itself is open to every role, but the credit card's figures
+   * are restricted on the credit pages (customer: ADMIN/CREDITMANAGER/FINANCE;
+   * supplier: ADMIN/CREDITMANAGER). Hiding the card for roles that may see
+   * neither keeps that policy rather than widening exposure here.
+   */
+  readonly canSeeAnyCredit = computed(() => this.auth.canAccessCustomerCredit() || this.auth.canAccessCredit());
 }

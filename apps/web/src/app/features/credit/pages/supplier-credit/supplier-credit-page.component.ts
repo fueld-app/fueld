@@ -4,6 +4,7 @@ import {
   signal,
   inject,
   OnInit,
+  OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -175,7 +176,11 @@ interface CompanySearchResultOption {
               } @empty {
                 <tr>
                   <td colspan="9" class="px-4 py-8 text-center text-gray-400 dark:text-muted">
-                    No supplier credit lines yet. Click "Add Credit Line" to create one.
+                    @if (search().trim()) {
+                      No credit lines match "{{ search().trim() }}".
+                    } @else {
+                      No supplier credit lines yet. Click "Add Credit Line" to create one.
+                    }
                   </td>
                 </tr>
               }
@@ -360,7 +365,7 @@ interface CompanySearchResultOption {
     </div>
   `,
 })
-export class SupplierCreditPageComponent implements OnInit {
+export class SupplierCreditPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -377,7 +382,9 @@ export class SupplierCreditPageComponent implements OnInit {
   readonly sortDir = signal<'asc' | 'desc'>('asc');
   /** Free-text filter on supplier names, applied server-side. */
   readonly search = signal('');
-  private searchDebounce: ReturnType<typeof setTimeout> | null = null;
+  private searchDebounce: ReturnType<typeof setTimeout> | undefined;
+  /** Monotonic id of the latest loadData() call, for discarding stale responses. */
+  private loadRequestId = 0;
 
   // Own companies
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
@@ -404,7 +411,7 @@ export class SupplierCreditPageComponent implements OnInit {
   readonly companySearch = signal('');
   readonly companySearchResults = signal<CompanySearchResultOption[]>([]);
   readonly companyDropdownOpen = signal(false);
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Delete
   readonly deleteTarget = signal<CreditLineDto | null>(null);
@@ -421,6 +428,10 @@ export class SupplierCreditPageComponent implements OnInit {
   }
 
   async loadData(): Promise<void> {
+    // Search is a high-frequency trigger, so two loads can be in flight at once
+    // and their resolution order is not guaranteed — an older, broader result
+    // could overwrite a newer, narrower one while the input shows the new term.
+    const requestId = ++this.loadRequestId;
     this.loading.set(true);
     try {
       const params = new URLSearchParams({
@@ -441,6 +452,8 @@ export class SupplierCreditPageComponent implements OnInit {
           this.http.get<ApiResponse<{ currencies: string[] }>>(`${API}/admin/settings/my-currencies`),
         ),
       ]);
+      // A newer load started while this one was in flight — drop this response.
+      if (requestId !== this.loadRequestId) return;
       if (res.success && res.data) {
         this.creditLines.set(res.data.items);
         this.total.set(res.data.total);
@@ -452,16 +465,21 @@ export class SupplierCreditPageComponent implements OnInit {
     } catch (err) {
       console.error('Failed to load credit lines:', err);
     } finally {
-      this.loading.set(false);
+      // Only the latest request owns the spinner.
+      if (requestId === this.loadRequestId) this.loading.set(false);
     }
+  }
+
+  ngOnDestroy(): void {
+    // A keystroke within the debounce window of navigating away would otherwise
+    // fire loadData() on a destroyed component (one wasted authenticated request).
+    clearTimeout(this.searchDebounce);
+    clearTimeout(this.searchTimer);
   }
 
   changePage(page: number): void {
     this.currentPage.set(page);
-    const queryParams: Record<string, string | null> = {
-      page: page > 1 ? String(page) : null,
-    };
-    this.router.navigate([], { queryParams, queryParamsHandling: 'merge', replaceUrl: true });
+    this.syncPageParam();
     this.loadData();
   }
 
@@ -469,6 +487,9 @@ export class SupplierCreditPageComponent implements OnInit {
     this.sortBy.set(event.field);
     this.sortDir.set(event.dir);
     this.currentPage.set(1);
+    // Resetting to page 1 must reset the URL too, or a reload jumps to a page
+    // of the previous result set.
+    this.syncPageParam();
     this.loadData();
   }
 
@@ -479,17 +500,28 @@ export class SupplierCreditPageComponent implements OnInit {
    */
   onSearch(term: string): void {
     this.search.set(term);
-    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+    clearTimeout(this.searchDebounce);
     this.searchDebounce = setTimeout(() => {
       this.currentPage.set(1);
+      this.syncPageParam();
       void this.loadData();
     }, 300);
+  }
+
+  /** Mirror the current page into the URL (null when on page 1). */
+  private syncPageParam(): void {
+    const page = this.currentPage();
+    void this.router.navigate([], {
+      queryParams: { page: page > 1 ? String(page) : null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   // --- Company search ---
   onCompanySearch(term: string): void {
     this.companySearch.set(term);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
+    clearTimeout(this.searchTimer);
     if (term.length < 2) {
       this.companySearchResults.set([]);
       this.companyDropdownOpen.set(false);

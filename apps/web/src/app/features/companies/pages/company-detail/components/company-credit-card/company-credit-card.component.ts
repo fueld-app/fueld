@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, CreditLineDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
+import { AuthService } from '@app/core/auth/auth.service';
 
 /**
  * Credit lines held for / by this company, on the company detail page.
@@ -38,10 +39,14 @@ import { API } from '@app/core/config/api';
           }
         </div>
         @if (lines().length) {
-          <a
-            [routerLink]="creditPageRoute()"
-            class="text-[11px] font-medium text-brand-700 dark:text-brand-400 hover:underline"
-          >Open credit page</a>
+          <div class="flex items-center gap-3">
+            @for (link of creditPageLinks(); track link.route) {
+              <a
+                [routerLink]="link.route"
+                class="text-[11px] font-medium text-brand-700 dark:text-brand-400 hover:underline"
+              >{{ link.label }}</a>
+            }
+          </div>
         }
       </div>
 
@@ -115,11 +120,23 @@ import { API } from '@app/core/config/api';
 })
 export class CompanyCreditCardComponent {
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
 
   readonly companyId = input.required<string>();
 
   readonly lines = signal<CreditLineDto[]>([]);
   readonly loading = signal(true);
+
+  /**
+   * The credit pages are role-gated (supplier credit is ADMIN/CREDITMANAGER;
+   * customer credit adds FINANCE), but the company page is open to every role.
+   * Rendering the card's figures to a role the credit pages exclude would widen
+   * exposure of financial data through a less-restricted surface, so the card
+   * mirrors the same policy per side and is hidden entirely for roles that may
+   * see neither.
+   */
+  readonly canSeeCustomerCredit = this.auth.canAccessCustomerCredit;
+  readonly canSeeSupplierCredit = this.auth.canAccessCredit;
 
   constructor() {
     // Re-fetch whenever the company changes (same component instance is reused
@@ -135,22 +152,33 @@ export class CompanyCreditCardComponent {
     this.loading.set(true);
     try {
       // One request per side, so the response labels are unambiguous even if a
-      // company somehow holds both.
+      // company somehow holds both. The supplier side is only fetched when the
+      // role may see it (see canSeeSupplierCredit) — fetching and hiding would
+      // still ship the figures to a browser that should not have them.
       const [customer, supplier] = await Promise.all([
-        firstValueFrom(
-          this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
-            `${API}/credit/lines?type=CUSTOMER&counterpartyId=${encodeURIComponent(companyId)}&limit=50`,
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
-            `${API}/credit/lines?type=SUPPLIER&counterpartyId=${encodeURIComponent(companyId)}&limit=50`,
-          ),
-        ),
+        this.canSeeCustomerCredit()
+          ? firstValueFrom(
+            this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
+              `${API}/credit/lines?type=CUSTOMER&counterpartyId=${encodeURIComponent(companyId)}&limit=50`,
+            ),
+          )
+          : Promise.resolve(null),
+        this.canSeeSupplierCredit()
+          ? firstValueFrom(
+            this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
+              `${API}/credit/lines?type=SUPPLIER&counterpartyId=${encodeURIComponent(companyId)}&limit=50`,
+            ),
+          )
+          : Promise.resolve(null),
       ]);
+      // The component instance is REUSED across navigations, so a slower response
+      // for the company we just left can resolve after the new one and overwrite
+      // the new company's lines with the old company's. Discard any response whose
+      // request is no longer the current company.
+      if (this.companyId() !== companyId) return;
       const rows = [
-        ...(customer.success ? customer.data?.items ?? [] : []),
-        ...(supplier.success ? supplier.data?.items ?? [] : []),
+        ...(customer?.success ? customer.data?.items ?? [] : []),
+        ...(supplier?.success ? supplier.data?.items ?? [] : []),
       ];
       // Customer lines first — the company page is reached most often to check
       // what a customer may owe, not what we may owe a supplier.
@@ -158,15 +186,25 @@ export class CompanyCreditCardComponent {
       this.lines.set(rows);
     } catch {
       // Non-critical on this page — the card simply stays empty.
-      this.lines.set([]);
+      if (this.companyId() === companyId) this.lines.set([]);
     } finally {
-      this.loading.set(false);
+      if (this.companyId() === companyId) this.loading.set(false);
     }
   }
 
-  /** The credit page for the type this company actually has lines on. */
-  creditPageRoute(): string {
-    return this.lines()[0]?.type === 'SUPPLIER' ? '/credit/suppliers' : '/credit/customers';
+  /**
+   * One link per credit type the company actually holds lines on.
+   *
+   * A company can hold BOTH customer and supplier lines. Linking only to the
+   * first row's page (customer-first sort) left its supplier lines with no path
+   * from here, so each present type gets its own link.
+   */
+  creditPageLinks(): Array<{ label: string; route: string }> {
+    const types = new Set(this.lines().map((l) => l.type));
+    const links: Array<{ label: string; route: string }> = [];
+    if (types.has('CUSTOMER')) links.push({ label: 'Customer credit', route: '/credit/customers' });
+    if (types.has('SUPPLIER')) links.push({ label: 'Supplier credit', route: '/credit/suppliers' });
+    return links;
   }
 
   parseFloat = parseFloat;

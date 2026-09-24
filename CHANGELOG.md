@@ -26,6 +26,13 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 - **PO Number field is always visible** on the order details page, even when a broker is assigned. Previously it would disappear when a broker was set.
 - **Customer and supplier terms** now show up to 2 lines by default with a "show more" toggle, so you can see more terms at a glance without scrolling.
 
+## Credit
+
+- **Search and sort the credit lists.** Both the Customer and Supplier credit pages now have a search box that filters by company name on the server (so it searches the whole list, not just the 25 rows on screen), and every column is sortable — including the derived Used and Available figures and the average-days-to-pay column.
+- **Broker credit flag on customer lines.** A customer credit line can be marked as broker credit, matching the supplier side, and the flag can be set and cleared from the create/edit form. Broker deals use broker lines, regular deals use regular lines.
+- **Credit lines on the company page.** Opening a company now shows its credit lines — customer and supplier — with credit, used and available amounts, the period and the average days to pay, so you no longer have to leave the company to look up its credit.
+- **Credit figures respect roles.** The company card follows the same access rules as the credit pages: supplier credit is shown to administrators and credit managers, customer credit additionally to finance, and staff without either access do not see the card.
+
 ## Filtering
 
 - **New filter overlay on Companies, Vessels, and Places pages.** The same filter panel used on the orders list is now available across all major list pages, with relevant filters for each:

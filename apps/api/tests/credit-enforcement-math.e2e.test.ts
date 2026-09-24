@@ -27,6 +27,7 @@ async function seedCustomerWithLine(creditAmount: string, currency = 'USD', isBr
   const db = await getDb();
   const svc = await loadCreditService();
   const line = await svc.createCreditLine({
+    tenantId: seeded.tenant.id,
     counterpartyIds: [seeded.client.id],
     type: 'CUSTOMER',
     creditAmount,

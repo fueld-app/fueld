@@ -32,6 +32,7 @@ async function seedBrokerDealScenario(opts: { skipCustomerCheck: boolean }) {
   // the customer already has a fully-committed line, so any conversion
   // would fail if the customer gate applied.
   await credit.createCreditLine({
+    tenantId: seeded.tenant.id,
     counterpartyIds: [seeded.client.id],
     type: 'CUSTOMER',
     creditAmount: '100000',
@@ -77,6 +78,7 @@ async function seedBrokerDealScenario(opts: { skipCustomerCheck: boolean }) {
     })
     .returning();
   await credit.createCreditLine({
+    tenantId: seeded.tenant.id,
     counterpartyIds: [supplier.id],
     type: 'SUPPLIER',
     creditAmount: '500000',

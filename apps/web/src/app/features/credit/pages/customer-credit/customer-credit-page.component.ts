@@ -504,8 +504,12 @@ interface CompanySearchResultOption {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="12" class="px-4 py-8 text-center text-gray-400 dark:text-muted">
-                    No customer credit lines yet. Click "Add Credit Line" to create one.
+                  <td [attr.colspan]="atradiusEnabled() ? 13 : 12" class="px-4 py-8 text-center text-gray-400 dark:text-muted">
+                    @if (search().trim()) {
+                      No credit lines match "{{ search().trim() }}".
+                    } @else {
+                      No customer credit lines yet. Click "Add Credit Line" to create one.
+                    }
                   </td>
                 </tr>
               }
@@ -591,7 +595,9 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   readonly sortDir = signal<'asc' | 'desc'>('asc');
   /** Free-text filter on customer names, applied server-side. */
   readonly search = signal('');
-  private searchDebounce: ReturnType<typeof setTimeout> | null = null;
+  private searchDebounce: ReturnType<typeof setTimeout> | undefined;
+  /** Monotonic id of the latest loadData() call, for discarding stale responses. */
+  private loadRequestId = 0;
 
   // Own companies
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
@@ -611,7 +617,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   readonly companySearch = signal('');
   readonly companySearchResults = signal<CounterpartyOption[]>([]);
   readonly companyDropdownOpen = signal(false);
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Frozen state
   readonly frozenCounterpartyIds = signal<Set<string>>(new Set());
@@ -693,13 +699,19 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.searchTimer) {
-      clearTimeout(this.searchTimer);
-      this.searchTimer = null;
-    }
+    // A keystroke within the 300ms debounce of navigating away would otherwise
+    // fire loadData() on a destroyed component (one wasted authenticated request).
+    clearTimeout(this.searchTimer);
+    clearTimeout(this.searchDebounce);
   }
 
   async loadData(): Promise<void> {
+    // Search is a high-frequency trigger (one request per debounce), so two
+    // loads can be in flight at once and their resolution order is not
+    // guaranteed — an older, broader result could overwrite a newer, narrower
+    // one while the input still shows the narrow term. Discard anything that is
+    // not the latest request.
+    const requestId = ++this.loadRequestId;
     this.loading.set(true);
     try {
       const params = new URLSearchParams({
@@ -721,6 +733,9 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
         ),
         this.canManageCreditOverrides() ? this.riskService.getPendingOverrides().catch(() => null) : Promise.resolve(null),
       ]);
+      // A newer load started while this one was in flight — its result is the
+      // one the user is waiting for, so drop this response entirely.
+      if (requestId !== this.loadRequestId) return;
       if (res.success && res.data) {
         this.creditLines.set(res.data.items);
         this.total.set(res.data.total);
@@ -737,7 +752,9 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
     } catch (err) {
       console.error('Failed to load credit lines:', err);
     } finally {
-      this.loading.set(false);
+      // Only the latest request owns the spinner; an older one finishing late
+      // must not clear it while the newer request is still loading.
+      if (requestId === this.loadRequestId) this.loading.set(false);
     }
   }
 
@@ -835,10 +852,7 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
 
   changePage(page: number): void {
     this.currentPage.set(page);
-    const queryParams: Record<string, string | null> = {
-      page: page > 1 ? String(page) : null,
-    };
-    this.router.navigate([], { queryParams, queryParamsHandling: 'merge', replaceUrl: true });
+    this.syncPageParam();
     this.loadData();
   }
 
@@ -846,6 +860,9 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
     this.sortBy.set(event.field);
     this.sortDir.set(event.dir);
     this.currentPage.set(1);
+    // Searching/sorting resets to page 1, so the URL's ?page must reset with it
+    // — otherwise a reload jumps back to a page of the previous result set.
+    this.syncPageParam();
     this.loadData();
   }
 
@@ -855,17 +872,28 @@ export class CustomerCreditPageComponent implements OnInit, OnDestroy {
    */
   onSearch(term: string): void {
     this.search.set(term);
-    if (this.searchDebounce) clearTimeout(this.searchDebounce);
+    clearTimeout(this.searchDebounce);
     this.searchDebounce = setTimeout(() => {
       this.currentPage.set(1);
+      this.syncPageParam();
       void this.loadData();
     }, 300);
+  }
+
+  /** Mirror the current page into the URL (null when on page 1). */
+  private syncPageParam(): void {
+    const page = this.currentPage();
+    void this.router.navigate([], {
+      queryParams: { page: page > 1 ? String(page) : null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   // --- Company search ---
   onCompanySearch(term: string): void {
     this.companySearch.set(term);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
+    clearTimeout(this.searchTimer);
     if (term.length < 2) {
       this.companySearchResults.set([]);
       this.companyDropdownOpen.set(false);

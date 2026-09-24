@@ -50,6 +50,7 @@ describe('broker credit auto-release', () => {
     }).returning();
 
     const line = await createCreditLine({
+      tenantId: tenant.id,
       counterpartyIds: [supplier.id],
       type: 'SUPPLIER',
       creditAmount: '100000',
@@ -77,6 +78,7 @@ describe('broker credit auto-release', () => {
     }).returning();
 
     const line = await createCreditLine({
+      tenantId: tenant.id,
       counterpartyIds: [supplier.id],
       type: 'SUPPLIER',
       creditAmount: '100000',
@@ -88,7 +90,7 @@ describe('broker credit auto-release', () => {
     const [dbRow1] = await db.select().from(creditLines).where(eq(creditLines.id, line!.id)).limit(1);
     expect(dbRow1?.isBrokerCreditLine).toBe(false);
 
-    const updated = await updateCreditLine(line!.id, { isBrokerCreditLine: true });
+    const updated = await updateCreditLine(line!.id, tenant.id, { isBrokerCreditLine: true });
     expect(updated).toBeTruthy();
     // C1 FIXED: isBrokerCreditLine is now selected in queries
     expect(updated?.isBrokerCreditLine).toBe(true);
@@ -108,6 +110,7 @@ describe('broker credit auto-release', () => {
     }).returning();
 
     const line = await createCreditLine({
+      tenantId: seeded.tenant.id,
       counterpartyIds: [supplier.id],
       type: 'SUPPLIER',
       creditAmount: '100000',
@@ -171,6 +174,7 @@ describe('broker credit auto-release', () => {
     }).returning();
 
     const line = await createCreditLine({
+      tenantId: seeded.tenant.id,
       counterpartyIds: [supplier.id],
       type: 'SUPPLIER',
       creditAmount: '100000',
@@ -274,6 +278,7 @@ describe('broker credit auto-release', () => {
     }).returning();
 
     const line = await createCreditLine({
+      tenantId: seeded.tenant.id,
       counterpartyIds: [supplier.id],
       type: 'SUPPLIER',
       creditAmount: '100000',
@@ -344,6 +349,7 @@ describe('broker credit auto-release', () => {
     }).returning();
 
     const line = await createCreditLine({
+      tenantId: seeded.tenant.id,
       counterpartyIds: [supplier.id],
       type: 'SUPPLIER',
       creditAmount: '100000',
@@ -411,6 +417,7 @@ describe('broker credit auto-release', () => {
     }).returning();
 
     const line = await createCreditLine({
+      tenantId: seeded.tenant.id,
       counterpartyIds: [supplier.id],
       type: 'SUPPLIER',
       creditAmount: '100000',
@@ -483,6 +490,7 @@ describe('broker credit auto-release', () => {
     }).returning();
 
     const line = await createCreditLine({
+      tenantId: seeded.tenant.id,
       counterpartyIds: [supplier.id],
       type: 'SUPPLIER',
       creditAmount: '100000',
