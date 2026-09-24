@@ -7,6 +7,7 @@ import {
   computed,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { DateFormatPipe } from '@app/shared/pipes/date-format.pipe';
 import type { InvoiceDueBasis, OrderPaymentScheduleTrancheDto } from '@fueld/types';
 
 /** A row being edited. `percent` is a string because it is a text input. */
@@ -32,7 +33,7 @@ interface DraftTranche {
 @Component({
   selector: 'app-order-payment-schedule-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, DateFormatPipe],
   template: `
     <div class="rounded-xl border border-gray-200 dark:border-line p-4">
       <div class="flex items-center justify-between">
@@ -149,7 +150,7 @@ interface DraftTranche {
           @for (p of preview(); track $index) {
             <p class="text-xs text-gray-500 dark:text-muted">
               {{ p.label || ('Tranche ' + (p.seq)) }} — {{ p.amount }} {{ currency() }}
-              @if (p.dueDate) { <span>due {{ p.dueDate }}</span> }
+              @if (p.dueDate) { <span>due {{ p.dueDate | dateFormat }}</span> }
             </p>
           }
         </div>

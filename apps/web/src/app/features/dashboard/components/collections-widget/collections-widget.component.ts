@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import type { OverdueInvoiceDto } from '@fueld/types';
 import { AuthService } from '@app/core/auth/auth.service';
+import { DateFormatPipe } from '@app/shared/pipes/date-format.pipe';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Collections Widget — Lists overdue invoices and allows adding notes
@@ -15,7 +16,7 @@ import { AuthService } from '@app/core/auth/auth.service';
 @Component({
   selector: 'app-collections-widget',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [],
+  imports: [DateFormatPipe],
   template: `
     <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
       <div class="flex items-center justify-between border-b border-gray-200 dark:border-line p-5">
@@ -45,7 +46,7 @@ import { AuthService } from '@app/core/auth/auth.service';
                   } @else {
                     <p class="text-sm font-semibold text-gray-400 dark:text-muted italic">Hidden</p>
                   }
-                  <p class="text-xs text-gray-500 dark:text-muted">Due {{ invoice.dueDate }}</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">Due {{ invoice.dueDate | dateFormat }}</p>
                 </div>
               </div>
               @if (selectedInvoiceId() === invoice.invoiceId) {

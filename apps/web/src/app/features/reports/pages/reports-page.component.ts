@@ -20,6 +20,7 @@ import { Role } from '@fueld/types';
 import { API } from '@app/core/config/api';
 import { ReportsSavedViewsCardComponent } from './reports-saved-views-card.component';
 import { ReportsScheduleFormComponent } from './reports-schedule-form.component';
+import { DateFormatPipe } from '@app/shared/pipes/date-format.pipe';
 
 type ExportKind = 'trader-performance' | 'invoice-aging' | 'commercial-summary' | 'margin-analysis' | 'exceptions';
 type ExportFormat = 'csv' | 'xlsx';
@@ -28,7 +29,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
 @Component({
   selector: 'app-reports-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ReportsSavedViewsCardComponent, ReportsScheduleFormComponent],
+  imports: [RouterLink, ReportsSavedViewsCardComponent, ReportsScheduleFormComponent, DateFormatPipe],
   template: `
     <div class="space-y-6 pb-8">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -463,7 +464,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                           <td class="px-4 py-3">{{ row.invoiceNumber }}</td>
                           <td class="px-4 py-3">{{ row.clientName }}</td>
                           <td class="px-4 py-3">{{ row.traderName || '—' }}</td>
-                          <td class="px-4 py-3">{{ row.dueDate }}</td>
+                          <td class="px-4 py-3">{{ row.dueDate | dateFormat }}</td>
                           <td class="px-4 py-3">{{ formatCurrency(row.outstandingAmount) }}</td>
                         </tr>
                       } @empty {
@@ -528,7 +529,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                       </td>
                       <td class="px-5 py-3">{{ row.clientName }}</td>
                       <td class="px-5 py-3">{{ row.traderName || '—' }}</td>
-                      <td class="px-5 py-3">{{ row.dueDate }}</td>
+                      <td class="px-5 py-3">{{ row.dueDate | dateFormat }}</td>
                       <td class="px-5 py-3">{{ formatCurrency(row.outstandingAmount) }}</td>
                       <td class="px-5 py-3">{{ row.agingBucket }} · {{ row.daysOverdue }}</td>
                     </tr>

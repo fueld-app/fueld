@@ -26,6 +26,12 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 - **PO Number field is always visible** on the order details page, even when a broker is assigned. Previously it would disappear when a broker was set.
 - **Customer and supplier terms** now show up to 2 lines by default with a "show more" toggle, so you can see more terms at a glance without scrolling.
 
+## Documents & Settings
+
+- **Date format now applies to the due date.** Choose ISO (`2026-10-01`), European (`01/10/2026`) or American (`10/01/2026`) under Admin → Settings → General, and invoice due dates follow it. Previously the setting changed most dates on a document but not the due date itself, which stayed in the ISO form regardless.
+- **Date format follows the document's own tenant.** The setting was read from the first tenant on the instance rather than the one the document belongs to, so on a multi-tenant server every tenant rendered — and saved — in the same format.
+- **Same fix on the offer/confirmation date and the dashboard/report due dates** (Collections widget, reports drill-down, payment schedule preview), which showed the raw form rather than your configured one.
+
 ## Credit
 
 - **Search and sort the credit lists.** Both the Customer and Supplier credit pages now have a search box that filters by company name on the server (so it searches the whole list, not just the 25 rows on screen), and every column is sortable — including the derived Used and Available figures and the average-days-to-pay column.

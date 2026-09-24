@@ -973,7 +973,7 @@ describe('document.service formatting helpers', () => {
   it('maps revision info and company registration helper branches', () => {
     const revision = {
       id: 'rev-1',
-      tenantId: 'tenant-1',
+      tenantId: '00000000-0000-4000-8000-000000000000',
       revisionNumber: 4,
       verificationRef: 'INV-20260304-R004',
       verifyToken: 'token-123',
@@ -1036,7 +1036,7 @@ describe('document.service formatting helpers', () => {
 
     const baseRevision = {
       id: 'rev-exp-1',
-      tenantId: 'tenant-1',
+      tenantId: '00000000-0000-4000-8000-000000000000',
       revisionNumber: 1,
       verificationRef: 'INV-20260304-R001',
       verifyToken: 'token',
@@ -1423,6 +1423,7 @@ describe('document.service formatting helpers', () => {
       order: {
         id: 'ord-public-1',
         orderNumber: 'ORD-PUBLIC-1',
+        tenantId: '00000000-0000-4000-8000-000000000000',
         bankAccountId: null,
         invoicingCompanyId: null,
         client: { name: 'Acme Marine', country: 'Denmark' },
@@ -1910,6 +1911,7 @@ describe('document.service formatting helpers', () => {
       order: {
         id: 'ord-logo-1',
         orderNumber: 'ORD-LOGO-1',
+        tenantId: '00000000-0000-4000-8000-000000000000',
         bankAccountId: null,
         invoicingCompanyId: null,
         client: { name: 'Acme Marine', country: 'Denmark' },
@@ -2496,6 +2498,7 @@ describe('document.service formatting helpers', () => {
       order: {
         id: 'ord-itemnote-1',
         orderNumber: 'ORD-ITEMNOTE-1',
+        tenantId: '00000000-0000-4000-8000-000000000000',
         bankAccountId: null,
         invoicingCompanyId: null,
         client: { name: 'Acme Marine', country: 'Denmark' },

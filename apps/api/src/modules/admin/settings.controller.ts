@@ -2943,7 +2943,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .get('/date-format', async ({ auth }) => {
     try {
       requireAdmin(auth);
-      const data = await getDateFormatSettings();
+      const data = await getDateFormatSettings(auth.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -2956,7 +2956,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .put('/date-format', async ({ auth, body }) => {
     try {
       requireAdmin(auth);
-      const data = await updateDateFormatSettings(body);
+      const data = await updateDateFormatSettings(auth.tenantId, body);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -2969,9 +2969,9 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     detail: { tags: ['Admin Settings'], summary: 'Update date format setting' },
   })
 
-  .get('/my-date-format', async () => {
+  .get('/my-date-format', async ({ auth }) => {
     try {
-      const data = await getDateFormatSettings();
+      const data = await getDateFormatSettings(auth.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';

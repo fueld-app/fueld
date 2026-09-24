@@ -2282,19 +2282,39 @@ export async function updateCostSalesDecimalPrecision(data: { precision?: number
   return getCostSalesDecimalPrecision();
 }
 
-export async function getDateFormatSettings(): Promise<{ dateFormat: DateFormatSetting }> {
-  const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
+/**
+ * The tenant's configured date format.
+ *
+ * TENANT-SCOPED, not `tenants.limit(1)`: with more than one tenant on an
+ * instance, the first-row read returned whichever tenant the planner happened to
+ * pick, so every tenant's documents rendered in one tenant's format and a save
+ * silently rewrote that same wrong row.
+ */
+export async function getDateFormatSettings(tenantId: string): Promise<{ dateFormat: DateFormatSetting }> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
   const settings = (tenant?.settings ?? {}) as import('../../db/schema').TenantSettings;
   return { dateFormat: (settings.dateFormat as DateFormatSetting) ?? DEFAULT_DATE_FORMAT };
 }
 
-export async function updateDateFormatSettings(data: { dateFormat?: DateFormatSetting }): Promise<{ dateFormat: DateFormatSetting }> {
-  const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
-  const settings = (tenant?.settings ?? {}) as import('../../db/schema').TenantSettings;
+export async function updateDateFormatSettings(
+  tenantId: string,
+  data: { dateFormat?: DateFormatSetting },
+): Promise<{ dateFormat: DateFormatSetting }> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!tenant) throw new Error('Tenant not found');
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
   settings.dateFormat = data.dateFormat ?? DEFAULT_DATE_FORMAT;
   await db
     .update(tenants)
     .set({ settings, updatedAt: new Date() })
-    .where(eq(tenants.id, tenant.id));
-  return getDateFormatSettings();
+    .where(eq(tenants.id, tenantId));
+  return getDateFormatSettings(tenantId);
 }

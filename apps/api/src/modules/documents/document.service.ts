@@ -1196,8 +1196,8 @@ function buildInvoiceDocument(data: {
           {
             width: '50%',
             stack: [
-              { text: `Invoice Date: ${data.createdAt.toISOString().split('T')[0]}`, alignment: 'right' },
-              { text: `Due Date: ${data.dueDate}`, alignment: 'right', bold: true },
+              { text: `Invoice Date: ${formatStoredDateOnlyForDisplay(data.createdAt, null, data.dateFormat ?? undefined) ?? ''}`, alignment: 'right' },
+              { text: `Due Date: ${formatStoredDateOnlyForDisplay(data.dueDate, null, data.dateFormat ?? undefined) ?? ''}`, alignment: 'right', bold: true },
               { text: `Sales Rep: ${data.salesRepName ?? 'N/A'}`, alignment: 'right', color: '#666666' },
             ],
           },
@@ -1506,7 +1506,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
   const invoice = await fetchInvoiceData(invoiceId);
   const order = invoice.order;
 
-  const { dateFormat } = await getDateFormatSettings();
+  const { dateFormat } = await getDateFormatSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
 
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
@@ -1702,7 +1702,7 @@ export async function generateOrderInvoicePdfBuffer(
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
-  const { dateFormat } = await getDateFormatSettings();
+  const { dateFormat } = await getDateFormatSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
 
   // Materialize the invoice row on ISSUANCE. Before this existed, no production
@@ -1988,7 +1988,10 @@ export function buildOfferDocument(data: {
   const dd = String(data.createdAt.getUTCDate()).padStart(2, '0');
   const mm = String(data.createdAt.getUTCMonth() + 1).padStart(2, '0');
   const yyyy = data.createdAt.getUTCFullYear();
-  const createdDate = `${dd}-${mm}-${yyyy}`;
+  // Same as the invoice: the document date is a date on the page, so it follows
+  // the tenant's configured format rather than a hardcoded DD-MM-YYYY.
+  const createdDate = formatStoredDateOnlyForDisplay(data.createdAt, null, data.dateFormat ?? undefined)
+    ?? `${dd}-${mm}-${yyyy}`;
   const title = data.docTitle ?? 'OFFER';
   const openingTopMargin = title === 'NOMINATION' ? 8 : 18;
   const showAgentBlock = (title === 'CONFIRMATION' || title === 'NOMINATION')
@@ -2416,7 +2419,7 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
   const includeHidden = options?.includeHiddenItems ?? false;
   void includeHidden; // kept for API compat: hideOnDocuments lines stay excluded everywhere; CREDIT_NOTE lines are now also unconditionally excluded
   const order = await fetchOrderForInvoice(orderId);
-  const { dateFormat } = await getDateFormatSettings();
+  const { dateFormat } = await getDateFormatSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const isInquiryContext = order.status === 'INQUIRY' || order.status === 'OFFER';
   const documentTitle = options?.documentTitleOverride ?? (isInquiryContext ? 'OFFER' : 'CONFIRMATION');
@@ -2642,7 +2645,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
-  const { dateFormat } = await getDateFormatSettings();
+  const { dateFormat } = await getDateFormatSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const nominationContext = resolveNominationSupplierContext(order, options?.orderSupplierId ?? null);
   if (!nominationContext.items.length) {
@@ -2889,7 +2892,10 @@ function buildProformaDocument(data: {
   const dd2 = String(data.createdAt.getUTCDate()).padStart(2, '0');
   const mm2 = String(data.createdAt.getUTCMonth() + 1).padStart(2, '0');
   const yyyy2 = data.createdAt.getUTCFullYear();
-  const createdDate = `${dd2}-${mm2}-${yyyy2}`;
+  // The document date follows the tenant's configured format, like every other
+  // date on the page — it was hardcoded DD-MM-YYYY and ignored the setting.
+  const createdDate = formatStoredDateOnlyForDisplay(data.createdAt, null, data.dateFormat ?? undefined)
+    ?? `${dd2}-${mm2}-${yyyy2}`;
 
   // Customer address block (top-left)
   const customerBlock: Content[] = [
@@ -3175,7 +3181,7 @@ function buildProformaDocument(data: {
                 ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 2] } as Content]
                 : []),
               ...(data.dueDate
-                ? [{ text: [{ text: 'Due date:  ', bold: true }, { text: data.dueDate }], margin: [0, 0, 0, 2] } as Content]
+                ? [{ text: [{ text: 'Due date:  ', bold: true }, { text: formatStoredDateOnlyForDisplay(data.dueDate, null, data.dateFormat ?? undefined) ?? data.dueDate }], margin: [0, 0, 0, 2] } as Content]
                 : []),
               ...buildNotesSection({
                 customerNote: data.customerNote,
@@ -3311,7 +3317,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
-  const { dateFormat } = await getDateFormatSettings();
+  const { dateFormat } = await getDateFormatSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'PROFORMA_INVOICE',
