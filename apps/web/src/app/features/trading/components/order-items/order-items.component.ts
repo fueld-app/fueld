@@ -941,6 +941,8 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly allowDeliveredEdit = input(false);
   readonly canSeePrices = input(true);
   readonly isBrokerDeal = input(false);
+  /** Order-level broker commission rate — the second tier when a line has none. */
+  readonly commissionPerMt = input<string | null>(null);
   readonly currency = input('USD');
   // Deal economics (tenant 'deal-economics' view) — order-level commissions
   readonly tpcPerMt = input<string | null>(null);
@@ -1571,18 +1573,32 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Broker deal profit = commissionPerUnit × quantity (in base unit).
+   * Broker deal profit = rate × quantity, mirroring
+   * `order-financing.calculateLineEconomics` so the editor and the server agree.
    *
    * Fees and services earn nothing — a barging fee is a lump sum stored with
    * quantity 1, so multiplying it by the per-MT rate showed a flat rate as
    * though it were a tonne, and the row total counted the fee as tonnage. Uses
-   * the same shared rule as the commission report and the server profit column.
+   * the same shared rule as the commission report and the profit column.
+   *
+   * The rate falls back per-line → order-level, which matters because most
+   * broker-deal lines carry NO per-line rate (the UI seeds the tenant default
+   * onto the ORDER): without the fallback this preview read $0 for a line the
+   * report billed in full. Delivered quantity wins over ordered, matching the
+   * server, so a partially delivered deal does not preview the wrong figure.
    */
   brokerProfitForRow(row: OrderItemRow): number {
     if (!isCommissionableLine(row.productType)) return 0;
-    const rate = row.commissionPerUnit ?? 0;
-    const qty = row.quantity ?? 0;
+    const rate = row.commissionPerUnit ?? this.parseNullableNumber(this.commissionPerMt()) ?? 0;
+    const qty = row.deliveredQuantity ?? row.quantity ?? 0;
     return rate * qty;
+  }
+
+  /** Parse an optional numeric input, treating blank/absent as "no value". */
+  private parseNullableNumber(value: string | number | null | undefined): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   /** Total broker deal profit across all rows. */

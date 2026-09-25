@@ -6,6 +6,7 @@
 
 import { eq, and, desc, asc, sql, ilike, inArray, or, isNull, gte, lte } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import { isCommissionableLine } from '@fueld/types';
 import { db } from '../../db';
 import {
   orders,
@@ -3090,7 +3091,12 @@ export async function listDealEconomics(
       placeName: row.placeName,
       clientName: row.clientName,
       status: row.status,
-      products: (typesByOrder.get(row.id) ?? []).join(', '),
+      // For a broker deal the quantity and profit on this row already exclude
+      // fee lines, so the "products" column must match — otherwise it reads
+      // "VLSFO, BARGING_FEE" beside a quantity that omits the fee.
+      products: (typesByOrder.get(row.id) ?? [])
+        .filter((type) => !row.isBrokerDeal || isCommissionableLine(type))
+        .join(', '),
       totalQuantity: economics.totalQuantity,
       costBase: economics.totalCostBase,
       revenueBase: economics.totalRevenueBase,

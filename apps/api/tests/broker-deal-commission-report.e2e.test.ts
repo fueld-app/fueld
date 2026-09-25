@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { seedAuthBasics, truncateAll, getDb } from './helpers/db';
 import { loginE2E, requestJson, requestRaw } from './helpers/e2e';
 import { eq } from 'drizzle-orm';
-import { tenants, orders, orderItems } from '../src/db/schema';
+import { tenants, users, orders, orderItems } from '../src/db/schema';
 
 /**
  * API E2E tests for the broker commission report endpoint + exports.
@@ -637,7 +637,7 @@ describe('broker commission report e2e', () => {
   it('commissions PRODUCTS only — a barging fee earns no per-MT commission', async () => {
     // Daniek (Moxie): "it counts the $3/MT on barging fee, but it should only
     // be on products". A barging fee is a lump sum stored with quantity 1, so
-    // mulitplying it by the $/MT rate billed a flat $3 as if it were a tonne —
+    // multiplying it by the $/MT rate billed a flat $3 as if it were a tonne —
     // and added the fee's 1 to the reported tonnage.
     const seeded = await seedAuthBasics();
     await enableBrokerDeals(seeded.tenant.id);
@@ -667,6 +667,44 @@ describe('broker commission report e2e', () => {
     const productTypes = cust.orders.map((o: { productType: string }) => o.productType);
     expect(productTypes).not.toContain('BARGING_FEE');
     expect(productTypes.sort()).toEqual(['LSMGO', 'VLSFO']);
+  });
+
+  it('lists only products in the deal row, matching its fee-excluded quantity', async () => {
+    // The deal-economics "products" column joined every line type, so a broker
+    // deal read "VLSFO, BARGING_FEE" beside a quantity that already excluded
+    // the fee. Panel finding (DS2 #3).
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    // The endpoint is gated on the 'deal-economics' view + a money-privileged role.
+    // Re-read AFTER enableBrokerDeals so this write does not clobber brokerDeals
+    // with the pre-enable snapshot (which left isBrokerDeal stripped to false).
+    const db0 = await getDb();
+    const [freshTenant] = await db0.select({ settings: tenants.settings }).from(tenants).where(eq(tenants.id, seeded.tenant.id));
+    await db0.update(tenants).set({
+      settings: { ...(freshTenant!.settings as object), enabledViews: ['deal-economics'] },
+      updatedAt: new Date(),
+    }).where(eq(tenants.id, seeded.tenant.id));
+    await db0.update(users).set({ role: 'ADMIN' }).where(eq(users.id, seeded.user.id));
+
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+    const orderId = await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [
+        { productType: 'VLSFO', quantity: '100' },
+        { productType: 'BARGING_FEE', quantity: '1' },
+      ],
+      { status: 'CONFIRMED', deliveredAt: '2026-08-20' },
+    );
+
+    const res = await requestJson('/orders/deal-economics?from=2026-08-01&to=2026-08-31', { token });
+    expect(res.status).toBe(200);
+    const row = (res.data?.data ?? []).find((r: { id: string }) => r.id === orderId);
+    expect(row).toBeTruthy();
+    expect(row.products).toBe('VLSFO');
+    expect(row.products).not.toContain('BARGING_FEE');
+    // The quantity beside it already excluded the fee — the two must agree.
+    expect(parseFloat(row.totalQuantity)).toBe(100);
   });
 
   it('excludes every fee/service line type, but keeps a custom product type', async () => {
