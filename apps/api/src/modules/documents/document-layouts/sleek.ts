@@ -40,9 +40,8 @@ export interface SleekParty {
 }
 
 export interface SleekLine {
+  /** Product name and its description, already joined (e.g. "LSMGO — DMA"). */
   description: string;
-  /** Second line under the description (item notes). */
-  detail?: string | null;
   quantity: string;
   unitPrice: string;
   /** Omitted when the document hides prices. */
@@ -339,12 +338,11 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
 
   const body: TableCell[][] = [headerCells];
   for (const line of input.lines) {
-    const desc: Content[] = [{ text: line.description, fontSize: 10, color: INK } as Content];
-    if (line.detail?.trim()) {
-      desc.push({ text: line.detail.trim(), fontSize: 8.5, color: MUTED, margin: [0, 2, 0, 0] as [number, number, number, number] } as Content);
-    }
+    // One cell holding name and description together, so the pair reads as a
+    // single item and stays on one line. Long text wraps inside the cell rather
+    // than being clipped.
     body.push([
-      { stack: desc } as TableCell,
+      { text: line.description, fontSize: 10, color: INK } as TableCell,
       { text: line.quantity, fontSize: 10, color: INK, alignment: 'right' } as TableCell,
       { text: line.unitPrice, fontSize: 10, color: INK, alignment: 'right' } as TableCell,
       { text: line.amount ?? '', fontSize: 10, color: INK, alignment: 'right' } as TableCell,

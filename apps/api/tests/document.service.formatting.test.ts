@@ -1219,6 +1219,44 @@ describe('document.service formatting helpers', () => {
 
   it('resolves the tenant accent, rejecting malformed or unreadable colours', async () => {
     const FUELD = '#1a56db';
+    // Line-item label: product name and description on ONE line. The separator
+    // rule has a trap — an unescaped hyphen in the character class forms the
+    // range "/"-"–" (0x2F-0x2013), which spans the alphabet, so every
+    // description matched "already has a separator" and none got one.
+    const lineLabel = (productType: string, description: string | null) => {
+      const def = __documentTestUtils.buildProformaDocument({
+        orderNumber: 'T-1', clientName: 'C', clientCountry: 'DK', clientAddress: null,
+        customerContactName: null, customerContactRole: null, customerContactPhone: null,
+        customerContactEmail: null, vesselName: 'V', vesselImo: null, portName: 'P',
+        eta: null, etd: null, timezone: 'UTC', currency: 'USD', fromName: null, fromEmail: null,
+        fromPhone: null, paymentTerms: null, customerNote: null, termsAndConditions: null,
+        placeRemark: null, companyName: 'C', companyAddress: null, companyPhone: null,
+        companyEmail: null, companyWebsite: null, companyLogoDataUrl: null, itemNotes: [],
+        items: [{ productType, description, quantity: '1', unit: 'MT', salesPrice: '1', salesCurrency: 'USD' }],
+        createdAt: new Date('2026-09-24T00:00:00Z'), dateFormat: 'ISO', layout: 'SLEEK',
+      }) as never as { content: Array<{ table?: { body?: Array<Array<{ text?: string }>> } }> };
+      // The voyage block is also a table, so pick the one whose header row is
+      // the line-item header rather than the first table found.
+      const table = def.content.find((c) =>
+        (c.table?.body?.[0] ?? []).some((cell: { text?: string }) => cell.text === 'Description'),
+      );
+      return table?.table?.body?.[1]?.[0]?.text;
+    };
+
+    // An ordinary description is separated by a dash.
+    expect(lineLabel('LSMGO', 'DMA')).toBe('LSMGO — DMA');
+    // A description that already opens with its own separator is joined as-is,
+    // because Moxie stores "/ TRUCKING" meaning "BARGING FEE / TRUCKING".
+    expect(lineLabel('BARGING_FEE', '/ TRUCKING')).toBe('BARGING FEE / TRUCKING');
+    // No description: just the product name, and no trailing separator.
+    expect(lineLabel('VLSFO', null)).toBe('VLSFO');
+    // Whitespace-only is treated as absent.
+    expect(lineLabel('VLSFO', '   ')).toBe('VLSFO');
+    // A free-text product name that already IS the description must not double up.
+    expect(lineLabel('BILGE', 'BILGE')).toBe('BILGE');
+    // Underscores in the product type become spaces.
+    expect(lineLabel('IFO380CST_STD', 'X')).toBe('IFO380CST STD — X');
+
     // Layout selection: CLASSIC stays the default and SLEEK is a genuinely
     // different structure — not a restyle — so these assert on structure rather
     // than on wording that will keep changing.

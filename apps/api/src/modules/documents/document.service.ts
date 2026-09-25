@@ -2534,10 +2534,30 @@ function buildSleekProformaInput(data: ProformaDocumentData, accentText: string,
     const qty = parseFloat(item.quantity) || 0;
     const unitPrice = parseFloat(item.salesPrice ?? '0') || 0;
     const hidePrice = item.salesPriceFinalized === false && !item.salesPrice;
-    const desc = formatProductTypeLabel(item.productType);
+    // Product name and its description on ONE line, matching CLASSIC, which
+    // renders the same pair inline. Joined here rather than in the layout so the
+    // separator stays a document-data decision.
+    const label = formatProductTypeLabel(item.productType);
+    const detail = item.description?.trim() || '';
+    // The description is free text and often already carries its own separator:
+    // Moxie stores "/ TRUCKING" against BARGING_FEE, which means "BARGING FEE /
+    // TRUCKING". Adding a dash to those produced "BARGING FEE — / TRUCKING", so
+    // a description that opens with punctuation is joined with just a space.
+    // Otherwise an em dash separates the two parts.
+    // The hyphen is ESCAPED deliberately: unescaped it forms the range
+    // "\u002F-\u2013" between "/" and "–", which spans the whole ASCII alphabet,
+    // so every description matched and no separator was ever added.
+    const needsOwnSeparator = /^[\/\-–—,;:·]/.test(detail);
+    // No separator at all when there is no description, and no duplicate when the
+    // product name already IS the description (ChannelTX holds free-text names
+    // like "BILGE SLOPS DISPOSAL").
+    const description = !detail || detail === label
+      ? (detail || label)
+      : needsOwnSeparator
+        ? `${label} ${detail}`
+        : `${label} — ${detail}`;
     return {
-      description: desc,
-      detail: item.description?.trim() || null,
+      description,
       // Unit rides with the quantity, so the table has the reference's four
       // columns rather than a fifth that has no header.
       quantity: `${formatNumber(item.quantity, qtyDecimals)} ${item.unit}`.trim(),
