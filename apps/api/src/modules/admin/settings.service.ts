@@ -2307,9 +2307,11 @@ export async function getDateFormatSettings(tenantId: string): Promise<{ dateFor
  * default is false because enabling it changes the appearance of documents
  * already going to customers; see TenantSettings.documentBrandingEnabled.
  */
+export type DocumentLayoutSetting = 'CLASSIC' | 'SLEEK';
+
 export async function getDocumentBrandingSettings(
   tenantId: string,
-): Promise<{ enabled: boolean; hasBrandColor: boolean }> {
+): Promise<{ enabled: boolean; hasBrandColor: boolean; layout: DocumentLayoutSetting }> {
   const [tenant] = await db
     .select({ settings: tenants.settings })
     .from(tenants)
@@ -2323,7 +2325,37 @@ export async function getDocumentBrandingSettings(
     .from(counterparties)
     .where(and(eq(counterparties.tenantId, tenantId), isNotNull(counterparties.brandColor)))
     .limit(1);
-  return { enabled: settings.documentBrandingEnabled === true, hasBrandColor: !!branded };
+  return {
+    enabled: settings.documentBrandingEnabled === true,
+    hasBrandColor: !!branded,
+    layout: settings.documentLayout === 'SLEEK' ? 'SLEEK' : 'CLASSIC',
+  };
+}
+
+/**
+ * Set the tenant's document layout. Admin-only.
+ *
+ * Explicit write rather than something inferred, for the same reason as
+ * branding: a layout change restructures documents a customer receives.
+ */
+export async function updateDocumentLayoutSetting(
+  tenantId: string,
+  data: { layout?: DocumentLayoutSetting },
+): Promise<{ layout: DocumentLayoutSetting }> {
+  if (data.layout !== 'CLASSIC' && data.layout !== 'SLEEK') {
+    throw new Error("layout must be 'CLASSIC' or 'SLEEK'");
+  }
+  await db
+    .update(tenants)
+    .set({
+      settings: sql`jsonb_set(
+        COALESCE(${tenants.settings}, '{}'::jsonb),
+        '{documentLayout}',
+        to_jsonb(${data.layout}::text)
+      )`,
+    })
+    .where(eq(tenants.id, tenantId));
+  return { layout: data.layout };
 }
 
 /**

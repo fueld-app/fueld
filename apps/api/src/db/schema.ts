@@ -479,6 +479,16 @@ export interface TenantSettings {
    * documents those tenants never asked to change. Turning it on is a decision a
    * tenant makes, not something they discover in a PDF a customer received.
    */
+  /**
+   * Which document layout this tenant's PDFs use.
+   *
+   * Default CLASSIC. A layout is a structural change (block order, totals
+   * breakdown, remittance rendering), not a cosmetic one, so switching it is a
+   * tenant decision — the same reasoning as documentBrandingEnabled. Moxie asked
+   * for the sleeker reference layout; every other tenant stays on CLASSIC until
+   * they ask, which keeps their documents byte-identical.
+   */
+  documentLayout?: 'CLASSIC' | 'SLEEK';
   documentBrandingEnabled?: boolean;
   // Configurable date format: 'AMERICAN' (MM/DD/YYYY), 'EUROPEAN' (DD/MM/YYYY), 'ISO' (YYYY-MM-DD)
   dateFormat?: 'AMERICAN' | 'EUROPEAN' | 'ISO';

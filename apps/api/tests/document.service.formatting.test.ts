@@ -1219,6 +1219,38 @@ describe('document.service formatting helpers', () => {
 
   it('resolves the tenant accent, rejecting malformed or unreadable colours', async () => {
     const FUELD = '#1a56db';
+    // Layout selection: CLASSIC stays the default and SLEEK is a genuinely
+    // different structure — not a restyle — so these assert on structure rather
+    // than on wording that will keep changing.
+    const fixture = (layout?: 'CLASSIC' | 'SLEEK') => __documentTestUtils.buildProformaDocument({
+      orderNumber: 'T-1', clientName: 'C', clientCountry: 'DK', clientAddress: null,
+      customerContactName: null, customerContactRole: null, customerContactPhone: null,
+      customerContactEmail: null, vesselName: 'V', vesselImo: null, portName: 'P',
+      eta: null, etd: null, timezone: 'UTC', currency: 'USD', fromName: null, fromEmail: null,
+      fromPhone: null, paymentTerms: null, customerNote: null, termsAndConditions: null,
+      placeRemark: null, companyName: 'C', companyAddress: null, companyPhone: null,
+      companyEmail: null, companyWebsite: null, companyLogoDataUrl: null, itemNotes: [],
+      items: [{ productType: 'VLSFO', description: null, quantity: '1', unit: 'MT', salesPrice: '1', salesCurrency: 'USD' }],
+      createdAt: new Date('2026-09-24T00:00:00Z'), dateFormat: 'ISO', layout,
+    }) as never as { content: unknown[]; styles?: Record<string, unknown>; pageMargins?: number[] };
+
+    // Omitted layout is CLASSIC: every tenant that has not opted in keeps the
+    // original structure, which is what keeps their documents byte-identical.
+    const asDefault = fixture(undefined);
+    const asClassic = fixture('CLASSIC');
+    expect(JSON.stringify(asDefault)).toBe(JSON.stringify(asClassic));
+    // CLASSIC carries the styles table; SLEEK does not, because it styles
+    // per-node rather than through named styles.
+    expect(asClassic.styles).toBeDefined();
+
+    const sleek = fixture('SLEEK');
+    expect(sleek.styles).toBeUndefined();
+    expect(sleek.content.length).toBeGreaterThan(0);
+    // The two layouts must not produce the same document, or the setting is inert.
+    expect(JSON.stringify(sleek)).not.toBe(JSON.stringify(asClassic));
+    // The sleek page leaves room for the footer; it must not be the classic margin.
+    expect(sleek.pageMargins).toEqual([54, 42, 54, 78]);
+
     // The accent must survive the round trip into the builder. Shipping the
     // gate inside the resolver made branding a silent no-op: the builder calls
     // the resolver a second time, so a NULL accent was re-resolved into the

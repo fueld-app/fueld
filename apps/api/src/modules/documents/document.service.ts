@@ -1,6 +1,7 @@
 import pdfmake from 'pdfmake';
 import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
+import { buildSleekDocument, type DocumentLayout } from './document-layouts/sleek';
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray, sql } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -1401,7 +1402,7 @@ export async function generateOrderInvoicePdfBuffer(
 }> {
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings(order.tenantId);
-  const { enabled: brandingEnabled } = await getDocumentBrandingSettings(order.tenantId);
+  const { enabled: brandingEnabled, layout: documentLayout } = await getDocumentBrandingSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
 
   // Materialize the invoice row on ISSUANCE. Before this existed, no production
@@ -1523,6 +1524,7 @@ export async function generateOrderInvoicePdfBuffer(
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
+    layout: documentLayout,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2072,7 +2074,7 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
   void includeHidden; // kept for API compat: hideOnDocuments lines stay excluded everywhere; CREDIT_NOTE lines are now also unconditionally excluded
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings(order.tenantId);
-  const { enabled: brandingEnabled } = await getDocumentBrandingSettings(order.tenantId);
+  const { enabled: brandingEnabled, layout: documentLayout } = await getDocumentBrandingSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const isInquiryContext = order.status === 'INQUIRY' || order.status === 'OFFER';
   const documentTitle = options?.documentTitleOverride ?? (isInquiryContext ? 'OFFER' : 'CONFIRMATION');
@@ -2152,6 +2154,7 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
     ),
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
+    layout: documentLayout,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2300,7 +2303,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
 }> {
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings(order.tenantId);
-  const { enabled: brandingEnabled } = await getDocumentBrandingSettings(order.tenantId);
+  const { enabled: brandingEnabled, layout: documentLayout } = await getDocumentBrandingSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const nominationContext = resolveNominationSupplierContext(order, options?.orderSupplierId ?? null);
   if (!nominationContext.items.length) {
@@ -2394,6 +2397,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     // account (e.g. Ocean7 Chartering), not our own invoicing company.
     accountName: order.isBrokerDeal ? order.client?.name ?? null : undefined,
     accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
+    layout: documentLayout,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2463,11 +2467,186 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
   return { buffer: canonicalBuffer, fileName, revision };
 }
 
+
+/** Document noun for the sleek title. Reference uses title case ("Invoice"). */
+function sleekTitleFor(data: ProformaDocumentData): string {
+  const override = data.docTitle?.trim();
+  if (override) {
+    // The classic titles are upper case ("PROFORMA INVOICE"); the reference
+    // title-cases them. Only the casing changes, never the wording.
+    return override
+      .split(/\s+/)
+      .map((w) => (w.length > 0 ? w[0]!.toUpperCase() + w.slice(1).toLowerCase() : w))
+      .join(' ');
+  }
+  return 'Proforma Invoice';
+}
+
+/** Human list of the people the money is owed to, for the due line. */
+function sleekTotalLabel(data: ProformaDocumentData): string | null {
+  const company = data.companyName?.trim() || 'Company';
+  const percent = data.tranchePercent == null ? null : String(parseFloat(data.tranchePercent));
+  if (!data.trancheLabel && !percent) return null;
+  return `${data.trancheLabel ? `${data.trancheLabel} — ` : ''}${percent}% of the order, including VAT, is due to ${company}.`;
+}
+
+/**
+ * Map the proforma builder's data onto the sleek layout.
+ *
+ * Kept next to the builder rather than in the layout module so the layout stays
+ * independent of how any one document type is fetched, and so a change to the
+ * document data breaks here (a type error) instead of silently rendering a
+ * blank field.
+ */
+function buildSleekProformaInput(data: ProformaDocumentData, accentText: string, accent: string) {
+  const qtyDecimals = computeMaxDecimalPlaces(data.items, 'quantity');
+  const priceDecimals = computeMaxDecimalPlaces(data.items, 'salesPrice');
+  const currency = data.items[0]?.salesCurrency || data.currency;
+
+  const lineItemsTotal = data.items.reduce((sum, item) => {
+    const qty = parseFloat(item.quantity) || 0;
+    const price = parseFloat(item.salesPrice ?? '0') || 0;
+    return sum + qty * price;
+  }, 0);
+  const grandTotal = data.frozenTotal != null && data.frozenTotal !== ''
+    ? parseFloat(data.frozenTotal) || 0
+    : lineItemsTotal;
+
+  // Tax comes from the line items. Every item in production currently has a NULL
+  // rate, so this prints 0.00 — the same figure the reference shows — and starts
+  // reporting real VAT as soon as a line carries one.
+  const taxTotal = data.items.reduce((sum, item) => {
+    const amount = parseFloat((item as { taxAmount?: string | null }).taxAmount ?? '0') || 0;
+    return sum + amount;
+  }, 0);
+  const taxRate = data.items
+    .map((item) => parseFloat((item as { taxRate?: string | null }).taxRate ?? ''))
+    .find((r) => Number.isFinite(r) && r > 0);
+  const taxLabel = taxRate ? `VAT ${formatNumber(String(taxRate * 100), 0)}%` : 'VAT';
+
+  const lines = data.items.map((item) => {
+    const qty = parseFloat(item.quantity) || 0;
+    const unitPrice = parseFloat(item.salesPrice ?? '0') || 0;
+    const hidePrice = item.salesPriceFinalized === false && !item.salesPrice;
+    const desc = formatProductTypeLabel(item.productType);
+    return {
+      description: desc,
+      detail: item.description?.trim() || null,
+      // Unit rides with the quantity, so the table has the reference's four
+      // columns rather than a fifth that has no header.
+      quantity: `${formatNumber(item.quantity, qtyDecimals)} ${item.unit}`.trim(),
+      // The reference prints price and currency together ("15.00 USD").
+      unitPrice: hidePrice ? 'TBD' : `${formatNumber(item.salesPrice, priceDecimals)} ${item.salesCurrency || data.currency}`,
+      amount: hidePrice ? null : `${formatNumber(String(qty * unitPrice), priceDecimals)} ${item.salesCurrency || data.currency}`,
+    };
+  });
+
+  const money = (v: number) => `${formatNumber(String(v), 2)} ${currency}`;
+
+  const voyage: Array<{ label: string; value: string }> = [];
+  const vesselRef = `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}`;
+  if (vesselRef.trim()) voyage.push({ label: 'Vessel:', value: vesselRef });
+  if (data.portName?.trim()) voyage.push({ label: 'Delivery place:', value: data.portName });
+  const deliveryDate = data.deliveredAt
+    ? formatDateTimeForDisplay(data.deliveredAt.toISOString(), data.timezone, false, data.dateFormat ?? undefined)
+      ?? formatStoredDateOnlyForDisplay(data.deliveredAt, data.timezone, data.dateFormat ?? undefined)
+    : null;
+  if (deliveryDate) voyage.push({ label: 'Delivery date:', value: deliveryDate });
+
+  const dueFormatted = data.dueDate
+    ? formatStoredDateOnlyForDisplay(data.dueDate, data.timezone, data.dateFormat ?? undefined) ?? data.dueDate
+    : null;
+
+  const meta: Array<{ label: string; value: string }> = [];
+  if (data.orderNumber?.trim()) meta.push({ label: 'Invoice number', value: data.orderNumber.trim() });
+  const createdDate = formatDateTimeForDisplay(data.createdAt.toISOString(), data.timezone, false, data.dateFormat ?? undefined);
+  if (createdDate) meta.push({ label: 'Invoice date', value: createdDate });
+  if (dueFormatted) meta.push({ label: 'Due date', value: dueFormatted });
+
+  // A bank block only when there is a payable account; otherwise the document
+  // must not invite a payment to nowhere. Same rule as the classic layout.
+  const bank = data.bank && !!data.bank.iban?.trim()
+    ? {
+        beneficiary: data.bank.accountName?.trim() || data.companyName?.trim() || 'Company',
+        bankName: data.bank.bankName,
+        accountNumber: data.bank.accountNumber,
+        iban: data.bank.iban,
+        swift: data.bank.swift,
+        branchAddress: data.bank.branchAddress,
+      }
+    : null;
+
+  const notes: string[] = [];
+  if (data.customerNote?.trim()) notes.push(data.customerNote.trim());
+  for (const n of data.itemNotes) notes.push(`${n.label}: ${n.note}`);
+  if (data.termsAndConditions?.trim()) notes.push(data.termsAndConditions.trim());
+  if (data.latePaymentInterest) {
+    notes.push(`Note : Late payment charged @ ${data.latePaymentInterest} interest, per month pro rata.`);
+  }
+
+  // Name only: the reference shows "Att.: Kathy Rolfo", and appending the role
+  // reads as a surname on the addressee line.
+  const attention = data.customerContactName?.trim() ? `Att.: ${data.customerContactName.trim()}` : null;
+
+  return {
+    brandName: data.companyName?.trim() || 'Fueld Trading',
+    logoDataUrl: data.companyLogoDataUrl,
+    title: sleekTitleFor(data),
+    meta,
+    issuer: {
+      name: data.companyName?.trim() || 'Fueld Trading',
+      address: data.companyAddress,
+      taxId: data.vatNumber ?? null,
+      phone: data.companyPhone,
+      email: data.companyEmail,
+    },
+    party: {
+      name: data.clientName,
+      address: data.clientAddress ?? data.clientCountry,
+      attention,
+    },
+    voyage,
+    lines,
+    headers: ['Description', 'Quantity', 'Unit price', 'Price'],
+    totals: data.items.length > 0
+      ? {
+          subtotal: money(grandTotal),
+          taxable: money(0),
+          taxLabel,
+          taxAmount: money(taxTotal),
+          total: money(grandTotal + taxTotal),
+          totalShortLabel: 'Total including VAT',
+          totalLabel: sleekTotalLabel(data),
+          exchangeRate: null,
+        }
+      : null,
+    dueLine: dueFormatted ? `The amount is due on ${dueFormatted}.` : null,
+    trancheNote: null,
+    bank,
+    notes,
+    accent: accentText || accent,
+    verifyUrl: data.verifyUrl ?? null,
+    verifyLink: data.verifyLink ?? null,
+    fraudPreventionText: data.fraudPreventionText ?? null,
+    footer: buildDocumentFooter({
+      senderName: data.companyName?.trim() || 'Fueld Trading',
+      companyAddress: data.companyAddress,
+      companyPhone: data.companyPhone,
+      companyEmail: data.companyEmail,
+      vatNumber: data.vatNumber ?? null,
+      companyRegistrationNumber: null,
+      printMeta: data.printMeta ?? null,
+      dateFormat: data.dateFormat ?? null,
+      accent,
+    }),
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Proforma Invoice PDF
 // ═══════════════════════════════════════════════════════════════════════
 
-function buildProformaDocument(data: {
+export type ProformaDocumentData = {
   orderNumber: string | null;
   clientName: string;
   clientCountry: string | null;
@@ -2543,7 +2722,11 @@ function buildProformaDocument(data: {
   /** The order's full lines total, shown so a tranche invoice reconciles. */
   orderLinesTotal?: number | null;
   trancheSeq?: number | null;
-}): TDocumentDefinitions {
+  /** Per-tenant layout. CLASSIC (the default) keeps the original structure. */
+  layout?: DocumentLayout;
+};
+
+function buildProformaDocument(data: ProformaDocumentData): TDocumentDefinitions {
   // Heading colour: the tenant's accent when they set a legible one, else the
   // previous near-black. Using the blue default here would silently restyle
   // every unbranded tenant's live documents.
@@ -2554,6 +2737,14 @@ function buildProformaDocument(data: {
 
   // Tenant accent (validated); Fueld blue when the issuer has none.
   const accent = resolveDocAccent(data.accentColor);
+
+  // SLEEK is a different structure rather than a restyle, so it is assembled
+  // separately instead of interleaving conditionals through the classic layout.
+  // Everything it needs is derived here, from the same data, so the two layouts
+  // cannot disagree about a figure.
+  if (data.layout === 'SLEEK') {
+    return buildSleekDocument(buildSleekProformaInput(data, accentText, accent));
+  }
 
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -2916,7 +3107,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 }> {
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings(order.tenantId);
-  const { enabled: brandingEnabled } = await getDocumentBrandingSettings(order.tenantId);
+  const { enabled: brandingEnabled, layout: documentLayout } = await getDocumentBrandingSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'PROFORMA_INVOICE',
@@ -2991,6 +3182,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
+    layout: documentLayout,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,

@@ -300,6 +300,42 @@ import { ViewsSettingsCardComponent } from './views-settings-card.component';
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="app-panel">
             <div class="app-panel-header">
+              <h3 class="app-panel-title">Document Layout</h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-muted">
+                How your PDFs are laid out. Classic is the original layout; Sleek follows the reference layout Moxie asked for.
+              </p>
+            </div>
+
+            <div class="app-panel-body space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Layout</label>
+                <select
+                  class="app-input w-full max-w-xs bg-white dark:bg-surface"
+                  [ngModel]="documentLayout()"
+                  (ngModelChange)="documentLayout.set($event)"
+                >
+                  <option value="CLASSIC">Classic — default</option>
+                  <option value="SLEEK">Sleek — reference layout</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
+                  Applies to new documents. Documents already issued keep the layout they were issued with.
+                </p>
+              </div>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button (click)="saveDocumentLayout()" [disabled]="documentLayoutSaving()" class="app-button-primary">
+                  @if (documentLayoutSaving()) { Saving… } @else { Save Layout }
+                </button>
+                @if (documentLayoutSaved()) {
+                  <span class="text-sm text-green-600 dark:text-green-400">Saved</span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header">
               <h3 class="app-panel-title">Document Branding</h3>
               <p class="mt-1 text-sm text-gray-500 dark:text-muted">
                 Show your own brand colour on document headings and links. Off by default — while off, your documents look exactly as they do now.
@@ -500,6 +536,9 @@ export class GeneralSettingsPageComponent implements OnInit {
   readonly costSalesPrecisionSaved = signal(false);
 
   readonly dateFormat = signal<'AMERICAN' | 'EUROPEAN' | 'ISO'>('ISO');
+  readonly documentLayout = signal<'CLASSIC' | 'SLEEK'>('CLASSIC');
+  readonly documentLayoutSaving = signal(false);
+  readonly documentLayoutSaved = signal(false);
   readonly documentBranding = signal(false);
   readonly documentBrandingSaving = signal(false);
   readonly documentBrandingSaved = signal(false);
@@ -719,15 +758,33 @@ export class GeneralSettingsPageComponent implements OnInit {
       // The endpoint reports whether a brand colour even exists, so the hint
       // below is accurate without a second request.
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ enabled: boolean; hasBrandColor: boolean }>>(
+        this.http.get<ApiResponse<{ enabled: boolean; hasBrandColor: boolean; layout: 'CLASSIC' | 'SLEEK' }>>(
           `${API}/admin/settings/document-branding`,
         ),
       );
       this.documentBranding.set(res.data?.enabled === true);
       this.hasBrandColor.set(res.data?.hasBrandColor === true);
+      this.documentLayout.set(res.data?.layout === 'SLEEK' ? 'SLEEK' : 'CLASSIC');
     } catch {
       this.documentBranding.set(false);
       this.hasBrandColor.set(false);
+    }
+  }
+
+  async saveDocumentLayout(): Promise<void> {
+    this.documentLayoutSaving.set(true);
+    this.documentLayoutSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ layout: 'CLASSIC' | 'SLEEK' }>>(`${API}/admin/settings/document-layout`, {
+          layout: this.documentLayout(),
+        }),
+      );
+      this.documentLayout.set(res.data?.layout === 'SLEEK' ? 'SLEEK' : 'CLASSIC');
+      this.documentLayoutSaved.set(true);
+      setTimeout(() => this.documentLayoutSaved.set(false), 2500);
+    } finally {
+      this.documentLayoutSaving.set(false);
     }
   }
 

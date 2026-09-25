@@ -97,6 +97,7 @@ import {
   updateDateFormatSettings,
   getDocumentBrandingSettings,
   updateDocumentBrandingSettings,
+  updateDocumentLayoutSetting,
 } from './settings.service';
 import { getCommentsDigestSettings } from '../comments/comments-digest.service';
 import { getDailyPricingEmailSettings, getCustomerContactOptions } from '../reports/daily-pricing.service';
@@ -2996,6 +2997,20 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     body: t.Object({ enabled: t.Boolean() }),
     detail: { tags: ['Admin Settings'], summary: 'Update document branding setting' },
+  })
+
+  .put('/document-layout', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateDocumentLayoutSetting(auth.tenantId, body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({ layout: t.Union([t.Literal('CLASSIC'), t.Literal('SLEEK')]) }),
+    detail: { tags: ['Admin Settings'], summary: 'Update document layout' },
   })
 
   .get('/my-date-format', async ({ auth }) => {
