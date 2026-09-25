@@ -34,7 +34,7 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 
 ## Documents & Settings
 
-- **Your documents now use your own brand colour.** Where a document used to show Fueld's blue, it now follows the brand colour set on the invoicing company — on offers, confirmations, invoices and proformas. Leave the brand colour unset and nothing changes: your documents look exactly as they did before. A very pale brand colour is ignored in favour of the readable default, so a light brand colour can never make the headings unreadable on paper.
+- **Branded documents are available on request.** If you'd like your own brand colour on document headings and links, it can be switched on for your account — tell us and we'll enable it. It is off by default, so nothing about your existing documents changes unless you ask. A very pale brand colour is ignored in favour of the readable default, so a light colour can never make headings unreadable on paper.
 - **Invoices no longer print another company's bank account.** When an order had no bank account configured, the invoice fell back to a built-in default — which was Fueld's own account. A tenant that had not set up banking was therefore telling its customers to pay into the wrong account, and the customer had no way to notice. Invoices now print no remittance section until a bank account is configured, which is a visible gap rather than a silent money hazard.
 
 - **Date format now applies to the due date.** Choose ISO (`2026-10-01`), European (`01/10/2026`) or American (`10/01/2026`) under Admin → Settings → General, and invoice due dates follow it. Previously the setting changed most dates on a document but not the due date itself, which stayed in the ISO form regardless.

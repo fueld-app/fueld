@@ -470,6 +470,16 @@ export interface TenantSettings {
   defaultUnit?: string;
   // Configurable decimal precision for cost/sales prices (default 5)
   costSalesDecimalPrecision?: number;
+  /**
+   * Opt-IN for tenant-branded documents (accent colour on headings/links).
+   *
+   * Default OFF, deliberately. The accent work changed headings from near-black
+   * to the tenant's brand colour for any tenant that already had a legible
+   * `brandColor` on its invoicing company — which would silently restyle
+   * documents those tenants never asked to change. Turning it on is a decision a
+   * tenant makes, not something they discover in a PDF a customer received.
+   */
+  documentBrandingEnabled?: boolean;
   // Configurable date format: 'AMERICAN' (MM/DD/YYYY), 'EUROPEAN' (DD/MM/YYYY), 'ISO' (YYYY-MM-DD)
   dateFormat?: 'AMERICAN' | 'EUROPEAN' | 'ISO';
   // Tax rates — simple flat percentage per product

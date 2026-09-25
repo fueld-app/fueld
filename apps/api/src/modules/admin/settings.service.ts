@@ -2300,6 +2300,23 @@ export async function getDateFormatSettings(tenantId: string): Promise<{ dateFor
   return { dateFormat: (settings.dateFormat as DateFormatSetting) ?? DEFAULT_DATE_FORMAT };
 }
 
+/**
+ * Whether tenant-branded document styling is enabled. Default FALSE.
+ *
+ * Read per-document-generation so a tenant can flip it without a deploy. The
+ * default is false because enabling it changes the appearance of documents
+ * already going to customers; see TenantSettings.documentBrandingEnabled.
+ */
+export async function getDocumentBrandingSettings(tenantId: string): Promise<{ enabled: boolean }> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  const settings = (tenant?.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { enabled: settings.documentBrandingEnabled === true };
+}
+
 export async function updateDateFormatSettings(
   tenantId: string,
   data: { dateFormat?: DateFormatSetting },

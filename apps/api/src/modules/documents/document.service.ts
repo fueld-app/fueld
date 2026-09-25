@@ -9,7 +9,7 @@ import QRCode from 'qrcode';
 import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, priceReferences, type TenantSettings } from '../../db/schema';
 import { isIanaTimezone } from '../../utils/timezone';
-import { getDateFormatSettings, getCostSalesDecimalPrecision } from '../admin/settings.service';
+import { getDateFormatSettings, getCostSalesDecimalPrecision, getDocumentBrandingSettings } from '../admin/settings.service';
 import { ensureOrderInvoice, InvoiceLinesChangedError, InvoiceNotFoundError } from '../orders/invoice.service';
 import { splitAmountByPercent } from '../orders/invoice-amounts';
 import { customerFacingItems, isSupplierCreditPlaceholder } from './customer-facing-items';
@@ -922,7 +922,14 @@ function contrastOnWhite(hex: string): number {
 
 /**
  * The accent colour for a tenant's documents: the ISSUING COMPANY's
- * `brandColor` when set AND legible, else Fueld's blue.
+ * `brandColor` when the tenant has OPTED IN and the colour is legible, else
+ * Fueld's blue.
+ *
+ * Opt-in because branding is an appearance change to documents a customer
+ * receives. A tenant that already had a legible `brandColor` stored would
+ * otherwise have had its invoices silently restyled by shipping this feature —
+ * verified: ChannelTX has two legible brand colours on companies that invoice
+ * 290 orders. Default off means nobody's documents change until they choose to.
  *
  * `brandColor` has been stored on counterparties all along and the email
  * template already reads it — the PDFs hardcoded Fueld blue in 18 places, so a
@@ -942,8 +949,8 @@ function contrastOnWhite(hex: string): number {
  *    tenant cannot make their own documents unreadable by picking a pale brand
  *    colour.
  */
-export function resolveDocAccent(brandColor: string | null | undefined): string {
-  return resolveOptionalDocAccent(brandColor) ?? DEFAULT_DOC_ACCENT;
+export function resolveDocAccent(brandColor: string | null | undefined, brandingEnabled = false): string {
+  return resolveOptionalDocAccent(brandColor, brandingEnabled) ?? DEFAULT_DOC_ACCENT;
 }
 
 /**
@@ -955,7 +962,9 @@ export function resolveDocAccent(brandColor: string | null | undefined): string 
  * and keep the previous neutral styling; callers that always need a colour
  * (rules, links) use `resolveDocAccent`.
  */
-export function resolveOptionalDocAccent(brandColor: string | null | undefined): string | null {
+export function resolveOptionalDocAccent(brandColor: string | null | undefined, brandingEnabled = false): string | null {
+  // Not opted in: no accent, so the caller keeps its previous styling.
+  if (!brandingEnabled) return null;
   const value = (brandColor ?? '').trim();
   let candidate: string | null = null;
   if (/^#[0-9a-fA-F]{6}$/.test(value)) {
@@ -1329,6 +1338,7 @@ export async function generateOrderInvoicePdfBuffer(
 }> {
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings(order.tenantId);
+  const { enabled: brandingEnabled } = await getDocumentBrandingSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
 
   // Materialize the invoice row on ISSUANCE. Before this existed, no production
@@ -1448,7 +1458,7 @@ export async function generateOrderInvoicePdfBuffer(
     deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
-    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor),
+    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -1991,6 +2001,7 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
   void includeHidden; // kept for API compat: hideOnDocuments lines stay excluded everywhere; CREDIT_NOTE lines are now also unconditionally excluded
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings(order.tenantId);
+  const { enabled: brandingEnabled } = await getDocumentBrandingSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const isInquiryContext = order.status === 'INQUIRY' || order.status === 'OFFER';
   const documentTitle = options?.documentTitleOverride ?? (isInquiryContext ? 'OFFER' : 'CONFIRMATION');
@@ -2069,7 +2080,7 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
       documentName,
     ),
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
-    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor),
+    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2218,6 +2229,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
 }> {
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings(order.tenantId);
+  const { enabled: brandingEnabled } = await getDocumentBrandingSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const nominationContext = resolveNominationSupplierContext(order, options?.orderSupplierId ?? null);
   if (!nominationContext.items.length) {
@@ -2310,7 +2322,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     // Broker deals: the nomination is for the account of the deal's customer
     // account (e.g. Ocean7 Chartering), not our own invoicing company.
     accountName: order.isBrokerDeal ? order.client?.name ?? null : undefined,
-    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor),
+    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2826,6 +2838,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 }> {
   const order = await fetchOrderForInvoice(orderId);
   const { dateFormat } = await getDateFormatSettings(order.tenantId);
+  const { enabled: brandingEnabled } = await getDocumentBrandingSettings(order.tenantId);
   const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'PROFORMA_INVOICE',
@@ -2899,7 +2912,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
-    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor),
+    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -3005,6 +3018,7 @@ export const __documentTestUtils = {
   hasPayableBankDetails,
   findAnyInvoiceRevision: getAnyDocumentRevisionByInvoiceId,
   resolveDocAccent,
+  resolveOptionalDocAccent,
   buildCustomerBlock,
   buildDocumentFooter,
   overwriteDocumentRevisionArtifact,

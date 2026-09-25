@@ -1219,10 +1219,18 @@ describe('document.service formatting helpers', () => {
 
   it('resolves the tenant accent, rejecting malformed or unreadable colours', async () => {
     const FUELD = '#1a56db';
-    // Valid AND legible on white — adopted as-is.
-    expect(__documentTestUtils.resolveDocAccent('#E60000')).toBe('#E60000');
-    expect(__documentTestUtils.resolveDocAccent('  #003366  ')).toBe('#003366');
-    expect(__documentTestUtils.resolveDocAccent('#000000')).toBe('#000000');
+    // Tenant branding is OPT-IN. A tenant that already has a legible brandColor
+    // stored must NOT have its documents restyled by shipping this feature —
+    // verified live: ChannelTX stores #2f75b8 on a company that invoices 290
+    // orders, so default-on would have changed those PDFs silently.
+    expect(__documentTestUtils.resolveOptionalDocAccent('#2f75b8')).toBeNull();
+    expect(__documentTestUtils.resolveOptionalDocAccent('#2f75b8', true)).toBe('#2f75b8');
+    expect(__documentTestUtils.resolveDocAccent('#2f75b8')).toBe('#1a56db');
+
+    // Valid AND legible on white — adopted as-is once opted in.
+    expect(__documentTestUtils.resolveOptionalDocAccent('#E60000', true)).toBe('#E60000');
+    expect(__documentTestUtils.resolveOptionalDocAccent('  #003366  ', true)).toBe('#003366');
+    expect(__documentTestUtils.resolveOptionalDocAccent('#000000', true)).toBe('#000000');
 
     // Absent / malformed / injection-shaped input falls back.
     expect(__documentTestUtils.resolveDocAccent(null)).toBe(FUELD);
