@@ -39,7 +39,7 @@ import type {
   ThroughputReportRowDto,
   ThroughputLocationDto,
 } from '@fueld/types';
-import { Role } from '@fueld/types';
+import { Role, isCommissionableLine } from '@fueld/types';
 import * as XLSX from 'xlsx';
 import { db } from '../../db';
 import {
@@ -2488,6 +2488,12 @@ export async function buildBrokerCommissionReport(
   let grandTotalCommission = 0;
 
   for (const r of filtered) {
+    // Fees and services do not earn $/MT. The report multiplied the rate by
+    // EVERY line's quantity, so Moxie's barging fee — a lump sum stored with
+    // quantity 1 — collected a full $3 as though it were a tonne of fuel, and
+    // its "total quantity" counted the fee as tonnage. Skipped entirely rather
+    // than listed at 0, so the group's quantity stays delivered product.
+    if (!isCommissionableLine(r.productType)) continue;
     // Commission rate resolution: per-line override → order-level rate →
     // tenant default. Both the ordering AND the guard now match
     // order-financing.calculateLineEconomics — they share lib/numbers

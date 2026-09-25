@@ -43,6 +43,16 @@
 5. Export as **CSV** or **XLSX** for sending to Ocean7
 6. Click **Create Commission Orders** to auto-generate commission invoices (admin only)
 
+**Commission is earned on products only.** A broker deal's line items are split into
+products (VLSFO, LSMGO, blends — anything with its own product type) and charges
+(barging fees, agency, trucking, taxes, hire, commission, payments). The report and
+the broker-deal profit column both bill the **$/MT rate on products only**; a charge
+line is excluded from both the commission and the quantity total.
+
+This matters because a charge is stored as a single line with the fee as the amount —
+a 2,500 barging fee is `quantity: 1`. Charging a per-MT rate on it billed a flat rate
+as though it were one tonne of fuel, and added that 1 to the reported tonnage.
+
 ---
 
 ## Broker Credit Lines

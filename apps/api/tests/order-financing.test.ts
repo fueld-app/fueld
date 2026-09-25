@@ -599,6 +599,27 @@ describe('broker deal commission rate resolution', () => {
     expect(line.grossProfit).toBe(0);
   });
 
+  it('earns nothing on a fee line, so the profit column matches the report', () => {
+    // The commission report and this column are the two places broker money is
+    // computed; both must exclude the same lines. A barging fee is a lump sum
+    // stored with quantity 1, so commissioning it added a flat rate to the
+    // deal's profit and overstated tonnage.
+    const fee = calculateLineEconomics(item({ productType: 'BARGING_FEE', quantity: '1', commissionPerUnit: '3' }), 0.08, 30, true, 3);
+    expect(fee.grossProfit).toBe(0);
+    expect(fee.quantity).toBe(0);
+    expect(fee.netProfit).toBe(0);
+  });
+
+  it('still commissions a custom product type, and an unreadable one', () => {
+    // Deny-list semantics: only known fee types are excluded. A custom blend is
+    // a product; an absent type only happens when a caller forgot to select the
+    // column, and zeroing that caller's whole total would be the worse failure.
+    const blend = calculateLineEconomics(item({ productType: 'B30', commissionPerUnit: '3' }), 0.08, 30, true, 3);
+    expect(blend.grossProfit).toBe(300);
+    const unknown = calculateLineEconomics(item({ productType: undefined, commissionPerUnit: '3' }), 0.08, 30, true, 3);
+    expect(unknown.grossProfit).toBe(300);
+  });
+
   it('bills the delivered quantity, not the ordered quantity, when it is set', () => {
     const line = calculateLineEconomics(
       item({ quantity: '100', deliveredQuantity: '80', commissionPerUnit: '3' }),

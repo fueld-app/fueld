@@ -153,3 +153,49 @@ export enum PlattsSectionType {
   Commentary = 'COMMENTARY',
   Other = 'OTHER',
 }
+
+// ─── Commissionable lines ────────────────────────────────────────────
+
+/**
+ * Order-line types that a broker does NOT earn a per-MT commission on: fees,
+ * services and ledger adjustments.
+ *
+ * Moxie's rule (Daniek, 2026-09-25): broker commission is "$3/MT" on the
+ * PRODUCT delivered, not on the charges around it. These types are stored as
+ * their own line with the charge as a lump sum — a barging fee of 2,500 is
+ * `quantity: 1` — so multiplying them by a per-MT rate billed a flat $3 as
+ * though it were a tonne, and counted the fee as tonnage in the reported total.
+ */
+export const NON_PRODUCT_LINE_TYPES: ReadonlySet<string> = new Set([
+  'BARGING_FEE',
+  'COMMISSION',
+  'HIRE',
+  'PAYMENT',
+  'CREDIT_NOTE',
+  'ITEM',
+]);
+
+/**
+ * True when a broker deal earns commission on this line.
+ *
+ * Deny-list semantics: only the known fee/service types are excluded, and
+ * anything else — including an unrecognised or absent product type — is
+ * commissionable. That direction matters. `productType` is NOT NULL in the
+ * schema, so a stored line always carries one; an absent value only occurs in a
+ * caller that failed to map the column. Treating that as non-commissionable
+ * would silently zero that caller's entire commission total, which is a worse
+ * failure than commissioning a line we could not classify.
+ *
+ * `ITEM` is a generic catch-all the traders use for charges (agency, trucking,
+ * taxes, overtime — Moxie stores exactly those under it), never for fuel, which
+ * always carries its own product type. A custom blend (B30/B100) is not in the
+ * set and stays commissionable.
+ *
+ * Both the commission report (apps/api reports.service) and the broker-deal
+ * profit column (order-financing) resolve through this, so the two money paths
+ * cannot disagree about which lines earn.
+ */
+export function isCommissionableLine(productType: string | null | undefined): boolean {
+  const type = (productType ?? '').trim().toUpperCase();
+  return !NON_PRODUCT_LINE_TYPES.has(type);
+}

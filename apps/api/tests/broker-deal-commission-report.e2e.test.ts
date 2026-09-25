@@ -115,6 +115,52 @@ async function createBrokerDeal(
   return orderId;
 }
 
+/**
+ * Create a broker deal with SEVERAL lines in one save — the shape Moxie's
+ * orders actually have (a fuel line beside a barging fee).
+ */
+async function createBrokerDealWithLines(
+  token: string,
+  clientId: string,
+  vesselId: string,
+  placeId: string,
+  lines: Array<{ productType: string; quantity: string; unit?: string; commissionPerUnit?: string | null }>,
+  opts: { status?: string; deliveredAt?: string } = {},
+): Promise<string> {
+  const created = await requestJson('/orders', {
+    method: 'POST',
+    token,
+    body: { clientId, vesselId, placeId, isBrokerDeal: true, eta: opts.deliveredAt ?? '2026-07-15' },
+  });
+  const orderId = created.data?.data?.id as string;
+
+  await requestJson(`/orders/${orderId}/items`, {
+    method: 'PUT',
+    token,
+    body: {
+      items: lines.map((l) => ({
+        productType: l.productType,
+        quantity: l.quantity,
+        unit: l.unit ?? 'MT',
+        costPrice: '100',
+        costCurrency: 'USD',
+        salesPrice: '115',
+        salesCurrency: 'USD',
+        commissionPerUnit: l.commissionPerUnit === undefined ? '3' : l.commissionPerUnit,
+      })),
+    },
+  });
+
+  if (opts.status && opts.status !== 'INQUIRY') {
+    await requestJson(`/orders/${orderId}/status`, { method: 'PUT', token, body: { status: opts.status } });
+  }
+  if (opts.deliveredAt) {
+    const db = await getDb();
+    await db.update(orders).set({ deliveredAt: new Date(opts.deliveredAt) }).where(eq(orders.id, orderId));
+  }
+  return orderId;
+}
+
 describe('broker commission report e2e', () => {
   beforeEach(async () => {
     await truncateAll();
@@ -586,5 +632,74 @@ describe('broker commission report e2e', () => {
     // Design doc intent: converted qty (3.785) × rate (3) = 11.355
     // FIXME when M1 is fixed: expect(parseFloat(report.data?.data?.totalCommission)).toBe(11.36);
     expect(parseFloat(report.data?.data?.totalCommission)).toBe(3000);
+  });
+
+  it('commissions PRODUCTS only — a barging fee earns no per-MT commission', async () => {
+    // Daniek (Moxie): "it counts the $3/MT on barging fee, but it should only
+    // be on products". A barging fee is a lump sum stored with quantity 1, so
+    // mulitplying it by the $/MT rate billed a flat $3 as if it were a tonne —
+    // and added the fee's 1 to the reported tonnage.
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [
+        { productType: 'VLSFO', quantity: '218' },
+        { productType: 'LSMGO', quantity: '45' },
+        { productType: 'BARGING_FEE', quantity: '1' },
+      ],
+      { status: 'CONFIRMED', deliveredAt: '2026-08-20' },
+    );
+
+    const report = await requestJson('/reports/broker-commission?from=2026-08-01&to=2026-08-31', { token });
+    expect(report.data?.success).toBe(true);
+
+    // 218 + 45 tonnes at $3 — the barging line contributes neither.
+    expect(parseFloat(report.data?.data?.totalCommission)).toBe((218 + 45) * 3);
+
+    const cust = report.data?.data?.byCustomer[0];
+    expect(parseFloat(cust.totalQuantity)).toBe(218 + 45);
+    // The fee line is not listed at all: the report states products, and a
+    // 0.00-commission fee row would still read as a billable line.
+    const productTypes = cust.orders.map((o: { productType: string }) => o.productType);
+    expect(productTypes).not.toContain('BARGING_FEE');
+    expect(productTypes.sort()).toEqual(['LSMGO', 'VLSFO']);
+  });
+
+  it('excludes every fee/service line type, but keeps a custom product type', async () => {
+    // The excluded set is the non-fuel half of the product-type enum. A custom
+    // blend (Moxie trades B30/B100) is NOT in that set, so it stays
+    // commissionable — the list is a deny list, so a new product type added
+    // later does not silently drop out of the report.
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [
+        { productType: 'VLSFO', quantity: '100' },
+        { productType: 'ITEM', quantity: '1' },
+        { productType: 'COMMISSION', quantity: '1' },
+        { productType: 'HIRE', quantity: '1' },
+        { productType: 'PAYMENT', quantity: '1' },
+        { productType: 'CREDIT_NOTE', quantity: '1' },
+        { productType: 'B30', quantity: '10' },
+      ],
+      { status: 'CONFIRMED', deliveredAt: '2026-08-20' },
+    );
+
+    const report = await requestJson('/reports/broker-commission?from=2026-08-01&to=2026-08-31', { token });
+    const cust = report.data?.data?.byCustomer[0];
+    const productTypes = cust.orders.map((o: { productType: string }) => o.productType).sort();
+
+    expect(productTypes).toEqual(['B30', 'VLSFO']);
+    // 100 + 10 tonnes only; the five fee lines contribute nothing.
+    expect(parseFloat(cust.totalQuantity)).toBe(110);
+    expect(parseFloat(report.data?.data?.totalCommission)).toBe(110 * 3);
   });
 });

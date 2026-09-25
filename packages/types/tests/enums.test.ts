@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   CounterpartyType,
+  isCommissionableLine,
   InvoiceStatus,
   OrderAttachmentType,
   OrderStatus,
@@ -119,5 +120,38 @@ describe('enums', () => {
       OperationsManager: 'OPERATIONSMANAGER',
       Light: 'LIGHT',
     });
+  });
+});
+
+describe('isCommissionableLine', () => {
+  test('excludes every fee/service line type', () => {
+    // A broker earns $/MT on the product, not on the charges around it. Each of
+    // these is stored as its own line with the charge as a lump sum, so a
+    // per-MT rate would bill a flat fee as though it were product tonnage.
+    for (const type of ['BARGING_FEE', 'COMMISSION', 'HIRE', 'PAYMENT', 'CREDIT_NOTE', 'ITEM']) {
+      expect(isCommissionableLine(type)).toBe(false);
+    }
+  });
+
+  test('keeps fuel products commissionable, including custom blends', () => {
+    // Deny-list semantics: a product type added later (Moxie trades B30/B100)
+    // must not silently drop out of the commission report.
+    for (const type of ['VLSFO', 'LSMGO', 'LFO', 'MGO', 'LUBE', 'B30', 'B100', 'PYGAS']) {
+      expect(isCommissionableLine(type)).toBe(true);
+    }
+  });
+
+  test('is case- and whitespace-insensitive', () => {
+    expect(isCommissionableLine(' barging_fee ')).toBe(false);
+    expect(isCommissionableLine('Vlsfo')).toBe(true);
+  });
+
+  test('treats an absent type as commissionable rather than zeroing the total', () => {
+    // productType is NOT NULL in the schema, so an absent value means a caller
+    // failed to map the column. Failing open keeps their whole commission total
+    // from silently becoming 0.
+    expect(isCommissionableLine(null)).toBe(true);
+    expect(isCommissionableLine(undefined)).toBe(true);
+    expect(isCommissionableLine('')).toBe(true);
   });
 });

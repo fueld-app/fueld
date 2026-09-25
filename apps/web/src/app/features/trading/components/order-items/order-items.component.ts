@@ -26,6 +26,7 @@ import { OrderItemInventoryBandComponent } from './order-item-inventory-band.com
 
 import {
   PricingModel,
+  isCommissionableLine,
   type PlattsSuggestionsResponseDto,
   ProductType,
 } from '@fueld/types';
@@ -1569,8 +1570,16 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     return 'MT';
   }
 
-  /** Broker deal profit = commissionPerUnit × quantity (in base unit). */
+  /**
+   * Broker deal profit = commissionPerUnit × quantity (in base unit).
+   *
+   * Fees and services earn nothing — a barging fee is a lump sum stored with
+   * quantity 1, so multiplying it by the per-MT rate showed a flat rate as
+   * though it were a tonne, and the row total counted the fee as tonnage. Uses
+   * the same shared rule as the commission report and the server profit column.
+   */
   brokerProfitForRow(row: OrderItemRow): number {
+    if (!isCommissionableLine(row.productType)) return 0;
     const rate = row.commissionPerUnit ?? 0;
     const qty = row.quantity ?? 0;
     return rate * qty;

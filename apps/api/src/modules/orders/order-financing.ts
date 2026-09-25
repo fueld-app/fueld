@@ -1,3 +1,4 @@
+import { isCommissionableLine } from '@fueld/types';
 import type { TenantSettings } from '../../db/schema';
 import { toFiniteNumber } from '../../lib/numbers';
 import { getFxRate } from '../prices/price.service';
@@ -27,6 +28,8 @@ export interface FinancingTermsInput {
 export interface FinancingItemInput {
   quantity?: string | number | null;
   deliveredQuantity?: string | number | null;
+  /** Line type — decides whether a broker deal earns commission on this line. */
+  productType?: string | null;
   costPrice?: string | number | null;
   costCurrency?: string | null;
   costConversionFactor?: string | number | null;
@@ -242,6 +245,20 @@ export function calculateLineEconomics(
   // and broker deals carry no financing cost. costBase/revenueBase are still
   // computed so the "Value" column can show the pass-through deal value.
   if (isBrokerDeal) {
+    // Fees/services earn no commission — the same rule the commission report
+    // applies, so the profit column and the report cannot disagree. A barging
+    // fee is a lump sum stored with quantity 1; commissioning it added a flat
+    // rate to the deal's profit and overstated the tonnage it was based on.
+    if (!isCommissionableLine(item.productType)) {
+      return {
+        quantity: 0,
+        costBase,
+        revenueBase,
+        grossProfit: 0,
+        financingCost: 0,
+        netProfit: 0,
+      };
+    }
     // Per-line rate → order-level rate, resolved through the shared
     // lib/numbers.toFiniteNumber with `??`, so a deliberate 0 wins instead of
     // falling through. The report previously used `??` while this used `||`,

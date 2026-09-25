@@ -26,6 +26,10 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 - **PO Number field is always visible** on the order details page, even when a broker is assigned. Previously it would disappear when a broker was set.
 - **Customer and supplier terms** now show up to 2 lines by default with a "show more" toggle, so you can see more terms at a glance without scrolling.
 
+## Broker Deals
+
+- **Commission is now earned on products only.** A broker commission report counted the $/MT rate against every line on a broker deal, so a barging fee — a lump sum stored as one unit — collected a full rate as though it were a tonne of fuel, and its 1 was added to the reported tonnage. Fees, agency, trucking, taxes, hire and similar charges are now excluded from both the commission and the quantity total, in the report, the exports, the auto-generated commission orders, the broker-deal profit column and the on-screen preview. Products (VLSFO, LSMGO, blends, anything with its own product type) are unaffected.
+
 ## Documents & Settings
 
 - **Date format now applies to the due date.** Choose ISO (`2026-10-01`), European (`01/10/2026`) or American (`10/01/2026`) under Admin → Settings → General, and invoice due dates follow it. Previously the setting changed most dates on a document but not the due date itself, which stayed in the ISO form regardless.
