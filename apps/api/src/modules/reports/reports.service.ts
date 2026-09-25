@@ -2606,58 +2606,124 @@ export function brokerCommissionReportToXlsx(report: BrokerCommissionReportDto):
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
 }
 
+/** What one call to createCommissionOrdersFromReport produced. */
+export interface CommissionOrderCreationResult {
+  /** Orders created by THIS call. */
+  created: Array<{ orderNumber: string | null; customerName: string; commissionAmount: string }>;
+  /** Customers already billed for this period — skipped, not duplicated. */
+  alreadyCreated: Array<{ customerName: string; orderNumber: string | null }>;
+}
+
+/**
+ * Turn a broker-commission report into one commission order per customer.
+ *
+ * IDEMPOTENT per (tenant, period, customer). A second call for the same period
+ * creates nothing and reports the customers it skipped.
+ *
+ * Why it needs to be: every call used to mint NEW order rows, so a double click
+ * — or two tabs, or a retry after a timeout — billed the same commission period
+ * twice. Two identical `BROKERAGE_COMMISSION` orders that nothing could tell
+ * apart, with no link back to the period that produced them.
+ *
+ * Two mechanisms, because they cover different races:
+ *
+ *  - A transaction-scoped advisory lock serializes the whole call per tenant.
+ *    Without it two concurrent calls both read "no order yet" and both insert,
+ *    which the unique index would then reject — correct, but with a raw
+ *    constraint error instead of the honest "already billed" answer. The lock
+ *    makes the second caller see the first's row. Released with the
+ *    transaction, so a crash cannot strand it.
+ *  - The unique index on `orders.source_key` is the durable guarantee. It holds
+ *    even if the lock is bypassed (a future caller, a direct script, a restore
+ *    that lost the lock), and it is what makes the invariant true rather than
+ *    merely conventional.
+ */
 export async function createCommissionOrdersFromReport(
   tenantId: string,
   from: string,
   to: string,
-): Promise<Array<{ orderNumber: string | null; customerName: string; commissionAmount: string }>> {
+): Promise<CommissionOrderCreationResult> {
+  // Collected inside the transaction so the caller gets the real list.
+  const created: CommissionOrderCreationResult['created'] = [];
+  const alreadyCreated: CommissionOrderCreationResult['alreadyCreated'] = [];
+  // The inserted order rows, so the supplier sync can run after commit.
+  const insertedRows: Array<typeof orders.$inferSelect> = [];
+
+  // The report is built OUTSIDE the lock: it is a read, and holding the lock
+  // across the whole report query would serialize unrelated admin requests.
   const report = await buildBrokerCommissionReport(tenantId, from, to);
-  const result: Array<{ orderNumber: string | null; customerName: string; commissionAmount: string }> = [];
 
-  for (const cust of report.byCustomer) {
-    if (parseFloat(cust.totalCommission) <= 0) continue;
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`commission-orders:${tenantId}`}))`);
 
-    // Find a vessel and place from the broker deals for this customer
-    const [sampleOrder] = await db
-      .select({
-        vesselId: orders.vesselId,
-        placeId: orders.placeId,
-      })
-      .from(orders)
-      .where(
-        and(
-          eq(orders.tenantId, tenantId),
-          eq(orders.isBrokerDeal, true),
-          eq(orders.clientId, cust.customerId),
-        ),
-      )
-      .limit(1);
+    for (const cust of report.byCustomer) {
+      if (parseFloat(cust.totalCommission) <= 0) continue;
 
-    if (!sampleOrder) continue;
+      // One order per (period, customer). Deterministic, so a retry computes the
+      // same key and the unique index recognises the duplicate.
+      const sourceKey = `${tenantId}:commission:${from}:${to}:${cust.customerId}`;
 
-    // Generate order number
-    const orderNumber = await generateOrderNumber(tenantId);
+      // Find a vessel and place from the broker deals for this customer
+      const [sampleOrder] = await tx
+        .select({
+          vesselId: orders.vesselId,
+          placeId: orders.placeId,
+          orderNumber: orders.orderNumber,
+        })
+        .from(orders)
+        .where(
+          and(
+            eq(orders.tenantId, tenantId),
+            eq(orders.isBrokerDeal, true),
+            eq(orders.clientId, cust.customerId),
+          ),
+        )
+        .limit(1);
 
-    // Create the commission order (regular order, NOT a broker deal)
-    const [created] = await db
-      .insert(orders)
-      .values({
-        tenantId,
-        orderNumber,
-        clientId: cust.customerId,
-        vesselId: sampleOrder.vesselId,
-        placeId: sampleOrder.placeId,
-        currency: report.currency,
-        status: 'CONFIRMED',
-        isBrokerDeal: false,
-        customerNote: `Brokerage commission for ${from} to ${to}: ${cust.orderCount} deliveries, ${cust.totalQuantity} total`,
-      })
-      .returning();
+      if (!sampleOrder) continue;
 
-    if (created) {
+      // Generate order number
+      const orderNumber = await generateOrderNumber(tenantId);
+
+      // Create the commission order (regular order, NOT a broker deal).
+      // onConflictDoNothing + returning: an empty result means this period is
+      // already billed for this customer, so we skip it rather than duplicate.
+      const [inserted] = await tx
+        .insert(orders)
+        .values({
+          tenantId,
+          orderNumber,
+          clientId: cust.customerId,
+          vesselId: sampleOrder.vesselId,
+          placeId: sampleOrder.placeId,
+          currency: report.currency,
+          status: 'CONFIRMED',
+          isBrokerDeal: false,
+          sourceKey,
+          customerNote: `Brokerage commission for ${from} to ${to}: ${cust.orderCount} deliveries, ${cust.totalQuantity} total`,
+        })
+        .onConflictDoNothing({ target: orders.sourceKey })
+        .returning();
+
+      if (!inserted) {
+        // Already billed for this period. Report it rather than silently
+        // doing nothing, so the admin sees why the count is lower than the
+        // report's customer count.
+        const [existing] = await tx
+          .select({ orderNumber: orders.orderNumber })
+          .from(orders)
+          .where(eq(orders.sourceKey, sourceKey))
+          .limit(1);
+        alreadyCreated.push({
+          customerName: cust.customerName,
+          orderNumber: existing?.orderNumber ?? null,
+        });
+        continue;
+      }
+
       // Add a single line item for the commission
-      await db.insert(orderItems).values({
-        orderId: created.id,
+      await tx.insert(orderItems).values({
+        orderId: inserted.id,
         productType: 'BROKERAGE_COMMISSION',
         quantity: cust.totalQuantity,
         unit: 'MT',
@@ -2669,17 +2735,23 @@ export async function createCommissionOrdersFromReport(
         sortOrder: 0,
       });
 
-      await syncPrimaryOrderSupplierFromLegacy(created);
-
-      result.push({
-        orderNumber: created.orderNumber,
+      insertedRows.push(inserted);
+      created.push({
+        orderNumber: inserted.orderNumber,
         customerName: cust.customerName,
         commissionAmount: cust.totalCommission,
       });
     }
+  });
+
+  // Outside the transaction, keeping the locked section short. The supplier
+  // sync issues its own statements on the shared pool (it does not accept an
+  // executor), so it cannot join this transaction anyway.
+  for (const row of insertedRows) {
+    await syncPrimaryOrderSupplierFromLegacy(row);
   }
 
-  return result;
+  return { created, alreadyCreated };
 }
 
 // ═══════════════════════════════════════════════════════════════════════

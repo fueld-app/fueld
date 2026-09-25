@@ -327,6 +327,18 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS order_number text
   `;
 
+  // Mirrors migration 0132: report-generated orders carry an idempotency key,
+  // and a partial unique index makes one order per key. Without it the
+  // commission double-click guard silently disappears on the shim path.
+  await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS source_key text
+  `;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS orders_source_key_unique
+      ON orders (source_key)
+  `;
+
   await sql`
     ALTER TABLE orders
     ADD COLUMN IF NOT EXISTS bank_account_id uuid

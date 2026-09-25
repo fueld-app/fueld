@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { seedAuthBasics, truncateAll, getDb } from './helpers/db';
 import { loginE2E, requestJson, requestRaw } from './helpers/e2e';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { tenants, users, orders, orderItems } from '../src/db/schema';
 
 /**
@@ -602,6 +602,115 @@ describe('broker commission report e2e', () => {
     // H4 FIXED: endpoint now requires admin role
     expect(res.status).toBe(403);
     expect(res.data?.success).toBe(false);
+  });
+
+  it('a second click does NOT bill the same period twice', async () => {
+    // Panel finding (Kimi #1 / GLM #1): every call minted NEW order rows, so a
+    // double click created two identical commission invoices with nothing to
+    // tell them apart.
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    const db = await getDb();
+    await db.update(users).set({ role: 'ADMIN' }).where(eq(users.id, seeded.user.id));
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      quantity: '100', status: 'CONFIRMED', deliveredAt: '2026-07-10',
+    });
+
+    const first = await requestJson('/reports/broker-commission/create-orders', {
+      method: 'POST', token, body: { from: '2026-07-01', to: '2026-07-31' },
+    });
+    expect(first.status).toBe(200);
+    expect(first.data?.data?.created.length).toBe(1);
+    expect(first.data?.data?.alreadyCreated.length).toBe(0);
+
+    // The second click — the bug. It must create NOTHING.
+    const second = await requestJson('/reports/broker-commission/create-orders', {
+      method: 'POST', token, body: { from: '2026-07-01', to: '2026-07-31' },
+    });
+    expect(second.status).toBe(200);
+    expect(second.data?.data?.created.length).toBe(0);
+    expect(second.data?.data?.alreadyCreated.length).toBe(1);
+    expect(second.data?.data?.alreadyCreated[0].orderNumber).toBe(first.data?.data?.created[0].orderNumber);
+
+    // And the database holds exactly ONE commission order for the period.
+    const commissionOrders = await db
+      .select({ id: orders.id })
+      .from(orders)
+      .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .where(and(eq(orders.tenantId, seeded.tenant.id), eq(orderItems.productType, 'BROKERAGE_COMMISSION')));
+    expect(commissionOrders.length).toBe(1);
+  });
+
+  it('CONCURRENT clicks create exactly one commission order', async () => {
+    // The sequential test above passes even with a read-then-write check; this
+    // one only passes if the guarantee is durable (unique index) or serialized
+    // (advisory lock), because both requests race past any pre-check.
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    const db = await getDb();
+    await db.update(users).set({ role: 'ADMIN' }).where(eq(users.id, seeded.user.id));
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      quantity: '100', status: 'CONFIRMED', deliveredAt: '2026-07-10',
+    });
+
+    const body = { from: '2026-07-01', to: '2026-07-31' };
+    const [a, b] = await Promise.all([
+      requestJson('/reports/broker-commission/create-orders', { method: 'POST', token, body }),
+      requestJson('/reports/broker-commission/create-orders', { method: 'POST', token, body }),
+    ]);
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+
+    const createdCount = (a.data?.data?.created.length ?? 0) + (b.data?.data?.created.length ?? 0);
+    expect(createdCount).toBe(1);
+
+    const rows = await db
+      .select({ id: orders.id })
+      .from(orders)
+      .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .where(and(eq(orders.tenantId, seeded.tenant.id), eq(orderItems.productType, 'BROKERAGE_COMMISSION')));
+    expect(rows.length).toBe(1);
+  });
+
+  it('a DIFFERENT period still bills separately', async () => {
+    // The guard is per (tenant, period, customer) — it must not become a
+    // blanket "only ever one commission order".
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    const db = await getDb();
+    await db.update(users).set({ role: 'ADMIN' }).where(eq(users.id, seeded.user.id));
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      quantity: '100', status: 'CONFIRMED', deliveredAt: '2026-07-10',
+    });
+    await createBrokerDeal(token, seeded.client.id, seeded.vessel.id, seeded.place.id, {
+      quantity: '50', status: 'CONFIRMED', deliveredAt: '2026-08-10',
+    });
+
+    const july = await requestJson('/reports/broker-commission/create-orders', {
+      method: 'POST', token, body: { from: '2026-07-01', to: '2026-07-31' },
+    });
+    const august = await requestJson('/reports/broker-commission/create-orders', {
+      method: 'POST', token, body: { from: '2026-08-01', to: '2026-08-31' },
+    });
+    expect(july.data?.data?.created.length).toBe(1);
+    expect(august.data?.data?.created.length).toBe(1);
+    expect(august.data?.data?.alreadyCreated.length).toBe(0);
+
+    const rows = await db
+      .select({ id: orders.id })
+      .from(orders)
+      .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .where(and(eq(orders.tenantId, seeded.tenant.id), eq(orderItems.productType, 'BROKERAGE_COMMISSION')));
+    expect(rows.length).toBe(2);
   });
 
   it('unit conversion: commission uses raw quantity, not converted (M1 — known gap)', async () => {

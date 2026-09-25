@@ -201,18 +201,37 @@ export class BrokerCommissionReportPageComponent implements OnInit {
   }
 
   async createCommissionOrders(): Promise<void> {
+    if (this.creatingOrders()) return;
     this.creatingOrders.set(true);
     try {
       const res = await firstValueFrom(
-        this.http.post<ApiResponse<any>>(`${API}/reports/broker-commission/create-orders`, {
-          from: this.fromDate(),
-          to: this.toDate(),
-        }),
+        this.http.post<ApiResponse<{ created: Array<{ orderNumber: string | null; customerName: string; commissionAmount: string }>; alreadyCreated: Array<{ customerName: string; orderNumber: string | null }> }>>(
+          `${API}/reports/broker-commission/create-orders`,
+          { from: this.fromDate(), to: this.toDate() },
+        ),
       );
       if (res.success && res.data) {
-        const count = (res.data as any[]).length;
-        const total = (res.data as any[]).reduce((sum, o) => sum + parseFloat(o.commissionAmount), 0);
-        alert(`Created ${count} commission order(s) totaling $${total.toFixed(2)}.\n\nThese are regular orders (not broker deals) with the commission amount as profit. They appear in margin analysis and active orders.`);
+        const created = res.data.created ?? [];
+        const skipped = res.data.alreadyCreated ?? [];
+        const total = created.reduce((sum, o) => sum + parseFloat(o.commissionAmount), 0);
+
+        // Report both lists. A repeat click creates nothing, and saying
+        // "Created 0" without saying why would read as a failure.
+        const lines: string[] = [];
+        if (created.length) {
+          lines.push(`Created ${created.length} commission order(s) totaling $${total.toFixed(2)}.`);
+          lines.push('');
+          lines.push('These are regular orders (not broker deals) with the commission amount as profit. They appear in margin analysis and active orders.');
+        }
+        if (skipped.length) {
+          if (lines.length) lines.push('');
+          lines.push(`Already billed for this period — skipped ${skipped.length} customer(s):`);
+          for (const s of skipped) lines.push(`  • ${s.customerName}${s.orderNumber ? ` (${s.orderNumber})` : ''}`);
+        }
+        if (!created.length && !skipped.length) {
+          lines.push('Nothing to create — no commission for this period.');
+        }
+        alert(lines.join('\n'));
       }
     } catch {
       alert('Failed to create commission orders.');

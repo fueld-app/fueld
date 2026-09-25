@@ -1151,6 +1151,19 @@ export const orders = pgTable('orders', {
   // Tenant-configurable custom column values keyed by column key (e.g. { comment: "...", voyage: "..." })
   customFields: jsonb('custom_fields').$type<Record<string, string | number | null>>().default({}),
 
+  /**
+   * Idempotency key for orders generated FROM a report rather than created by a
+   * trader. Currently only the broker-commission flow sets it:
+   * `<tenantId>:commission:<from>:<to>:<customerId>`.
+   *
+   * A partial unique index on this column is what makes "Create Commission
+   * Orders" safe to click twice. Before it, each call minted a NEW order row, so
+   * a double click (or two tabs, or a retry) billed the same commission period
+   * twice with no way to tell the duplicates apart. Null for every
+   * human-created order, so the index constrains only generated ones.
+   */
+  sourceKey: text('source_key'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

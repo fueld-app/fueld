@@ -418,8 +418,10 @@ export const reportsController = new Elysia({ prefix: '/reports' })
       set.status = 403;
       return { success: false, data: null, message: 'Admin access required' };
     }
-    const orders = await createCommissionOrdersFromReport(auth.tenantId, body.from, body.to);
-    return { success: true, data: orders } satisfies ApiResponse<unknown>;
+    // Idempotent per period: a repeat call creates nothing and reports what it
+    // skipped, so a double click cannot bill commission twice.
+    const result = await createCommissionOrdersFromReport(auth.tenantId, body.from, body.to);
+    return { success: true, data: result } satisfies ApiResponse<unknown>;
   }, {
     body: t.Object({
       from: t.String(),

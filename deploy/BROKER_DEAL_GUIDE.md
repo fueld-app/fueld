@@ -43,6 +43,11 @@
 5. Export as **CSV** or **XLSX** for sending to Ocean7
 6. Click **Create Commission Orders** to auto-generate commission invoices (admin only)
 
+**Clicking it twice is safe.** Commission orders are created once per period and
+customer: a repeat click (or two tabs, or a retry) creates nothing and reports
+which customers were already billed, with the order number that did it. Run it
+again for a *different* period and it bills that period normally.
+
 **Commission is earned on products only.** A broker deal's line items are split into
 products (VLSFO, LSMGO, blends — anything with its own product type) and charges
 (barging fees, agency, trucking, taxes, hire, commission, payments). The report and

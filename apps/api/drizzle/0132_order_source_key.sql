@@ -1,0 +1,32 @@
+-- Idempotent report-generated orders: "Create Commission Orders" is now
+-- safe to click twice.
+--
+-- The broker-commission flow turned report totals into real orders, and every
+-- call minted NEW order rows. Two clicks (or two tabs, or a retry after a
+-- timeout) therefore billed the same commission period twice, producing two
+-- identical `BROKERAGE_COMMISSION` invoices that nothing could distinguish.
+--
+-- `source_key` records what a generated order was generated FROM, and a unique
+-- index enforces one order per key. The key is
+-- `<tenantId>:commission:<from>:<to>:<customerId>`, so the same period and
+-- customer can only ever be billed once; a DIFFERENT period (or customer) is a
+-- different key and still creates its own order, which is correct.
+--
+-- A PLAIN unique index, not a partial one (`WHERE source_key IS NOT NULL`),
+-- for two reasons:
+--
+--  1. Postgres treats NULLs as distinct in a unique index, so every
+--     human-created order (source_key NULL — i.e. all existing rows) is
+--     unconstrained anyway. The partial predicate buys nothing.
+--  2. `ON CONFLICT` can only infer a PARTIAL index when the statement repeats
+--     the index predicate, and Drizzle's `onConflictDoNothing` drops
+--     `targetWhere`, emitting `on conflict ("source_key")`. Against a partial
+--     index that fails at runtime with "no unique or exclusion constraint
+--     matching the ON CONFLICT specification". A plain index matches the
+--     emitted clause exactly.
+--
+-- Additive and safe on live data: no existing row has a key, so no existing row
+-- can violate the index.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS source_key text;
+--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS orders_source_key_unique ON orders (source_key);
