@@ -1232,7 +1232,7 @@ describe('document.service formatting helpers', () => {
         fromPhone: null, paymentTerms: null, customerNote: null, termsAndConditions: null,
         placeRemark: null, companyName: 'C', companyAddress: null, companyPhone: null,
         companyEmail: null, companyWebsite: null, companyLogoDataUrl: null, itemNotes: [],
-        items: [{ productType: 'VLSFO', quantity: '1', unit: 'MT', salesPrice: '1', salesCurrency: 'USD' }],
+        items: [{ productType: 'VLSFO', description: null, quantity: '1', unit: 'MT', salesPrice: '1', salesCurrency: 'USD' }],
         createdAt: new Date('2026-09-24T00:00:00Z'), dateFormat: 'ISO', accentColor,
       }) as never as { styles: Record<string, { color?: string }> }).styles;
       return { tableHeader, sectionLabel };
