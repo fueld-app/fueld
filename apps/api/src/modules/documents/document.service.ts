@@ -949,8 +949,24 @@ function contrastOnWhite(hex: string): number {
  *    tenant cannot make their own documents unreadable by picking a pale brand
  *    colour.
  */
-export function resolveDocAccent(brandColor: string | null | undefined, brandingEnabled = false): string {
-  return resolveOptionalDocAccent(brandColor, brandingEnabled) ?? DEFAULT_DOC_ACCENT;
+export function resolveDocAccent(brandColor: string | null | undefined): string {
+  return resolveOptionalDocAccent(brandColor) ?? DEFAULT_DOC_ACCENT;
+}
+
+/**
+ * The accent to hand a builder for a tenant: their legible brand colour when
+ * branding is enabled, else NULL meaning "keep the unbranded styling".
+ *
+ * The opt-in lives HERE, not in the resolver, because it depends on tenant
+ * settings that only the caller has. Putting it in the resolver too would
+ * cancel itself out — the builder calls the resolver a second time, so a null
+ * accent would be re-resolved into the default and branding could never apply.
+ */
+export function resolveTenantDocAccent(
+  brandColor: string | null | undefined,
+  brandingEnabled: boolean,
+): string | null {
+  return brandingEnabled ? resolveDocAccent(brandColor) : null;
 }
 
 /**
@@ -962,9 +978,7 @@ export function resolveDocAccent(brandColor: string | null | undefined, branding
  * and keep the previous neutral styling; callers that always need a colour
  * (rules, links) use `resolveDocAccent`.
  */
-export function resolveOptionalDocAccent(brandColor: string | null | undefined, brandingEnabled = false): string | null {
-  // Not opted in: no accent, so the caller keeps its previous styling.
-  if (!brandingEnabled) return null;
+export function resolveOptionalDocAccent(brandColor: string | null | undefined): string | null {
   const value = (brandColor ?? '').trim();
   let candidate: string | null = null;
   if (/^#[0-9a-fA-F]{6}$/.test(value)) {
@@ -1458,7 +1472,7 @@ export async function generateOrderInvoicePdfBuffer(
     deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
-    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
+    accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -1634,7 +1648,10 @@ export function buildOfferDocument(data: {
   // Heading colour: the tenant's accent when they set a legible one, else the
   // previous near-black. Using the blue default here would silently restyle
   // every unbranded tenant's live documents.
-  const accentText = resolveOptionalDocAccent(data.accentColor) ?? '#111827';
+  // NULL when the tenant is unbranded: the heading keeps its previous near-black
+  // and the table header keeps its previous (unset = black) colour.
+  const brandedAccent = resolveOptionalDocAccent(data.accentColor);
+  const accentText = brandedAccent ?? '#111827';
 
   // Tenant accent (validated); Fueld blue when the issuer has none.
   const accent = resolveDocAccent(data.accentColor);
@@ -1978,7 +1995,11 @@ export function buildOfferDocument(data: {
       // not see it on the invoice but near-black headings on the offer for the
       // same deal.
       sectionLabel: { fontSize: 10, bold: true, color: accentText, margin: [0, 0, 0, 4] },
-      tableHeader: { fontSize: 9, bold: true, color: accentText },
+      // No colour when unbranded — the baseline had none, so adding #111827 here
+      // would restyle every other tenant's table headers.
+      tableHeader: brandedAccent
+        ? { fontSize: 9, bold: true, color: accentText }
+        : { fontSize: 9, bold: true },
     },
     defaultStyle: { fontSize: 10, font: 'Roboto' },
   };
@@ -2080,7 +2101,7 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
       documentName,
     ),
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
-    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
+    accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2322,7 +2343,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     // Broker deals: the nomination is for the account of the deal's customer
     // account (e.g. Ocean7 Chartering), not our own invoicing company.
     accountName: order.isBrokerDeal ? order.client?.name ?? null : undefined,
-    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
+    accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2476,7 +2497,10 @@ function buildProformaDocument(data: {
   // Heading colour: the tenant's accent when they set a legible one, else the
   // previous near-black. Using the blue default here would silently restyle
   // every unbranded tenant's live documents.
-  const accentText = resolveOptionalDocAccent(data.accentColor) ?? '#111827';
+  // NULL when the tenant is unbranded: the heading keeps its previous near-black
+  // and the table header keeps its previous (unset = black) colour.
+  const brandedAccent = resolveOptionalDocAccent(data.accentColor);
+  const accentText = brandedAccent ?? '#111827';
 
   // Tenant accent (validated); Fueld blue when the issuer has none.
   const accent = resolveDocAccent(data.accentColor);
@@ -2822,7 +2846,11 @@ function buildProformaDocument(data: {
       // Section headings carry the tenant accent, so a tenant that sets a brand
       // colour sees it on every document rather than Fueld's blue.
       sectionLabel: { fontSize: 10, bold: true, color: accentText, margin: [0, 0, 0, 4] },
-      tableHeader: { fontSize: 9, bold: true, color: accentText },
+      // No colour when unbranded — the baseline had none, so adding #111827 here
+      // would restyle every other tenant's table headers.
+      tableHeader: brandedAccent
+        ? { fontSize: 9, bold: true, color: accentText }
+        : { fontSize: 9, bold: true },
     },
     defaultStyle: { fontSize: 10, font: 'Roboto' },
   };
@@ -2912,7 +2940,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
-    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
+    accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -3019,6 +3047,7 @@ export const __documentTestUtils = {
   findAnyInvoiceRevision: getAnyDocumentRevisionByInvoiceId,
   resolveDocAccent,
   resolveOptionalDocAccent,
+  resolveTenantDocAccent,
   buildCustomerBlock,
   buildDocumentFooter,
   overwriteDocumentRevisionArtifact,

@@ -1219,18 +1219,49 @@ describe('document.service formatting helpers', () => {
 
   it('resolves the tenant accent, rejecting malformed or unreadable colours', async () => {
     const FUELD = '#1a56db';
+    // The accent must survive the round trip into the builder. Shipping the
+    // gate inside the resolver made branding a silent no-op: the builder calls
+    // the resolver a second time, so a NULL accent was re-resolved into the
+    // blue default and "enabled" never changed a single pixel.
+    const branded = (accentColor: string | null) => {
+      const { tableHeader, sectionLabel } = (__documentTestUtils.buildProformaDocument({
+        orderNumber: 'T-1', clientName: 'C', clientCountry: 'DK', clientAddress: null,
+        customerContactName: null, customerContactRole: null, customerContactPhone: null,
+        customerContactEmail: null, vesselName: 'V', vesselImo: null, portName: 'P',
+        eta: null, etd: null, timezone: 'UTC', currency: 'USD', fromName: null, fromEmail: null,
+        fromPhone: null, paymentTerms: null, customerNote: null, termsAndConditions: null,
+        placeRemark: null, companyName: 'C', companyAddress: null, companyPhone: null,
+        companyEmail: null, companyWebsite: null, companyLogoDataUrl: null, itemNotes: [],
+        items: [{ productType: 'VLSFO', quantity: '1', unit: 'MT', salesPrice: '1', salesCurrency: 'USD' }],
+        createdAt: new Date('2026-09-24T00:00:00Z'), dateFormat: 'ISO', accentColor,
+      }) as never as { styles: Record<string, { color?: string }> }).styles;
+      return { tableHeader, sectionLabel };
+    };
+    // Unbranded: the heading is near-black and the table header carries NO colour
+    // (the baseline had none; adding #111827 there would restyle table headers
+    // for every tenant that never opted in).
+    const off = branded(__documentTestUtils.resolveTenantDocAccent('#2f75b8', false));
+    expect(off.sectionLabel.color).toBe('#111827');
+    expect(off.tableHeader.color).toBeUndefined();
+    // Branded: the opted-in colour actually reaches the document.
+    const on = branded(__documentTestUtils.resolveTenantDocAccent('#2f75b8', true));
+    expect(on.sectionLabel.color).toBe('#2f75b8');
+    expect(on.tableHeader.color).toBe('#2f75b8');
+
     // Tenant branding is OPT-IN. A tenant that already has a legible brandColor
     // stored must NOT have its documents restyled by shipping this feature —
     // verified live: ChannelTX stores #2f75b8 on a company that invoices 290
     // orders, so default-on would have changed those PDFs silently.
-    expect(__documentTestUtils.resolveOptionalDocAccent('#2f75b8')).toBeNull();
-    expect(__documentTestUtils.resolveOptionalDocAccent('#2f75b8', true)).toBe('#2f75b8');
-    expect(__documentTestUtils.resolveDocAccent('#2f75b8')).toBe('#1a56db');
+    expect(__documentTestUtils.resolveTenantDocAccent('#2f75b8', false)).toBeNull();
+    expect(__documentTestUtils.resolveTenantDocAccent('#2f75b8', true)).toBe('#2f75b8');
+    // The resolver itself stays pure — the gate is the caller's, so a builder
+    // re-resolving the accent cannot accidentally re-enable it.
+    expect(__documentTestUtils.resolveOptionalDocAccent('#2f75b8')).toBe('#2f75b8');
 
     // Valid AND legible on white — adopted as-is once opted in.
-    expect(__documentTestUtils.resolveOptionalDocAccent('#E60000', true)).toBe('#E60000');
-    expect(__documentTestUtils.resolveOptionalDocAccent('  #003366  ', true)).toBe('#003366');
-    expect(__documentTestUtils.resolveOptionalDocAccent('#000000', true)).toBe('#000000');
+    expect(__documentTestUtils.resolveTenantDocAccent('#E60000', true)).toBe('#E60000');
+    expect(__documentTestUtils.resolveTenantDocAccent('  #003366  ', true)).toBe('#003366');
+    expect(__documentTestUtils.resolveTenantDocAccent('#000000', true)).toBe('#000000');
 
     // Absent / malformed / injection-shaped input falls back.
     expect(__documentTestUtils.resolveDocAccent(null)).toBe(FUELD);
