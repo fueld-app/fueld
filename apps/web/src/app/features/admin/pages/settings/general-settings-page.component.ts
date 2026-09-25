@@ -298,6 +298,53 @@ import { ViewsSettingsCardComponent } from './views-settings-card.component';
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header">
+              <h3 class="app-panel-title">Document Branding</h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-muted">
+                Show your own brand colour on document headings and links. Off by default — while off, your documents look exactly as they do now.
+              </p>
+            </div>
+
+            <div class="app-panel-body space-y-4">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  [ngModel]="documentBranding()"
+                  (ngModelChange)="documentBranding.set($event)"
+                  class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span class="text-sm text-gray-700 dark:text-ink-dim">
+                  Use the invoicing company's brand colour on documents
+                  @if (!hasBrandColor()) {
+                    <span class="block mt-1 text-xs text-amber-600 dark:text-amber-400">
+                      No brand colour is set on any company yet, so nothing will change until you add one under Companies.
+                    </span>
+                  }
+                </span>
+              </label>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveDocumentBranding()"
+                  [disabled]="documentBrandingSaving()"
+                  class="app-button-primary"
+                >
+                  @if (documentBrandingSaving()) { Saving… } @else { Save Branding }
+                </button>
+                @if (documentBrandingSaved()) {
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  Role Dashboards                                        -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="app-panel">
@@ -453,6 +500,11 @@ export class GeneralSettingsPageComponent implements OnInit {
   readonly costSalesPrecisionSaved = signal(false);
 
   readonly dateFormat = signal<'AMERICAN' | 'EUROPEAN' | 'ISO'>('ISO');
+  readonly documentBranding = signal(false);
+  readonly documentBrandingSaving = signal(false);
+  readonly documentBrandingSaved = signal(false);
+  /** True when any owning company has a brand colour set, so the toggle does something. */
+  readonly hasBrandColor = signal(false);
   readonly dateFormatSaving = signal(false);
   readonly dateFormatSaved = signal(false);
   readonly dateFormatExample = computed(() => {
@@ -535,6 +587,7 @@ export class GeneralSettingsPageComponent implements OnInit {
     this.loadTimezoneSettings();
     this.loadCostSalesPrecision();
     this.loadDateFormat();
+    this.loadDocumentBranding();
     this.loadRoleDashboards();
     this.loadFollowUpSettings();
   }
@@ -658,6 +711,40 @@ export class GeneralSettingsPageComponent implements OnInit {
       this.toastService.show('error', 'Failed to save decimal precision setting.');
     } finally {
       this.costSalesPrecisionSaving.set(false);
+    }
+  }
+
+  private async loadDocumentBranding(): Promise<void> {
+    try {
+      // The endpoint reports whether a brand colour even exists, so the hint
+      // below is accurate without a second request.
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ enabled: boolean; hasBrandColor: boolean }>>(
+          `${API}/admin/settings/document-branding`,
+        ),
+      );
+      this.documentBranding.set(res.data?.enabled === true);
+      this.hasBrandColor.set(res.data?.hasBrandColor === true);
+    } catch {
+      this.documentBranding.set(false);
+      this.hasBrandColor.set(false);
+    }
+  }
+
+  async saveDocumentBranding(): Promise<void> {
+    this.documentBrandingSaving.set(true);
+    this.documentBrandingSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ enabled: boolean }>>(`${API}/admin/settings/document-branding`, {
+          enabled: this.documentBranding(),
+        }),
+      );
+      this.documentBranding.set(res.data?.enabled === true);
+      this.documentBrandingSaved.set(true);
+      setTimeout(() => this.documentBrandingSaved.set(false), 2500);
+    } finally {
+      this.documentBrandingSaving.set(false);
     }
   }
 

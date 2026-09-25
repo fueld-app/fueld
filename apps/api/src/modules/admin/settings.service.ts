@@ -2,7 +2,7 @@
 //  Settings Service — Own companies, teams, company groups
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, sql, isNull, inArray, not } from 'drizzle-orm';
+import { eq, and, sql, isNull, isNotNull, inArray, not } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   counterparties,
@@ -2307,14 +2307,50 @@ export async function getDateFormatSettings(tenantId: string): Promise<{ dateFor
  * default is false because enabling it changes the appearance of documents
  * already going to customers; see TenantSettings.documentBrandingEnabled.
  */
-export async function getDocumentBrandingSettings(tenantId: string): Promise<{ enabled: boolean }> {
+export async function getDocumentBrandingSettings(
+  tenantId: string,
+): Promise<{ enabled: boolean; hasBrandColor: boolean }> {
   const [tenant] = await db
     .select({ settings: tenants.settings })
     .from(tenants)
     .where(eq(tenants.id, tenantId))
     .limit(1);
   const settings = (tenant?.settings ?? {}) as import('../../db/schema').TenantSettings;
-  return { enabled: settings.documentBrandingEnabled === true };
+  // `hasBrandColor` lets the UI say whether turning this on will actually do
+  // anything, instead of leaving the admin to guess.
+  const [branded] = await db
+    .select({ id: counterparties.id })
+    .from(counterparties)
+    .where(and(eq(counterparties.tenantId, tenantId), isNotNull(counterparties.brandColor)))
+    .limit(1);
+  return { enabled: settings.documentBrandingEnabled === true, hasBrandColor: !!branded };
+}
+
+/**
+ * Enable/disable tenant-branded document styling. Admin-only, per tenant.
+ *
+ * Deliberately an explicit write rather than something inferred from a stored
+ * brandColor: switching it on restyles documents a customer receives, so it
+ * should be an action someone takes, not a side effect of another edit.
+ */
+export async function updateDocumentBrandingSettings(
+  tenantId: string,
+  data: { enabled?: boolean },
+): Promise<{ enabled: boolean }> {
+  if (typeof data.enabled !== 'boolean') {
+    throw new Error('enabled must be a boolean');
+  }
+  await db
+    .update(tenants)
+    .set({
+      settings: sql`jsonb_set(
+        COALESCE(${tenants.settings}, '{}'::jsonb),
+        '{documentBrandingEnabled}',
+        to_jsonb(${data.enabled}::boolean)
+      )`,
+    })
+    .where(eq(tenants.id, tenantId));
+  return { enabled: data.enabled };
 }
 
 export async function updateDateFormatSettings(

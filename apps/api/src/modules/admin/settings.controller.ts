@@ -95,6 +95,8 @@ import {
   updateCostSalesDecimalPrecision,
   getDateFormatSettings,
   updateDateFormatSettings,
+  getDocumentBrandingSettings,
+  updateDocumentBrandingSettings,
 } from './settings.service';
 import { getCommentsDigestSettings } from '../comments/comments-digest.service';
 import { getDailyPricingEmailSettings, getCustomerContactOptions } from '../reports/daily-pricing.service';
@@ -2967,6 +2969,33 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       dateFormat: t.Union([t.Literal('AMERICAN'), t.Literal('EUROPEAN'), t.Literal('ISO')]),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update date format setting' },
+  })
+
+  .get('/document-branding', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getDocumentBrandingSettings(auth.tenantId);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get document branding setting' },
+  })
+
+  .put('/document-branding', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateDocumentBrandingSettings(auth.tenantId, body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({ enabled: t.Boolean() }),
+    detail: { tags: ['Admin Settings'], summary: 'Update document branding setting' },
   })
 
   .get('/my-date-format', async ({ auth }) => {
