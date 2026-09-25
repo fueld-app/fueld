@@ -2307,6 +2307,34 @@ export async function getDateFormatSettings(tenantId: string): Promise<{ dateFor
  * default is false because enabling it changes the appearance of documents
  * already going to customers; see TenantSettings.documentBrandingEnabled.
  */
+/**
+ * The "1 USD = 6.52 DKK" line printed under a document's totals, or null.
+ *
+ * Null unless the tenant has configured it. There is no order-level FX rate in
+ * the schema — the only `fxRate` column belongs to supplier credit notes — so
+ * deriving one here would put a figure the tenant never set on a document that
+ * tells a customer what they owe.
+ */
+export async function getDocumentExchangeRateLine(
+  tenantId: string,
+  orderCurrency: string,
+): Promise<string | null> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  const settings = (tenant?.settings ?? {}) as {
+    documentExchangeRate?: { quoteCurrency?: string; rate?: string | number };
+  };
+  const configured = settings.documentExchangeRate;
+  const quote = configured?.quoteCurrency?.trim();
+  const rate = Number(configured?.rate);
+  if (!quote || !Number.isFinite(rate) || rate <= 0) return null;
+  const from = orderCurrency?.trim() || 'USD';
+  return `1 ${from} = ${rate} ${quote.toUpperCase()}`;
+}
+
 export type DocumentLayoutSetting = 'CLASSIC' | 'SLEEK';
 
 export async function getDocumentBrandingSettings(

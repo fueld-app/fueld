@@ -10,7 +10,7 @@ import QRCode from 'qrcode';
 import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, priceReferences, type TenantSettings } from '../../db/schema';
 import { isIanaTimezone } from '../../utils/timezone';
-import { getDateFormatSettings, getCostSalesDecimalPrecision, getDocumentBrandingSettings } from '../admin/settings.service';
+import { getDateFormatSettings, getCostSalesDecimalPrecision, getDocumentBrandingSettings, getDocumentExchangeRateLine } from '../admin/settings.service';
 import { ensureOrderInvoice, InvoiceLinesChangedError, InvoiceNotFoundError } from '../orders/invoice.service';
 import { splitAmountByPercent } from '../orders/invoice-amounts';
 import { customerFacingItems, isSupplierCreditPlaceholder } from './customer-facing-items';
@@ -1525,6 +1525,8 @@ export async function generateOrderInvoicePdfBuffer(
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     layout: documentLayout,
+    clientTaxId: order.client?.vatNumber ?? null,
+    exchangeRateLine: await getDocumentExchangeRateLine(order.tenantId, order.currency ?? 'USD'),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2155,6 +2157,8 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     layout: documentLayout,
+    clientTaxId: order.client?.vatNumber ?? null,
+    exchangeRateLine: await getDocumentExchangeRateLine(order.tenantId, order.currency ?? 'USD'),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2398,6 +2402,8 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     accountName: order.isBrokerDeal ? order.client?.name ?? null : undefined,
     accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     layout: documentLayout,
+    clientTaxId: order.client?.vatNumber ?? null,
+    exchangeRateLine: await getDocumentExchangeRateLine(order.tenantId, order.currency ?? 'USD'),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2604,6 +2610,7 @@ function buildSleekProformaInput(data: ProformaDocumentData, accentText: string,
       name: data.clientName,
       address: data.clientAddress ?? data.clientCountry,
       attention,
+      taxId: data.clientTaxId ?? null,
     },
     voyage,
     lines,
@@ -2617,7 +2624,7 @@ function buildSleekProformaInput(data: ProformaDocumentData, accentText: string,
           total: money(grandTotal + taxTotal),
           totalShortLabel: 'Total including VAT',
           totalLabel: sleekTotalLabel(data),
-          exchangeRate: null,
+          exchangeRate: data.exchangeRateLine ?? null,
         }
       : null,
     dueLine: dueFormatted ? `The amount is due on ${dueFormatted}.` : null,
@@ -2724,6 +2731,10 @@ export type ProformaDocumentData = {
   trancheSeq?: number | null;
   /** Per-tenant layout. CLASSIC (the default) keeps the original structure. */
   layout?: DocumentLayout;
+  /** Customer's registration number, printed under their address in SLEEK. */
+  clientTaxId?: string | null;
+  /** Pre-formatted "1 USD = 6.52 DKK" line; null when the tenant set none. */
+  exchangeRateLine?: string | null;
 };
 
 function buildProformaDocument(data: ProformaDocumentData): TDocumentDefinitions {
@@ -3183,6 +3194,8 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     accentColor: resolveTenantDocAccent(order.invoicingCompany?.brandColor, brandingEnabled),
     layout: documentLayout,
+    clientTaxId: order.client?.vatNumber ?? null,
+    exchangeRateLine: await getDocumentExchangeRateLine(order.tenantId, order.currency ?? 'USD'),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,

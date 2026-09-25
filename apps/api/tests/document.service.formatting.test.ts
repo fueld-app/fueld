@@ -1248,8 +1248,12 @@ describe('document.service formatting helpers', () => {
     expect(sleek.content.length).toBeGreaterThan(0);
     // The two layouts must not produce the same document, or the setting is inert.
     expect(JSON.stringify(sleek)).not.toBe(JSON.stringify(asClassic));
-    // The sleek page leaves room for the footer; it must not be the classic margin.
-    expect(sleek.pageMargins).toEqual([54, 42, 54, 78]);
+    // SLEEK draws its own heading rule above the table; CLASSIC relies on table
+    // rules. A missing rule is what made the header look detached.
+    expect(JSON.stringify(sleek)).toContain('lineColor');
+    // The sleek page leaves room for the footer and must differ from the classic
+    // margins, or the two layouts would be positioned identically.
+    expect(sleek.pageMargins).toEqual([54, 40, 54, 86]);
 
     // The accent must survive the round trip into the builder. Shipping the
     // gate inside the resolver made branding a silent no-op: the builder calls

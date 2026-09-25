@@ -33,8 +33,10 @@ export interface SleekIssuer {
 export interface SleekParty {
   name: string;
   address: string | null;
-  /** Contact line, already labelled (e.g. "Att.: Kasper") or null. */
+  /** Contact line, already labelled (e.g. "Att.: Kathy Rolfo") or null. */
   attention: string | null;
+  /** Customer's own registration number, printed under their address. */
+  taxId: string | null;
 }
 
 export interface SleekLine {
@@ -233,26 +235,33 @@ function bankBlock(bank: SleekBank, beneficiaryFallback: string): Content {
   detail('IBAN:', bank.iban);
   detail('SWIFT:', bank.swift);
 
-  return { stack: lines, margin: [0, 26, 0, 0] } as Content;
+  return { stack: lines, margin: [0, 16, 0, 0] } as Content;
 }
 
 export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefinitions {
   const { accent } = input;
 
-  // ── Header: logo top-right, then the metadata line under it ────────
-  const logoColumn: Content[] = [];
+  // ── Logo: centred on its own line, as the reference has it ─────────
+  const logoBlock: Content[] = [];
   if (input.logoDataUrl) {
-    logoColumn.push({ image: input.logoDataUrl, fit: [170, 60], alignment: 'center' as const } as Content);
+    logoBlock.push({
+      image: input.logoDataUrl,
+      fit: [200, 68],
+      alignment: 'center' as const,
+      margin: [0, 0, 0, 2] as [number, number, number, number],
+    } as Content);
   }
-  logoColumn.push(metaRow(input.meta));
 
   // ── Party (left) ───────────────────────────────────────────────────
-  const partyStack: Content[] = [{ text: input.party.name, fontSize: 11.5, bold: true, color: INK } as Content];
+  const partyStack: Content[] = [{ text: input.party.name, fontSize: 11, bold: true, color: INK } as Content];
   if (input.party.attention?.trim()) {
     partyStack.push({ text: input.party.attention.trim(), fontSize: 10, color: INK } as Content);
   }
   for (const line of addressLines(input.party.address)) {
     partyStack.push({ text: line, fontSize: 10, color: INK } as Content);
+  }
+  if (input.party.taxId?.trim()) {
+    partyStack.push({ text: `Tax ID: ${input.party.taxId.trim()}`, fontSize: 10, color: INK, margin: [0, 6, 0, 0] } as Content);
   }
 
   // ── Issuer (right) ─────────────────────────────────────────────────
@@ -261,7 +270,9 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
     issuerStack.push({ text, fontSize: 10, color: INK, bold, alignment: 'right' as const } as Content);
   issuerLine(input.issuer.name, true);
   for (const line of addressLines(input.issuer.address)) issuerLine(line);
-  if (input.issuer.taxId?.trim()) issuerLine(`Tax ID: ${input.issuer.taxId.trim()}`);
+  if (input.issuer.taxId?.trim()) {
+    issuerStack.push({ text: `Tax ID: ${input.issuer.taxId.trim()}`, fontSize: 10, color: INK, alignment: 'right' as const, margin: [0, 6, 0, 0] } as Content);
+  }
   if (input.issuer.phone?.trim()) {
     issuerStack.push({ text: `Phone: ${input.issuer.phone.trim()}`, fontSize: 10, color: accent, alignment: 'right' as const } as Content);
   }
@@ -271,17 +282,10 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
 
   const content: Content[] = [];
 
-  // ── Title + metadata ───────────────────────────────────────────────
-  content.push({
-    columns: [
-      // Title takes the flexible column and the logo/meta block takes its natural
-      // width, so a long title wraps inside its own space instead of squeezing
-      // the metadata onto two lines.
-      { width: '*', text: input.title, ...TITLE } as Content,
-      { width: 'auto' as const, stack: logoColumn, margin: [16, 0, 0, 0] as [number, number, number, number] } as Content,
-    ],
-    margin: [0, 18, 0, 6],
-  } as Content);
+  // ── Logo ───────────────────────────────────────────────────────────
+  if (logoBlock.length > 0) {
+    content.push({ stack: logoBlock, margin: [0, 0, 0, 6] } as Content);
+  }
 
   // ── Parties ────────────────────────────────────────────────────────
   content.push({
@@ -289,14 +293,28 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
       { width: '*', stack: partyStack } as Content,
       { width: 'auto', stack: issuerStack } as Content,
     ],
+    margin: [0, 6, 0, 0],
+  } as Content);
+
+  // ── Title + metadata, over a full-width rule, then the table follows ─
+  content.push({
+    columns: [
+      { width: '*', text: input.title, ...TITLE } as Content,
+      { width: 'auto' as const, stack: [metaRow(input.meta)], margin: [16, 0, 0, 0] as [number, number, number, number] } as Content,
+    ],
     margin: [0, 18, 0, 0],
+  } as Content);
+  // The rule that separates the heading from the lines, as in the reference.
+  content.push({
+    canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 487, y2: 0, lineWidth: 0.6, lineColor: RULE }],
+    margin: [0, 6, 0, 0],
   } as Content);
 
   // ── Voyage (vessel / delivery) ─────────────────────────────────────
   if (input.voyage.length > 0) {
     content.push({
       width: 300,
-      margin: [0, 22, 0, 0],
+      margin: [0, 14, 0, 0],
       table: {
         widths: [90, '*'],
         body: input.voyage.map((v) => [
@@ -334,12 +352,14 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
   }
 
   content.push({
-    margin: [0, 20, 0, 0],
+    margin: [0, 0, 0, 0],
     // Four columns, matching the reference and the body rows.
     table: { widths: ['*', 80, 95, 105], headerRows: 1, body },
     layout: {
+      // One rule under the header row and one closing the table; the heading
+      // rule above is drawn separately so it spans the full width.
       hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
-        (i === 0 || i === 1 || i === node.table.body.length ? 0.6 : 0),
+        (i === 1 || i === node.table.body.length ? 0.6 : 0),
       hLineColor: () => RULE,
       vLineWidth: () => 0,
       paddingLeft: () => 0,
@@ -354,12 +374,12 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
     if (input.trancheNote?.trim()) {
       content.push({ text: input.trancheNote.trim(), fontSize: 9.5, color: INK, margin: [0, 12, 0, 0] } as Content);
     }
-    content.push({ ...(totalsBlock(input.totals) as object), margin: [0, 14, 0, 0] } as Content);
+    content.push({ ...(totalsBlock(input.totals) as object), margin: [0, 10, 0, 0] } as Content);
   }
 
   // ── Due line ───────────────────────────────────────────────────────
   if (input.dueLine?.trim()) {
-    content.push({ text: input.dueLine.trim(), fontSize: 10, color: INK, margin: [0, 18, 0, 0] } as Content);
+    content.push({ text: input.dueLine.trim(), fontSize: 10, color: INK, margin: [0, 12, 0, 0] } as Content);
   }
 
   // ── Notes ──────────────────────────────────────────────────────────
@@ -382,12 +402,12 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
         {
           width: 'auto' as const,
           stack: [
-            { image: input.verifyUrl, fit: [86, 86], alignment: 'center' as const } as Content,
-            { text: 'Scan to verify', fontSize: 7.5, color: accent, alignment: 'center' as const, margin: [0, 4, 0, 0], link: input.verifyLink ?? undefined } as Content,
+            { image: input.verifyUrl, fit: [78, 78], alignment: 'center' as const } as Content,
+            { text: 'Scan to verify', fontSize: 7.5, color: accent, alignment: 'center' as const, margin: [0, 3, 0, 0], link: input.verifyLink ?? undefined } as Content,
           ],
         },
       ],
-      margin: [0, 26, 0, 0],
+      margin: [0, 14, 0, 0],
     } as Content);
   }
   if (input.fraudPreventionText?.trim()) {
@@ -396,7 +416,7 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
 
   return {
     pageSize: 'A4',
-    pageMargins: [54, 42, 54, 78],
+    pageMargins: [54, 40, 54, 86],
     content,
     footer: input.footer,
     defaultStyle: { fontSize: 10, font: 'Roboto', color: INK },
