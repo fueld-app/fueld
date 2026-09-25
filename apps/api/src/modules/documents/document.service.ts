@@ -768,7 +768,74 @@ function buildCustomerBlock(params: {
 }
 
 /**
- * The page footer shared by every tenant document: issuer name and address on
+ * The page header shared by the live builders: company logo, the
+ * Date/Ref/PO table, and the three-column strip (party block, document title,
+ * meta). Only three values differ between an offer and a proforma — the side
+ * column width, the title, and whether the title wraps — so those are the
+ * parameters rather than a copied block.
+ *
+ * The party block is rendered on page 1 only; later pages repeat the header
+ * without re-printing the addressee.
+ */
+function buildDocumentHeader(params: {
+  companyLogoDataUrl: string | null;
+  createdDate: string;
+  refNum: string;
+  purchaseOrderNumber: string | null;
+  customerBlock: Content[];
+  customerTopOffset: number;
+  title: string;
+  /** Width of the outer columns, in points. */
+  sideWidth: number;
+  titleNoWrap?: boolean;
+}): (currentPage: number, pageCount: number) => Content {
+  return (currentPage: number, _pageCount: number) => {
+    const rightStack: Content[] = [];
+    if (params.companyLogoDataUrl) {
+      rightStack.push({ image: params.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 10] } as Content);
+    }
+    // Date / Ref — tabular so labels and values are column-aligned
+    rightStack.push({
+      table: {
+        widths: ['auto', 'auto'],
+        body: [
+          [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: params.createdDate, alignment: 'right' }],
+          [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: params.refNum, alignment: 'right' }],
+          ...(params.purchaseOrderNumber?.trim() ? [
+            [{ text: 'PO.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: params.purchaseOrderNumber.trim(), alignment: 'right' }],
+          ] : []),
+        ],
+      },
+      layout: {
+        hLineWidth: () => 0,
+        vLineWidth: () => 0,
+        paddingLeft: () => 0,
+        paddingRight: () => 0,
+        paddingTop: () => 1,
+        paddingBottom: () => 1,
+      },
+      fontSize: 10,
+    } as Content);
+
+    return {
+      margin: [40, 30, 0, 0],
+      columns: [
+        { width: params.sideWidth, stack: currentPage === 1 ? params.customerBlock : [{ text: '' }], margin: [0, params.customerTopOffset, 0, 0] },
+        {
+          width: '*',
+          text: params.title,
+          style: 'docTitle',
+          alignment: 'center',
+          margin: [10, 0, 10, 0],
+          ...(params.titleNoWrap ? { noWrap: true } : {}),
+        },
+        { width: params.sideWidth, stack: rightStack, margin: [0, 0, 40, 0] },
+      ],
+    } as Content;
+  };
+}
+
+/** The page footer shared by every tenant document: issuer name and address on
  * the left, contacts in the middle, page number on the right, and the
  * revision/fingerprint line beneath when the document is a finalised revision.
  *
@@ -1713,44 +1780,16 @@ export function buildOfferDocument(data: {
   const headerContentHeight = 30 + customerTopOffset + customerBlock.length * 14 + 4;
   const topMargin = Math.max(140, headerContentHeight);
 
-  const header = (currentPage: number, pageCount: number): Content => {
-    const rightStack: Content[] = [];
-    // Logo
-    if (data.companyLogoDataUrl) {
-      rightStack.push({ image: data.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 10] } as Content);
-    }
-    // Date / Ref — tabular so labels and values are column-aligned
-    rightStack.push({
-      table: {
-        widths: ['auto', 'auto'],
-        body: [
-          [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
-          [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
-          ...(data.purchaseOrderNumber?.trim() ? [
-            [{ text: 'PO.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: data.purchaseOrderNumber.trim(), alignment: 'right' }],
-          ] : []),
-        ],
-      },
-      layout: {
-        hLineWidth: () => 0,
-        vLineWidth: () => 0,
-        paddingLeft: () => 0,
-        paddingRight: () => 0,
-        paddingTop: () => 1,
-        paddingBottom: () => 1,
-      },
-      fontSize: 10,
-    } as Content);
-
-    return {
-      margin: [40, 30, 0, 0],
-      columns: [
-        { width: 200, stack: currentPage === 1 ? customerBlock : [{ text: '' }], margin: [0, customerTopOffset, 0, 0] },
-        { width: '*', text: title, style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0] },
-        { width: 200, stack: rightStack, margin: [0, 0, 40, 0] },
-      ],
-    } as Content;
-  };
+  const header = buildDocumentHeader({
+    companyLogoDataUrl: data.companyLogoDataUrl,
+    createdDate,
+    refNum,
+    purchaseOrderNumber: data.purchaseOrderNumber ?? null,
+    customerBlock,
+    customerTopOffset,
+    title,
+    sideWidth: 200,
+  });
 
   // ── Footer (company details + page number) ────────────────────────
   const footerFn = buildDocumentFooter({
@@ -2543,43 +2582,17 @@ function buildProformaDocument(data: {
   const headerContentHeight = 30 + customerTopOffset + customerBlock.length * 14 + 4;
   const topMargin = Math.max(140, headerContentHeight);
 
-  const header = (currentPage: number, _pageCount: number): Content => {
-    const rightStack: Content[] = [];
-    if (data.companyLogoDataUrl) {
-      rightStack.push({ image: data.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 10] } as Content);
-    }
-    // Date / Ref — tabular so labels and values are column-aligned
-    rightStack.push({
-      table: {
-        widths: ['auto', 'auto'],
-        body: [
-          [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
-          [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
-          ...(data.purchaseOrderNumber?.trim() ? [
-            [{ text: 'PO.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: data.purchaseOrderNumber.trim(), alignment: 'right' }],
-          ] : []),
-        ],
-      },
-      layout: {
-        hLineWidth: () => 0,
-        vLineWidth: () => 0,
-        paddingLeft: () => 0,
-        paddingRight: () => 0,
-        paddingTop: () => 1,
-        paddingBottom: () => 1,
-      },
-      fontSize: 10,
-    } as Content);
-
-    return {
-      margin: [40, 30, 0, 0],
-      columns: [
-        { width: 150, stack: currentPage === 1 ? customerBlock : [{ text: '' }], margin: [0, customerTopOffset, 0, 0] },
-        { width: '*', text: data.docTitle ?? 'PROFORMA INVOICE', style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0], noWrap: true },
-        { width: 150, stack: rightStack, margin: [0, 0, 40, 0] },
-      ],
-    } as Content;
-  };
+  const header = buildDocumentHeader({
+    companyLogoDataUrl: data.companyLogoDataUrl,
+    createdDate,
+    refNum,
+    purchaseOrderNumber: data.purchaseOrderNumber ?? null,
+    customerBlock,
+    customerTopOffset,
+    title: data.docTitle ?? 'PROFORMA INVOICE',
+    sideWidth: 150,
+    titleNoWrap: true,
+  });
 
   // ── Footer (company details + page number) ────────────────────────
   const footerFn = buildDocumentFooter({
