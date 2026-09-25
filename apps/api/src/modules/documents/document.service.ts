@@ -54,12 +54,25 @@ type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER' | 'BROKER
 /**
  * Bump this whenever document output changes so cached revisions regenerate.
  *
- * Bumped to 2026-09-25a for the bank-fail-closed + tenant-accent change
- * (8bbbc799): the same order now renders different bytes than before, and
- * without the bump a cached revision would keep serving the old appearance
- * forever, so the fix would appear not to have taken effect.
+ * DELIBERATELY NOT BUMPED for the bank-fail-closed + tenant-accent change
+ * (8bbbc799 / 90defaef). Bumping it looked harmless — it only exists to refresh
+ * cached documents — but the stream key embeds this version, and for an ISSUED
+ * invoice that refresh is the wrong outcome: it makes the versioned lookup miss,
+ * so an invoice the customer already holds gets re-rendered under the new
+ * template. That is precisely what the freeze in generateOrderInvoicePdfBuffer
+ * exists to prevent, and the two mechanisms were fighting.
+ *
+ * Measured on a copy of moxie's data with its real stored artifacts: the bump
+ * alone does not change the outcome (3 of 6 issued invoices served their stored
+ * bytes either way), because the invoice-link fallback below catches the miss
+ * first. So this is a reduction in reliance on that fallback, not a fix in
+ * itself — the actual defect was the missing order-level fallback. Keeping the
+ * version stable means the versioned lookup hits directly for issued invoices.
+ *
+ * The rule this encodes: an output change must reach a tenant by issuing a NEW
+ * document, never by silently restating one they already hold.
  */
-const DOCUMENT_TEMPLATE_VERSION = '2026-09-25a';
+const DOCUMENT_TEMPLATE_VERSION = '2026-04-10a';
 
 export interface DocumentRevisionInfo {
   id: string;
@@ -459,6 +472,33 @@ async function getAnyDocumentRevisionByInvoiceId(invoiceId: string): Promise<Doc
     .select()
     .from(documentRevisions)
     .where(and(eq(documentRevisions.invoiceId, invoiceId), eq(documentRevisions.documentType, 'INVOICE')))
+    .orderBy(desc(documentRevisions.revisionNumber))
+    .limit(1);
+  return revision ? mapRevisionInfo(revision) : null;
+}
+
+/**
+ * The latest INVOICE revision for an order regardless of template version or
+ * invoice link.
+ *
+ * Needed because `invoice_id` only started being recorded recently: every
+ * invoice issued before that has it NULL, so `getAnyDocumentRevisionByInvoiceId`
+ * can never match them. Without this fallback the versioned lookup misses too
+ * (the stream key embeds the template version, which has since been bumped), so
+ * an already-issued invoice would be re-rendered under the new template — the
+ * exact "silently restating a document the customer already holds" failure the
+ * freeze exists to prevent.
+ *
+ * Order-level rather than invoice-level because that is the only link those
+ * revisions carry. It is unambiguous while an order has a single invoice; an
+ * order with several (split payment terms) names its invoice, and then the
+ * invoice_id lookup above matches first and wins.
+ */
+async function getAnyDocumentRevisionByOrderId(orderId: string): Promise<DocumentRevisionInfo | null> {
+  const [revision] = await db
+    .select()
+    .from(documentRevisions)
+    .where(and(eq(documentRevisions.orderId, orderId), eq(documentRevisions.documentType, 'INVOICE')))
     .orderBy(desc(documentRevisions.revisionNumber))
     .limit(1);
   return revision ? mapRevisionInfo(revision) : null;
@@ -1380,7 +1420,8 @@ export async function generateOrderInvoicePdfBuffer(
     documentType: 'INVOICE',
     orderId: order.id,
     invoiceId: invoice.id,
-  }) ?? await getAnyDocumentRevisionByInvoiceId(invoice.id);
+  }) ?? await getAnyDocumentRevisionByInvoiceId(invoice.id)
+     ?? await getAnyDocumentRevisionByOrderId(order.id);
   if (existingRevision) {
     const fileName = `Fueld_Invoice_${invoice.invoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
     return {
