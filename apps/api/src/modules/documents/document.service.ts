@@ -1,7 +1,7 @@
 import pdfmake from 'pdfmake';
 import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray, sql } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
@@ -498,7 +498,16 @@ async function getAnyDocumentRevisionByOrderId(orderId: string): Promise<Documen
   const [revision] = await db
     .select()
     .from(documentRevisions)
-    .where(and(eq(documentRevisions.orderId, orderId), eq(documentRevisions.documentType, 'INVOICE')))
+    .where(and(
+      eq(documentRevisions.orderId, orderId),
+      eq(documentRevisions.documentType, 'INVOICE'),
+      // Must be the ONLY live invoice on the order. With split payment terms an
+      // order has several, and an order-level match would then hand the deposit's
+      // document to the balance tranche — caught by the tranche rendering test.
+      // An ambiguous order returns null and re-renders from current data instead,
+      // which is the lesser evil: the alternative is serving the wrong invoice.
+      sql`(select count(*) from ${invoices} i where i.order_id = ${orderId} and i.status <> 'VOID') = 1`,
+    ))
     .orderBy(desc(documentRevisions.revisionNumber))
     .limit(1);
   return revision ? mapRevisionInfo(revision) : null;
