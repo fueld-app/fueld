@@ -1219,6 +1219,54 @@ describe('document.service formatting helpers', () => {
 
   it('resolves the tenant accent, rejecting malformed or unreadable colours', async () => {
     const FUELD = '#1a56db';
+    // Offers adopt SLEEK too. They are structurally different from invoices, so
+    // these assert the differences rather than the shared shell.
+    const offerFixture = (extra: Record<string, unknown> = {}) => __documentTestUtils.buildOfferDocument({
+      orderNumber: 'T-1', clientName: 'C', clientCountry: 'DK', clientAddress: null,
+      customerContactName: null, customerContactRole: null, customerContactPhone: null,
+      customerContactEmail: null, vesselName: 'V', vesselImo: null, portName: 'P',
+      eta: null, etd: null, timezone: 'UTC', currency: 'USD', fromName: null, fromEmail: null,
+      fromPhone: null, paymentTerms: null, customerNote: null, termsAndConditions: null,
+      placeRemark: null, companyName: 'C', companyAddress: null, companyPhone: null,
+      companyEmail: null, companyWebsite: null, companyLogoDataUrl: null, itemNotes: [],
+      items: [{ productType: 'VLSFO', description: '0.5%', quantity: '380', quantityMin: '360', quantityMax: '380', unit: 'CBM', salesPrice: '1', salesCurrency: 'USD' }],
+      createdAt: new Date('2026-09-24T00:00:00Z'), dateFormat: 'ISO', layout: 'SLEEK',
+      ...extra,
+    }) as never as { content: Array<Record<string, unknown>>; styles?: unknown };
+
+    const sleekOffer = offerFixture();
+    // SLEEK for offers must be a different structure from CLASSIC.
+    expect(JSON.stringify(sleekOffer)).not.toBe(JSON.stringify(offerFixture({ layout: 'CLASSIC' })));
+    // An offer has no totals and no remittance block: it is a quote, and its
+    // quantity may be a range, so a grand total would state a figure the offer
+    // does not commit to.
+    const offerJson = JSON.stringify(sleekOffer);
+    expect(offerJson).not.toContain('Total including VAT');
+    expect(offerJson).not.toContain('Payment methods accepted');
+    expect(offerJson).not.toContain('Total excluding VAT');
+    // It ends with a signature block, which invoices do not have.
+    expect(offerJson).toContain('Best regards');
+    // A range quantity must not be flattened to a single figure.
+    expect(offerJson).toContain('360.00 - 380.00');
+
+    // Broker deals hide prices, so the table must declare only the columns that
+    // carry data — a blank Price column reads as something to interpret.
+    const hidden = offerFixture({ hidePrices: true });
+    const hiddenTable = hidden.content.find((c) =>
+      Array.isArray((c as { table?: { body?: unknown[][] } }).table?.body) &&
+      ((c as { table: { body: Array<Array<{ text?: string }>> } }).table.body[0] ?? [])
+        .some((cell) => cell.text === 'Description'),
+    ) as { table: { body: unknown[][] } };
+    expect(hiddenTable.table.body[0].length).toBe(2);
+    expect(hiddenTable.table.body[1].length).toBe(2);
+    const pricedTable = sleekOffer.content.find((c) =>
+      Array.isArray((c as { table?: { body?: unknown[][] } }).table?.body) &&
+      ((c as { table: { body: Array<Array<{ text?: string }>> } }).table.body[0] ?? [])
+        .some((cell) => cell.text === 'Description'),
+    ) as { table: { body: unknown[][] } };
+    expect(pricedTable.table.body[0].length).toBe(3);
+    expect(pricedTable.table.body[1].length).toBe(3);
+
     // Line-item label: product name and description on ONE line. The separator
     // rule has a trap — an unescaped hyphen in the character class forms the
     // range "/"-"–" (0x2F-0x2013), which spans the alphabet, so every

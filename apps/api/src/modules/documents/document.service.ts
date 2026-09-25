@@ -1621,11 +1621,176 @@ function createPdfBuffer(docDefinition: TDocumentDefinitions): Promise<Buffer> {
   return pdf.getBuffer();
 }
 
+
+/**
+ * Map the offer builder's data onto the sleek layout.
+ *
+ * Offers differ from invoices in ways the layout must respect rather than pad
+ * over: they carry no remittance block, no tax, and no totals; broker deals hide
+ * prices entirely; a formula price is genuinely multi-line; and they end with a
+ * signature block. Each of those maps to an absent or different block instead of
+ * a zeroed one.
+ */
+function buildSleekOfferInput(data: OfferDocumentData, accentText: string, accent: string) {
+  const qtyDecimals = computeMaxDecimalPlaces(data.items, 'quantity');
+  const priceDecimals = computeMaxDecimalPlaces(data.items, 'salesPrice');
+  const currency = data.items[0]?.salesCurrency || data.currency;
+
+  // Header nouns. The classic builder upper-cases them ("OFFER"); the reference
+  // title-cases, so apply the same casing rule as the proforma title.
+  const title = (data.docTitle ?? 'OFFER')
+    .split(/\s+/)
+    .map((w) => (w.length > 0 ? w[0]!.toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(' ');
+
+  const lines = data.items.map((item) => {
+    // Quantity as a range when the offer states one; matches the classic layout.
+    const maxQty = formatNumber(
+      item.quantityMax != null && String(item.quantityMax).trim() !== '' ? item.quantityMax : item.quantity,
+      qtyDecimals,
+    );
+    const minQty = item.quantityMin != null && String(item.quantityMin).trim() !== ''
+      ? formatNumber(item.quantityMin, qtyDecimals)
+      : '';
+    const qty = minQty && minQty !== maxQty ? `${minQty} - ${maxQty}` : maxQty;
+
+    const label = formatProductTypeLabel(item.productType);
+    const detail = item.description?.trim() || '';
+    const needsOwnSeparator = /^[\/\-–—,;:·]/.test(detail);
+    const description = !detail || detail === label
+      ? (detail || label)
+      : needsOwnSeparator
+        ? `${label} ${detail}`
+        : `${label} — ${detail}`;
+
+    let unitPrice: string | Content[] = '';
+    if (!data.hidePrices) {
+      if (item.salesPricingModel === 'FORMULA') {
+        // Formula pricing is multi-line by nature, so it keeps its shape rather
+        // than being flattened into a string that would lose the bold figures.
+        const parts: Content[] = [];
+        if (item.salesReferenceName) parts.push({ text: item.salesReferenceName, bold: true, fontSize: 9 } as Content);
+        if (item.salesPremium && parseFloat(item.salesPremium)) {
+          parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 } as Content);
+        }
+        if (item.salesBarging && parseFloat(item.salesBarging)) {
+          parts.push({ text: `barging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 } as Content);
+        }
+        if (item.salesPriceFinalized) {
+          parts.push({ text: `${formatNumber(item.salesPrice, priceDecimals)} ${item.salesCurrency || data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true } as Content);
+        }
+        unitPrice = parts;
+      } else {
+        unitPrice = `${formatNumber(item.salesPrice, priceDecimals)} ${item.salesCurrency || data.currency}/${item.priceUnit ?? item.unit}`;
+      }
+    }
+
+    return {
+      description,
+      quantity: `${qty} ${item.unit}`.trim(),
+      unitPrice,
+      // An offer states a unit price, not a line total: it is a quote, and the
+      // quantity may be a range.
+      amount: null,
+    };
+  });
+
+  const voyage: Array<{ label: string; value: string }> = [];
+  const vesselRef = `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}`;
+  if (vesselRef.trim()) voyage.push({ label: 'Vessel:', value: vesselRef });
+  if (data.portName?.trim()) voyage.push({ label: 'Delivery place:', value: data.portName });
+  const eta = formatDateTimeForDisplay(data.eta, data.timezone, false, data.dateFormat ?? undefined);
+  const etd = formatDateTimeForDisplay(data.etd, data.timezone, false, data.dateFormat ?? undefined);
+  const window = eta && etd ? `${etd} - ${eta}` : (etd ?? eta);
+  if (window) voyage.push({ label: 'Delivery window:', value: window });
+
+  const meta: Array<{ label: string; value: string }> = [];
+  const refLabel = data.purchaseOrderNumber?.trim() ? 'PO number' : 'Reference';
+  const refValue = data.purchaseOrderNumber?.trim() || data.orderNumber?.trim();
+  if (refValue) meta.push({ label: refLabel, value: refValue });
+  const createdDate = formatDateTimeForDisplay(data.createdAt.toISOString(), data.timezone, false, data.dateFormat ?? undefined);
+  if (createdDate) meta.push({ label: 'Date', value: createdDate });
+
+  const notes: string[] = [];
+  // The order's own note first and unlabelled (classic prints a "Notes" heading
+  // over it), then the per-item notes, then the boilerplate.
+  if (data.customerNote?.trim()) notes.push(data.customerNote.trim());
+  for (const n of data.itemNotes) notes.push(`${n.label}: ${n.note}`);
+  if (data.paymentTerms?.trim()) notes.push(`Payment terms: ${data.paymentTerms.trim()}`);
+  if (data.termsAndConditions?.trim()) notes.push(data.termsAndConditions.trim());
+  if (data.placeRemark?.trim()) notes.push(data.placeRemark.trim());
+
+  const attention = data.customerContactName?.trim() ? `Att.: ${data.customerContactName.trim()}` : null;
+
+  return {
+    brandName: data.companyName?.trim() || 'Fueld Trading',
+    logoDataUrl: data.companyLogoDataUrl,
+    title,
+    meta,
+    issuer: {
+      name: data.companyName?.trim() || 'Fueld Trading',
+      address: data.companyAddress,
+      taxId: data.vatNumber ?? null,
+      phone: data.companyPhone,
+      email: data.companyEmail,
+    },
+    party: {
+      name: data.clientName,
+      address: data.clientAddress ?? data.clientCountry,
+      attention,
+      taxId: data.clientTaxId ?? null,
+    },
+    accountName: data.accountName ?? null,
+    voyage,
+    lines,
+    // Three columns when prices are hidden: a Price header with no data would
+    // read as a blank the customer has to interpret.
+    headers: data.hidePrices
+      ? ['Description', 'Quantity']
+      : ['Description', 'Quantity', 'Unit price'],
+    // An offer has no totals: it quotes unit prices, and the quantity may be a
+    // range, so a grand total would state a figure the offer does not commit to.
+    totals: null,
+    dueLine: null,
+    trancheNote: null,
+    bank: null,
+    notes,
+    accent: accentText || accent,
+    verifyUrl: data.verifyUrl ?? null,
+    verifyLink: null,
+    fraudPreventionText: null,
+    responseQr: data.supplierResponseQrUrl
+      ? {
+          url: data.supplierResponseQrUrl,
+          title: data.supplierResponseTitle ?? null,
+          text: data.supplierResponseText ?? null,
+        }
+      : null,
+    closing: {
+      senderName: data.companyName?.trim() || 'Fueld Trading',
+      fromName: data.fromName,
+      fromEmail: data.fromEmail,
+      fromPhone: data.fromPhone,
+    },
+    footer: buildDocumentFooter({
+      senderName: data.companyName?.trim() || 'Fueld Trading',
+      companyAddress: data.companyAddress,
+      companyPhone: data.companyPhone,
+      companyEmail: data.companyEmail,
+      vatNumber: data.vatNumber ?? null,
+      companyRegistrationNumber: data.companyRegistrationNumber ?? null,
+      printMeta: data.printMeta ?? null,
+      dateFormat: data.dateFormat ?? null,
+      accent,
+    }),
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Offer PDF
 // ═══════════════════════════════════════════════════════════════════════
 
-export function buildOfferDocument(data: {
+export type OfferDocumentData = {
   orderNumber: string | null;
   clientName: string;
   clientCountry: string | null;
@@ -1698,7 +1863,13 @@ export function buildOfferDocument(data: {
   printMeta?: DocumentPrintMeta | null;
   purchaseOrderNumber?: string | null;
   hidePrices?: boolean;
-}): TDocumentDefinitions {
+  /** Per-tenant layout. CLASSIC (the default) keeps the original structure. */
+  layout?: DocumentLayout;
+  /** Customer's registration number, shown under their address in SLEEK. */
+  clientTaxId?: string | null;
+};
+
+export function buildOfferDocument(data: OfferDocumentData): TDocumentDefinitions {
   // Heading colour: the tenant's accent when they set a legible one, else the
   // previous near-black. Using the blue default here would silently restyle
   // every unbranded tenant's live documents.
@@ -1709,6 +1880,12 @@ export function buildOfferDocument(data: {
 
   // Tenant accent (validated); Fueld blue when the issuer has none.
   const accent = resolveDocAccent(data.accentColor);
+
+  // SLEEK is a different structure rather than a restyle, so it is assembled
+  // separately; the proforma builder uses the same arrangement.
+  if (data.layout === 'SLEEK') {
+    return buildSleekDocument(buildSleekOfferInput(data, accentText, accent));
+  }
 
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';

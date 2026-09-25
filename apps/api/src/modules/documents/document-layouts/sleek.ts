@@ -43,9 +43,29 @@ export interface SleekLine {
   /** Product name and its description, already joined (e.g. "LSMGO — DMA"). */
   description: string;
   quantity: string;
-  unitPrice: string;
+  /**
+   * Plain text for a fixed price; rich content for a formula price, which is
+   * genuinely multi-line (reference, premium, barging, finalized figure).
+   */
+  unitPrice: string | Content[];
   /** Omitted when the document hides prices. */
-  amount: string | null;
+  amount: string | Content[] | null;
+}
+
+/** Closing signature block. Offers end with one; invoices do not. */
+export interface SleekClosing {
+  /** Name the letter is signed off with, e.g. "Moxie Brokerage ApS". */
+  senderName: string;
+  fromName: string | null;
+  fromEmail: string | null;
+  fromPhone: string | null;
+}
+
+/** The nomination's supplier-response QR, shown beside the verification QR. */
+export interface SleekResponseQr {
+  url: string;
+  title: string | null;
+  text: string | null;
 }
 
 export interface SleekTotals {
@@ -97,6 +117,15 @@ export interface SleekDocumentInput {
   verifyUrl: string | null;
   verifyLink: string | null;
   fraudPreventionText: string | null;
+  /**
+   * Broker-deal account the document is for (e.g. Ocean7 Chartering), shown with
+   * the parties. Null for an ordinary offer, which is addressed to the customer.
+   */
+  accountName?: string | null;
+  /** Signature block. Null for invoices, which end with the remittance block. */
+  closing?: SleekClosing | null;
+  /** Nomination supplier-response QR, beside the verification QR. */
+  responseQr?: SleekResponseQr | null;
   /** Footer closure from buildDocumentFooter — reused so both layouts agree. */
   footer: (currentPage: number, pageCount: number) => Content;
 }
@@ -309,6 +338,19 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
     margin: [0, 6, 0, 0],
   } as Content);
 
+  // ── Account (broker deals) ─────────────────────────────────────────
+  // The nomination is for the account of the deal's customer rather than our own
+  // invoicing company, so it is stated explicitly under the parties.
+  if (input.accountName?.trim()) {
+    content.push({
+      text: [
+        { text: 'For account of: ', fontSize: 10, color: MUTED } as Content,
+        { text: input.accountName.trim(), fontSize: 10, bold: true, color: INK } as Content,
+      ],
+      margin: [0, 16, 0, 0],
+    } as Content);
+  }
+
   // ── Voyage (vessel / delivery) ─────────────────────────────────────
   if (input.voyage.length > 0) {
     content.push({
@@ -341,18 +383,45 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
     // One cell holding name and description together, so the pair reads as a
     // single item and stays on one line. Long text wraps inside the cell rather
     // than being clipped.
-    body.push([
+    // Cells follow the HEADER count, not a fixed four. A document that hides
+    // prices declares two headers, and rows carrying four cells would shear the
+    // table against its own header (the bug that produced a 4-header/5-cell
+    // mismatch earlier in this work).
+    const cells: TableCell[] = [
       { text: line.description, fontSize: 10, color: INK } as TableCell,
-      { text: line.quantity, fontSize: 10, color: INK, alignment: 'right' } as TableCell,
-      { text: line.unitPrice, fontSize: 10, color: INK, alignment: 'right' } as TableCell,
-      { text: line.amount ?? '', fontSize: 10, color: INK, alignment: 'right' } as TableCell,
-    ]);
+      { text: line.quantity, fontSize: 10, color: INK, alignment: 'right' as const, noWrap: true } as TableCell,
+    ];
+    if (input.headers.length >= 3) {
+      cells.push(
+        typeof line.unitPrice === 'string'
+          ? { text: line.unitPrice, fontSize: 10, color: INK, alignment: 'right' } as TableCell
+          : { stack: line.unitPrice, fontSize: 10, color: INK, alignment: 'right' } as TableCell,
+      );
+    }
+    if (input.headers.length >= 4) {
+      cells.push(
+        line.amount == null
+          ? { text: '' } as TableCell
+          : typeof line.amount === 'string'
+            ? { text: line.amount, fontSize: 10, color: INK, alignment: 'right' } as TableCell
+            : { stack: line.amount, fontSize: 10, color: INK, alignment: 'right' } as TableCell,
+      );
+    }
+    body.push(cells);
   }
 
   content.push({
     margin: [0, 0, 0, 0],
-    // Four columns, matching the reference and the body rows.
-    table: { widths: ['*', 80, 95, 105], headerRows: 1, body },
+    // Widths follow the declared columns so the header and body always agree.
+    table: {
+      widths: input.headers.length >= 4
+        ? ['*', 95, 95, 105]
+        : input.headers.length === 3
+          ? ['*', 95, 105]
+          : ['*', 110],
+      headerRows: 1,
+      body,
+    },
     layout: {
       // One rule under the header row and one closing the table; the heading
       // rule above is drawn separately so it spans the full width.
@@ -390,20 +459,61 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
     content.push(bankBlock(input.bank, input.issuer.name));
   }
 
-  // ── Verification ───────────────────────────────────────────────────
-  // Deliberately kept: the reference omits it, but it is how a customer proves
-  // the PDF is authentic. Made visually quiet so it does not fight the layout.
+  // ── Closing (offers end with a signature block) ────────────────────
+  if (input.closing) {
+    content.push({ text: 'Best regards', fontSize: 10, color: INK, margin: [0, 22, 0, 0] } as Content);
+    content.push({ text: input.closing.senderName, fontSize: 10, bold: true, color: INK, margin: [0, 4, 0, 0] } as Content);
+    if (input.closing.fromName?.trim()) {
+      content.push({ text: input.closing.fromName.trim(), fontSize: 9, color: INK, margin: [0, 2, 0, 0] } as Content);
+    }
+    // Contacts stay accent-coloured and tappable, as in the classic layout.
+    if (input.closing.fromEmail?.trim()) {
+      content.push({
+        text: [{ text: 'Direct Email:  ', fontSize: 9, color: INK } as Content, { text: input.closing.fromEmail.trim(), fontSize: 9, color: accent, link: `mailto:${input.closing.fromEmail.trim()}` } as Content],
+        margin: [0, 2, 0, 0],
+      } as Content);
+    }
+    if (input.closing.fromPhone?.trim()) {
+      content.push({
+        text: [{ text: 'Direct Phone:  ', fontSize: 9, color: INK } as Content, { text: input.closing.fromPhone.trim(), fontSize: 9, color: accent } as Content],
+        margin: [0, 2, 0, 0],
+      } as Content);
+    }
+  }
+
+  // ── QRs ────────────────────────────────────────────────────────────
+  // Deliberately kept: the reference omits them, but they are how a customer
+  // proves the PDF is authentic and how a supplier answers a nomination. Made
+  // visually quiet so they do not fight the layout.
+  const qrStack: Content[] = [];
   if (input.verifyUrl) {
+    qrStack.push({
+      width: 'auto' as const,
+      stack: [
+        { image: input.verifyUrl, fit: [78, 78], alignment: 'center' as const } as Content,
+        { text: 'Scan to verify', fontSize: 7.5, color: accent, alignment: 'center' as const, margin: [0, 3, 0, 0], link: input.verifyLink ?? undefined } as Content,
+      ],
+    } as Content);
+  }
+  if (input.responseQr) {
+    qrStack.push({
+      width: 'auto' as const,
+      stack: [
+        { image: input.responseQr.url, fit: [78, 78], alignment: 'center' as const } as Content,
+        ...(input.responseQr.title?.trim()
+          ? [{ text: input.responseQr.title.trim(), fontSize: 7.5, bold: true, color: INK, alignment: 'center' as const, margin: [0, 3, 0, 0] } as Content]
+          : []),
+        ...(input.responseQr.text?.trim()
+          ? [{ text: input.responseQr.text.trim(), fontSize: 7, color: MUTED, alignment: 'center' as const } as Content]
+          : []),
+      ],
+    } as Content);
+  }
+  if (qrStack.length > 0) {
     content.push({
       columns: [
         { width: '*' as const, text: '' },
-        {
-          width: 'auto' as const,
-          stack: [
-            { image: input.verifyUrl, fit: [78, 78], alignment: 'center' as const } as Content,
-            { text: 'Scan to verify', fontSize: 7.5, color: accent, alignment: 'center' as const, margin: [0, 3, 0, 0], link: input.verifyLink ?? undefined } as Content,
-          ],
-        },
+        { width: 'auto' as const, columns: qrStack, columnGap: 24 },
       ],
       margin: [0, 14, 0, 0],
     } as Content);
