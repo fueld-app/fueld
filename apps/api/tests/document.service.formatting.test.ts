@@ -1233,8 +1233,9 @@ describe('document.service formatting helpers', () => {
       }]);
 
       const specific = await __documentTestUtils.loadOrderBankDetails('ba-1', 'cp-1');
-      expect(specific.bankName).toBe('Specific Bank');
-      expect(specific.swift).toBe('SWIFT123');
+      expect(specific).not.toBeNull();
+      expect(specific?.bankName).toBe('Specific Bank');
+      expect(specific?.swift).toBe('SWIFT123');
 
       responses.push([], [{
         bankName: 'Default Bank',
@@ -1248,19 +1249,68 @@ describe('document.service formatting helpers', () => {
       }]);
 
       const companyDefault = await __documentTestUtils.loadOrderBankDetails('missing-bank', 'cp-2');
-      expect(companyDefault.bankName).toBe('Default Bank');
-      expect(companyDefault.currency).toBe('EUR');
+      expect(companyDefault).not.toBeNull();
+      expect(companyDefault?.bankName).toBe('Default Bank');
+      expect(companyDefault?.currency).toBe('EUR');
 
+      // No account resolves. It must return NULL — NOT a fallback. This used to
+      // return Fueld's own account (DNB Bank ASA / NO93 8601 1117 947), so a
+      // tenant with no banking configured printed another entity's IBAN on its
+      // invoices. Asserting the null is what stops that regression returning.
       responses.push([], []);
       const unresolvedCompanyDefault = await __documentTestUtils.loadOrderBankDetails('missing-bank-2', 'cp-3');
-      expect(unresolvedCompanyDefault.bankName).toBe('DNB Bank ASA');
+      expect(unresolvedCompanyDefault).toBeNull();
 
-      const globalDefault = await __documentTestUtils.loadOrderBankDetails(null, null);
-      expect(globalDefault.bankName).toBe('DNB Bank ASA');
-      expect(globalDefault.swift).toBe('DNBANOKKXXX');
+      const noArgs = await __documentTestUtils.loadOrderBankDetails(null, null);
+      expect(noArgs).toBeNull();
+
+      // And no code path may hand back Fueld's account.
+      const serialized = JSON.stringify([specific, companyDefault, unresolvedCompanyDefault, noArgs]);
+      expect(serialized).not.toContain('DNB Bank ASA');
+      expect(serialized).not.toContain('NO93 8601 1117 947');
     } finally {
       mutableDb.select = originalSelect;
     }
+  });
+
+  it('never falls back to another entity\'s bank account', async () => {
+    // The invoice used to print Fueld's OWN account (DNB Bank ASA /
+    // NO93 8601 1117 947) whenever a tenant had configured no banking, under a
+    // REMITTANCE INSTRUCTIONS heading addressed to that tenant's customers.
+    // Money to the wrong account, undetectable by the customer.
+    const mutableDb = db as unknown as { select: (...args: unknown[]) => unknown };
+    const originalSelect = mutableDb.select;
+    const responses: unknown[][] = [];
+    mutableDb.select = () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => responses.shift() ?? [],
+        }),
+      }),
+    });
+    try {
+      responses.push([], []);
+      expect(await __documentTestUtils.loadOrderBankDetails('missing', 'cp-none')).toBeNull();
+      expect(await __documentTestUtils.loadOrderBankDetails(null, null)).toBeNull();
+      // A tenant with no account is NOT payable.
+      expect(await __documentTestUtils.hasPayableBankDetails(null, null)).toBe(false);
+    } finally {
+      mutableDb.select = originalSelect;
+    }
+  });
+
+  it('resolves the tenant accent, rejecting anything that is not a hex colour', async () => {
+    // brandColor is user input written straight into the PDF, so an invalid
+    // value must not reach pdfmake (which would throw or emit a broken colour).
+    expect(__documentTestUtils.resolveDocAccent('#F5C518')).toBe('#F5C518');
+    expect(__documentTestUtils.resolveDocAccent('  #f5c518  ')).toBe('#f5c518');
+    expect(__documentTestUtils.resolveDocAccent('#abc')).toBe('#aabbcc');
+    // Absent / malformed / injection-ish input all fall back to Fueld blue.
+    expect(__documentTestUtils.resolveDocAccent(null)).toBe('#1a56db');
+    expect(__documentTestUtils.resolveDocAccent('')).toBe('#1a56db');
+    expect(__documentTestUtils.resolveDocAccent('red')).toBe('#1a56db');
+    expect(__documentTestUtils.resolveDocAccent('#12345')).toBe('#1a56db');
+    expect(__documentTestUtils.resolveDocAccent('#1a56db; } malicious')).toBe('#1a56db');
   });
 
   it('covers overwriteDocumentRevisionArtifact write and update path', async () => {

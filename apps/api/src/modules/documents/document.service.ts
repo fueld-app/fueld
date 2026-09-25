@@ -470,18 +470,19 @@ export async function overwriteDocumentRevisionArtifact(revision: DocumentRevisi
     .where(eq(documentRevisions.id, revision.id));
 }
 
-const DEFAULT_BANK_DETAILS: BankDetails = {
-  bankName: 'DNB Bank ASA',
-  accountName: 'Fueld Trading Ltd',
-  accountNumber: null,
-  iban: 'NO93 8601 1117 947',
-  swift: 'DNBANOKKXXX',
-  currency: 'USD',
-  branchAddress: null,
-  sortCode: null,
-  routingNumber: null,
-  intermediaryBank: null,
-};
+/**
+ * NO fallback bank details — deliberately.
+ *
+ * This used to be a Fueld company account (`DNB Bank ASA`, `Fueld Trading Ltd`,
+ * IBAN `NO93 8601 1117 947`), returned whenever neither the order nor the
+ * invoicing company resolved an account. A tenant that had not configured
+ * banking therefore printed ANOTHER ENTITY'S IBAN on its invoices, under a
+ * "REMITTANCE INSTRUCTIONS" heading, addressed to its own customers — money to
+ * the wrong account, undetectable by the customer.
+ *
+ * A missing remittance block is a visible configuration gap. A wrong account
+ * number is a silent financial hazard. `loadOrderBankDetails` returns null.
+ */
 
 // ─── Data fetching ───────────────────────────────────────────────────
 
@@ -611,7 +612,20 @@ function getCompanyRegistrationNumber(company: unknown): string | null {
 export async function loadOrderBankDetails(
   bankAccountId: string | null | undefined,
   invoicingCompanyId: string | null | undefined,
-): Promise<BankDetails> {
+): Promise<BankDetails | null> {
+  const mapAccount = (ba: typeof bankAccounts.$inferSelect): BankDetails => ({
+    bankName: ba.bankName,
+    accountName: ba.accountName,
+    accountNumber: ba.accountNumber,
+    iban: ba.iban,
+    swift: ba.swiftBic,
+    currency: ba.currency,
+    branchAddress: ba.branchAddress,
+    sortCode: ba.sortCode,
+    routingNumber: ba.routingNumber,
+    intermediaryBank: ba.intermediaryBank,
+  });
+
   // Try specific bank account first
   if (bankAccountId) {
     const [ba] = await db
@@ -619,20 +633,7 @@ export async function loadOrderBankDetails(
       .from(bankAccounts)
       .where(eq(bankAccounts.id, bankAccountId))
       .limit(1);
-    if (ba) {
-      return {
-        bankName: ba.bankName,
-        accountName: ba.accountName,
-        accountNumber: ba.accountNumber,
-        iban: ba.iban,
-        swift: ba.swiftBic,
-        currency: ba.currency,
-        branchAddress: ba.branchAddress,
-        sortCode: ba.sortCode,
-        routingNumber: ba.routingNumber,
-        intermediaryBank: ba.intermediaryBank,
-      };
-    }
+    if (ba) return mapAccount(ba);
   }
   // Fallback: default bank account for the invoicing company
   if (invoicingCompanyId) {
@@ -641,22 +642,23 @@ export async function loadOrderBankDetails(
       .from(bankAccounts)
       .where(and(eq(bankAccounts.counterpartyId, invoicingCompanyId), eq(bankAccounts.isDefault, true)))
       .limit(1);
-    if (ba) {
-      return {
-        bankName: ba.bankName,
-        accountName: ba.accountName,
-        accountNumber: ba.accountNumber,
-        iban: ba.iban,
-        swift: ba.swiftBic,
-        currency: ba.currency,
-        branchAddress: ba.branchAddress,
-        sortCode: ba.sortCode,
-        routingNumber: ba.routingNumber,
-        intermediaryBank: ba.intermediaryBank,
-      };
-    }
+    if (ba) return mapAccount(ba);
   }
-  return DEFAULT_BANK_DETAILS;
+
+  // No account configured: print nothing. Never substitute another entity's.
+  return null;
+}
+
+/**
+ * Whether this order's documents would print payable banking details. Lets
+ * callers warn BEFORE issuing: an invoice with no remittance section becomes a
+ * support ticket, and one with the wrong account is worse.
+ */
+export async function hasPayableBankDetails(
+  bankAccountId: string | null | undefined,
+  invoicingCompanyId: string | null | undefined,
+): Promise<boolean> {
+  return (await loadOrderBankDetails(bankAccountId, invoicingCompanyId)) !== null;
 }
 
 // ─── PDF Builder ─────────────────────────────────────────────────────
@@ -746,6 +748,30 @@ function countryAlreadyInAddress(lines: string[], country: string): boolean {
     const nl = normalizeCountryName(l);
     return nl.includes(norm) || norm.includes(nl);
   });
+}
+
+/** Fueld's own accent — the fallback when the issuing company has no brand colour. */
+const DEFAULT_DOC_ACCENT = '#1a56db';
+
+/**
+ * The accent colour for a tenant's documents: the ISSUING COMPANY's
+ * `brandColor` when set, else Fueld's blue.
+ *
+ * `brandColor` has been stored on counterparties all along and the email
+ * template already reads it — the PDFs hardcoded Fueld blue in 18 places, so a
+ * tenant that set its own colour got Fueld's on every invoice. Validate as a hex
+ * triple: pdfmake writes the value straight into the PDF, and an unvalidated
+ * string would either throw mid-render or, worse, silently emit a broken colour.
+ */
+export function resolveDocAccent(brandColor: string | null | undefined): string {
+  const value = (brandColor ?? '').trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) return value;
+  // Accept the #RGB shorthand too, expanding it — a stored value is user input.
+  if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+    const [r, g, b] = [value[1]!, value[2]!, value[3]!];
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return DEFAULT_DOC_ACCENT;
 }
 
 /**
@@ -1067,7 +1093,7 @@ function buildInvoiceDocument(data: {
     costPrice: string | null;
   }>;
   totalAmount: string | null;
-  bank: BankDetails;
+  bank: BankDetails | null;
   createdAt: Date;
   companyName: string | null;
   vatNumber: string | null;
@@ -1249,7 +1275,7 @@ function buildInvoiceDocument(data: {
       { text: '', margin: [0, 6, 0, 0] } as Content,
 
       // ── Remittance Instructions + QR code (true 2-column layout) ──
-      ...(data.verifyUrl ? [{
+      ...(data.bank && data.verifyUrl ? [{
         columns: [
           // Left: full remittance instructions
           {
@@ -1336,7 +1362,7 @@ function buildInvoiceDocument(data: {
           },
         ],
         margin: [0, 6, 0, 0],
-      } as Content] : [
+      } as Content] : data.bank ? [
         // No QR code — render remittance instructions full-width
         { text: 'REMITTANCE INSTRUCTIONS', style: 'sectionLabel' } as Content,
         { text: 'Payment to be effected, free of all charges to us, by telegraphic transfer to:', fontSize: 9, margin: [0, 2, 0, 6] } as Content,
@@ -1404,7 +1430,7 @@ function buildInvoiceDocument(data: {
           ],
           margin: [0, 2, 0, 0],
         } as Content] : []),
-      ]),
+      ] : []),
 
       // ── VAT Number ──
       ...(data.vatNumber ? [{
@@ -1569,6 +1595,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
+    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -1812,6 +1839,7 @@ export async function generateOrderInvoicePdfBuffer(
     deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
+    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -1933,6 +1961,8 @@ export function buildOfferDocument(data: {
   timezone: string | null;
   dateFormat?: string | null;
   costSalesDecimalPrecision?: number | null;
+  /** Tenant accent for rules/labels — the issuing company's brandColor. */
+  accentColor?: string | null;
   fromName: string | null;
   fromEmail: string | null;
   fromPhone: string | null;
@@ -1982,6 +2012,9 @@ export function buildOfferDocument(data: {
   purchaseOrderNumber?: string | null;
   hidePrices?: boolean;
 }): TDocumentDefinitions {
+  // Tenant accent (validated); Fueld blue when the issuer has none.
+  const accent = resolveDocAccent(data.accentColor);
+
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
   const senderName = data.companyName?.trim() || 'Fueld Trading';
@@ -2012,13 +2045,13 @@ export function buildOfferDocument(data: {
     const email = data.agentContactEmail?.trim();
     const phone = data.agentContactPhone?.trim();
     if (email) {
-      parts.push({ text: email, link: `mailto:${email}`, color: '#1a56db' });
+      parts.push({ text: email, link: `mailto:${email}`, color: accent });
     }
     if (email && phone) {
       parts.push('  |  ');
     }
     if (phone) {
-      parts.push({ text: formatPhoneDisplay(phone) ?? phone, link: phoneToTelUri(phone), color: '#1a56db' });
+      parts.push({ text: formatPhoneDisplay(phone) ?? phone, link: phoneToTelUri(phone), color: accent });
     }
     if (!parts.length) return null;
     return {
@@ -2207,10 +2240,10 @@ export function buildOfferDocument(data: {
     const middleTexts: Content[] = [];
     if (data.companyPhone?.trim()) {
       const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
-      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: '#1a56db', link: phoneToTelUri(data.companyPhone) } as Content);
+      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: accent, link: phoneToTelUri(data.companyPhone) } as Content);
     }
     if (data.companyEmail?.trim()) {
-      middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
+      middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: accent, link: `mailto:${data.companyEmail.trim()}` } as Content);
     }
 
     return {
@@ -2498,6 +2531,7 @@ export async function generateOfferPdfBuffer(orderId: string, options?: {
       documentName,
     ),
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
+    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2738,6 +2772,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     // Broker deals: the nomination is for the account of the deal's customer
     // account (e.g. Ocean7 Chartering), not our own invoicing company.
     accountName: order.isBrokerDeal ? order.client?.name ?? null : undefined,
+    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -2828,6 +2863,8 @@ function buildProformaDocument(data: {
   timezone: string | null;
   dateFormat?: string | null;
   costSalesDecimalPrecision?: number | null;
+  /** Tenant accent for rules/labels — the issuing company's brandColor. */
+  accentColor?: string | null;
   currency: string;
   fromName: string | null;
   fromEmail: string | null;
@@ -2886,6 +2923,9 @@ function buildProformaDocument(data: {
   orderLinesTotal?: number | null;
   trancheSeq?: number | null;
 }): TDocumentDefinitions {
+  // Tenant accent (validated); Fueld blue when the issuer has none.
+  const accent = resolveDocAccent(data.accentColor);
+
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
   const senderName = data.companyName?.trim() || 'Fueld Trading';
@@ -3072,10 +3112,10 @@ function buildProformaDocument(data: {
     const middleTexts: Content[] = [];
     if (data.companyPhone?.trim()) {
       const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
-      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: '#1a56db', link: phoneToTelUri(data.companyPhone) } as Content);
+      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: accent, link: phoneToTelUri(data.companyPhone) } as Content);
     }
     if (data.companyEmail?.trim()) {
-      middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
+      middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: accent, link: `mailto:${data.companyEmail.trim()}` } as Content);
     }
 
     return {
@@ -3194,7 +3234,7 @@ function buildProformaDocument(data: {
             width: 'auto',
             stack: [
               { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
-              { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
+              { text: 'Scan or click to verify', fontSize: 7, color: accent, alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
               ...(data.verifyLink ? [
                 { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
               ] : []),
@@ -3301,8 +3341,10 @@ function buildProformaDocument(data: {
     footer: footerFn,
     styles: {
       docTitle: { fontSize: 16, bold: true, color: '#111827' },
-      sectionLabel: { fontSize: 10, bold: true, color: '#111827', margin: [0, 0, 0, 4] },
-      tableHeader: { fontSize: 9, bold: true },
+      // Section headings carry the tenant accent, so a tenant that sets a brand
+      // colour sees it on every document rather than Fueld's blue.
+      sectionLabel: { fontSize: 10, bold: true, color: accent, margin: [0, 0, 0, 4] },
+      tableHeader: { fontSize: 9, bold: true, color: accent },
     },
     defaultStyle: { fontSize: 10, font: 'Roboto' },
   };
@@ -3391,6 +3433,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
+    accentColor: resolveDocAccent(order.invoicingCompany?.brandColor),
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -3494,6 +3537,8 @@ export const __documentTestUtils = {
   fetchOrderForInvoice,
   getCompanyRegistrationNumber,
   loadOrderBankDetails,
+  hasPayableBankDetails,
+  resolveDocAccent,
   overwriteDocumentRevisionArtifact,
   formatNumber,
   generateInvoicePdfBuffer,
