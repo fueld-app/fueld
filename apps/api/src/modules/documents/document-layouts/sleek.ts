@@ -110,7 +110,7 @@ const MUTED = '#6b7280';
 const SUBTLE_RULE = '#e5e7eb';
 
 /** The reference's title is large, light and lower-case-titled ("Invoice"). */
-const TITLE = { fontSize: 30, color: INK };
+const TITLE = { fontSize: 26, color: INK };
 
 const LABEL = { fontSize: 9.5, color: INK };
 const VALUE = { fontSize: 9.5, bold: true, color: INK };
@@ -120,13 +120,15 @@ function metaRow(entries: Array<{ label: string; value: string }>): Content {
   return {
     columns: entries.map((e, i) => ({
       width: 'auto' as const,
+      // The value never wraps: a date or reference broken across lines is unreadable.
       text: [
         { text: `${e.label}: `, ...LABEL } as Content,
-        { text: e.value, ...VALUE } as Content,
+        { text: e.value, ...VALUE, noWrap: true } as Content,
       ],
       ...(i > 0 ? { margin: [18, 0, 0, 0] as [number, number, number, number] } : {}),
     })),
     alignment: 'right' as const,
+    margin: [0, 6, 0, 0] as [number, number, number, number],
   } as Content;
 }
 
@@ -272,8 +274,11 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
   // ── Title + metadata ───────────────────────────────────────────────
   content.push({
     columns: [
-      { width: 'auto' as const, text: input.title, ...TITLE } as Content,
-      { width: '*', stack: logoColumn } as Content,
+      // Title takes the flexible column and the logo/meta block takes its natural
+      // width, so a long title wraps inside its own space instead of squeezing
+      // the metadata onto two lines.
+      { width: '*', text: input.title, ...TITLE } as Content,
+      { width: 'auto' as const, stack: logoColumn, margin: [16, 0, 0, 0] as [number, number, number, number] } as Content,
     ],
     margin: [0, 18, 0, 6],
   } as Content);
