@@ -18,7 +18,6 @@ const {
   getLatestDocumentRevisionByStream,
   getDocumentRevisionByVerifyToken,
   loadDocumentRevisionBuffer,
-  generateInvoicePdfBuffer,
   generateOrderInvoicePdfBuffer,
   generateOfferPdfBuffer,
   generateNominationPdfBuffer,
@@ -107,6 +106,67 @@ const commonOfferInput = {
 };
 
 describe('document.service formatting helpers', () => {
+  it('renders the shared footer with multi-line address, contacts, reg and fingerprint', () => {
+    // The footer is shared between the live builders (buildDocumentFooter).
+    // Exercised through the PROFORMA — the path a customer's invoice takes —
+    // rather than the invoice builder that used to have its own copy and has
+    // since been deleted. Covers the fields no other test reaches: a multi-line
+    // address (splitAddressLines), the reg number, and the finalised-revision
+    // fingerprint line.
+    const doc = __documentTestUtils.buildProformaDocument({
+      orderNumber: 'ORD-FOOT-1',
+      clientName: 'Acme Marine',
+      clientCountry: 'Denmark',
+      clientAddress: null,
+      customerContactName: null,
+      customerContactRole: null,
+      customerContactPhone: null,
+      customerContactEmail: null,
+      vesselName: 'Aurora',
+      vesselImo: '1234567',
+      portName: 'Rotterdam',
+      eta: null,
+      etd: null,
+      timezone: 'UTC',
+      currency: 'USD',
+      fromName: null,
+      fromEmail: null,
+      fromPhone: null,
+      paymentTerms: null,
+      customerNote: null,
+      termsAndConditions: null,
+      companyName: 'Fueld Trading Ltd',
+      companyAddress: 'Line 1\nLine 2',
+      companyPhone: '+4526131217',
+      companyEmail: 'ops@fueld.app',
+      companyRegistrationNumber: 'NO123456',
+      companyWebsite: null,
+      companyLogoDataUrl: null,
+      itemNotes: [],
+      items: [{ productType: 'VLSFO', description: null, quantity: '1', unit: 'MT', salesPrice: '1' }],
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      printMeta: {
+        issuedAt: new Date('2026-03-01T00:00:00.000Z'),
+        revisionNumber: 1,
+        verificationRef: 'INV-20260301-R001',
+        fingerprintShort: 'ABCDEF123456',
+      },
+    });
+
+    expect(typeof doc.footer).toBe('function');
+    const footer = (doc.footer as (currentPage: number, pageCount: number) => unknown)(1, 1);
+    const footerText = collectTextValues(footer).join(' | ');
+    expect(footerText).toContain('Line 1');
+    expect(footerText).toContain('Line 2');
+    expect(footerText).toContain('+45 26 13 12 17');
+    expect(footerText).toContain('ops@fueld.app');
+    expect(footerText).toContain('Reg. No : NO123456');
+    expect(footerText).toContain('Fingerprint: ABCDEF123456');
+    // Page numbering still comes from pdfmake's per-page call.
+    const page3 = collectTextValues((doc.footer as Function)(3, 5)).join(' | ');
+    expect(page3).toContain('3 / 5');
+  });
+
   it('resolves public API base URL from env precedence and fallbacks', () => {
     const originalVerify = process.env.VERIFY_BASE_URL;
     const originalPublic = process.env.PUBLIC_API_URL;
@@ -401,120 +461,7 @@ describe('document.service formatting helpers', () => {
     });
   }
 
-  it('builds invoice document with remittance and totals', () => {
-    const doc = __documentTestUtils.buildInvoiceDocument({
-      invoiceNumber: 'INV-0001',
-      orderNumber: 'ORD-001',
-      dueDate: '2026-03-20',
-      clientName: 'Acme Marine',
-      clientCountry: 'Denmark',
-      vesselName: 'Aurora',
-      vesselImo: '1234567',
-      portName: 'Rotterdam',
-      salesRepName: 'John Trader',
-      paymentTerms: 'Credit 30 days',
-      customerNote: null,
-      itemNotes: [],
-      items: [
-        {
-          productType: 'VLSFO',
-          quantity: '100',
-          unit: 'MT',
-          salesPrice: '500',
-          costPrice: '450',
-        },
-      ],
-      totalAmount: '50000',
-      bank: {
-        bankName: 'DNB',
-        accountName: 'Fueld Trading Ltd',
-        accountNumber: '12345678',
-        iban: 'NO9386011117947',
-        swift: 'DNBANOKKXXX',
-        currency: 'USD',
-        branchAddress: 'Oslo',
-        sortCode: null,
-        routingNumber: null,
-        intermediaryBank: 'Intermediary',
-      },
-      createdAt: new Date('2026-03-01T00:00:00.000Z'),
-      companyName: 'Fueld Trading Ltd',
-      vatNumber: 'VAT-123',
-      companyRegistrationNumber: 'NO123456',
-      fraudPreventionText: 'Verify bank details by phone.',
-      latePaymentInterest: '2%',
-      verifyUrl: 'data:image/png;base64,abcd',
-      verifyLink: 'https://example.com/verify/abc',
-      companyLogoDataUrl: null,
-      companyAddress: 'Main Street 2, Oslo',
-      companyPhone: '+4799998888',
-      companyEmail: 'ops@fueld.app',
-      printMeta: null,
-    });
 
-    const text = collectTextValues(doc).join(' | ');
-    expect(text).toContain('INVOICE');
-    expect(text).toContain('REMITTANCE INSTRUCTIONS');
-    expect(text).toContain('Total amount due to Fueld Trading Ltd');
-    // Fraud prevention section removed — QR is now in remittance section
-    expect(text).not.toContain('FRAUD PREVENTION');
-    // Verify text changed from "Verify domain:" to "Verify:" to fit narrower column
-    expect(text).toContain('Verify: example.com');
-
-    const content = doc.content as unknown as Array<Record<string, unknown>>;
-    const tableBlock = content.find((entry) => !!entry.table && !!entry.layout);
-    expect(tableBlock).toBeTruthy();
-    const layout = tableBlock!.layout as { hLineColor: (i: number) => string };
-    expect(layout.hLineColor(2)).toBe('#e5e7eb');
-  });
-
-  it('builds invoice document without optional sections when values are missing', () => {
-    const doc = __documentTestUtils.buildInvoiceDocument({
-      invoiceNumber: 'INV-0002',
-      orderNumber: null,
-      dueDate: '2026-03-20',
-      clientName: 'Acme Marine',
-      clientCountry: null,
-      vesselName: 'Aurora',
-      vesselImo: null,
-      portName: 'Rotterdam',
-      salesRepName: null,
-      paymentTerms: null,
-      customerNote: null,
-      itemNotes: [],
-      items: [{ productType: 'MGO', quantity: '10', unit: 'MT', salesPrice: '700', costPrice: null }],
-      totalAmount: null,
-      bank: {
-        bankName: 'DNB',
-        accountName: null,
-        accountNumber: null,
-        iban: null,
-        swift: null,
-        currency: 'USD',
-        branchAddress: null,
-        sortCode: null,
-        routingNumber: null,
-        intermediaryBank: null,
-      },
-      createdAt: new Date('2026-03-01T00:00:00.000Z'),
-      companyName: null,
-      vatNumber: null,
-      companyRegistrationNumber: null,
-      fraudPreventionText: null,
-      latePaymentInterest: null,
-      verifyUrl: null,
-      verifyLink: null,
-      companyLogoDataUrl: null,
-      companyAddress: null,
-      companyPhone: null,
-      companyEmail: null,
-      printMeta: null,
-    });
-
-    const text = collectTextValues(doc).join(' | ');
-    expect(text).toContain('Total amount due to Company');
-    expect(text).not.toContain('FRAUD PREVENTION');
-  });
 
   it('builds proforma document with remittance and transformed terms text', () => {
     const doc = __documentTestUtils.buildProformaDocument({
@@ -1147,35 +1094,6 @@ describe('document.service formatting helpers', () => {
     expect(() => loadDocumentRevisionBuffer(revision)).toThrow('Document artifact missing on disk');
   });
 
-  it('covers fetchInvoiceData fallback/rethrow/not-found branches', async () => {
-    const mutableDb = db as unknown as {
-      query: { invoices: { findFirst: (...args: unknown[]) => Promise<unknown> } };
-    };
-    const originalFindFirst = mutableDb.query.invoices.findFirst;
-
-    try {
-      let invoiceCalls = 0;
-      mutableDb.query.invoices.findFirst = async () => {
-        invoiceCalls += 1;
-        if (invoiceCalls === 1) throw new Error('column company_registration_number does not exist');
-        return { id: 'inv-fallback-1', order: { id: 'ord-1' } };
-      };
-
-      const fallbackInvoice = await __documentTestUtils.fetchInvoiceData('inv-fallback-1');
-      expect((fallbackInvoice as { id: string }).id).toBe('inv-fallback-1');
-      expect(invoiceCalls).toBe(2);
-
-      mutableDb.query.invoices.findFirst = async () => {
-        throw new Error('database offline');
-      };
-      await expect(__documentTestUtils.fetchInvoiceData('inv-fallback-1')).rejects.toThrow('database offline');
-
-      mutableDb.query.invoices.findFirst = async () => null;
-      await expect(__documentTestUtils.fetchInvoiceData('inv-missing')).rejects.toThrow('Invoice inv-missing not found');
-    } finally {
-      mutableDb.query.invoices.findFirst = originalFindFirst;
-    }
-  });
 
   it('covers fetchOrderForInvoice fallback/rethrow/not-found branches', async () => {
     const mutableDb = db as unknown as {
@@ -1468,61 +1386,6 @@ describe('document.service formatting helpers', () => {
     }
   });
 
-  it('generates invoice PDF buffer through public API with mocked invoice query', async () => {
-    const mutableDb = db as unknown as {
-      query: { invoices: { findFirst: (...args: unknown[]) => Promise<unknown> } };
-    };
-    const originalFindFirst = mutableDb.query.invoices.findFirst;
-
-    mutableDb.query.invoices.findFirst = async () => ({
-      id: 'inv-public-1',
-      invoiceNumber: 'INV-PUBLIC-1',
-      dueDate: '2026-03-20',
-      amount: '50000',
-      createdAt: new Date('2026-03-01T00:00:00.000Z'),
-      order: {
-        id: 'ord-public-1',
-        orderNumber: 'ORD-PUBLIC-1',
-        tenantId: '00000000-0000-4000-8000-000000000000',
-        bankAccountId: null,
-        invoicingCompanyId: null,
-        client: { name: 'Acme Marine', country: 'Denmark' },
-        vessel: { name: 'Aurora', imo: '1234567' },
-        place: { name: 'Rotterdam' },
-        salesRep: { name: 'John Trader' },
-        customerPaymentTermType: 'CREDIT',
-        customerCreditDays: 30,
-        customerNote: null,
-        items: [{
-          productType: 'VLSFO',
-          customerNote: null,
-          deliveredQuantity: '100',
-          quantity: '100',
-          unit: 'MT',
-          salesPrice: '500',
-          costPrice: '450',
-        }],
-        invoicingCompany: {
-          name: 'Fueld Trading Ltd',
-          vatNumber: 'VAT-123',
-          fraudPreventionText: null,
-          latePaymentInterest: null,
-          logoUrl: null,
-          headOfficeAddress: null,
-          headOfficePhone: null,
-          headOfficeEmail: null,
-        },
-      },
-    });
-
-    try {
-      const buffer = await generateInvoicePdfBuffer('inv-public-1');
-      expect(Buffer.isBuffer(buffer)).toBe(true);
-      expect(buffer.length).toBeGreaterThan(100);
-    } finally {
-      mutableDb.query.invoices.findFirst = originalFindFirst;
-    }
-  });
 
   it('returns cached order invoice revision when source data is older', async () => {
     const mutableDb = db as unknown as {
@@ -1950,73 +1813,6 @@ describe('document.service formatting helpers', () => {
     }
   });
 
-  it('covers generateInvoicePdfBuffer QR catch and logo file branch', async () => {
-    const mutableDb = db as unknown as {
-      query: { invoices: { findFirst: (...args: unknown[]) => Promise<unknown> } };
-    };
-    const originalFindFirst = mutableDb.query.invoices.findFirst;
-    const originalQr = QRCode.toDataURL;
-
-    const logoRelativePath = `logos/${Date.now()}-invoice-logo.png`;
-    const logoAbsolutePath = join(process.cwd(), 'uploads', logoRelativePath);
-    mkdirSync(join(process.cwd(), 'uploads', 'logos'), { recursive: true });
-    writeFileSync(logoAbsolutePath, Buffer.from(tinyPngBase64, 'base64'));
-
-    mutableDb.query.invoices.findFirst = async () => ({
-      id: 'inv-logo-1',
-      invoiceNumber: 'INV-LOGO-1',
-      dueDate: '2026-03-20',
-      amount: '50000',
-      createdAt: new Date('2026-03-01T00:00:00.000Z'),
-      order: {
-        id: 'ord-logo-1',
-        orderNumber: 'ORD-LOGO-1',
-        tenantId: '00000000-0000-4000-8000-000000000000',
-        bankAccountId: null,
-        invoicingCompanyId: null,
-        client: { name: 'Acme Marine', country: 'Denmark' },
-        vessel: { name: 'Aurora', imo: '1234567' },
-        place: { name: 'Rotterdam' },
-        salesRep: { name: 'John Trader' },
-        customerPaymentTermType: 'CREDIT',
-        customerCreditDays: 30,
-        customerNote: null,
-        items: [{
-          productType: 'VLSFO',
-          customerNote: null,
-          deliveredQuantity: '100',
-          quantity: '100',
-          unit: 'MT',
-          salesPrice: '500',
-          costPrice: '450',
-        }],
-        invoicingCompany: {
-          name: 'Fueld Trading Ltd',
-          vatNumber: 'VAT-123',
-          fraudPreventionText: null,
-          latePaymentInterest: null,
-          logoUrl: logoRelativePath,
-          headOfficeAddress: null,
-          headOfficePhone: null,
-          headOfficeEmail: null,
-        },
-      },
-    });
-
-    QRCode.toDataURL = (async () => {
-      throw new Error('qr failed');
-    }) as typeof QRCode.toDataURL;
-
-    try {
-      const buffer = await generateInvoicePdfBuffer('inv-logo-1');
-      expect(Buffer.isBuffer(buffer)).toBe(true);
-      expect(buffer.length).toBeGreaterThan(100);
-    } finally {
-      mutableDb.query.invoices.findFirst = originalFindFirst;
-      QRCode.toDataURL = originalQr;
-      rmSync(logoAbsolutePath, { force: true });
-    }
-  });
 
   it('covers generateOrderInvoicePdfBuffer new-revision finalization and token-QR catch', async () => {
     const mutableDb = db as unknown as {
@@ -2485,118 +2281,7 @@ describe('document.service formatting helpers', () => {
     }
   });
 
-  it('covers invoice footer optional address/contact/reg fields', () => {
-    const doc = __documentTestUtils.buildInvoiceDocument({
-      invoiceNumber: 'INV-FOOT-1',
-      orderNumber: 'ORD-FOOT-1',
-      dueDate: '2026-03-20',
-      clientName: 'Acme Marine',
-      clientCountry: 'Denmark',
-      vesselName: 'Aurora',
-      vesselImo: '1234567',
-      portName: 'Rotterdam',
-      salesRepName: 'John Trader',
-      paymentTerms: 'Credit 30 days',
-      customerNote: null,
-      itemNotes: [],
-      items: [{ productType: 'MGO', quantity: '10', unit: 'MT', salesPrice: '700', costPrice: null }],
-      totalAmount: '7000',
-      bank: {
-        bankName: 'DNB',
-        accountName: null,
-        accountNumber: null,
-        iban: null,
-        swift: null,
-        currency: 'USD',
-        branchAddress: null,
-        sortCode: null,
-        routingNumber: null,
-        intermediaryBank: null,
-      },
-      createdAt: new Date('2026-03-01T00:00:00.000Z'),
-      companyName: 'Fueld Trading Ltd',
-      vatNumber: 'VAT-123',
-      companyRegistrationNumber: 'NO123456',
-      fraudPreventionText: null,
-      latePaymentInterest: null,
-      verifyUrl: null,
-      verifyLink: null,
-      companyLogoDataUrl: null,
-      companyAddress: 'Line 1, Oslo\nLine 2',
-      companyPhone: '+4526131217',
-      companyEmail: 'ops@fueld.app',
-      printMeta: {
-        issuedAt: new Date('2026-03-01T00:00:00.000Z'),
-        revisionNumber: 1,
-        verificationRef: 'INV-20260301-R001',
-        fingerprintShort: 'ABCDEF123456',
-      },
-    });
 
-    expect(typeof doc.footer).toBe('function');
-    const footer = (doc.footer as (currentPage: number, pageCount: number) => unknown)(1, 1);
-    const footerText = collectTextValues(footer).join(' | ');
-    expect(footerText).toContain('Line 1');
-    expect(footerText).toContain('Line 2');
-    expect(footerText).toContain('Phone No : +45 26 13 12 17');
-    expect(footerText).toContain('Email : ops@fueld.app');
-    expect(footerText).toContain('Reg. No : NO123456');
-  });
-
-  it('covers generateInvoicePdfBuffer item-note mapping branch', async () => {
-    const mutableDb = db as unknown as {
-      query: { invoices: { findFirst: (...args: unknown[]) => Promise<unknown> } };
-    };
-    const originalFindFirst = mutableDb.query.invoices.findFirst;
-
-    mutableDb.query.invoices.findFirst = async () => ({
-      id: 'inv-itemnote-1',
-      invoiceNumber: 'INV-ITEMNOTE-1',
-      dueDate: '2026-03-20',
-      amount: '50000',
-      createdAt: new Date('2026-03-01T00:00:00.000Z'),
-      order: {
-        id: 'ord-itemnote-1',
-        orderNumber: 'ORD-ITEMNOTE-1',
-        tenantId: '00000000-0000-4000-8000-000000000000',
-        bankAccountId: null,
-        invoicingCompanyId: null,
-        client: { name: 'Acme Marine', country: 'Denmark' },
-        vessel: { name: 'Aurora', imo: '1234567' },
-        place: { name: 'Rotterdam' },
-        salesRep: { name: 'John Trader' },
-        customerPaymentTermType: 'CREDIT',
-        customerCreditDays: 30,
-        customerNote: null,
-        items: [{
-          productType: 'VLSFO',
-          customerNote: 'Keep warm',
-          deliveredQuantity: '100',
-          quantity: '100',
-          unit: 'MT',
-          salesPrice: '500',
-          costPrice: '450',
-        }],
-        invoicingCompany: {
-          name: 'Fueld Trading Ltd',
-          vatNumber: 'VAT-123',
-          fraudPreventionText: null,
-          latePaymentInterest: null,
-          logoUrl: null,
-          headOfficeAddress: null,
-          headOfficePhone: null,
-          headOfficeEmail: null,
-        },
-      },
-    });
-
-    try {
-      const buffer = await generateInvoicePdfBuffer('inv-itemnote-1');
-      expect(buffer.length).toBeGreaterThan(100);
-    } finally {
-      mutableDb.query.invoices.findFirst = originalFindFirst;
-    }
-  });
 
   it('covers generateOrderInvoicePdfBuffer logo-read and item-note mapping branches', async () => {
     const mutableDb = db as unknown as {

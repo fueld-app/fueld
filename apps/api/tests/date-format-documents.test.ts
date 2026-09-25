@@ -105,42 +105,6 @@ function proformaData(overrides: Record<string, unknown> = {}) {
   } as Parameters<typeof __documentTestUtils.buildProformaDocument>[0];
 }
 
-function invoiceData(overrides: Record<string, unknown> = {}) {
-  return {
-    invoiceNumber: 'INV-1',
-    orderNumber: 'ORD-1',
-    dueDate: '2026-10-01',
-    clientName: 'Acme Marine',
-    clientCountry: 'Denmark',
-    vesselName: 'Aurora',
-    vesselImo: null,
-    portName: 'Rotterdam',
-    salesRepName: null,
-    paymentTerms: 'Credit 21 days',
-    customerNote: null,
-    itemNotes: [],
-    items: [{ productType: 'VLSFO', quantity: '100', unit: 'MT', salesPrice: '600', costPrice: null }],
-    totalAmount: null,
-    bank: {
-      bankName: 'DNB', accountName: null, accountNumber: null, iban: null,
-      swift: null, currency: 'USD', branchAddress: null, sortCode: null,
-      routingNumber: null, intermediaryBank: null,
-    },
-    createdAt: new Date('2026-09-10T00:00:00.000Z'),
-    companyName: 'Moxie Fuels',
-    vatNumber: null,
-    companyRegistrationNumber: null,
-    fraudPreventionText: null,
-    latePaymentInterest: null,
-    companyLogoDataUrl: null,
-    companyAddress: null,
-    companyPhone: null,
-    companyEmail: null,
-    printMeta: null,
-    ...overrides,
-  } as Parameters<typeof __documentTestUtils.buildInvoiceDocument>[0];
-}
-
 describe('tenant date format reaches document dates', () => {
   it('proforma due date follows the configured format, not ISO', () => {
     // The reported symptom: "Due date: 2026-10-01" on a Danish customer's
@@ -155,14 +119,6 @@ describe('tenant date format reaches document dates', () => {
     // The whole point: the ISO form must be GONE under a non-ISO setting.
     expect(eu).not.toContain('2026-10-01');
     expect(us).not.toContain('2026-10-01');
-  });
-
-  it('invoice due date follows the configured format, not ISO', () => {
-    const eu = documentText(__documentTestUtils.buildInvoiceDocument(invoiceData({ dateFormat: 'EUROPEAN' })));
-    const us = documentText(__documentTestUtils.buildInvoiceDocument(invoiceData({ dateFormat: 'AMERICAN' })));
-    expect(eu).toContain('01/10/2026');
-    expect(us).toContain('10/01/2026');
-    expect(eu).not.toContain('2026-10-01');
   });
 
   it('the document date follows the configured format too', () => {
