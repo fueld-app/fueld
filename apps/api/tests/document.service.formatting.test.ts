@@ -1299,18 +1299,28 @@ describe('document.service formatting helpers', () => {
     }
   });
 
-  it('resolves the tenant accent, rejecting anything that is not a hex colour', async () => {
-    // brandColor is user input written straight into the PDF, so an invalid
-    // value must not reach pdfmake (which would throw or emit a broken colour).
-    expect(__documentTestUtils.resolveDocAccent('#F5C518')).toBe('#F5C518');
-    expect(__documentTestUtils.resolveDocAccent('  #f5c518  ')).toBe('#f5c518');
-    expect(__documentTestUtils.resolveDocAccent('#abc')).toBe('#aabbcc');
-    // Absent / malformed / injection-ish input all fall back to Fueld blue.
-    expect(__documentTestUtils.resolveDocAccent(null)).toBe('#1a56db');
-    expect(__documentTestUtils.resolveDocAccent('')).toBe('#1a56db');
-    expect(__documentTestUtils.resolveDocAccent('red')).toBe('#1a56db');
-    expect(__documentTestUtils.resolveDocAccent('#12345')).toBe('#1a56db');
-    expect(__documentTestUtils.resolveDocAccent('#1a56db; } malicious')).toBe('#1a56db');
+  it('resolves the tenant accent, rejecting malformed or unreadable colours', async () => {
+    const FUELD = '#1a56db';
+    // Valid AND legible on white — adopted as-is.
+    expect(__documentTestUtils.resolveDocAccent('#E60000')).toBe('#E60000');
+    expect(__documentTestUtils.resolveDocAccent('  #003366  ')).toBe('#003366');
+    expect(__documentTestUtils.resolveDocAccent('#000000')).toBe('#000000');
+
+    // Absent / malformed / injection-shaped input falls back.
+    expect(__documentTestUtils.resolveDocAccent(null)).toBe(FUELD);
+    expect(__documentTestUtils.resolveDocAccent('')).toBe(FUELD);
+    expect(__documentTestUtils.resolveDocAccent('red')).toBe(FUELD);
+    expect(__documentTestUtils.resolveDocAccent('#12345')).toBe(FUELD);
+    expect(__documentTestUtils.resolveDocAccent('#1a56db; } malicious')).toBe(FUELD);
+
+    // VALID HEX BUT ILLEGIBLE ON WHITE must also fall back. A bright yellow
+    // brand colour is 1.63:1 against white, so accent section headings and the
+    // table header would be effectively invisible on the customer's invoice.
+    // Shape validation alone let this through — this is the regression guard.
+    expect(__documentTestUtils.resolveDocAccent('#F5C518')).toBe(FUELD);
+    expect(__documentTestUtils.resolveDocAccent('#FFFFFE')).toBe(FUELD);
+    expect(__documentTestUtils.resolveDocAccent('#aabbcc')).toBe(FUELD);
+    expect(__documentTestUtils.resolveDocAccent('#00ff00')).toBe(FUELD);
   });
 
   it('covers overwriteDocumentRevisionArtifact write and update path', async () => {

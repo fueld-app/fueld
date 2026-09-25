@@ -23,6 +23,7 @@ const {
   __documentTestUtils,
   isDocumentRevisionVerificationExpired,
   getLatestDocumentRevisionByOrderId,
+  getLatestDocumentRevisionByStream,
   getDocumentRevisionByVerifyToken,
   loadDocumentRevisionBuffer,
 } = await import('../src/modules/documents/document.service');
@@ -1117,5 +1118,62 @@ describe('verification reference is unique per document stream', () => {
   it('keeps the plain form when no stream is given', () => {
     expect(__documentTestUtils.buildVerificationRef('INVOICE', new Date('2026-09-23T10:00:00Z'), 1))
       .toBe('INV-20260923-R001');
+  });
+
+  it('an ISSUED invoice keeps its bytes when the template version changes', async () => {
+    // The frozen-document invariant. The stream key embeds
+    // DOCUMENT_TEMPLATE_VERSION, so a template bump (which exists to regenerate
+    // cached documents after an output change) would make the versioned lookup
+    // MISS and re-render an already-issued invoice into a NEW revision —
+    // silently restating a document the customer already holds and invalidating
+    // its fingerprint.
+    //
+    // Exercised through the REAL generator, with a revision persisted under a
+    // deliberately stale version segment. If the renderer only used the
+    // versioned lookup, it would re-render and the returned revision number
+    // would differ from the stored one.
+    const { db } = await import('../src/db');
+    const { documentRevisions, invoices, orders } = await import('../src/db/schema');
+    const { eq } = await import('drizzle-orm');
+    const { seedBasics } = await import('./helpers/db');
+    const { generateOrderInvoicePdfBuffer } = await import('../src/modules/documents/document.service');
+    const { mkdirSync, writeFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const [order] = await db.insert(orders).values({
+      tenantId: tenant.id, orderNumber: `STALE-${Date.now()}`, clientId: client.id,
+      vesselId: vessel.id, placeId: place.id, salesRepId: user.id, status: 'CONFIRMED', currency: 'USD',
+    }).returning();
+    const [invoice] = await db.insert(invoices).values({
+      orderId: order!.id, invoiceNumber: `STALE-INV-${Date.now()}`, status: 'SENT',
+      dueDate: '2026-12-31', amount: '100.00',
+    }).returning();
+
+    // Persist a revision under an OLD template version, with a real artifact.
+    const relPath = `documents/${tenant.id}/stale/r0001-STALE.pdf`;
+    const abs = join(process.cwd(), 'uploads', relPath);
+    mkdirSync(join(process.cwd(), 'uploads', `documents/${tenant.id}/stale`), { recursive: true });
+    writeFileSync(abs, Buffer.from('%PDF-1.4\nSTALE-ORIGINAL-BYTES\n'));
+
+    await db.insert(documentRevisions).values({
+      tenantId: tenant.id, orderId: order!.id, invoiceId: invoice!.id,
+      documentType: 'INVOICE',
+      streamKey: `INVOICE:${invoice!.id}:1999-01-01a`,
+      revisionNumber: 7, verificationRef: 'INV-STALE-R007', verifyToken: crypto.randomUUID(),
+      sha256Hex: 'f'.repeat(64), fingerprintShort: 'STALE1234567',
+      filePath: relPath, fileName: 'stale.pdf', mimeType: 'application/pdf', fileSize: 30,
+    });
+
+    try {
+      const result = await generateOrderInvoicePdfBuffer(order!.id, { invoiceId: invoice!.id });
+      // Reused the stored revision rather than minting a new one.
+      expect(result.revision.revisionNumber).toBe(7);
+      expect(result.revision.verificationRef).toBe('INV-STALE-R007');
+      expect(result.buffer.toString()).toContain('STALE-ORIGINAL-BYTES');
+    } finally {
+      await db.delete(documentRevisions).where(eq(documentRevisions.invoiceId, invoice!.id));
+      rmSync(join(process.cwd(), 'uploads', `documents/${tenant.id}`), { recursive: true, force: true });
+    }
   });
 });

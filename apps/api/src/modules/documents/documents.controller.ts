@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 import { and, desc, eq, inArray, isNull, ne, notInArray } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
 import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError, InvoiceLinesChangedError, InvoiceNotFoundError, UnpricedScheduleError } from '../orders/invoice.service';
-import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, generateBrokerConfirmationPdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
+import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, generateBrokerConfirmationPdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms, hasPayableBankDetails } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById, updateOrderStatus } from '../orders/orders.service';
 import { getPortSuppliers } from '../lloyds/lli.service';
@@ -424,7 +424,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         set.status = 400;
         return { success: false, message: 'Add at least one line item before generating documents' };
       }
-      if (!order?.bankAccountId) {
+      if (!(await hasPayableBankDetails(order?.bankAccountId, order?.invoicingCompanyId))) {
         set.status = 400;
         return { success: false, message: 'Select a bank account before generating Proforma Invoice' };
       }
@@ -473,7 +473,14 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         set.status = 400;
         return { success: false, message: 'Add at least one line item before generating documents' };
       }
-      if (!order?.bankAccountId) {
+      // Checked with the SAME resolver the renderer uses, not just
+      // `order.bankAccountId`. The renderer also falls back to the invoicing
+      // company's default account, so an order without an explicit pick can
+      // still render payable details — blocking that was a false negative. The
+      // converse (an account that resolves to nothing) is what must be blocked,
+      // because the renderer now omits the remittance section entirely rather
+      // than substituting another entity's account.
+      if (!(await hasPayableBankDetails(order?.bankAccountId, order?.invoicingCompanyId))) {
         set.status = 400;
         return { success: false, message: 'Select a bank account before generating Invoice/Proforma' };
       }

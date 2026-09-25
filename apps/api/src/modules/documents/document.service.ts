@@ -51,8 +51,15 @@ interface BankDetails {
 }
 
 type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER' | 'BROKER_CONFIRMATION';
-// Bump this whenever document output changes so cached revisions regenerate.
-const DOCUMENT_TEMPLATE_VERSION = '2026-04-10a';
+/**
+ * Bump this whenever document output changes so cached revisions regenerate.
+ *
+ * Bumped to 2026-09-25a for the bank-fail-closed + tenant-accent change
+ * (8bbbc799): the same order now renders different bytes than before, and
+ * without the bump a cached revision would keep serving the old appearance
+ * forever, so the fix would appear not to have taken effect.
+ */
+const DOCUMENT_TEMPLATE_VERSION = '2026-09-25a';
 
 export interface DocumentRevisionInfo {
   id: string;
@@ -439,6 +446,21 @@ export async function getLatestDocumentRevisionByStream(params: {
     .orderBy(desc(documentRevisions.revisionNumber))
     .limit(1);
 
+  return revision ? mapRevisionInfo(revision) : null;
+}
+
+/**
+ * The newest revision for an invoice, IGNORING the template-version segment of
+ * the stream key. Used only to keep an already-issued invoice frozen when the
+ * template version is bumped; see the call site in generateOrderInvoicePdfBuffer.
+ */
+async function getAnyDocumentRevisionByInvoiceId(invoiceId: string): Promise<DocumentRevisionInfo | null> {
+  const [revision] = await db
+    .select()
+    .from(documentRevisions)
+    .where(and(eq(documentRevisions.invoiceId, invoiceId), eq(documentRevisions.documentType, 'INVOICE')))
+    .orderBy(desc(documentRevisions.revisionNumber))
+    .limit(1);
   return revision ? mapRevisionInfo(revision) : null;
 }
 
@@ -860,25 +882,68 @@ function buildDocumentFooter(params: {
 /** Fueld's own accent — the fallback when the issuing company has no brand colour. */
 const DEFAULT_DOC_ACCENT = '#1a56db';
 
+/** Relative luminance per WCAG 2.x, for the contrast floor below. */
+function relativeLuminance(hex: string): number {
+  const h = hex.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  const channel = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * channel(r!) + 0.7152 * channel(g!) + 0.0722 * channel(b!);
+}
+
+/** Contrast ratio of a colour against white (the document background). */
+function contrastOnWhite(hex: string): number {
+  return (1.0 + 0.05) / (relativeLuminance(hex) + 0.05);
+}
+
 /**
  * The accent colour for a tenant's documents: the ISSUING COMPANY's
- * `brandColor` when set, else Fueld's blue.
+ * `brandColor` when set AND legible, else Fueld's blue.
  *
  * `brandColor` has been stored on counterparties all along and the email
  * template already reads it — the PDFs hardcoded Fueld blue in 18 places, so a
- * tenant that set its own colour got Fueld's on every invoice. Validate as a hex
- * triple: pdfmake writes the value straight into the PDF, and an unvalidated
- * string would either throw mid-render or, worse, silently emit a broken colour.
+ * tenant that set its own colour got Fueld's on every invoice.
+ *
+ * Two guards, both necessary because this is user input written into a legal
+ * document:
+ *
+ *  - SHAPE. Must be a hex triple (#RRGGBB, or #RGB expanded). An unvalidated
+ *    string would either throw inside pdfmake mid-render or emit a broken
+ *    colour.
+ *  - LEGIBILITY. Shape alone is not enough: a valid `#F5C518` (a bright yellow
+ *    brand colour) has a contrast ratio of 1.63:1 on white, so section
+ *    headings and the table header would be effectively invisible on the
+ *    customer's invoice. Any colour below the WCAG large-text floor (3:1) falls
+ *    back to Fueld blue. This is a floor, not a preference — the point is that a
+ *    tenant cannot make their own documents unreadable by picking a pale brand
+ *    colour.
  */
 export function resolveDocAccent(brandColor: string | null | undefined): string {
+  return resolveOptionalDocAccent(brandColor) ?? DEFAULT_DOC_ACCENT;
+}
+
+/**
+ * The tenant's accent, or NULL when they have not configured a usable one.
+ *
+ * Separate from `resolveDocAccent` because "no accent configured" and "accent
+ * is Fueld blue" are different things to a document. Callers that would
+ * otherwise change the appearance of an unbranded tenant's documents use this
+ * and keep the previous neutral styling; callers that always need a colour
+ * (rules, links) use `resolveDocAccent`.
+ */
+export function resolveOptionalDocAccent(brandColor: string | null | undefined): string | null {
   const value = (brandColor ?? '').trim();
-  if (/^#[0-9a-fA-F]{6}$/.test(value)) return value;
-  // Accept the #RGB shorthand too, expanding it — a stored value is user input.
-  if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+  let candidate: string | null = null;
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+    candidate = value;
+  } else if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+    // A stored value is user input, so accept the #RGB shorthand too.
     const [r, g, b] = [value[1]!, value[2]!, value[3]!];
-    return `#${r}${r}${g}${g}${b}${b}`;
+    candidate = `#${r}${r}${g}${g}${b}${b}`;
   }
-  return DEFAULT_DOC_ACCENT;
+  if (!candidate) return null;
+  // WCAG large-text minimum. Below this the accent text stops being readable.
+  if (contrastOnWhite(candidate) < 3) return null;
+  return candidate;
 }
 
 /**
@@ -931,13 +996,13 @@ function phoneToTelUri(phone: string): string {
 }
 
 /** Build a pdfmake text node for a phone number with tel: link */
-function phoneTextNode(label: string, phone: string, opts: { fontSize?: number; margin?: number[] } = {}): Content {
+function phoneTextNode(label: string, phone: string, opts: { fontSize?: number; margin?: number[]; accent?: string } = {}): Content {
   const display = formatPhoneDisplay(phone) ?? phone;
   const uri = phoneToTelUri(phone);
   return {
     text: [
       { text: label, bold: true },
-      { text: display, link: uri, color: '#1a56db' },
+      { text: display, link: uri, color: opts.accent ?? '#1a56db' },
     ],
     fontSize: opts.fontSize ?? 10,
     margin: opts.margin ?? [0, 0, 0, 2],
@@ -945,11 +1010,11 @@ function phoneTextNode(label: string, phone: string, opts: { fontSize?: number; 
 }
 
 /** Build a pdfmake text node for an email with mailto: link */
-function emailTextNode(label: string, email: string, opts: { fontSize?: number; margin?: number[] } = {}): Content {
+function emailTextNode(label: string, email: string, opts: { fontSize?: number; margin?: number[]; accent?: string } = {}): Content {
   return {
     text: [
       { text: label, bold: true },
-      { text: email, link: `mailto:${email}`, color: '#1a56db' },
+      { text: email, link: `mailto:${email}`, color: opts.accent ?? '#1a56db' },
     ],
     fontSize: opts.fontSize ?? 10,
     margin: opts.margin ?? [0, 0, 0, 2],
@@ -1850,11 +1915,21 @@ export async function generateOrderInvoicePdfBuffer(
     ? await fetchInvoiceRowForOrder(order.id, options.invoiceId)
     : await ensureOrderInvoice(order.id);
 
+  // An ISSUED invoice is a frozen artifact: once rendered, it must keep serving
+  // THOSE bytes. The stream key embeds DOCUMENT_TEMPLATE_VERSION, so a template
+  // bump (which exists to regenerate cached documents after an output change)
+  // would otherwise make this lookup MISS and re-render an already-issued
+  // invoice into a new revision — silently restating a document the customer
+  // already holds, and breaking the fingerprint/verification story.
+  //
+  // So: use the versioned stream first, then fall back to any revision for this
+  // invoice regardless of template version. A draft/pre-issue invoice has no
+  // revision yet, so it re-renders under the new template exactly as intended.
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'INVOICE',
     orderId: order.id,
     invoiceId: invoice.id,
-  });
+  }) ?? await getAnyDocumentRevisionByInvoiceId(invoice.id);
   if (existingRevision) {
     const fileName = `Fueld_Invoice_${invoice.invoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
     return {
@@ -2119,6 +2194,11 @@ export function buildOfferDocument(data: {
   purchaseOrderNumber?: string | null;
   hidePrices?: boolean;
 }): TDocumentDefinitions {
+  // Heading colour: the tenant's accent when they set a legible one, else the
+  // previous near-black. Using the blue default here would silently restyle
+  // every unbranded tenant's live documents.
+  const accentText = resolveOptionalDocAccent(data.accentColor) ?? '#111827';
+
   // Tenant accent (validated); Fueld blue when the issuer has none.
   const accent = resolveDocAccent(data.accentColor);
 
@@ -2452,10 +2532,10 @@ export function buildOfferDocument(data: {
                 : []),
               { text: '', margin: [0, 2, 0, 0] } as Content,
               ...(data.fromEmail?.trim()
-                ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
+                ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9, accent })]
                 : []),
               ...(data.fromPhone?.trim()
-                ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9 })]
+                ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9, accent })]
                 : []),
             ],
           },
@@ -2475,18 +2555,21 @@ export function buildOfferDocument(data: {
           : []),
         { text: '', margin: [0, 2, 0, 0] } as Content,
         ...(data.fromEmail?.trim()
-          ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
+          ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9, accent })]
           : []),
         ...(data.fromPhone?.trim()
-          ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9 })]
+          ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9, accent })]
           : []),
       ]),
     ],
     footer: footerFn,
     styles: {
       docTitle: { fontSize: 16, bold: true, color: '#111827' },
-      sectionLabel: { fontSize: 10, bold: true, color: '#111827', margin: [0, 0, 0, 4] },
-      tableHeader: { fontSize: 9, bold: true },
+      // Same treatment as the proforma: a tenant that sets a brand colour must
+      // not see it on the invoice but near-black headings on the offer for the
+      // same deal.
+      sectionLabel: { fontSize: 10, bold: true, color: accentText, margin: [0, 0, 0, 4] },
+      tableHeader: { fontSize: 9, bold: true, color: accentText },
     },
     defaultStyle: { fontSize: 10, font: 'Roboto' },
   };
@@ -2979,6 +3062,11 @@ function buildProformaDocument(data: {
   orderLinesTotal?: number | null;
   trancheSeq?: number | null;
 }): TDocumentDefinitions {
+  // Heading colour: the tenant's accent when they set a legible one, else the
+  // previous near-black. Using the blue default here would silently restyle
+  // every unbranded tenant's live documents.
+  const accentText = resolveOptionalDocAccent(data.accentColor) ?? '#111827';
+
   // Tenant accent (validated); Fueld blue when the issuer has none.
   const accent = resolveDocAccent(data.accentColor);
 
@@ -3348,8 +3436,8 @@ function buildProformaDocument(data: {
       docTitle: { fontSize: 16, bold: true, color: '#111827' },
       // Section headings carry the tenant accent, so a tenant that sets a brand
       // colour sees it on every document rather than Fueld's blue.
-      sectionLabel: { fontSize: 10, bold: true, color: accent, margin: [0, 0, 0, 4] },
-      tableHeader: { fontSize: 9, bold: true, color: accent },
+      sectionLabel: { fontSize: 10, bold: true, color: accentText, margin: [0, 0, 0, 4] },
+      tableHeader: { fontSize: 9, bold: true, color: accentText },
     },
     defaultStyle: { fontSize: 10, font: 'Roboto' },
   };
@@ -3543,6 +3631,7 @@ export const __documentTestUtils = {
   getCompanyRegistrationNumber,
   loadOrderBankDetails,
   hasPayableBankDetails,
+  findAnyInvoiceRevision: getAnyDocumentRevisionByInvoiceId,
   resolveDocAccent,
   buildCustomerBlock,
   buildDocumentFooter,
