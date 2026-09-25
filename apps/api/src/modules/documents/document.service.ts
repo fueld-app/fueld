@@ -750,6 +750,113 @@ function countryAlreadyInAddress(lines: string[], country: string): boolean {
   });
 }
 
+/**
+ * The "Bill To" party block: customer name, attention line, then the address
+ * lines with the country appended when it is not already part of the address.
+ *
+ * Shared by the offer and proforma builders, which carried identical copies.
+ * Kept as a builder rather than a constant because `Att.:` is only emitted when
+ * a contact exists — a blank attention line on a legal document reads as an
+ * omission.
+ */
+function buildCustomerBlock(params: {
+  clientName: string;
+  customerContactName: string | null;
+  clientAddress: string | null;
+  clientCountry: string | null;
+  fontSize?: number;
+}): Content[] {
+  const size = params.fontSize ?? 10;
+  const block: Content[] = [{ text: params.clientName, fontSize: size } as Content];
+  if (params.customerContactName?.trim()) {
+    block.push({ text: `Att.: ${params.customerContactName.trim()}`, fontSize: size } as Content);
+  }
+  const clientAddr = params.clientAddress?.trim();
+  if (clientAddr) {
+    const lines = splitAddressLines(clientAddr);
+    for (const line of lines) {
+      block.push({ text: line, fontSize: size } as Content);
+    }
+    // Append country only when the address did not already carry it.
+    if (params.clientCountry?.trim() && !countryAlreadyInAddress(lines, params.clientCountry)) {
+      block.push({ text: params.clientCountry.trim(), fontSize: size } as Content);
+    }
+  } else if (params.clientCountry?.trim()) {
+    block.push({ text: params.clientCountry.trim(), fontSize: size } as Content);
+  }
+  return block;
+}
+
+/**
+ * The page footer shared by every tenant document: issuer name and address on
+ * the left, contacts in the middle, page number on the right, and the
+ * revision/fingerprint line beneath when the document is a finalised revision.
+ *
+ * Extracted because the offer and proforma builders carried character-identical
+ * copies (2432 chars each). Two copies of a legal document's footer is two
+ * places for the issuer's own address to disagree with itself.
+ */
+function buildDocumentFooter(params: {
+  senderName: string;
+  companyAddress: string | null;
+  companyPhone: string | null;
+  companyEmail: string | null;
+  vatNumber: string | null;
+  companyRegistrationNumber: string | null;
+  printMeta: DocumentPrintMeta | null;
+  dateFormat?: string | null;
+  accent: string;
+}): (currentPage: number, pageCount: number) => Content {
+  return (currentPage: number, pageCount: number) => {
+    const leftTexts: Content[] = [
+      { text: params.senderName, fontSize: 8, bold: true, color: '#374151' } as Content,
+    ];
+    if (params.companyAddress?.trim()) {
+      for (const line of splitAddressLines(params.companyAddress)) {
+        leftTexts.push({ text: line, fontSize: 8, color: '#374151' } as Content);
+      }
+    }
+    // VAT / registration belong with the company address block (per Daniel/Moxie
+    // feedback) rather than in the middle contact column.
+    if (params.vatNumber?.trim()) {
+      leftTexts.push({ text: `VAT No : ${params.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    }
+    if (params.companyRegistrationNumber?.trim()) {
+      leftTexts.push({ text: `Reg. No : ${params.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    }
+    const middleTexts: Content[] = [];
+    if (params.companyPhone?.trim()) {
+      const display = formatPhoneDisplay(params.companyPhone) ?? params.companyPhone.trim();
+      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: params.accent, link: phoneToTelUri(params.companyPhone) } as Content);
+    }
+    if (params.companyEmail?.trim()) {
+      middleTexts.push({ text: params.companyEmail.trim(), fontSize: 8, color: params.accent, link: `mailto:${params.companyEmail.trim()}` } as Content);
+    }
+
+    return {
+      margin: [40, 0, 40, 20] as [number, number, number, number],
+      stack: [
+        { canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#9ca3af' }] },
+        {
+          columns: [
+            { width: '*' as const, stack: leftTexts },
+            { width: '*' as const, stack: middleTexts },
+            { width: 'auto' as const, stack: [{ text: `${currentPage} / ${pageCount}`, fontSize: 8, color: '#374151', alignment: 'right' as const }] },
+          ],
+          margin: [0, 8, 0, 0] as [number, number, number, number],
+        },
+        ...(params.printMeta ? [{
+          text: `Issued (UTC): ${formatIssuedAtUtc(params.printMeta.issuedAt, params.dateFormat ?? undefined)}   Revision: ${params.printMeta.revisionNumber}   Ref: ${params.printMeta.verificationRef}   Fingerprint: ${params.printMeta.fingerprintShort}`,
+          fontSize: 7,
+          color: '#6b7280',
+          alignment: 'center',
+          margin: [0, 16, 0, 0] as [number, number, number, number],
+        } as Content] : []),
+      ],
+    };
+  };
+}
+
 /** Fueld's own accent — the fallback when the issuing company has no brand colour. */
 const DEFAULT_DOC_ACCENT = '#1a56db';
 
@@ -2061,26 +2168,12 @@ export function buildOfferDocument(data: {
   })();
 
   // Customer address block (top-left)
-  const customerBlock: Content[] = [
-    { text: data.clientName, fontSize: 10 } as Content,
-  ];
-  if (data.customerContactName?.trim()) {
-    customerBlock.push({ text: `Att.: ${data.customerContactName.trim()}`, fontSize: 10 } as Content);
-  }
-  // Client address lines
-  const clientAddr = data.clientAddress?.trim();
-  if (clientAddr) {
-    const lines = splitAddressLines(clientAddr);
-    for (const line of lines) {
-      customerBlock.push({ text: line, fontSize: 10 } as Content);
-    }
-    // Append country if not already included in address lines
-    if (data.clientCountry?.trim() && !countryAlreadyInAddress(lines, data.clientCountry)) {
-      customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
-    }
-  } else if (data.clientCountry?.trim()) {
-    customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
-  }
+  const customerBlock: Content[] = buildCustomerBlock({
+    clientName: data.clientName,
+    customerContactName: data.customerContactName,
+    clientAddress: data.clientAddress,
+    clientCountry: data.clientCountry,
+  });
 
   // Right-side meta block (Date / Ref / Page — Page is dynamic via header)
   const rightMetaBlock: Content[] = [];
@@ -2220,54 +2313,17 @@ export function buildOfferDocument(data: {
   };
 
   // ── Footer (company details + page number) ────────────────────────
-  const footerFn = (currentPage: number, pageCount: number) => {
-    const leftTexts: Content[] = [
-      { text: senderName, fontSize: 8, bold: true, color: '#374151' } as Content,
-    ];
-    if (data.companyAddress?.trim()) {
-      for (const line of splitAddressLines(data.companyAddress)) {
-        leftTexts.push({ text: line, fontSize: 8, color: '#374151' } as Content);
-      }
-    }
-    // VAT / registration belong with the company address block (per Daniel/Moxie
-    // feedback) rather than in the middle contact column.
-    if (data.vatNumber?.trim()) {
-      leftTexts.push({ text: `VAT No : ${data.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
-    }
-    if (data.companyRegistrationNumber?.trim()) {
-      leftTexts.push({ text: `Reg. No : ${data.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
-    }
-    const middleTexts: Content[] = [];
-    if (data.companyPhone?.trim()) {
-      const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
-      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: accent, link: phoneToTelUri(data.companyPhone) } as Content);
-    }
-    if (data.companyEmail?.trim()) {
-      middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: accent, link: `mailto:${data.companyEmail.trim()}` } as Content);
-    }
-
-    return {
-      margin: [40, 0, 40, 20] as [number, number, number, number],
-      stack: [
-        { canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#9ca3af' }] },
-        {
-          columns: [
-            { width: '*' as const, stack: leftTexts },
-            { width: '*' as const, stack: middleTexts },
-            { width: 'auto' as const, stack: [{ text: `${currentPage} / ${pageCount}`, fontSize: 8, color: '#374151', alignment: 'right' as const }] },
-          ],
-          margin: [0, 8, 0, 0] as [number, number, number, number],
-        },
-        ...(data.printMeta ? [{
-          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt, data.dateFormat ?? undefined)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
-          fontSize: 7,
-          color: '#6b7280',
-          alignment: 'center',
-          margin: [0, 16, 0, 0] as [number, number, number, number],
-        } as Content] : []),
-      ],
-    };
-  };
+  const footerFn = buildDocumentFooter({
+    senderName,
+    companyAddress: data.companyAddress,
+    companyPhone: data.companyPhone,
+    companyEmail: data.companyEmail,
+    vatNumber: data.vatNumber ?? null,
+    companyRegistrationNumber: data.companyRegistrationNumber ?? null,
+    printMeta: data.printMeta ?? null,
+    dateFormat: data.dateFormat,
+    accent,
+  });
 
   // ── Document definition ───────────────────────────────────────────
   return {
@@ -2938,26 +2994,12 @@ function buildProformaDocument(data: {
     ?? `${dd2}-${mm2}-${yyyy2}`;
 
   // Customer address block (top-left)
-  const customerBlock: Content[] = [
-    { text: data.clientName, fontSize: 10 } as Content,
-  ];
-  if (data.customerContactName?.trim()) {
-    customerBlock.push({ text: `Att.: ${data.customerContactName.trim()}`, fontSize: 10 } as Content);
-  }
-  // Client address lines
-  const clientAddr = data.clientAddress?.trim();
-  if (clientAddr) {
-    const lines = splitAddressLines(clientAddr);
-    for (const line of lines) {
-      customerBlock.push({ text: line, fontSize: 10 } as Content);
-    }
-    // Append country if not already included in address lines
-    if (data.clientCountry?.trim() && !countryAlreadyInAddress(lines, data.clientCountry)) {
-      customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
-    }
-  } else if (data.clientCountry?.trim()) {
-    customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
-  }
+  const customerBlock: Content[] = buildCustomerBlock({
+    clientName: data.clientName,
+    customerContactName: data.customerContactName,
+    clientAddress: data.clientAddress,
+    clientCountry: data.clientCountry,
+  });
 
   // Items table (with totals for confirmation/nomination)
   const tableHeader: TableCell[] = [
@@ -3092,54 +3134,17 @@ function buildProformaDocument(data: {
   };
 
   // ── Footer (company details + page number) ────────────────────────
-  const footerFn = (currentPage: number, pageCount: number) => {
-    const leftTexts: Content[] = [
-      { text: senderName, fontSize: 8, bold: true, color: '#374151' } as Content,
-    ];
-    if (data.companyAddress?.trim()) {
-      for (const line of splitAddressLines(data.companyAddress)) {
-        leftTexts.push({ text: line, fontSize: 8, color: '#374151' } as Content);
-      }
-    }
-    // VAT / registration belong with the company address block (per Daniel/Moxie
-    // feedback) rather than in the middle contact column.
-    if (data.vatNumber?.trim()) {
-      leftTexts.push({ text: `VAT No : ${data.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
-    }
-    if (data.companyRegistrationNumber?.trim()) {
-      leftTexts.push({ text: `Reg. No : ${data.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
-    }
-    const middleTexts: Content[] = [];
-    if (data.companyPhone?.trim()) {
-      const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
-      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: accent, link: phoneToTelUri(data.companyPhone) } as Content);
-    }
-    if (data.companyEmail?.trim()) {
-      middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: accent, link: `mailto:${data.companyEmail.trim()}` } as Content);
-    }
-
-    return {
-      margin: [40, 0, 40, 20] as [number, number, number, number],
-      stack: [
-        { canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#9ca3af' }] },
-        {
-          columns: [
-            { width: '*' as const, stack: leftTexts },
-            { width: '*' as const, stack: middleTexts },
-            { width: 'auto' as const, stack: [{ text: `${currentPage} / ${pageCount}`, fontSize: 8, color: '#374151', alignment: 'right' as const }] },
-          ],
-          margin: [0, 8, 0, 0] as [number, number, number, number],
-        },
-        ...(data.printMeta ? [{
-          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt, data.dateFormat ?? undefined)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
-          fontSize: 7,
-          color: '#6b7280',
-          alignment: 'center',
-          margin: [0, 16, 0, 0] as [number, number, number, number],
-        } as Content] : []),
-      ],
-    };
-  };
+  const footerFn = buildDocumentFooter({
+    senderName,
+    companyAddress: data.companyAddress,
+    companyPhone: data.companyPhone,
+    companyEmail: data.companyEmail,
+    vatNumber: data.vatNumber ?? null,
+    companyRegistrationNumber: data.companyRegistrationNumber ?? null,
+    printMeta: data.printMeta ?? null,
+    dateFormat: data.dateFormat,
+    accent,
+  });
 
   // ── Document definition ───────────────────────────────────────────
   return {
@@ -3539,6 +3544,8 @@ export const __documentTestUtils = {
   loadOrderBankDetails,
   hasPayableBankDetails,
   resolveDocAccent,
+  buildCustomerBlock,
+  buildDocumentFooter,
   overwriteDocumentRevisionArtifact,
   formatNumber,
   generateInvoicePdfBuffer,
