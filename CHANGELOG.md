@@ -34,6 +34,7 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 
 ## Documents & Settings
 
+- **A second document layout is available on request.** Documents can now use a "sleek" layout with a lighter, airier structure — the number, date and due date on one line, an itemised tax break-down under the lines, and a plain "Payment methods accepted" block — instead of the classic layout. It is off by default, so nothing about your existing documents changes unless you ask us to switch it on. Documents you have already issued keep the layout they were issued with.
 - **Branded documents are available on request.** If you'd like your own brand colour on document headings and links, it can be switched on for your account — tell us and we'll enable it. It is off by default, so nothing about your existing documents changes unless you ask. A very pale brand colour is ignored in favour of the readable default, so a light colour can never make headings unreadable on paper.
 - **Invoices no longer print another company's bank account.** When an order had no bank account configured, the invoice fell back to a built-in default — which was Fueld's own account. A tenant that had not set up banking was therefore telling its customers to pay into the wrong account, and the customer had no way to notice. Invoices now print no remittance section until a bank account is configured, which is a visible gap rather than a silent money hazard.
 
