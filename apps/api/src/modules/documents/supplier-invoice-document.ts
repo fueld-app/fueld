@@ -217,7 +217,7 @@ export function buildSupplierInvoiceDocument(input: SupplierInvoiceDocumentInput
       color: MUTED,
       margin: [0, 0, 0, 12],
     },
-    ...(input.bankDetails
+    ...(input.bankDetails && remittanceLines(input.bankDetails).length > 0
       ? [{
         stack: [
           { text: 'REMITTANCE', fontSize: 8, bold: true, color: MUTED, margin: [0, 0, 0, 3] },

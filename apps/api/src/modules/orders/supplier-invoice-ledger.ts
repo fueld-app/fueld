@@ -54,17 +54,17 @@ export function deriveSupplierInvoiceStatus(
  */
 export async function recomputeSupplierInvoiceReceived(invoiceId: string): Promise<void> {
   const [invoice] = await db
-    .select({ id: supplierInvoices.id, status: supplierInvoices.status, amount: supplierInvoices.amount })
+    .select({
+      id: supplierInvoices.id,
+      status: supplierInvoices.status,
+      amount: supplierInvoices.amount,
+      amountReceived: supplierInvoices.amountReceived,
+      currency: supplierInvoices.currency,
+    })
     .from(supplierInvoices)
     .where(eq(supplierInvoices.id, invoiceId))
     .limit(1);
   if (!invoice) return;
-
-  const [invoiceCurrency] = await db
-    .select({ currency: supplierInvoices.currency })
-    .from(supplierInvoices)
-    .where(eq(supplierInvoices.id, invoiceId))
-    .limit(1);
 
   /**
    * Only receipts in the invoice's own currency count.
@@ -80,7 +80,11 @@ export async function recomputeSupplierInvoiceReceived(invoiceId: string): Promi
     .where(
       and(
         eq(supplierPayments.supplierInvoiceId, invoiceId),
-        eq(supplierPayments.currency, invoiceCurrency?.currency ?? ''),
+        // Case-insensitive, matching the guard in
+        // `assertReceiptCurrencyMatchesInvoice`. An exact match here would let a
+        // lowercase-currency receipt pass the guard and then be silently dropped
+        // from the sum — the silent failure the guard exists to prevent.
+        sql`upper(${supplierPayments.currency}) = upper(${invoice?.currency ?? ''})`,
       ),
     );
 
@@ -89,13 +93,24 @@ export async function recomputeSupplierInvoiceReceived(invoiceId: string): Promi
     { status: invoice.status, amount: invoice.amount ?? '0', amountReceived: received },
     0,
   );
+  const storedStatus = nextStatus === 'OVERDUE' ? 'SENT' : nextStatus;
+
+  /**
+   * Written only when something actually changed.
+   *
+   * This runs on every read (it is how the figure self-heals), so an
+   * unconditional UPDATE would take a row lock and bump `updated_at` on every
+   * GET — including the PDF route — and make reads no longer read-only.
+   */
+  const current = parseFloat(invoice.amountReceived ?? '0') || 0;
+  const stored = parseFloat(received) || 0;
+  if (Math.abs(current - stored) < SETTLEMENT_EPSILON && invoice.status === storedStatus) return;
 
   await db
     .update(supplierInvoices)
     .set({
       amountReceived: received,
-      // OVERDUE is a display state, never stored.
-      status: nextStatus === 'OVERDUE' ? 'SENT' : nextStatus,
+      status: storedStatus,
       updatedAt: new Date(),
     })
     .where(eq(supplierInvoices.id, invoiceId));
@@ -106,6 +121,33 @@ export async function recomputeSupplierInvoiceReceived(invoiceId: string): Promi
  * recompute both the old and the new invoice. Kept in one place so the link and
  * the received amount can never drift apart.
  */
+/**
+ * Refuse a receipt in a currency the invoice is not in.
+ *
+ * Exposed so the CALLER can validate BEFORE inserting the payment. Throwing
+ * after the insert (as an earlier version did) left a persisted, unlinked
+ * receipt plus an error, which invites a retry that doubles the money.
+ *
+ * Compares case-insensitively and returns the invoice currency, so the
+ * check and the settlement sum cannot disagree about what "same currency" means.
+ */
+export async function assertReceiptCurrencyMatchesInvoice(
+  currency: string,
+  invoiceId: string,
+): Promise<void> {
+  const [invoice] = await db
+    .select({ currency: supplierInvoices.currency })
+    .from(supplierInvoices)
+    .where(eq(supplierInvoices.id, invoiceId))
+    .limit(1);
+  if (!invoice) throw new Error('Supplier invoice not found');
+  if ((currency ?? '').trim().toUpperCase() !== (invoice.currency ?? '').trim().toUpperCase()) {
+    throw new Error(
+      `Payment is in ${currency} but the invoice is in ${invoice.currency}; they cannot be settled against each other.`,
+    );
+  }
+}
+
 export async function applySupplierPaymentToInvoice(
   paymentId: string,
   invoiceId: string | null,
@@ -116,25 +158,6 @@ export async function applySupplierPaymentToInvoice(
     .where(eq(supplierPayments.id, paymentId))
     .limit(1);
   if (!payment) return;
-
-  if (invoiceId) {
-    // Refuse a mismatch here rather than letting it be silently ignored by the
-    // sum below: the operator must learn now, not discover a shortfall later.
-    const [mismatch] = await db
-      .select({ paymentCurrency: supplierPayments.currency, invoiceCurrency: supplierInvoices.currency })
-      .from(supplierPayments)
-      .innerJoin(supplierInvoices, eq(supplierInvoices.id, invoiceId))
-      .where(eq(supplierPayments.id, paymentId))
-      .limit(1);
-    if (
-      mismatch
-      && (mismatch.paymentCurrency ?? '').toUpperCase() !== (mismatch.invoiceCurrency ?? '').toUpperCase()
-    ) {
-      throw new Error(
-        `Payment is in ${mismatch.paymentCurrency} but the invoice is in ${mismatch.invoiceCurrency}; they cannot be settled against each other.`,
-      );
-    }
-  }
 
   await db
     .update(supplierPayments)

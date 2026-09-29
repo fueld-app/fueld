@@ -39,7 +39,7 @@ import {
   getFinancingRateAnnual,
 } from './order-financing';
 import { getFinancingTranchesByOrder } from './payment-schedule.service';
-import { applySupplierPaymentToInvoice } from './supplier-invoice-ledger';
+import { applySupplierPaymentToInvoice, assertReceiptCurrencyMatchesInvoice } from './supplier-invoice-ledger';
 import {
   listSupplierCreditNotes,
   summarizeSupplierCredits,
@@ -2424,7 +2424,15 @@ export async function listSupplierPayments(orderSupplierId: string) {
   const rows = await db
     .select()
     .from(supplierPayments)
-    .where(eq(supplierPayments.orderSupplierId, orderSupplierId))
+    .where(
+      and(
+        eq(supplierPayments.orderSupplierId, orderSupplierId),
+        // OUTBOUND only. A row linked to a supplier invoice is money coming BACK
+        // from a supplier against commission they funded — a receipt, not a
+        // payment we made — and must not appear as one.
+        isNull(supplierPayments.supplierInvoiceId),
+      ),
+    )
     .orderBy(desc(supplierPayments.paidAt));
   return rows.map(mapSupplierPaymentRow);
 }
@@ -2439,7 +2447,14 @@ export async function updateOrderSupplierAmountPaid(orderSupplierId: string): Pr
   const [{ paidTotal }] = await db
     .select({ paidTotal: sql<number>`COALESCE(SUM(${supplierPayments.amount}), 0)::float` })
     .from(supplierPayments)
-    .where(eq(supplierPayments.orderSupplierId, orderSupplierId));
+    .where(
+      and(
+        eq(supplierPayments.orderSupplierId, orderSupplierId),
+        // OUTBOUND only: counting a receipt here would mark the leg as paid for
+        // fuel on the strength of money the supplier sent US.
+        isNull(supplierPayments.supplierInvoiceId),
+      ),
+    );
 
   const [{ costTotal }] = await db
     .select({ costTotal: sql<number>`COALESCE(SUM(${orderItems.costPrice}::numeric * ${orderItems.quantity}::numeric), 0)::float` })
@@ -2490,6 +2505,12 @@ export async function createSupplierPayment(orderSupplierId: string, input: {
     .limit(1);
 
   if (!leg) return null;
+
+  // Validated BEFORE the insert. Throwing afterwards would leave a persisted,
+  // unlinked receipt plus an error, and the operator's retry would double it.
+  if (input.supplierInvoiceId) {
+    await assertReceiptCurrencyMatchesInvoice(input.currency, input.supplierInvoiceId);
+  }
 
   const [created] = await db
     .insert(supplierPayments)

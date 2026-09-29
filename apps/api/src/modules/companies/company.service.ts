@@ -2528,7 +2528,13 @@ export async function getSupplierPaymentLedger(
   const offset = opts.offset ?? 0;
   const sortCol = opts.sort === 'amount' ? supplierPayments.amount : supplierPayments.paidAt;
 
-  const conditions = [eq(supplierPayments.supplierId, companyId)];
+  const conditions = [
+    eq(supplierPayments.supplierId, companyId),
+    // OUTBOUND only. A row linked to a supplier invoice is money coming back
+    // FROM the supplier against funded commission; counting it as a payment we
+    // made would understate what we still owe them.
+    isNull(supplierPayments.supplierInvoiceId),
+  ];
   if (opts.dateFrom) conditions.push(sql`${supplierPayments.paidAt} >= ${opts.dateFrom}`);
   if (opts.dateTo) conditions.push(sql`${supplierPayments.paidAt} <= ${opts.dateTo}`);
 

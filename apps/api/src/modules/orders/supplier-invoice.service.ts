@@ -70,11 +70,12 @@ export async function allocateSupplierInvoiceNumber(
   tenantId: string,
   now = new Date(),
   /**
-   * Pass the caller's transaction when one is open, so a failure after
-   * allocation rolls the sequence back with the insert rather than leaving a
-   * permanent gap in an issued invoice series.
+   * The caller's transaction. REQUIRED, with no default: this used to default to
+   * the pool handle, which silently reintroduced the very bug it was added for
+   * (a sequence increment that survived a rollback) for any caller that forgot
+   * the argument. Making it mandatory turns that into a compile error.
    */
-  executor: Pick<typeof db, 'insert' | 'select'> = db,
+  executor: Pick<typeof db, 'insert' | 'select'>,
 ): Promise<string> {
   const [seq] = await executor
     .insert(supplierInvoiceNumberSequences)
@@ -125,12 +126,28 @@ function toLineDto(row: typeof supplierInvoiceLines.$inferSelect): SupplierInvoi
   };
 }
 
-export async function getSupplierInvoice(id: string): Promise<SupplierInvoiceDto | null> {
+/**
+ * Read one invoice.
+ *
+ * `tenantId` is REQUIRED and filtered here rather than checked by the caller
+ * afterwards: this function refreshes `amount_received`, which is a WRITE, and a
+ * caller-side check that runs after the read let any authenticated user cause a
+ * write to another tenant's row by naming its id (the response was 404ed, but
+ * the write had already happened). Ownership is now established before anything
+ * is touched.
+ */
+export async function getSupplierInvoice(id: string, tenantId: string): Promise<SupplierInvoiceDto | null> {
+  const [owned] = await db
+    .select({ id: supplierInvoices.id })
+    .from(supplierInvoices)
+    .where(and(eq(supplierInvoices.id, id), eq(supplierInvoices.tenantId, tenantId)))
+    .limit(1);
+  if (!owned) return null;
+
   // Refresh the received figure from the payments that actually exist before
   // reading it. `amount_received` is a cache, and a payment written by any path
   // that does not go through the ledger helper (support SQL, a future bulk tool)
   // would otherwise leave a stale outstanding figure with no way to self-heal.
-  // One aggregate is cheap next to the lines + payments reads below.
   await recomputeSupplierInvoiceReceived(id);
 
   const [row] = await db.select().from(supplierInvoices).where(eq(supplierInvoices.id, id)).limit(1);
@@ -213,7 +230,11 @@ export async function listSupplierInvoices(
   // is right for a single invoice but would issue three queries per row here.
   const ids = rows.map((r) => r.id);
   const [headers, allLines, allPayments] = await Promise.all([
-    db.select().from(supplierInvoices).where(inArray(supplierInvoices.id, ids)),
+    // Ordered explicitly: `inArray` has no inherent order, and the response order
+    // follows this map. Without it the list is arbitrary rather than newest-first.
+    db.select().from(supplierInvoices)
+      .where(inArray(supplierInvoices.id, ids))
+      .orderBy(desc(supplierInvoices.createdAt)),
     db.select().from(supplierInvoiceLines)
       .where(inArray(supplierInvoiceLines.supplierInvoiceId, ids))
       .orderBy(asc(supplierInvoiceLines.sortOrder), asc(supplierInvoiceLines.createdAt)),
@@ -221,6 +242,7 @@ export async function listSupplierInvoices(
       id: supplierPayments.id,
       supplierInvoiceId: supplierPayments.supplierInvoiceId,
       amount: supplierPayments.amount,
+      currency: supplierPayments.currency,
       paidAt: supplierPayments.paidAt,
       method: supplierPayments.method,
       note: supplierPayments.note,
@@ -249,7 +271,13 @@ export async function listSupplierInvoices(
   return headers.map((row) => {
     const lines = linesByInvoice.get(row.id) ?? [];
     const payments = paymentsByInvoice.get(row.id) ?? [];
-    const received = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    // ONLY receipts in the invoice's own currency count. The detail path applies
+    // the same filter in `recomputeSupplierInvoiceReceived`; without it here the
+    // list and the detail could report different outstanding figures for the
+    // same invoice, which is worse than either alone.
+    const received = payments
+      .filter((p) => (p.currency ?? '').toUpperCase() === (row.currency ?? '').toUpperCase())
+      .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
     const amount = parseFloat(row.amount ?? '0') || 0;
     return {
       id: row.id,
@@ -374,14 +402,24 @@ export async function createSupplierInvoicesFromReport(
         .where(and(eq(counterparties.tenantId, tenantId), eq(counterparties.isOwnCompany, true)))
         .limit(1);
 
-      const invoicingCompanyId = issuer?.companyId ?? fallbackCompany?.id ?? null;
-      const [company] = invoicingCompanyId
+      /**
+       * The issuer is resolved WITH the tenant predicate, on the write path as
+       * well as the read path. A `preferredInvoicingCompanyId` pointing at
+       * another tenant's company would otherwise freeze that tenant's name and
+       * bank details onto an issued document — and because the snapshot is
+       * frozen, the mistake would be permanent.
+       */
+      const requestedCompanyId = issuer?.companyId ?? fallbackCompany?.id ?? null;
+      const [company] = requestedCompanyId
         ? await tx
-          .select({ name: counterparties.name })
+          .select({ id: counterparties.id, name: counterparties.name })
           .from(counterparties)
-          .where(eq(counterparties.id, invoicingCompanyId))
+          .where(and(eq(counterparties.id, requestedCompanyId), eq(counterparties.tenantId, tenantId)))
           .limit(1)
         : [];
+      // Falls back to the tenant's own company when the preferred one is not ours.
+      const resolvedCompany = company ?? fallbackCompany ?? null;
+      const invoicingCompanyId = resolvedCompany?.id ?? null;
 
       const [bank] = invoicingCompanyId
         ? await tx
@@ -399,11 +437,12 @@ export async function createSupplierInvoicesFromReport(
           .limit(1)
         : [];
 
-      // Snapshot the remittance block as text: an issued invoice must keep
-      // printing the account it was issued with.
+      // Snapshot the remittance block as structured values: an issued invoice
+      // must keep printing the account it was issued with, and each field must
+      // stay labelled rather than being inferred from a position in a string.
       const bankDetails: SupplierInvoiceBankDetails | null = bank
         ? {
-          beneficiary: company?.name ?? tenant?.name ?? null,
+          beneficiary: resolvedCompany?.name ?? tenant?.name ?? null,
           // Usually identical to the beneficiary; kept separately so the
           // document can decide whether to print it twice.
           accountName: bank.accountName ?? null,
@@ -426,9 +465,10 @@ export async function createSupplierInvoicesFromReport(
       // Computed here rather than as SQL: a raw expression in `values()` binds
       // its parameter separately from the column list and the driver rejects the
       // mismatch.
-      const termsDays = Number.isFinite(settings.supplierInvoiceTermsDays)
-        ? Number(settings.supplierInvoiceTermsDays)
-        : 30;
+      // Coerced before the check: `Number.isFinite('45')` is false, so a numeric
+      // string in the settings blob would silently fall back to 30.
+      const configuredTerms = Number(settings.supplierInvoiceTermsDays);
+      const termsDays = Number.isFinite(configuredTerms) && configuredTerms >= 0 ? configuredTerms : 30;
       const dueDate = (() => {
         const end = new Date(`${to}T00:00:00Z`);
         end.setUTCDate(end.getUTCDate() + termsDays);
@@ -450,7 +490,7 @@ export async function createSupplierInvoicesFromReport(
           amountReceived: '0',
           dueDate,
           invoicingCompanyId,
-          invoicingCompanyName: company?.name ?? null,
+          invoicingCompanyName: resolvedCompany?.name ?? null,
           bankAccountId: bank?.id ?? null,
           bankDetails,
           note: `Brokerage commission for ${supplier.lineCount} line(s), ${from} to ${to}`,
@@ -528,11 +568,11 @@ export async function createSupplierInvoicesFromReport(
  * correction is a void plus a reissue — same rule as the customer side. The
  * number is NOT reused, so the two documents stay independently traceable.
  */
-export async function voidSupplierInvoice(id: string, reason?: string | null): Promise<SupplierInvoiceDto | null> {
+export async function voidSupplierInvoice(id: string, tenantId: string, reason?: string | null): Promise<SupplierInvoiceDto | null> {
   const [tenant] = await db
     .select({ tenantId: supplierInvoices.tenantId })
     .from(supplierInvoices)
-    .where(eq(supplierInvoices.id, id))
+    .where(and(eq(supplierInvoices.id, id), eq(supplierInvoices.tenantId, tenantId)))
     .limit(1);
   if (!tenant) return null;
 
@@ -595,7 +635,7 @@ export async function voidSupplierInvoice(id: string, reason?: string | null): P
       .where(eq(supplierPayments.supplierInvoiceId, id));
   });
 
-  return getSupplierInvoice(id);
+  return getSupplierInvoice(id, tenantId);
 }
 
 /** Suppliers on the tenant that owe commission in a period, for the UI picker. */

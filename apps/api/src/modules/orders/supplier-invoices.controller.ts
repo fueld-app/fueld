@@ -96,11 +96,10 @@ export const supplierInvoicesController = new Elysia({ prefix: '/supplier-invoic
       set.status = 404;
       return { success: false, data: null, message: 'Broker deals are not enabled for this tenant' } satisfies ApiResponse<null>;
     }
-    const invoice = await getSupplierInvoice(params.id);
-    // Tenancy is enforced by comparing the invoice's tenant through its supplier
-    // company's tenant; a missing or foreign invoice is a 404 either way, so an
-    // id from another tenant is not distinguishable from a bad one.
-    if (!invoice || !(await invoiceBelongsToTenant(invoice.id, auth.tenantId))) {
+    // Ownership is established INSIDE the read, before it refreshes anything —
+    // see getSupplierInvoice. A foreign id 404s without touching the row.
+    const invoice = await getSupplierInvoice(params.id, auth.tenantId);
+    if (!invoice) {
       set.status = 404;
       return { success: false, data: null, message: 'Supplier invoice not found' } satisfies ApiResponse<null>;
     }
@@ -116,8 +115,8 @@ export const supplierInvoicesController = new Elysia({ prefix: '/supplier-invoic
       set.status = 404;
       return { success: false, data: null, message: 'Broker deals are not enabled for this tenant' };
     }
-    const invoice = await getSupplierInvoice(params.id);
-    if (!invoice || !(await invoiceBelongsToTenant(invoice.id, auth.tenantId))) {
+    const invoice = await getSupplierInvoice(params.id, auth.tenantId);
+    if (!invoice) {
       set.status = 404;
       return { success: false, data: null, message: 'Supplier invoice not found' };
     }
@@ -208,28 +207,14 @@ export const supplierInvoicesController = new Elysia({ prefix: '/supplier-invoic
       set.status = 403;
       return { success: false, data: null, message: 'Admin access required' } satisfies ApiResponse<null>;
     }
-    if (!(await invoiceBelongsToTenant(params.id, auth.tenantId))) {
+    const invoice = await voidSupplierInvoice(params.id, auth.tenantId, body?.reason ?? null);
+    if (!invoice) {
       set.status = 404;
       return { success: false, data: null, message: 'Supplier invoice not found' } satisfies ApiResponse<null>;
     }
-    const invoice = await voidSupplierInvoice(params.id, body?.reason ?? null);
     return { success: true, data: invoice } satisfies ApiResponse<SupplierInvoiceDto | null>;
   }, {
     params: t.Object({ id: t.String() }),
     body: t.Optional(t.Object({ reason: t.Optional(t.Nullable(t.String())) })),
     detail: { tags: ['Supplier Invoices'], summary: 'Void a supplier invoice', security: [{ bearerAuth: [] }] },
   });
-
-/**
- * Tenancy check. `supplier_invoices.tenant_id` is the authority: the caller must
- * own the row before anything is returned. A foreign id and a bad id both 404,
- * so an id from another tenant is not even distinguishable.
- */
-async function invoiceBelongsToTenant(invoiceId: string, tenantId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ tenantId: supplierInvoices.tenantId })
-    .from(supplierInvoices)
-    .where(and(eq(supplierInvoices.id, invoiceId), eq(supplierInvoices.tenantId, tenantId)))
-    .limit(1);
-  return !!row;
-}

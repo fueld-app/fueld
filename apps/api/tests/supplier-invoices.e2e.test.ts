@@ -396,6 +396,123 @@ describe('supplier invoices e2e', () => {
     expect(voidRes.status).toBe(403);
   });
 
+  it('list and detail agree on the received figure, including for a foreign-currency receipt', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Agreement Test Ltd');
+
+    const orderId = await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '10' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+
+    const db = await getDb();
+    const [invoice] = await db.select().from(supplierInvoices);
+    const { orderSuppliers } = await import('../src/db/schema');
+    const [leg] = await db.select().from(orderSuppliers).where(eq(orderSuppliers.orderId, orderId)).limit(1);
+
+    // A USD receipt and a EUR one written straight to the table — the foreign
+    // one must count in NEITHER view.
+    await db.insert(supplierPayments).values({
+      tenantId: seeded.tenant.id, orderSupplierId: leg!.id, orderId, supplierId,
+      supplierInvoiceId: invoice!.id, amount: '250', currency: 'USD',
+    });
+    await db.insert(supplierPayments).values({
+      tenantId: seeded.tenant.id, orderSupplierId: leg!.id, orderId, supplierId,
+      supplierInvoiceId: invoice!.id, amount: '9999', currency: 'EUR',
+    });
+
+    const detail = await requestJson(`/supplier-invoices/${invoice!.id}`, { token });
+    const list = await requestJson('/supplier-invoices', { token });
+    const listRow = list.data?.data[0];
+
+    expect(parseFloat(detail.data?.data?.amountReceived)).toBe(250);
+    expect(parseFloat(detail.data?.data?.amountOutstanding)).toBe(750);
+    // The list must not disagree with the detail.
+    expect(parseFloat(listRow?.amountReceived)).toBe(250);
+    expect(parseFloat(listRow?.amountOutstanding)).toBe(750);
+    expect(listRow?.status).toBe(detail.data?.data?.status);
+  });
+
+  it('does not count a receipt from the supplier as money we paid the supplier', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Direction Test Ltd');
+
+    const orderId = await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '10' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+
+    const db = await getDb();
+    const [invoice] = await db.select().from(supplierInvoices);
+    const { orderSuppliers } = await import('../src/db/schema');
+    const [leg] = await db.select().from(orderSuppliers).where(eq(orderSuppliers.orderId, orderId)).limit(1);
+
+    // An OUTBOUND payment we made to the supplier for fuel.
+    await db.insert(supplierPayments).values({
+      tenantId: seeded.tenant.id, orderSupplierId: leg!.id, orderId, supplierId,
+      amount: '500', currency: 'USD',
+    });
+    // A receipt FROM the supplier settling their commission invoice.
+    await requestJson(`/orders/${orderId}/suppliers/${leg!.id}/payments`, {
+      method: 'POST',
+      token,
+      body: { amount: '400', currency: 'USD', supplierInvoiceId: invoice!.id },
+    });
+
+    // The leg's "amount paid" is what WE paid: 500, not 900.
+    const { listSupplierPayments, updateOrderSupplierAmountPaid } = await import('../src/modules/orders/orders.service');
+    await updateOrderSupplierAmountPaid(leg!.id);
+    const outbound = await listSupplierPayments(leg!.id);
+    expect(outbound.length).toBe(1);
+    expect(parseFloat(outbound[0]!.amount)).toBe(500);
+
+    // And the receipt still settled the invoice.
+    const detail = await requestJson(`/supplier-invoices/${invoice!.id}`, { token });
+    expect(parseFloat(detail.data?.data?.amountReceived)).toBe(400);
+  });
+
+  it('serializes concurrent issues: two parallel calls create exactly one invoice', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Concurrency Ltd');
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '19' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+
+    // Two tabs, or a double click, arriving together. The advisory lock plus the
+    // unique index must produce exactly one invoice and one "already invoiced",
+    // never two numbers for the same period.
+    const [a, b] = await Promise.all([
+      requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } }),
+      requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } }),
+    ]);
+
+    const created = [...(a.data?.data?.created ?? []), ...(b.data?.data?.created ?? [])];
+    const already = [...(a.data?.data?.alreadyInvoiced ?? []), ...(b.data?.data?.alreadyInvoiced ?? [])];
+    expect(created.length).toBe(1);
+    expect(already.length).toBe(1);
+    expect(already[0].invoiceNumber).toBe(created[0].invoiceNumber);
+
+    const db = await getDb();
+    const all = await db.select().from(supplierInvoices);
+    expect(all.length).toBe(1);
+  });
+
   it('keeps supplier invoices out of the customer receivable ledger', async () => {
     const seeded = await seedAuthBasics();
     await enableBrokerDeals(seeded.tenant.id);
