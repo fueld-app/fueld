@@ -21,6 +21,17 @@ import { relations, sql } from 'drizzle-orm';
 //  JSONB TYPES
 // ═══════════════════════════════════════════════════════════════════════
 
+/** Remittance block frozen onto a supplier invoice at issue. */
+export interface SupplierInvoiceBankDetails {
+  beneficiary: string | null;
+  accountName: string | null;
+  bankName: string | null;
+  iban: string | null;
+  swift: string | null;
+  currency: string | null;
+  branchAddress: string | null;
+}
+
 export interface UserUiPreferences {
   orderListColumns?: {
     visible: string[];
@@ -251,6 +262,18 @@ export interface TenantSettings {
   orderNumberTemplate?: string;  // e.g. '{PREFIX}{YYYY}{MM}{DD}-{SEQ:6}', default '{YYYY}{MM}{DD}-{SEQ:6}'
   orderNumberPrefix?: string;    // optional prefix, e.g. 'FU-'
   invoiceNumberTemplate?: string; // e.g. '{PREFIX}{YYYY}-{SEQ:4}', default '{PREFIX}{YYYY}-{SEQ:4}'
+  /**
+   * Number series for SUPPLIER invoices (money owed to us by a supplier). Its
+   * own template because the two series must not interleave — a gap or duplicate
+   * in one would otherwise look like a fault in the other. Default 'SINV-{YYYY}-{SEQ:4}'.
+   */
+  supplierInvoiceNumberTemplate?: string;
+  /**
+   * Days after the period end that a supplier invoice falls due (default 30).
+   * Commission has no delivery date to count from, so the period end is the
+   * anchor; a supplier on 14-day terms can be accommodated without a code change.
+   */
+  supplierInvoiceTermsDays?: number;
   invoiceNumberPrefix?: string;   // default 'INV-'
   // Vessel-company roles (configurable from admin)
   vesselCompanyRoles?: { key: string; label: string; group: string; description?: string; seasearcherCode?: string }[];
@@ -1074,6 +1097,126 @@ export const invoiceNumberSequences = pgTable('invoice_number_sequences', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+//  SUPPLIER INVOICES (money owed TO us BY a supplier)
+//
+//  The mirror of `invoices`, deliberately a separate table. `invoices` is the
+//  customer receivable ledger with no party column — collections, ageing,
+//  company balance and QuickBooks all infer the payer from `orders.client_id`.
+//  A supplier-addressed row there would be reported as a customer receivable.
+//  Keeping the supplier side in its own ledger makes that impossible rather
+//  than merely filtered.
+//
+//  Used for broker-deal commission the SUPPLIER funds (see
+//  `orderItems.supplierCommissionPerUnit`).
+// ═══════════════════════════════════════════════════════════════════════
+
+export const supplierInvoiceStatusEnum = pgEnum('supplier_invoice_status', [
+  'DRAFT',
+  'SENT',
+  'OVERDUE',
+  'PARTIALLY_PAID',
+  'PAID',
+  'VOID',
+]);
+
+export const supplierInvoiceNumberSequences = pgTable('supplier_invoice_number_sequences', {
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }).primaryKey(),
+  lastSeq: integer('last_seq').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const supplierInvoices = pgTable('supplier_invoices', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  supplierId: uuid('supplier_id').notNull().references(() => counterparties.id),
+  /** Snapshotted so reissuing history never follows a later rename. */
+  supplierName: text('supplier_name').notNull(),
+  /**
+   * Tenant-scoped, NOT globally unique — the sequence and template are
+   * per-tenant, so two tenants on the default template would both mint
+   * `SINV-2026-0001`. Uniqueness within the issuing books is what matters; the
+   * index is on (tenantId, invoiceNumber).
+   */
+  invoiceNumber: text('invoice_number').notNull(),
+  status: supplierInvoiceStatusEnum('status').notNull().default('DRAFT'),
+
+  /** The commission period this statement covers. */
+  periodFrom: date('period_from').notNull(),
+  periodTo: date('period_to').notNull(),
+
+  currency: text('currency').notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull().default('0'),
+  amountReceived: numeric('amount_received', { precision: 14, scale: 2 }).notNull().default('0'),
+  dueDate: date('due_date').notNull(),
+
+  /** Who issues it (us) and where to remit — stored, not re-resolved. */
+  invoicingCompanyId: uuid('invoicing_company_id').references(() => counterparties.id),
+  invoicingCompanyName: text('invoicing_company_name'),
+  bankAccountId: uuid('bank_account_id').references(() => bankAccounts.id),
+  /**
+   * Structured remittance block, frozen at issue. Deliberately not a delimited
+   * string: the PDF previously resolved fields by position in a newline-joined
+   * blob, so a missing bank name shifted the IBAN and SWIFT lines and printed
+   * the wrong value against the wrong label.
+   */
+  bankDetails: jsonb('bank_details').$type<SupplierInvoiceBankDetails>(),
+
+  note: text('note'),
+  issuedAt: timestamp('issued_at', { withTimezone: true }),
+  voidedAt: timestamp('voided_at', { withTimezone: true }),
+
+  /**
+   * `<tenant>:supplier-invoice:<from>:<to>:<supplierId>` — what makes "bill
+   * this period" safe to repeat. Same guarantee `orders.sourceKey` gives
+   * commission orders.
+   */
+  sourceKey: text('source_key'),
+
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  // PLAIN, not partial: `ON CONFLICT` cannot use a partial index unless the
+  // statement repeats its predicate, and Drizzle's `onConflictDoNothing` drops
+  // `targetWhere`. NULLs are distinct in a unique index anyway. Same fix and
+  // same reasoning as `orders.sourceKey`.
+  sourceKeyUnique: uniqueIndex('supplier_invoices_source_key_unique')
+    .on(table.sourceKey),
+  // Uniqueness within the issuing tenant's books, replacing a global constraint
+  // that two tenants could collide on.
+  tenantNumberUnique: uniqueIndex('supplier_invoices_tenant_number_unique')
+    .on(table.tenantId, table.invoiceNumber),
+  tenantSupplierIdx: index('supplier_invoices_tenant_supplier_idx').on(table.tenantId, table.supplierId),
+}));
+
+/**
+ * One row per commissioned line, captured at ISSUE as values rather than as a
+ * join back to orders/order_items. An issued invoice must keep serving the
+ * figures it was issued with: renaming a company, editing a rate or delivering
+ * the order must not silently restate a document the supplier already holds.
+ * All descriptive fields are text for the same reason.
+ */
+export const supplierInvoiceLines = pgTable('supplier_invoice_lines', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  supplierInvoiceId: uuid('supplier_invoice_id').notNull().references(() => supplierInvoices.id, { onDelete: 'cascade' }),
+  /** Traceability only; never rendered, and set null if the order is pruned. */
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  orderNumber: text('order_number'),
+  customerName: text('customer_name'),
+  vesselName: text('vessel_name'),
+  placeName: text('place_name'),
+  productType: text('product_type'),
+  quantity: numeric('quantity', { precision: 14, scale: 6 }),
+  unit: text('unit'),
+  rate: numeric('rate', { precision: 14, scale: 7 }),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  invoiceIdx: index('supplier_invoice_lines_invoice_idx').on(table.supplierInvoiceId),
+}));
+
 export const orders = pgTable('orders', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
@@ -1644,6 +1787,13 @@ export const supplierPayments = pgTable('supplier_payments', {
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
   supplierId: uuid('supplier_id').notNull().references(() => counterparties.id),
   invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'set null' }),
+  /**
+   * Settles a SUPPLIER invoice (money owed to us BY a supplier). Distinct from
+   * `invoiceId` above, which points at the customer receivable ledger and has
+   * never been written. A receipt from a supplier is not a payment against a
+   * customer receivable, so the two links cannot share a column.
+   */
+  supplierInvoiceId: uuid('supplier_invoice_id').references(() => supplierInvoices.id, { onDelete: 'set null' }),
   amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
   currency: text('currency').notNull().default('USD'),
   paidAt: timestamp('paid_at', { withTimezone: true }).notNull().defaultNow(),

@@ -39,6 +39,7 @@ import {
   getFinancingRateAnnual,
 } from './order-financing';
 import { getFinancingTranchesByOrder } from './payment-schedule.service';
+import { applySupplierPaymentToInvoice } from './supplier-invoice-ledger';
 import {
   listSupplierCreditNotes,
   summarizeSupplierCredits,
@@ -2469,6 +2470,12 @@ export async function createSupplierPayment(orderSupplierId: string, input: {
   method?: string | null;
   note?: string | null;
   createdBy?: string | null;
+  /**
+   * Which SUPPLIER invoice this receipt settles, when the payment is money
+   * coming back from a supplier against commission they funded. Omitted for the
+   * ordinary case (money we paid out for fuel).
+   */
+  supplierInvoiceId?: string | null;
 }) {
   const [leg] = await db
     .select({
@@ -2501,6 +2508,11 @@ export async function createSupplierPayment(orderSupplierId: string, input: {
     .returning();
 
   if (created) {
+    // The invoice link moves the invoice's received figure, so it is applied
+    // through the service that owns that invariant rather than written raw.
+    if (input.supplierInvoiceId) {
+      await applySupplierPaymentToInvoice(created.id, input.supplierInvoiceId);
+    }
     await updateOrderSupplierAmountPaid(orderSupplierId);
   }
   return created ? mapSupplierPaymentRow(created) : null;

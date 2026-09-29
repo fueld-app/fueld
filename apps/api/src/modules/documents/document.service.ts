@@ -3478,6 +3478,13 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   return { buffer: canonicalBuffer, fileName, revision };
 }
 
+/**
+ * Helpers the supplier-invoice path reuses so our letterhead, remittance block
+ * and accent resolve identically on both ledgers. (`tryLoadLogoDataUrl` and
+ * `resolveTenantDocAccent` are already exported at their declarations.)
+ */
+export { buildDocumentFooter, createPdfBuffer };
+
 export const __documentTestUtils = {
   trimTrailingSlash,
   getPublicApiBaseUrl,

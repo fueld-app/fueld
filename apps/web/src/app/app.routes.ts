@@ -144,6 +144,24 @@ export const routes: Routes = [
         title: 'Supplier Commission Report',
       },
       {
+        path: 'reports/supplier-invoices',
+        canActivate: [lightGuard],
+        loadComponent: () =>
+          import('./features/reports/pages/supplier-invoices/supplier-invoices-list-page.component').then(
+            (m) => m.SupplierInvoicesListPageComponent,
+          ),
+        title: 'Supplier Invoices',
+      },
+      {
+        path: 'reports/supplier-invoices/:id',
+        canActivate: [lightGuard],
+        loadComponent: () =>
+          import('./features/reports/pages/supplier-invoices/supplier-invoice-detail-page.component').then(
+            (m) => m.SupplierInvoiceDetailPageComponent,
+          ),
+        title: 'Supplier Invoice',
+      },
+      {
         path: 'reports/throughput',
         canActivate: [lightGuard],
         loadComponent: () =>

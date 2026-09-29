@@ -215,6 +215,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Throughput Report', route: '/reports/throughput', requiresThroughputReport: true },
       { label: 'Broker Commission', route: '/reports/broker-commission', requiresBrokerDeals: true },
       { label: 'Supplier Commission', route: '/reports/supplier-commission', requiresBrokerDeals: true },
+      { label: 'Supplier Invoices', route: '/reports/supplier-invoices', requiresBrokerDeals: true },
     ],
   },
   {

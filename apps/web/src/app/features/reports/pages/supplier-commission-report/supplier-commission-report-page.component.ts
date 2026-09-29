@@ -8,14 +8,16 @@ import {
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, SupplierCommissionReportDto } from '@fueld/types';
+import type { ApiResponse, CreateSupplierInvoicesResultDto, SupplierCommissionReportDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
+import { SupplierInvoicesService } from '../supplier-invoices/supplier-invoices.service';
 
 @Component({
   selector: 'app-supplier-commission-report-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div>
       <div class="mb-6">
@@ -59,9 +61,85 @@ import { API } from '@app/core/config/api';
               class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
               XLSX
             </a>
+            <button (click)="invoiceSuppliers()" [disabled]="invoicing() || loading()"
+              class="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-1.5">
+              @if (invoicing()) {
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Invoicing…
+              } @else {
+                Invoice suppliers
+              }
+            </button>
           </div>
         }
       </div>
+
+      <!-- Result of the last "Invoice suppliers" run -->
+      @if (invoiceResult(); as run) {
+        <div class="mb-4 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-4 shadow-sm">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">
+              Invoice suppliers — {{ run.from }} to {{ run.to }}
+            </h3>
+            <button (click)="invoiceResult.set(null)" class="text-xs text-gray-400 dark:text-muted hover:text-gray-600">Dismiss</button>
+          </div>
+
+          <p class="mt-2 text-sm text-gray-700 dark:text-ink-dim">
+            Created <span class="font-semibold text-gray-900 dark:text-ink">{{ run.created.length }}</span>,
+            already invoiced for this period <span class="font-semibold text-gray-900 dark:text-ink">{{ run.alreadyInvoiced.length }}</span>,
+            skipped <span class="font-semibold text-gray-900 dark:text-ink">{{ run.skipped.length }}</span>.
+          </p>
+
+          @if (run.created.length) {
+            <div class="mt-3">
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Created</p>
+              <ul class="mt-1 space-y-0.5">
+                @for (c of run.created; track c.invoiceNumber) {
+                  <li class="text-sm">
+                    @if (invoiceIds()[c.invoiceNumber]; as invoiceId) {
+                      <a [routerLink]="['/reports/supplier-invoices', invoiceId]"
+                        class="font-mono text-xs font-medium text-brand-700 dark:text-brand-400 hover:underline">{{ c.invoiceNumber }}</a>
+                    } @else {
+                      <span class="font-mono text-xs text-gray-600 dark:text-ink-dim">{{ c.invoiceNumber }}</span>
+                    }
+                    <span class="ml-2 text-gray-700 dark:text-ink-dim">{{ c.supplierName }}</span>
+                    <span class="ml-2 text-gray-900 dark:text-ink">{{ formatAmount(c.amount) }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+
+          @if (run.alreadyInvoiced.length) {
+            <div class="mt-3">
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Already invoiced — not duplicated</p>
+              <ul class="mt-1 space-y-0.5">
+                @for (a of run.alreadyInvoiced; track a.supplierId) {
+                  <li class="text-sm text-gray-700 dark:text-ink-dim">
+                    {{ a.supplierName }}<span class="ml-2 font-mono text-xs text-gray-500 dark:text-muted">{{ a.invoiceNumber ?? '—' }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+
+          @if (run.skipped.length) {
+            <div class="mt-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-3 py-2">
+              <p class="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">Skipped — no invoice was raised</p>
+              <ul class="mt-1 space-y-0.5">
+                @for (s of run.skipped; track s.supplierId) {
+                  <li class="text-sm text-amber-800 dark:text-amber-300">
+                    {{ s.supplierName }} — {{ s.reason }}
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      }
 
       <!-- Report -->
       @if (report(); as r) {
@@ -166,11 +244,26 @@ import { API } from '@app/core/config/api';
 })
 export class SupplierCommissionReportPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly supplierInvoices = inject(SupplierInvoicesService);
 
   readonly fromDate = signal('');
   readonly toDate = signal('');
   readonly loading = signal(false);
   readonly report = signal<SupplierCommissionReportDto | null>(null);
+  readonly invoicing = signal(false);
+  /**
+   * The last create run, with the period it was posted for. The period is
+   * snapshotted rather than read from the date inputs: editing the dates after a
+   * run would otherwise relabel which period the reported outcome belongs to.
+   */
+  readonly invoiceResult = signal<(CreateSupplierInvoicesResultDto & { from: string; to: string }) | null>(null);
+
+  /**
+   * invoiceNumber → id, resolved after a create run. The create response carries
+   * numbers only, and the detail route is keyed by id, so each created invoice is
+   * looked up once to make the result link to its detail.
+   */
+  readonly invoiceIds = signal<Record<string, string>>({});
 
   readonly reportTitle = computed(() => 'Supplier Commission Report');
 
@@ -194,6 +287,35 @@ export class SupplierCommissionReportPageComponent implements OnInit {
 
   canGenerate(): boolean {
     return !!this.fromDate() && !!this.toDate();
+  }
+
+  /**
+   * Raise one supplier invoice per supplier for the shown period. Idempotent, so
+   * a repeat click creates nothing — which is why created/already-invoiced/skipped
+   * are all reported: a silent omission must never read as "nothing was owed".
+   */
+  async invoiceSuppliers(): Promise<void> {
+    if (this.invoicing() || !this.canGenerate()) return;
+    const from = this.fromDate();
+    const to = this.toDate();
+    this.invoicing.set(true);
+    try {
+      const result = await this.supplierInvoices.create(from, to);
+      if (!result) return;
+      this.invoiceResult.set({ ...result, from, to });
+
+      if (result.created.length) {
+        const ids: Record<string, string> = { ...this.invoiceIds() };
+        for (const invoice of await this.supplierInvoices.list()) {
+          ids[invoice.invoiceNumber] = invoice.id;
+        }
+        this.invoiceIds.set(ids);
+      }
+    } catch {
+      alert('Failed to invoice suppliers.');
+    } finally {
+      this.invoicing.set(false);
+    }
   }
 
   async generate(): Promise<void> {

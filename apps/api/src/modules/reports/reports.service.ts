@@ -2862,6 +2862,7 @@ export async function buildSupplierCommissionReport(
     grandTotalCustomerCommission += figures.customerAmount;
 
     const order: SupplierCommissionReportOrderDto = {
+      orderId: r.orderId ?? null,
       orderNumber: r.orderNumber ?? '—',
       vesselName: r.vesselName ?? '—',
       placeName: r.placeName ?? '—',

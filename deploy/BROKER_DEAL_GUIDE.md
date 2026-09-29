@@ -118,6 +118,43 @@ supplier.
   in the export rather than silently billed to the primary supplier; split the deal
   first.
 
+### Invoicing the supplier
+
+The report has an **Invoice suppliers** button. Pick a period, click it, and every
+supplier with commission owing gets a real invoice.
+
+- **One invoice per supplier per period.** Clicking it twice bills nothing extra; it
+  tells you which suppliers were already invoiced for that period and by which number.
+- **Its own number series** — `SINV-2026-0001` and so on, separate from customer
+  invoices so the two series never interleave.
+- **Due 30 days after the period end.** Commission has no delivery date to count from,
+  so the period end plus a month is stated on the invoice itself.
+- **Frozen once issued.** The lines, amounts and Moxie's bank details are captured when
+  it is raised. Renaming a company, editing a rate or delivering the order afterwards
+  will not change a document the supplier already holds.
+- **Voiding releases the period** so the correct invoice can be raised. The voided
+  document keeps its number and stays on file.
+- **Money received** from the supplier is recorded against the invoice (record it as a
+  supplier payment and pick the invoice), and the paid/outstanding figures follow.
+
+These invoices are kept in a **separate ledger from customer invoices**. Customer
+invoices are treated everywhere as money owed *to* Moxie *by* a customer — Collections,
+Invoice Ageing, the company balance and QuickBooks. A supplier invoice filed there
+would have appeared as a customer debt, so the two are kept apart by design: supplier
+invoices never appear in those views.
+
+**Reports → Supplier Invoices** is where you track them after they are raised. It lists
+them newest first with the invoice number, supplier, period, amount, received,
+outstanding, status and due date, plus an **Include voided** toggle — voided invoices are
+hidden by default but kept on file. Clicking a row opens the detail: the frozen lines, the
+payments booked against it, a **Download PDF** button and **Void Invoice**. A voided
+invoice is marked as such and its PDF is disabled, because the API refuses to re-render a
+voided document.
+
+**Before you send one:** check the customer rate on the underlying deals is `0` for
+anything the supplier is funding. If a line still has the supplier's full rate in
+`Comm./Unit`, the customer is being billed for commission the supplier is paying too.
+
 ---
 
 ## Broker Credit Lines

@@ -31,6 +31,7 @@ import { securityController } from './modules/admin/security.controller';
 import { llmController } from './modules/admin/llm.controller';
 import { activityController, adminActivityController } from './modules/activity/activity.controller';
 import { ordersController } from './modules/orders/orders.controller';
+import { supplierInvoicesController } from './modules/orders/supplier-invoices.controller';
 import { commentsController } from './modules/comments/comments.controller';
 import { portDocumentationController } from './modules/port-documentation/port-documentation.controller';
 import { logFromRequest, startPruneJob } from './modules/activity/activity.service';
@@ -533,6 +534,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(activityController)
     .use(adminActivityController)
     .use(ordersController)
+    .use(supplierInvoicesController)
     .use(portDocumentationController)
     .use(commentsController)
     .use(securityController)

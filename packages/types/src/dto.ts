@@ -3068,6 +3068,11 @@ export interface BrokerCommissionReportDto {
 // source of the supplier figure — there is no order-level or tenant default.
 
 export interface SupplierCommissionReportOrderDto {
+  /**
+   * The source order. Kept for traceability on the generated invoice line, and
+   * nullable because the report is a value snapshot rather than a join.
+   */
+  orderId: string | null;
   orderNumber: string;
   vesselName: string;
   placeName: string;
@@ -3120,6 +3125,88 @@ export interface SupplierCommissionReportDto {
    * does not convert into `currency`. Empty in normal operation.
    */
   excludedOtherCurrency: string[];
+}
+
+// ── Supplier invoices (money owed TO us BY a supplier) ───────────
+//
+// Raised FROM the supplier commission report, because the commission a
+// supplier funds is money the supplier owes us. This is a real receivable with
+// its own number series — deliberately a separate ledger from `invoices`, whose
+// readers all infer the payer from `orders.client_id` and would book a supplier
+// invoice as a customer receipt.
+
+export interface SupplierInvoiceLineDto {
+  id: string;
+  /** Traceability only; the rendered document uses the snapshot fields below. */
+  orderId: string | null;
+  orderNumber: string | null;
+  customerName: string | null;
+  vesselName: string | null;
+  placeName: string | null;
+  productType: string | null;
+  quantity: string | null;
+  unit: string | null;
+  rate: string | null;
+  amount: string;
+}
+
+/** Remittance block frozen onto a supplier invoice at issue. */
+export interface SupplierInvoiceBankDetailsDto {
+  beneficiary: string | null;
+  accountName: string | null;
+  bankName: string | null;
+  iban: string | null;
+  swift: string | null;
+  currency: string | null;
+  branchAddress: string | null;
+}
+
+export interface SupplierInvoiceDto {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  invoiceNumber: string;
+  /** DRAFT | SENT | OVERDUE | PARTIALLY_PAID | PAID | VOID */
+  status: string;
+  /** Stored status without the derived OVERDUE — the raw lifecycle value. */
+  rawStatus: string;
+  periodFrom: string;
+  periodTo: string;
+  currency: string;
+  amount: string;
+  amountReceived: string;
+  /** amount − amountReceived, floored at 0. */
+  amountOutstanding: string;
+  dueDate: string;
+  /** The issuing company, by id — resolve branding from this, never by name. */
+  invoicingCompanyId: string | null;
+  invoicingCompanyName: string | null;
+  hasBankDetails: boolean;
+  /**
+   * Remittance block frozen at issue. Structured, so the document can label
+   * each field instead of relying on their positions in a string.
+   */
+  bankDetails: SupplierInvoiceBankDetailsDto | null;
+  note: string | null;
+  issuedAt: string | null;
+  voidedAt: string | null;
+  createdAt: string;
+  lines: SupplierInvoiceLineDto[];
+  /** Payment ids and amounts recorded against this invoice. */
+  payments?: Array<{ id: string; amount: string; paidAt: string; method: string | null; note: string | null }>;
+}
+
+/** What one "invoice this supplier for this period" call produced. */
+export interface CreateSupplierInvoicesResultDto {
+  created: Array<{ supplierId: string; supplierName: string; invoiceNumber: string; amount: string }>;
+  /** Suppliers already invoiced for this period — skipped, not duplicated. */
+  alreadyInvoiced: Array<{ supplierId: string; supplierName: string; invoiceNumber: string | null }>;
+  /**
+   * Suppliers with commission in the period that produced NO invoice, and why.
+   * Reported rather than silently omitted, so a zero is never mistaken for
+   * "nothing was owed".
+   */
+  skipped: Array<{ supplierId: string; supplierName: string; reason: string }>;
 }
 
 // ── Kantox Dynamic Hedging (USD→EUR margin hedging) ───────────────

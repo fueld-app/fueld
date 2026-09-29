@@ -30,5 +30,7 @@ export class StatusBadgeComponent {
     const s = this.status();
     return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   });
-  protected readonly dataStatus = computed(() => this.status().toLowerCase());
+  // `PARTIALLY_PAID` must key the `partially-paid` pill: lowercasing alone yields
+  // `partially_paid`, which matches no rule and renders an uncoloured pill.
+  protected readonly dataStatus = computed(() => this.status().toLowerCase().replace(/_/g, '-'));
 }

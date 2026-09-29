@@ -28,6 +28,16 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 
 ## Broker Deals
 
+- **A supplier that funds the commission can now be invoiced for it.** When Moxie negotiates a rate above the usual $3/MT, the supplier pays that commission rather than the customer. Reports → Supplier Commission now has an **Invoice suppliers** button: pick a period, and each supplier with commission owing gets a real invoice in its own number series (`SINV-…`), with the lines, a due date, Moxie's own bank details, and a PDF to send.
+
+  These invoices are a **separate ledger from customer invoices**, on purpose: customer invoices are read as money owed *to* us *by* the customer everywhere in the system (Collections, Invoice Ageing, the company balance and QuickBooks), so a supplier invoice filed there would have shown up as a customer debt. Supplier invoices are hidden from all of those, and the two number series never interleave.
+
+  An issued invoice is frozen — the lines, amounts and remittance details are captured when it is raised, so renaming a company, editing a rate or delivering the order later cannot change a document the supplier already holds. Voiding an invoice releases that period so the correct one can be raised; the voided document keeps its number and is kept for audit.
+
+  Recording money received from the supplier against the invoice updates what has been received and the paid/outstanding figures. `Create supplier invoices` is safe to click twice — it bills each supplier once per period and tells you which were already invoiced.
+
+  **Reports → Supplier Invoices** lists them newest first, with a toggle for voided ones, and each row opens a detail page showing the frozen lines, the payments booked against it, and the PDF download. A voided invoice is marked and its PDF is disabled — it is kept for audit, not reissued.
+
 - **Commission funded by the supplier can now be tracked and reported.** On some deals the commission Moxie negotiates is paid by the supplier rather than the customer — sometimes only the part above the usual $3/MT, sometimes the whole rate. Each line item now carries two commission rates: **Comm./Unit** (what the customer is billed, as before) and a new **Supp./Unit** (what the supplier pays). Both feed the deal's profit figure, so a deal where the supplier funds the commission no longer reads as earning nothing.
 
   A new **Supplier Commission Report** (Reports → Supplier Commission) turns those supplier-side rates into a statement per supplier for a period, with CSV and XLSX exports, alongside the figure the customer is billed on the same lines for reconciliation. It is a statement Moxie sends itself — it creates no invoice and no receivable, so nothing about customer billing, collections, ageing or QuickBooks changes.

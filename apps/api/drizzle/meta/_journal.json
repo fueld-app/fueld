@@ -946,6 +946,13 @@
       "when": 1790732400000,
       "tag": "0134_broker_supplier_funded_commission_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1790818800000,
+      "tag": "0135_supplier_invoices",
+      "breakpoints": true
     }
   ]
 }
