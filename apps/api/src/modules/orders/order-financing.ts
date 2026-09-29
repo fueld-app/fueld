@@ -36,8 +36,13 @@ export interface FinancingItemInput {
   salesPrice?: string | number | null;
   salesCurrency?: string | null;
   unitConversionFactor?: string | number | null;
-  // Broker deal — per-line commission rate (falls back to the order-level rate).
+  // Broker deal — per-line commission rates: what the CUSTOMER is billed and,
+  // when the negotiated rate above the standard is funded by the supplier, what
+  // the SUPPLIER pays on the same line. The supplier side deliberately has no
+  // fallback chain (no order-level twin, no tenant default) — see the schema
+  // comment on `orderItems.supplierCommissionPerUnit`.
   commissionPerUnit?: string | number | null;
+  supplierCommissionPerUnit?: string | number | null;
 }
 
 export interface LineEconomics {
@@ -275,14 +280,22 @@ export function calculateLineEconomics(
     // Closing it needs the tenant default plumbed in — see `defaultCommissionRate`
     // on calculateLineEconomics, which already accepts it.
     //
-    // Note the UI cannot store a per-line 0 (its `+$event || null` turns one
-    // into null), so a stored 0 is intentional.
+    // A stored 0 is deliberate — the line earns no commission. The UI now sends
+    // an empty input as null and any other value as its number, so a typed 0
+    // survives the round trip.
     const rate = toFiniteNumber(item.commissionPerUnit)
       ?? toFiniteNumber(orderCommissionPerMt)
       ?? toFiniteNumber(defaultCommissionRate)
       ?? 0;
+    // The same line can ALSO be funded by the supplier: a rate negotiated above
+    // the standard (Moxie's is $3/MT) may be paid by the supplier instead of the
+    // customer, and on some deals the supplier funds the whole rate while the
+    // customer is billed none of it. That second rate has no fallback chain —
+    // the three tiers above all describe what the customer is billed. Leaving it
+    // out would report a supplier-funded deal as earning nothing.
+    const supplierRate = toFiniteNumber(item.supplierCommissionPerUnit) ?? 0;
     const currency = normalizedCurrency(item.salesCurrency ?? item.costCurrency);
-    const commissionBase = quantity * rate * getFxRate(currency);
+    const commissionBase = quantity * (rate + supplierRate) * getFxRate(currency);
     return {
       quantity,
       costBase,

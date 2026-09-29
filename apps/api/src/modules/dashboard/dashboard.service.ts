@@ -219,6 +219,7 @@ export async function getTeamStats(
         salesCurrency: orderItems.salesCurrency,
         unitConversionFactor: orderItems.unitConversionFactor,
         commissionPerUnit: orderItems.commissionPerUnit,
+        supplierCommissionPerUnit: orderItems.supplierCommissionPerUnit,
       })
       .from(orderItems)
       .where(inArray(orderItems.orderId, orderRows.map((row) => row.orderId))),

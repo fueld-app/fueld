@@ -1,0 +1,18 @@
+-- Broker deals: commission paid by the SUPPLIER alongside the customer's rate.
+--
+-- Moxie brokers bunker deals: the supplier invoices the customer directly and
+-- Moxie's revenue is its commission. On most deals the customer pays the whole
+-- $3/MT. But when Moxie negotiates a rate ABOVE the standard, the excess (and
+-- sometimes the whole rate) is funded by the supplier and Moxie must be able to
+-- bill the supplier for it.
+--
+-- `order_items.commission_per_unit` stays the CUSTOMER-side rate — every
+-- existing report, invoice and profit figure reads it, and they must keep
+-- meaning what they mean today. The new column is the sibling rate the supplier
+-- pays on the same line.
+--
+-- Nullable on purpose: NULL means "nothing is charged to the supplier" and is
+-- the only correct value for a line that predates this column. There is no
+-- order-level or tenant-default fallback for the supplier side — the trader
+-- types the number, or the supplier owes nothing.
+ALTER TABLE order_items ADD COLUMN supplier_commission_per_unit numeric(14, 7);

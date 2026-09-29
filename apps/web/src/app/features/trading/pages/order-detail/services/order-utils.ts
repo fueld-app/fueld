@@ -52,6 +52,8 @@ export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuant
       plannedInventoryAt: r.plannedInventoryAt ?? null,
       taxRate: r.taxRate != null ? String(r.taxRate) : null,
       commissionPerUnit: r.commissionPerUnit != null ? String(r.commissionPerUnit) : null,
+      supplierCommissionPerUnit:
+        r.supplierCommissionPerUnit != null ? String(r.supplierCommissionPerUnit) : null,
       hideOnDocuments: r.hideOnDocuments ?? false,
     };
   });

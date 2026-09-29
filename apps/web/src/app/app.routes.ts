@@ -135,6 +135,15 @@ export const routes: Routes = [
         title: 'Broker Commission Report',
       },
       {
+        path: 'reports/supplier-commission',
+        canActivate: [lightGuard],
+        loadComponent: () =>
+          import('./features/reports/pages/supplier-commission-report/supplier-commission-report-page.component').then(
+            (m) => m.SupplierCommissionReportPageComponent,
+          ),
+        title: 'Supplier Commission Report',
+      },
+      {
         path: 'reports/throughput',
         canActivate: [lightGuard],
         loadComponent: () =>

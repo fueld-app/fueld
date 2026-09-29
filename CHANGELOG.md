@@ -28,6 +28,12 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 
 ## Broker Deals
 
+- **Commission funded by the supplier can now be tracked and reported.** On some deals the commission Moxie negotiates is paid by the supplier rather than the customer — sometimes only the part above the usual $3/MT, sometimes the whole rate. Each line item now carries two commission rates: **Comm./Unit** (what the customer is billed, as before) and a new **Supp./Unit** (what the supplier pays). Both feed the deal's profit figure, so a deal where the supplier funds the commission no longer reads as earning nothing.
+
+  A new **Supplier Commission Report** (Reports → Supplier Commission) turns those supplier-side rates into a statement per supplier for a period, with CSV and XLSX exports, alongside the figure the customer is billed on the same lines for reconciliation. It is a statement Moxie sends itself — it creates no invoice and no receivable, so nothing about customer billing, collections, ageing or QuickBooks changes.
+
+  A line with no supplier rate means the supplier owes nothing on it, and such lines are left out of the statement entirely. If a deal has more than one supplier leg, its supplier commission cannot be attributed to a single supplier, so the deal is listed as excluded rather than silently billed to the wrong party.
+
 - **Create Commission Orders is now safe to click twice.** It used to create a fresh order on every click, so a double click (or two tabs, or a retry) billed the same commission period twice as two identical invoices. Commission orders are now created once per period and customer: a repeat click creates nothing and tells you which customers were already billed and by which order.
 
 - **Commission is now earned on products only.** A broker commission report counted the $/MT rate against every line on a broker deal, so a barging fee — a lump sum stored as one unit — collected a full rate as though it were a tonne of fuel, and its 1 was added to the reported tonnage. Fees, agency, trucking, taxes, hire and similar charges are now excluded from both the commission and the quantity total, in the report, the exports, the auto-generated commission orders, the broker-deal profit column and the on-screen preview. Products (VLSFO, LSMGO, blends, anything with its own product type) are unaffected.

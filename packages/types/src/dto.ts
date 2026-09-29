@@ -1149,6 +1149,20 @@ export interface OrderItemDto {
   salesBargingUnit?: string | null;
   salesCreditDays?: number | null;
   salesPriceFinalized?: boolean;
+  /**
+   * Broker deal — per-line commission, customer side. Web types order rows
+   * locally (`order-item.types.ts`) for numeric editing, so this is the API's
+   * wire shape rather than what the editor binds to.
+   */
+  commissionPerUnit?: string | null;
+  /**
+   * Broker deal — per-line commission, SUPPLIER side. No fallback chain: a null
+   * means the supplier owes nothing on this line. See
+   * `orderItems.supplierCommissionPerUnit` in the API schema.
+   */
+  supplierCommissionPerUnit?: string | null;
+  /** Hide this line from customer-facing documents. */
+  hideOnDocuments?: boolean;
 }
 
 export interface SupplierInquiryItemQuoteDto {
@@ -3039,6 +3053,75 @@ export interface BrokerCommissionReportDto {
   currency: string;
   byCustomer: BrokerCommissionReportByCustomerDto[];
 }
+
+// ── Supplier commission report ───────────────────────────────────
+// The mirror of the customer-side report above, grouped by SUPPLIER.
+//
+// On a broker deal the supplier invoices the customer directly and Moxie's
+// revenue is the commission. Usually the customer funds all of it, but when a
+// rate above the standard $3/MT is negotiated the excess — sometimes the whole
+// rate — is funded by the supplier, and Moxie bills the supplier for it via a
+// statement it sends itself. This report is that statement.
+//
+// It is deliberately NOT an invoice: it creates no receivable, no invoice
+// number and no order. `supplierCommissionPerUnit` on each line is the only
+// source of the supplier figure — there is no order-level or tenant default.
+
+export interface SupplierCommissionReportOrderDto {
+  orderNumber: string;
+  vesselName: string;
+  placeName: string;
+  /** The deal's customer — context for who the supplier invoiced. */
+  customerName: string;
+  productType: string;
+  quantity: string;
+  unit: string;
+  /** The rate the supplier pays per unit on this line. */
+  commissionPerMt: string;
+  /** Commission owed to us by the supplier on this line. */
+  commissionAmount: string;
+  /** What the customer is billed for the SAME line, for reconciliation. */
+  customerCommissionAmount: string;
+  deliveredAt: string | null;
+  status: string;
+}
+
+export interface SupplierCommissionReportBySupplierDto {
+  supplierId: string;
+  supplierName: string;
+  /**
+   * Lines, not orders. The report is line-granular — one order with two
+   * commissioned lines appears twice — and "orders" on a document sent to a
+   * counterparty to request money would understate what is being billed.
+   */
+  lineCount: number;
+  totalQuantity: string;
+  totalCommission: string;
+  /** Customer-side commission on the same lines — context, never subtracted. */
+  customerCommission: string;
+  orders: SupplierCommissionReportOrderDto[];
+}
+
+export interface SupplierCommissionReportDto {
+  period: { from: string; to: string };
+  totalCommission: string;
+  customerCommission: string;
+  currency: string;
+  bySupplier: SupplierCommissionReportBySupplierDto[];
+  /**
+   * Order numbers excluded from the totals because the deal has more than one
+   * supplier leg and the line's supplier commission therefore cannot be
+   * attributed to a single supplier. Empty in normal operation; a non-empty
+   * list means the statement must not be sent before the deals are split.
+   */
+  attributedToMultipleSuppliers: string[];
+  /**
+   * Order numbers excluded because they are priced in a currency this report
+   * does not convert into `currency`. Empty in normal operation.
+   */
+  excludedOtherCurrency: string[];
+}
+
 // ── Kantox Dynamic Hedging (USD→EUR margin hedging) ───────────────
 // Feature is per-tenant (TenantSettings.kantoxSettings.enabled). The API
 // password is stored in the encrypted credential vault and is never part

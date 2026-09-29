@@ -60,6 +60,66 @@ as though it were one tonne of fuel, and added that 1 to the reported tonnage.
 
 ---
 
+## Commission Paid By the Supplier
+
+Usually the customer funds the whole commission. When a rate above the standard is
+negotiated — or the supplier funds the entire rate — the extra is paid by the supplier
+instead, and each line carries **two** rates:
+
+| Field on the line | Who pays it |
+|---|---|
+| **Comm./Unit** | The customer (unchanged) |
+| **Supp./Unit** | The supplier |
+
+Set the customer's rate to `0` when the supplier funds the whole thing; the field
+accepts a deliberately typed `0` and keeps it. The deal's **Profit** column adds both
+rates, so a supplier-funded deal is no longer reported as earning nothing.
+
+⚠️ **The two rates are independent, so they must not both carry the supplier's full
+rate.** They answer different questions — "what does the customer pay?" and "what does
+the supplier pay?" — and the system adds them. Setting `Comm./Unit = 19` *and*
+`Supp./Unit = 19` charges 19 twice: once to the customer and once to the supplier. For
+a deal where the supplier funds the whole rate, `Comm./Unit` must be `0`:
+
+| | Comm./Unit | Supp./Unit |
+|---|---|---|
+| Customer funds everything (usual) | 3 | *(blank)* |
+| Customer pays 3, supplier pays the rest of 19 | 3 | 16 |
+| Supplier funds everything (e.g. 20260916-000132) | **0** | 19 |
+
+Setting `Comm./Unit` to `0` is what stops the customer report billing that commission;
+leaving it at `19` would bill United O7 for commission Thor Marine is paying.
+
+Leaving `Supp./Unit` **blank** is different from setting it to `0`: blank means "nothing
+recorded yet", `0` means "the supplier owes nothing on this line". Both keep the line out
+of the supplier statement, which is the same outcome here.
+
+`Supp./Unit` has **no fallback** — it is not taken from the order-level rate or the
+tenant default. The three-tier chain (line → order → tenant default) describes only
+what the *customer* is billed. Blank means the supplier owes nothing on that line.
+
+### Supplier Commission Report
+
+**Reports → Supplier Commission** (also linked from the Broker Deals tab). Pick a
+period, click **Generate Report**, and export **CSV** or **XLSX** to send to the
+supplier.
+
+- Grouped **by supplier**; each block lists the orders, the customer on each, the
+  supplier rate and the commission owed.
+- The summary also states what the **customer** is billed on the same lines, so the two
+  reports reconcile.
+- Lines with no supplier rate are omitted, and a charge line (barging fee, agency,
+  trucking, tax, hire, commission, payment) earns nothing on either side.
+- **This is a statement, not an invoice.** It creates no invoice, no order and no
+  receivable — Moxie sends it and collects outside the system. Customer billing,
+  collections, ageing and QuickBooks are untouched.
+- If a deal has **more than one supplier leg**, its supplier commission cannot be
+  attributed to a single supplier. Such deals are listed as **excluded** on screen and
+  in the export rather than silently billed to the primary supplier; split the deal
+  first.
+
+---
+
 ## Broker Credit Lines
 
 - Create a **Broker Credit Line** in **Credit → Suppliers** (tick "Broker Credit Line")

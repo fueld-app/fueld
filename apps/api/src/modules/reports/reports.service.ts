@@ -1,5 +1,6 @@
 import { and, asc, eq, gte, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type {
   CommercialSummaryReportDto,
   ConversionMetricsDto,
@@ -35,6 +36,9 @@ import type {
   BrokerCommissionReportDto,
   BrokerCommissionReportByCustomerDto,
   BrokerCommissionReportOrderDto,
+  SupplierCommissionReportDto,
+  SupplierCommissionReportBySupplierDto,
+  SupplierCommissionReportOrderDto,
   ThroughputReportDto,
   ThroughputReportRowDto,
   ThroughputLocationDto,
@@ -163,7 +167,13 @@ function formatPercentDisplay(value: number): string {
 }
 
 function escapeCsv(value: string | number | null | undefined): string {
-  const raw = value === null || value === undefined ? '' : String(value);
+  let raw = value === null || value === undefined ? '' : String(value);
+  // Spreadsheet formula injection: a cell beginning = + - @ (or a tab/CR
+  // variant) is executed as a formula when the CSV is opened in Excel or
+  // Sheets. Company and vessel names come from counterparty data, so a name
+  // starting with '=' would run on the recipient's machine. Prefix with a
+  // quote so it is read as text.
+  if (/^[=+\-@\t\r]/.test(raw)) raw = `'${raw}`;
   if (raw.includes(',') || raw.includes('"') || raw.includes('\n')) {
     return `"${raw.replace(/"/g, '""')}"`;
   }
@@ -172,6 +182,16 @@ function escapeCsv(value: string | number | null | undefined): string {
 
 function buildCsv(rows: Array<Array<string | number | null | undefined>>): string {
   return rows.map((row) => row.map((cell) => escapeCsv(cell)).join(',')).join('\n');
+}
+
+/**
+ * A CSV cell rendered always-quoted, with formula injection neutralised.
+ * Used by the commission reports, which are exported to be read.
+ */
+function quoteCsvCell(value: string | number | null | undefined): string {
+  let raw = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-\t\r]/.test(raw)) raw = `'${raw}`;
+  return `"${raw.replace(/"/g, '""')}"`;
 }
 
 function buildFileSuffix(filters: ReportFiltersDto): string {
@@ -2493,26 +2513,17 @@ export async function buildBrokerCommissionReport(
     // quantity 1 — collected a full $3 as though it were a tonne of fuel, and
     // its "total quantity" counted the fee as tonnage. Skipped entirely rather
     // than listed at 0, so the group's quantity stays delivered product.
-    if (!isCommissionableLine(r.productType)) continue;
-    // Commission rate resolution: per-line override → order-level rate →
-    // tenant default. Both the ordering AND the guard now match
-    // order-financing.calculateLineEconomics — they share lib/numbers
-    // toFiniteNumber, which is the point of that helper.
     //
-    // The guard matters because a non-finite rate poisons the whole report:
-    // rate * qty → NaN → grandTotalCommission becomes NaN → every total, the
-    // CSV/XLSX export, and the create-orders flow that turns these totals into
-    // real invoices. Postgres numeric accepts the literals 'NaN' and
-    // 'Infinity' (verified on this deployment, PG16), and sanitizeNumeric
-    // (orders.service.ts:1971) only normalises ''/'null'/'undefined', so such
-    // a row CAN be stored.
-    const rate = toFiniteNumber(r.itemCommissionPerUnit) ?? toFiniteNumber(r.orderCommissionPerMt) ?? toFiniteNumber(defaultCommissionRate) ?? 0;
-    // Bill what was delivered, falling back to the ordered quantity while a
-    // deal is still undelivered (deliveredQuantity is null until BDR entry).
-    // Mirrors order-financing.ts getEffectiveQuantity so the commission report
-    // and the broker-deal profit column cannot disagree on the same line.
-    const qty = toFiniteNumber(r.deliveredQuantity) ?? toFiniteNumber(r.quantity) ?? 0;
-    const commissionAmount = rate * qty;
+    // Rate resolution, the delivered-quantity choice AND the cent rounding all
+    // live in commissionLineFigures, which the supplier report also uses. They
+    // were duplicated here once and the two silently diverged; sharing the
+    // arithmetic is what keeps the customer column of the supplier report equal
+    // to this report's figure for the same line.
+    const figures = commissionLineFigures(r, defaultCommissionRate);
+    if (!figures) continue;
+    const rate = figures.customerRate;
+    const qty = figures.qty;
+    const commissionAmount = figures.customerAmount;
     grandTotalCommission += commissionAmount;
 
     const order: BrokerCommissionReportOrderDto = {
@@ -2573,7 +2584,10 @@ export function brokerCommissionReportToCsv(report: BrokerCommissionReportDto): 
   }
   rows.push(['', '', '', '', '', 'TOTAL', '', '', report.totalCommission, '', '']);
 
-  return rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  // Every cell is guarded against spreadsheet formula injection (see
+  // quoteCsvCell). These reports are exported to be read, not re-imported, so
+  // the always-quoted form the previous implementation used is kept.
+  return rows.map((r) => r.map((c) => quoteCsvCell(c)).join(',')).join('\n');
 }
 
 export function brokerCommissionReportToXlsx(report: BrokerCommissionReportDto): ArrayBuffer {
@@ -2603,6 +2617,378 @@ export function brokerCommissionReportToXlsx(report: BrokerCommissionReportDto):
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Broker Commission');
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+}
+
+// ── Supplier commission report ───────────────────────────────────
+//
+// The mirror of `buildBrokerCommissionReport`, grouped by SUPPLIER.
+//
+// Why it exists: a broker deal's supplier invoices the customer directly and
+// Moxie's revenue is the commission. Normally the customer funds all of it, but
+// a rate negotiated above the standard (Moxie's is $3/MT) can be funded by the
+// supplier instead — and on some deals the supplier funds the whole rate and
+// the customer is billed none of it. Daniel (Moxie) asked exactly this: "hvis
+// man laver en broker deal og kommission stiger over $3/mt, kan den så lave en
+// invoice til supplier på den kommission?" That is what this statement is for.
+//
+// It is NOT an invoice and NOT a receivable. Nothing here creates an order, an
+// invoice row or a number series — `invoices` has no payer column and every
+// reader of it (collections, aging, company balance, QuickBooks) resolves the
+// payer from `orders.client_id`, so a supplier-addressed invoice would be
+// reported as a customer receivable. The statement is generated and sent by
+// Moxie outside the system.
+//
+// Every figure comes from ONE column, `order_items.supplier_commission_per_unit`.
+// It does NOT resolve through the customer-side chain (per-line → order-level →
+// tenant default), because those three tiers all describe what the CUSTOMER is
+// billed; a line with no supplier rate means the supplier owes nothing, which
+// is what every line written before this column means.
+//
+// The customer-side figures are carried alongside, never subtracted: the two
+// sides price the same line independently, and a reader reconciling the two
+// reports needs the same line's customer number in front of them.
+
+/**
+ * Money in a report is stated in whole cents and the lines must sum to the
+ * stated totals, so every per-line amount is rounded once, here.
+ */
+function roundToCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** Rows one report line contributes to both the supplier and the customer side. */
+interface CommissionLineFigures {
+  qty: number;
+  customerRate: number;
+  supplierRate: number;
+  supplierAmount: number;
+  customerAmount: number;
+}
+
+/**
+ * Shared per-line arithmetic for the two commission reports, so the customer
+ * column of the supplier report can never drift from the customer report.
+ * Returns null for a line that earns no commission at all (fees, services).
+ */
+function commissionLineFigures(
+  row: {
+    productType: string;
+    quantity: string | null;
+    deliveredQuantity: string | null;
+    itemCommissionPerUnit: string | null;
+    orderCommissionPerMt: string | null;
+    /**
+     * Omitted by the customer report, which does not read the supplier side.
+     * A caller that DOES read `supplierAmount` must select the column — an
+     * absent value is treated as "supplier owes nothing", so omitting it there
+     * would silently report zero.
+     */
+    supplierCommissionPerUnit?: string | null;
+  },
+  defaultCommissionRate: number,
+): CommissionLineFigures | null {
+  if (!isCommissionableLine(row.productType)) return null;
+  // Same resolution order AND the same shared toFiniteNumber guard as
+  // order-financing.calculateLineEconomics. A non-finite rate poisons every
+  // total downstream (NaN), and Postgres numeric accepts the literals 'NaN'
+  // and 'Infinity', so such a row can be stored.
+  const customerRate = toFiniteNumber(row.itemCommissionPerUnit)
+    ?? toFiniteNumber(row.orderCommissionPerMt)
+    ?? toFiniteNumber(defaultCommissionRate)
+    ?? 0;
+  const qty = toFiniteNumber(row.deliveredQuantity) ?? toFiniteNumber(row.quantity) ?? 0;
+  const supplierRate = toFiniteNumber(row.supplierCommissionPerUnit) ?? 0;
+  // Each line's money is rounded to cents HERE, once, so a report's displayed
+  // lines sum exactly to its displayed totals. Rates carry up to 7 decimals and
+  // quantities 6, so accumulating raw products and rounding only at the end
+  // drifts against the line figures the reader can add up by hand — on a
+  // document sent to a counterparty to request money, that invites disputes.
+  return {
+    qty,
+    customerRate,
+    supplierRate,
+    supplierAmount: roundToCents(supplierRate * qty),
+    customerAmount: roundToCents(customerRate * qty),
+  };
+}
+
+/**
+ * Whether the tenant has the broker-deals feature enabled. The broker-deal UI
+ * and nav are hidden without it, but the API is the authority: a route gated
+ * only by the bearer token is callable by any authenticated user of any tenant.
+ */
+export async function isBrokerDealsEnabled(tenantId: string): Promise<boolean> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  return tenant?.settings?.brokerDeals?.enabled === true;
+}
+
+export async function buildSupplierCommissionReport(
+  tenantId: string,
+  from: string,
+  to: string,
+): Promise<SupplierCommissionReportDto> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  const bd = tenant?.settings?.brokerDeals;
+  const reportStatuses: (typeof orders.status.enumValues)[number][] = (bd?.reportStatuses ?? [
+    'CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID',
+  ]) as (typeof orders.status.enumValues)[number][];
+  const reportDateField: string = bd?.reportDateField ?? 'deliveredAt';
+  const reportDateFallback: string = bd?.reportDateFallback ?? 'eta';
+  // Pre-rename key accepted for the same reason as the customer report: the
+  // rename (fd69d793) updated the settings API but not the reports, so an
+  // instance provisioned before it still carries `defaultCommissionPerMt` and
+  // reading only the new key would silently report $0.00.
+  const defaultCommissionRate = bd?.defaultCommissionRate ?? bd?.defaultCommissionPerMt ?? 0;
+  const commissionCurrency: string = bd?.commissionCurrency ?? 'USD';
+
+  const dateColumn = reportDateField === 'eta' ? orders.eta : reportDateField === 'createdAt' ? orders.createdAt : orders.deliveredAt;
+  const fallbackColumn = reportDateFallback === 'eta' ? orders.eta : reportDateFallback === 'createdAt' ? orders.createdAt : orders.deliveredAt;
+
+  // The supplier is joined on the PRIMARY supplier leg (`orders.supplier_id`),
+  // matching how a broker deal is ordered: client = the buyer the supplier
+  // invoices, supplier = the party being billed here. `orders.client` is joined
+  // through a second alias because `counterparties` appears twice in one query.
+  const clients = alias(counterparties, 'commission_report_clients');
+
+  const rows = await db
+    .select({
+      orderId: orders.id,
+      orderNumber: orders.orderNumber,
+      vesselName: vessels.name,
+      placeName: places.name,
+      customerName: clients.name,
+      supplierId: orders.supplierId,
+      supplierName: counterparties.name,
+      productType: orderItems.productType,
+      quantity: orderItems.quantity,
+      unit: orderItems.unit,
+      itemCommissionPerUnit: orderItems.commissionPerUnit,
+      orderCommissionPerMt: orders.commissionPerMt,
+      supplierCommissionPerUnit: orderItems.supplierCommissionPerUnit,
+      deliveredQuantity: orderItems.deliveredQuantity,
+      deliveredAt: orders.deliveredAt,
+      status: orders.status,
+      // The line's own currency. The report states totals in the tenant's
+      // configured `commissionCurrency` and does NOT convert (neither does the
+      // customer report, whose amounts `createCommissionOrdersFromReport` bills
+      // verbatim). Rather than silently restate existing money, a deal priced
+      // in another currency is reported as a mismatch the reader must see.
+      orderCurrency: orders.currency,
+      primaryDate: dateColumn,
+      fallbackDate: fallbackColumn,
+      // How many supplier legs this order has. The report can only attribute a
+      // line to `orders.supplier_id` — the legacy primary — so an order with
+      // several legs would attribute every line's supplier commission to the
+      // primary and silently under-bill the others.
+      supplierLegCount: sql<number>`(
+        SELECT count(*)::int FROM order_suppliers os WHERE os.order_id = ${orders.id}
+      )`,
+    })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .innerJoin(vessels, eq(orders.vesselId, vessels.id))
+    .innerJoin(places, eq(orders.placeId, places.id))
+    .innerJoin(clients, eq(orders.clientId, clients.id))
+    // INNER JOIN on the supplier: a deal with no supplier leg has nobody to
+    // bill, and `orders.supplier_id` is nullable.
+    .innerJoin(counterparties, eq(orders.supplierId, counterparties.id))
+    .where(
+      and(
+        eq(orders.tenantId, tenantId),
+        eq(orders.isBrokerDeal, true),
+        inArray(orders.status, reportStatuses),
+        isNotNull(orders.supplierId),
+      ),
+    );
+
+  const fromDate = new Date(from);
+  const toDate = new Date(to + 'T23:59:59.999Z');
+  const filtered = rows.filter((r) => {
+    const date = r.primaryDate ?? r.fallbackDate;
+    if (!date) return false;
+    return date >= fromDate && date <= toDate;
+  });
+
+  const bySupplierMap = new Map<string, SupplierCommissionReportBySupplierDto>();
+  let grandTotalCommission = 0;
+  let grandTotalCustomerCommission = 0;
+
+  // Orders whose supplier commission cannot be attributed with the data model:
+  // more than one supplier leg, so `orders.supplier_id` (the legacy primary) is
+  // not necessarily the party for every line. Surfaced rather than guessed —
+  // attributing everything to the primary would under-bill the other suppliers
+  // silently, which is the one failure mode a commission statement cannot have.
+  // Empty for Moxie today (0 of their 146 broker deals have a second leg), so
+  // this is a guard against a future deal, not a live defect.
+  const ambiguousOrderNumbers = new Set<string>();
+  // Order numbers whose lines are priced in a currency other than the one the
+  // report states its totals in. The report does not convert (see the query
+  // comment), so mixing them would add EUR to USD as if 1:1. Surfaced instead.
+  const otherCurrencyOrderNumbers = new Set<string>();
+
+  for (const r of filtered) {
+    const figures = commissionLineFigures(r, defaultCommissionRate);
+    if (!figures) continue;
+    // A line whose supplier rate is null owes nothing. Skip it rather than
+    // listing a zero row — the same choice the customer report makes for fee
+    // lines, and it keeps a supplier's quantity total meaningful.
+    if (figures.supplierRate === 0) continue;
+    // The query INNER JOINs the supplier, so this is always set; a row without
+    // one has nobody to bill and is dropped rather than guessed at.
+    const supplierId = r.supplierId;
+    if (!supplierId) continue;
+    if (r.supplierLegCount > 1 && r.orderNumber) {
+      ambiguousOrderNumbers.add(r.orderNumber);
+      continue;
+    }
+    // Cannot be added to a single-currency total without converting, which this
+    // report deliberately does not do. Excluded and named rather than blended.
+    if ((r.orderCurrency ?? '').toUpperCase() !== commissionCurrency.toUpperCase()) {
+      if (r.orderNumber) otherCurrencyOrderNumbers.add(r.orderNumber);
+      continue;
+    }
+
+    grandTotalCommission += figures.supplierAmount;
+    grandTotalCustomerCommission += figures.customerAmount;
+
+    const order: SupplierCommissionReportOrderDto = {
+      orderNumber: r.orderNumber ?? '—',
+      vesselName: r.vesselName ?? '—',
+      placeName: r.placeName ?? '—',
+      customerName: r.customerName ?? '—',
+      productType: r.productType,
+      quantity: String(figures.qty),
+      unit: r.unit,
+      commissionPerMt: String(figures.supplierRate),
+      commissionAmount: figures.supplierAmount.toFixed(2),
+      customerCommissionAmount: figures.customerAmount.toFixed(2),
+      deliveredAt: r.deliveredAt?.toISOString() ?? null,
+      status: r.status,
+    };
+
+    const existing = bySupplierMap.get(supplierId);
+    if (existing) {
+      existing.orders.push(order);
+      existing.lineCount++;
+      existing.totalCommission = ((toFiniteNumber(existing.totalCommission) ?? 0) + figures.supplierAmount).toFixed(2);
+      existing.customerCommission = ((toFiniteNumber(existing.customerCommission) ?? 0) + figures.customerAmount).toFixed(2);
+      existing.totalQuantity = ((toFiniteNumber(existing.totalQuantity) ?? 0) + figures.qty).toFixed(6);
+    } else {
+      bySupplierMap.set(supplierId, {
+        supplierId,
+        supplierName: r.supplierName ?? '—',
+        lineCount: 1,
+        totalQuantity: figures.qty.toFixed(6),
+        totalCommission: figures.supplierAmount.toFixed(2),
+        customerCommission: figures.customerAmount.toFixed(2),
+        orders: [order],
+      });
+    }
+  }
+
+  return {
+    period: { from, to },
+    totalCommission: grandTotalCommission.toFixed(2),
+    customerCommission: grandTotalCustomerCommission.toFixed(2),
+    currency: commissionCurrency,
+    bySupplier: Array.from(bySupplierMap.values()),
+    // Order numbers EXCLUDED from the totals above because their supplier
+    // commission cannot be attributed to one supplier. Empty in normal
+    // operation; non-empty means a deal has several supplier legs and the
+    // statement would have under-billed someone, so it must not be sent as-is.
+    attributedToMultipleSuppliers: [...ambiguousOrderNumbers].sort(),
+    // Order numbers excluded because they are priced in a currency this report
+    // does not convert into `currency`.
+    excludedOtherCurrency: [...otherCurrencyOrderNumbers].sort(),
+  };
+}
+
+export function supplierCommissionReportToCsv(report: SupplierCommissionReportDto): string {
+  const rows: string[][] = [];
+  rows.push(['Supplier Commission Report']);
+  rows.push([`Period: ${report.period.from} to ${report.period.to}`]);
+  // Stated in the document itself, not only on screen: this file is what gets
+  // sent, and an under-billed statement must carry its own warning.
+  if (report.attributedToMultipleSuppliers.length > 0) {
+    rows.push([`EXCLUDED — supplier commission could not be attributed for: ${report.attributedToMultipleSuppliers.join(', ')}`]);
+  }
+  if (report.excludedOtherCurrency.length > 0) {
+    rows.push([`EXCLUDED — not in ${report.currency}, not converted: ${report.excludedOtherCurrency.join(', ')}`]);
+  }
+  rows.push([]);
+  rows.push(['Supplier', 'Order #', 'Vessel', 'Place', 'Customer', 'Product', 'Quantity', 'Unit', 'Rate', 'Commission', 'Customer Commission', 'Delivered At', 'Status']);
+
+  for (const sup of report.bySupplier) {
+    for (const o of sup.orders) {
+      rows.push([sup.supplierName, o.orderNumber, o.vesselName, o.placeName, o.customerName, o.productType, o.quantity, o.unit, o.commissionPerMt, o.commissionAmount, o.customerCommissionAmount, o.deliveredAt ?? '', o.status]);
+    }
+    rows.push(['', '', '', '', '', '', 'Subtotal', '', '', sup.totalCommission, sup.customerCommission, '', `${sup.lineCount} lines`]);
+    rows.push([]);
+  }
+  rows.push(['', '', '', '', '', '', 'TOTAL', '', '', report.totalCommission, report.customerCommission, '', '']);
+
+  return rows.map((row) => row.map((c) => quoteCsvCell(c)).join(',')).join('\n');
+}
+
+export function supplierCommissionReportToXlsx(report: SupplierCommissionReportDto): ArrayBuffer {
+  const data: any[] = [];
+  if (report.attributedToMultipleSuppliers.length > 0) {
+    data.push({
+      Supplier: 'EXCLUDED — supplier commission could not be attributed for',
+      'Order #': report.attributedToMultipleSuppliers.join(', '),
+    });
+  }
+  if (report.excludedOtherCurrency.length > 0) {
+    data.push({
+      Supplier: `EXCLUDED — not in ${report.currency}, not converted`,
+      'Order #': report.excludedOtherCurrency.join(', '),
+    });
+  }
+  for (const sup of report.bySupplier) {
+    for (const o of sup.orders) {
+      data.push({
+        Supplier: sup.supplierName,
+        'Order #': o.orderNumber,
+        Vessel: o.vesselName,
+        Place: o.placeName,
+        Customer: o.customerName,
+        Product: o.productType,
+        Quantity: o.quantity,
+        Unit: o.unit,
+        Rate: o.commissionPerMt,
+        Commission: o.commissionAmount,
+        'Customer Commission': o.customerCommissionAmount,
+        'Delivered At': o.deliveredAt ?? '',
+        Status: o.status,
+      });
+    }
+    data.push({
+      Supplier: '', 'Order #': '', Vessel: '', Place: '', Customer: '', Product: '',
+      Quantity: '', Unit: 'Subtotal', Rate: '', Commission: sup.totalCommission,
+      'Customer Commission': sup.customerCommission,
+      'Delivered At': '', Status: `${sup.lineCount} lines`,
+    });
+  }
+  // Matches the CSV, which states a grand total after the per-supplier blocks.
+  data.push({
+    Supplier: '', 'Order #': '', Vessel: '', Place: '', Customer: '', Product: '',
+    Quantity: '', Unit: 'TOTAL', Rate: '', Commission: report.totalCommission,
+    'Customer Commission': report.customerCommission,
+    'Delivered At': '', Status: '',
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Supplier Commission');
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
 }
 

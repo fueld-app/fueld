@@ -573,8 +573,9 @@ describe('broker deal commission rate resolution', () => {
   });
 
   it('treats a deliberate per-line 0 as zero rather than falling through', () => {
-    // The UI cannot store this (`+$event || null` maps 0 to null), so a stored
-    // 0 is intentional. `??` honours it; the old `||` fell through to 3 and
+    // A stored 0 is intentional and now reachable from the UI: both commission
+    // inputs send an empty string as null and any other value as its number, so
+    // a typed 0 survives. `??` honours it; the old `||` fell through to 3 and
     // paid the broker on a line explicitly marked as earning nothing.
     const line = calculateLineEconomics(item({ commissionPerUnit: '0' }), 0.08, 30, true, 3);
     expect(line.grossProfit).toBe(0);
@@ -627,5 +628,69 @@ describe('broker deal commission rate resolution', () => {
     );
     expect(line.quantity).toBe(80);
     expect(line.grossProfit).toBe(240); // 80 × 3
+  });
+
+  // ── Supplier-funded commission ───────────────────────────────────
+  // A rate negotiated above the standard can be funded by the supplier rather
+  // than the customer, and on some deals the supplier funds the whole rate and
+  // the customer is billed none of it. Both halves are the broker's revenue, so
+  // the profit column must sum them — reporting only the customer half would
+  // show a supplier-funded deal as earning nothing.
+
+  it('adds the supplier-funded rate to the customer rate', () => {
+    const line = calculateLineEconomics(
+      item({ commissionPerUnit: '3', supplierCommissionPerUnit: '16' }),
+      0.08, 30, true, null,
+    );
+    // 100 × (3 + 16)
+    expect(line.grossProfit).toBe(1900);
+  });
+
+  it('charges the whole commission to the supplier when the customer rate is zero', () => {
+    const line = calculateLineEconomics(
+      item({ commissionPerUnit: '0', supplierCommissionPerUnit: '19' }),
+      0.08, 30, true, null,
+    );
+    // 100 × 19 — the shape of Moxie's 20260916-000132.
+    expect(line.grossProfit).toBe(1900);
+  });
+
+  it('does not fall back to the order-level rate on the supplier side', () => {
+    // The three tiers (per-line → order-level → tenant default) all describe
+    // what the CUSTOMER is billed. A line with no supplier rate means the
+    // supplier owes nothing, even when the order carries a rate.
+    const line = calculateLineEconomics(item({ supplierCommissionPerUnit: null }), 0.08, 30, true, 9);
+    expect(line.grossProfit).toBe(900); // the customer's 100 × 9 only
+  });
+
+  it('ignores a blank or non-finite supplier rate', () => {
+    const blank = calculateLineEconomics(
+      item({ commissionPerUnit: '3', supplierCommissionPerUnit: '' }),
+      0.08, 30, true, null,
+    );
+    expect(blank.grossProfit).toBe(300);
+    const nonFinite = calculateLineEconomics(
+      item({ commissionPerUnit: '3', supplierCommissionPerUnit: 'NaN' }),
+      0.08, 30, true, null,
+    );
+    expect(Number.isFinite(nonFinite.grossProfit)).toBe(true);
+    expect(nonFinite.grossProfit).toBe(300);
+  });
+
+  it('earns nothing on a fee line even with a supplier rate set', () => {
+    const fee = calculateLineEconomics(
+      item({ productType: 'BARGING_FEE', quantity: '1', commissionPerUnit: '3', supplierCommissionPerUnit: '10' }),
+      0.08, 30, true, 3,
+    );
+    expect(fee.grossProfit).toBe(0);
+    expect(fee.quantity).toBe(0);
+  });
+
+  it('applies the delivered quantity to both commission sides', () => {
+    const line = calculateLineEconomics(
+      item({ quantity: '100', deliveredQuantity: '80', commissionPerUnit: '3', supplierCommissionPerUnit: '19' }),
+      0.08, 30, true, null,
+    );
+    expect(line.grossProfit).toBe(1760); // 80 × (3 + 19)
   });
 });

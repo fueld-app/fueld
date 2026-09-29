@@ -206,6 +206,8 @@ interface SaveItemInput {
   plannedInventoryAt?: string | null;
   // Broker deal — per-line-item commission
   commissionPerUnit?: string | null;
+  /** Commission the supplier pays on this line. No fallback chain — see schema. */
+  supplierCommissionPerUnit?: string | null;
   // Hide from customer-facing documents
   hideOnDocuments?: boolean | null;
 }
@@ -1323,6 +1325,7 @@ export async function listOrders(query?: ListOrdersQuery) {
           salesCurrency: orderItems.salesCurrency,
           unitConversionFactor: orderItems.unitConversionFactor,
           commissionPerUnit: orderItems.commissionPerUnit,
+          supplierCommissionPerUnit: orderItems.supplierCommissionPerUnit,
         })
         .from(orderItems)
         .where(inArray(orderItems.orderId, orderIds)),
@@ -1701,6 +1704,7 @@ export async function getOrderById(idOrNumber: string) {
       taxAmount: i.taxAmount ?? null,
       // Broker deal — per-line-item commission
       commissionPerUnit: i.commissionPerUnit ?? null,
+      supplierCommissionPerUnit: i.supplierCommissionPerUnit ?? null,
       // Hide from customer-facing documents
       hideOnDocuments: i.hideOnDocuments ?? false,
     })),
@@ -2005,6 +2009,17 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       );
     }
 
+    // Commission rates are per-unit charges: a negative one would silently
+    // reduce the commission total (and, for the supplier side, reduce what the
+    // supplier owes). The UI marks the inputs `min="0"`, but the API is the
+    // authority and a direct call bypasses the form entirely.
+    for (const [field, label] of [['commissionPerUnit', 'Commission per unit'], ['supplierCommissionPerUnit', 'Supplier commission per unit']] as const) {
+      const raw = item[field];
+      if (raw != null && raw !== '' && Number(raw) < 0) {
+        throw new Error(`${label} cannot be negative`);
+      }
+    }
+
     const costCurrency = (item.costCurrency ?? orderCurrency).toUpperCase();
     const salesCurrency = (item.salesCurrency ?? orderCurrency).toUpperCase();
     const profit = calculateGrossProfitBase({
@@ -2075,8 +2090,9 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       inventorySkuId: item.inventorySkuId ?? null,
       warehouseId: item.warehouseId ?? null,
       plannedInventoryAt: item.plannedInventoryAt ? new Date(item.plannedInventoryAt) : null,
-      // Broker deal — per-line-item commission
+      // Broker deal — per-line-item commission, customer side and supplier side
       commissionPerUnit: sanitizeNumeric(item.commissionPerUnit),
+      supplierCommissionPerUnit: sanitizeNumeric(item.supplierCommissionPerUnit),
       // Hide from customer-facing documents
       hideOnDocuments: item.hideOnDocuments ?? false,
     };

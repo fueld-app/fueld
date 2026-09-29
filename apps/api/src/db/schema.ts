@@ -425,7 +425,20 @@ export interface TenantSettings {
   brokerDeals?: {
     enabled: boolean;                  // Master toggle
     defaultCommissionRate: number;     // Default commission rate per unit (e.g., 3.00)
+    /**
+     * Legacy name for `defaultCommissionRate`, from before the rename in
+     * fd69d793 (which updated the settings API but not the commission report,
+     * so the fallback briefly read a field nothing wrote). Still accepted on
+     * read so an instance provisioned before the rename keeps its rate.
+     */
+    defaultCommissionPerMt?: number;
     reportStatuses: string[];          // Which statuses to include in report (default: ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'])
+    /** Which date the commission report period filters on (default 'deliveredAt'). */
+    reportDateField?: string;
+    /** Fallback date when the primary is null (default 'eta'). */
+    reportDateFallback?: string;
+    /** Display currency for commission reports (default 'USD'). */
+    commissionCurrency?: string;
     autoReleaseCredit: boolean;        // Auto-release supplier credit after credit period (default: true)
     autoReleaseBufferDays: number;     // Extra buffer days before auto-release (default: 0)
     /**
@@ -1297,8 +1310,19 @@ export const orderItems = pgTable('order_items', {
   // appear on customer documents but are included in margin calculations.
   hideOnDocuments: boolean('hide_on_documents').notNull().default(false),
 
-  // Broker deal — per-line-item commission rate (e.g., 3.00 for $3/unit)
+  // Broker deal — per-line-item commission rate (e.g., 3.00 for $3/unit).
+  // This is the CUSTOMER-side rate: what the customer is billed for this line.
   commissionPerUnit: numeric('commission_per_unit', { precision: 14, scale: 7 }),
+  /**
+   * Broker deal — the commission the SUPPLIER pays on this same line, when a
+   * negotiated rate above the standard $3/MT is funded by the supplier (or the
+   * supplier funds the whole rate and the customer is billed none of it).
+   *
+   * Deliberately has NO fallback chain: no order-level twin, no tenant default.
+   * NULL means the supplier owes nothing on this line, which is the right
+   * reading for every line written before this column existed.
+   */
+  supplierCommissionPerUnit: numeric('supplier_commission_per_unit', { precision: 14, scale: 7 }),
 
   // ── Inventory linkage (optional; only set for tracked SKUs) ───────
   // When set, this line participates in inventory rules: stock checks at

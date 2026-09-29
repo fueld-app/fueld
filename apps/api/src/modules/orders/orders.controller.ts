@@ -1156,6 +1156,10 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             salesPriceFinalized: t.Optional(t.Nullable(t.Boolean())),
             taxRate: t.Optional(t.Nullable(t.String())),
             commissionPerUnit: t.Optional(t.Nullable(t.String())),
+            // Supplier-side commission rate. Without declaring it here Elysia
+            // strips the key from the items payload and every save wipes it —
+            // the same silent-wipe trap documented for the inventory fields.
+            supplierCommissionPerUnit: t.Optional(t.Nullable(t.String())),
             hideOnDocuments: t.Optional(t.Boolean()),
             // Inventory linkage — the frontend payload includes these; without
             // declaring them Elysia strips the keys and every items save

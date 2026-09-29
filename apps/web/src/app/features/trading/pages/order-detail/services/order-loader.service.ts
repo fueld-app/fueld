@@ -134,6 +134,7 @@ export class OrderLoaderService {
       taxRate: item.taxRate != null ? parseFloat(item.taxRate) : null,
       taxAmount: item.taxAmount != null ? parseFloat(item.taxAmount) : null,
       commissionPerUnit: (item as any).commissionPerUnit != null ? parseFloat((item as any).commissionPerUnit) : null,
+      supplierCommissionPerUnit: item.supplierCommissionPerUnit != null ? parseFloat(item.supplierCommissionPerUnit) : null,
       hideOnDocuments: (item as any).hideOnDocuments ?? false,
     }));
 

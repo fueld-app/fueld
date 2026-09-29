@@ -83,6 +83,8 @@ import type {
               @if (isBrokerDeal()) {
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Price</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]">Comm./Unit</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]"
+                    title="Commission paid by the supplier instead of the customer">Supp./Unit</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Profit ({{ baseCurrency() }})</th>
               } @else {
                 <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Cost</th>
@@ -253,20 +255,34 @@ import type {
                     (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
                   />
                 </td>
-                <!-- Broker deal: Commission per unit -->
+                <!-- Broker deal: Commission per unit (customer pays) -->
                 <td class="px-4 py-2 align-top">
                   @if (readonly()) {
                     <span class="text-sm text-gray-500 dark:text-muted">{{ row.commissionPerUnit ?? '—' }}</span>
                   } @else {
                     <input type="number" step="0.01" min="0"
                       [ngModel]="row.commissionPerUnit ?? ''"
-                      (ngModelChange)="updateField(i, 'commissionPerUnit', +$event || null)"
+                      (ngModelChange)="updateField(i, 'commissionPerUnit', parseDecimalInput($event))"
                       placeholder="0"
                       class="w-20 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                     />
                   }
                 </td>
-                <!-- Broker deal: Profit (commission × quantity) -->
+                <!-- Broker deal: Commission per unit (supplier pays — no fallback) -->
+                <td class="px-4 py-2 align-top">
+                  @if (readonly()) {
+                    <span class="text-sm text-gray-500 dark:text-muted">{{ row.supplierCommissionPerUnit ?? '—' }}</span>
+                  } @else {
+                    <input type="number" step="0.0001" min="0"
+                      [ngModel]="row.supplierCommissionPerUnit ?? ''"
+                      (ngModelChange)="updateField(i, 'supplierCommissionPerUnit', parseDecimalInput($event))"
+                      placeholder="0"
+                      title="Commission paid by the supplier instead of the customer"
+                      class="w-20 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+                    />
+                  }
+                </td>
+                <!-- Broker deal: Profit (customer + supplier commission × quantity) -->
                 <td class="px-4 py-3 text-right tabular-nums text-sm font-semibold text-green-600 dark:text-green-400">
                   {{ brokerProfitForRow(row) | number:'1.2-2' }}
                 </td>
@@ -462,13 +478,13 @@ import type {
                 [warehouseOptions]="warehouseOptionsInput()"
                 [inventorySkuOptions]="inventorySkuOptionsInput()"
                 [availability]="availabilityByRowId()[row.id]"
-                [colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 3 : 5) : 0)"
+                [colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 4 : 5) : 0)"
                 (fieldChange)="onInventoryFieldChange(i, $event)"
               />
             }
           } @empty {
             <tr>
-              <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 3 : 5) : 0)" class="px-4 py-12 text-center">
+              <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? (isBrokerDeal() ? 4 : 5) : 0)" class="px-4 py-12 text-center">
                 <p class="text-sm text-gray-400 dark:text-muted">No line items yet.</p>
                 @if (!readonly()) {
                   <button
@@ -740,6 +756,39 @@ import type {
                 (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
               />
             </div>
+
+            <!-- Broker deal: Commission per unit (customer pays) -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Comm./Unit</label>
+              @if (readonly()) {
+                <span class="text-sm text-gray-500 dark:text-muted">{{ row.commissionPerUnit ?? '—' }}</span>
+              } @else {
+                <input type="number" step="0.01" min="0"
+                  [ngModel]="row.commissionPerUnit ?? ''"
+                  (ngModelChange)="updateField(i, 'commissionPerUnit', parseDecimalInput($event))"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-right text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+                />
+              }
+            </div>
+
+            <!-- Broker deal: Commission per unit (supplier pays — no fallback) -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted"
+                     title="Commission paid by the supplier instead of the customer">Supp./Unit</label>
+              @if (readonly()) {
+                <span class="text-sm text-gray-500 dark:text-muted">{{ row.supplierCommissionPerUnit ?? '—' }}</span>
+              } @else {
+                <input type="number" step="0.0001" min="0"
+                  [ngModel]="row.supplierCommissionPerUnit ?? ''"
+                  (ngModelChange)="updateField(i, 'supplierCommissionPerUnit', parseDecimalInput($event))"
+                  placeholder="0"
+                  title="Commission paid by the supplier instead of the customer"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-right text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+                />
+              }
+            </div>
+
             } @else {
             <!-- Cost -->
             <div>
@@ -1573,25 +1622,33 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Broker deal profit = rate × quantity, mirroring
+   * Broker deal profit = (customer rate + supplier rate) × quantity, mirroring
    * `order-financing.calculateLineEconomics` so the editor and the server agree.
+   *
+   * A broker deal can be paid from both sides of the trade: the customer rate
+   * (whatever the customer is charged on top) and the supplier rate (the extra
+   * the SUPPLIER pays when a deal is negotiated above the standard rate). Both
+   * apply to the same line quantity and are summed here.
+   *
+   * The customer rate falls back per-line → order-level, which matters because
+   * most broker-deal lines carry NO per-line rate (the UI seeds the tenant
+   * default onto the ORDER): without the fallback this preview read $0 for a
+   * line the report billed in full. The SUPPLIER rate has NO fallback — the
+   * per-line value is its only source, so an unset supplier rate contributes 0.
+   * Delivered quantity wins over ordered, matching the server, so a partially
+   * delivered deal does not preview the wrong figure.
    *
    * Fees and services earn nothing — a barging fee is a lump sum stored with
    * quantity 1, so multiplying it by the per-MT rate showed a flat rate as
    * though it were a tonne, and the row total counted the fee as tonnage. Uses
    * the same shared rule as the commission report and the profit column.
-   *
-   * The rate falls back per-line → order-level, which matters because most
-   * broker-deal lines carry NO per-line rate (the UI seeds the tenant default
-   * onto the ORDER): without the fallback this preview read $0 for a line the
-   * report billed in full. Delivered quantity wins over ordered, matching the
-   * server, so a partially delivered deal does not preview the wrong figure.
    */
   brokerProfitForRow(row: OrderItemRow): number {
     if (!isCommissionableLine(row.productType)) return 0;
-    const rate = row.commissionPerUnit ?? this.parseNullableNumber(this.commissionPerMt()) ?? 0;
+    const customerRate = row.commissionPerUnit ?? this.parseNullableNumber(this.commissionPerMt()) ?? 0;
+    const supplierRate = row.supplierCommissionPerUnit ?? 0;
     const qty = row.deliveredQuantity ?? row.quantity ?? 0;
-    return rate * qty;
+    return (customerRate + supplierRate) * qty;
   }
 
   /** Parse an optional numeric input, treating blank/absent as "no value". */

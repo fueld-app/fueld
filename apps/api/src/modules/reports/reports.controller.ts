@@ -33,6 +33,10 @@ import {
   buildBrokerCommissionReport,
   brokerCommissionReportToCsv,
   brokerCommissionReportToXlsx,
+  buildSupplierCommissionReport,
+  isBrokerDealsEnabled,
+  supplierCommissionReportToCsv,
+  supplierCommissionReportToXlsx,
   createCommissionOrdersFromReport,
   buildThroughputReport,
   exportThroughputXlsx,
@@ -40,6 +44,14 @@ import {
 import { getThroughputReportSettings } from '../admin/settings.service';
 import { previewCommentsDigest, getCommentsDigestSettings } from '../comments/comments-digest.service';
 import { previewDailyPricingEmail } from './daily-pricing.service';
+
+/**
+ * A calendar date, validated rather than free text. The value is interpolated
+ * into a `Content-Disposition` filename and parsed with `new Date()`, so an
+ * unconstrained string could inject header content or silently produce an
+ * Invalid Date that filters every row out.
+ */
+const DateOnly = t.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' });
 
 const reportFiltersSchema = t.Object({
   from: t.Optional(t.String()),
@@ -411,6 +423,70 @@ export const reportsController = new Elysia({ prefix: '/reports' })
       clientId: t.Optional(t.String()),
     }),
     detail: { tags: ['Reports'], summary: 'Export broker commission report as XLSX', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── Supplier commission report ─────────────────────────────────
+  // The mirror of the customer report above, grouped by supplier. Read-only on
+  // purpose: Moxie sends this statement itself and invoices the supplier
+  // outside the system. There is deliberately no create-orders counterpart —
+  // the `invoices` table has no payer column, so an order/invoice raised here
+  // would be reported as a customer receivable by collections, aging, the
+  // company balance and QuickBooks (all of which resolve the payer from
+  // `orders.client_id`).
+  //
+  // Every route is gated on the tenant's `brokerDeals.enabled` flag. The nav
+  // link is hidden without it, but that is presentation: without a server-side
+  // check any authenticated user of any tenant could read the report, and only
+  // the customer report's own feature gate would be missing here.
+  .get('/supplier-commission', async ({ auth, query, set }) => {
+    if (!(await isBrokerDealsEnabled(auth.tenantId))) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Broker deals are not enabled for this tenant' };
+    }
+    const data = await buildSupplierCommissionReport(auth.tenantId, query.from, query.to);
+    return { success: true, data } satisfies ApiResponse<unknown>;
+  }, {
+    query: t.Object({
+      from: DateOnly,
+      to: DateOnly,
+    }),
+    detail: { tags: ['Reports'], summary: 'Supplier commission report', security: [{ bearerAuth: [] }] },
+  })
+
+  .get('/supplier-commission/export', async ({ auth, query, set }) => {
+    if (!(await isBrokerDealsEnabled(auth.tenantId))) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Broker deals are not enabled for this tenant' };
+    }
+    const report = await buildSupplierCommissionReport(auth.tenantId, query.from, query.to);
+    const csv = supplierCommissionReportToCsv(report);
+    set.headers['content-type'] = 'text/csv';
+    set.headers['content-disposition'] = `attachment; filename="supplier_commission_${query.from}_${query.to}.csv"`;
+    return csv;
+  }, {
+    query: t.Object({
+      from: DateOnly,
+      to: DateOnly,
+    }),
+    detail: { tags: ['Reports'], summary: 'Export supplier commission report as CSV', security: [{ bearerAuth: [] }] },
+  })
+
+  .get('/supplier-commission/export.xlsx', async ({ auth, query, set }) => {
+    if (!(await isBrokerDealsEnabled(auth.tenantId))) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Broker deals are not enabled for this tenant' };
+    }
+    const report = await buildSupplierCommissionReport(auth.tenantId, query.from, query.to);
+    const buffer = supplierCommissionReportToXlsx(report);
+    set.headers['content-type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    set.headers['content-disposition'] = `attachment; filename="supplier_commission_${query.from}_${query.to}.xlsx"`;
+    return new Response(buffer as ArrayBuffer);
+  }, {
+    query: t.Object({
+      from: DateOnly,
+      to: DateOnly,
+    }),
+    detail: { tags: ['Reports'], summary: 'Export supplier commission report as XLSX', security: [{ bearerAuth: [] }] },
   })
 
   .post('/broker-commission/create-orders', async ({ auth, body, set }) => {

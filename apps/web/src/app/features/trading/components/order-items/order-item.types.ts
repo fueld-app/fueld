@@ -49,6 +49,8 @@ export interface OrderItemRow {
   taxAmount?: number | null;
   // Broker deal — per-line-item commission
   commissionPerUnit?: number | null;
+  /** Commission paid by the SUPPLIER instead of the customer. No fallback. */
+  supplierCommissionPerUnit?: number | null;
   // Hide from customer-facing documents (confirmations, nominations, etc.)
   hideOnDocuments?: boolean;
 }
