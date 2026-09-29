@@ -575,10 +575,6 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           method: body.method ?? null,
           note: body.note ?? null,
           createdBy: auth.sub,
-          // Optional: this receipt settles a supplier invoice (money coming back
-          // from a supplier for commission they funded), rather than the usual
-          // money paid out for fuel.
-          supplierInvoiceId: body.supplierInvoiceId ?? null,
         });
         if (!created) return { success: false, data: null, message: 'Order supplier leg not found' };
         await logActivity({
@@ -602,7 +598,6 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         paidAt: t.Optional(t.String()),
         method: t.Optional(t.Nullable(t.String())),
         note: t.Optional(t.Nullable(t.String())),
-        supplierInvoiceId: t.Optional(t.Nullable(t.String())),
       }),
       detail: { tags: ['Orders'], summary: 'Create a supplier payment for a leg' },
     },

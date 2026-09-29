@@ -953,6 +953,13 @@
       "when": 1790818800000,
       "tag": "0135_supplier_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1790905200000,
+      "tag": "0136_supplier_receipts",
+      "breakpoints": true
     }
   ]
 }

@@ -2835,6 +2835,13 @@ export async function buildSupplierCommissionReport(
   // report states its totals in. The report does not convert (see the query
   // comment), so mixing them would add EUR to USD as if 1:1. Surfaced instead.
   const otherCurrencyOrderNumbers = new Set<string>();
+  /**
+   * Commission withheld PER excluded order, so the caller can say how much is
+   * not being billed rather than only which orders. An unquantified exclusion
+   * list only half-warns: "3 orders skipped" does not tell an operator whether
+   * it is 30 or 30,000.
+   */
+  const withheldByOrder = new Map<string, number>();
 
   for (const r of filtered) {
     const figures = commissionLineFigures(r, defaultCommissionRate);
@@ -2849,12 +2856,16 @@ export async function buildSupplierCommissionReport(
     if (!supplierId) continue;
     if (r.supplierLegCount > 1 && r.orderNumber) {
       ambiguousOrderNumbers.add(r.orderNumber);
+      withheldByOrder.set(r.orderNumber, (withheldByOrder.get(r.orderNumber) ?? 0) + figures.supplierAmount);
       continue;
     }
     // Cannot be added to a single-currency total without converting, which this
     // report deliberately does not do. Excluded and named rather than blended.
     if ((r.orderCurrency ?? '').toUpperCase() !== commissionCurrency.toUpperCase()) {
-      if (r.orderNumber) otherCurrencyOrderNumbers.add(r.orderNumber);
+      if (r.orderNumber) {
+        otherCurrencyOrderNumbers.add(r.orderNumber);
+        withheldByOrder.set(r.orderNumber, (withheldByOrder.get(r.orderNumber) ?? 0) + figures.supplierAmount);
+      }
       continue;
     }
 
@@ -2911,6 +2922,11 @@ export async function buildSupplierCommissionReport(
     // Order numbers excluded because they are priced in a currency this report
     // does not convert into `currency`.
     excludedOtherCurrency: [...otherCurrencyOrderNumbers].sort(),
+    // What each excluded order would have contributed, so the caller can state
+    // the amount not being billed.
+    withheldByOrder: Object.fromEntries(
+      [...withheldByOrder].map(([orderNumber, amount]) => [orderNumber, amount.toFixed(2)]),
+    ),
   };
 }
 

@@ -3125,6 +3125,11 @@ export interface SupplierCommissionReportDto {
    * does not convert into `currency`. Empty in normal operation.
    */
   excludedOtherCurrency: string[];
+  /**
+   * Supplier commission withheld per excluded order number. Lets a caller state
+   * the AMOUNT not being billed, not just which orders.
+   */
+  withheldByOrder: Record<string, string>;
 }
 
 // ── Supplier invoices (money owed TO us BY a supplier) ───────────
@@ -3192,8 +3197,46 @@ export interface SupplierInvoiceDto {
   voidedAt: string | null;
   createdAt: string;
   lines: SupplierInvoiceLineDto[];
-  /** Payment ids and amounts recorded against this invoice. */
-  payments?: Array<{ id: string; amount: string; paidAt: string; method: string | null; note: string | null }>;
+  /**
+   * Money received FROM the supplier against this invoice. Distinct from the
+   * outbound payment ledger: a receipt is not a payment we made.
+   */
+  receipts?: Array<{ id: string; amount: string; receivedAt: string; method: string | null; note: string | null }>;
+}
+
+/**
+ * What a period's supplier commission WOULD invoice, before anything is raised.
+ *
+ * Returned by the candidates picker so an operator can see what will happen
+ * BEFORE pressing the button — including the deals that will be skipped, which
+ * otherwise only appeared in the result afterwards and could read as "nothing
+ * was owed".
+ */
+export interface SupplierInvoiceCandidateDto {
+  supplierId: string;
+  supplierName: string;
+  /** Commission that would be billed to this supplier. */
+  totalCommission: string;
+  lineCount: number;
+  /** The invoice number already raised for this supplier and period, if any. */
+  alreadyInvoiced: string | null;
+}
+
+export interface SupplierInvoiceCandidatesDto {
+  period: { from: string; to: string };
+  currency: string;
+  suppliers: SupplierInvoiceCandidateDto[];
+  /**
+   * Deals in the period that will produce NO supplier invoice, and why.
+   * `commissionAmount` is how much supplier commission is therefore not being
+   * billed — an unquantified skip list only half-warns.
+   */
+  willSkip: Array<{
+    reason: string;
+    skipped: Array<{ orderNumber: string; commissionAmount: string | null }>;
+    /** Total commission across `skipped`. */
+    commissionAmount: string;
+  }>;
 }
 
 /** What one "invoice this supplier for this period" call produced. */

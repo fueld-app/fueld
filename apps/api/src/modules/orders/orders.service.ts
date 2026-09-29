@@ -39,7 +39,6 @@ import {
   getFinancingRateAnnual,
 } from './order-financing';
 import { getFinancingTranchesByOrder } from './payment-schedule.service';
-import { applySupplierPaymentToInvoice, assertReceiptCurrencyMatchesInvoice } from './supplier-invoice-ledger';
 import {
   listSupplierCreditNotes,
   summarizeSupplierCredits,
@@ -2424,15 +2423,7 @@ export async function listSupplierPayments(orderSupplierId: string) {
   const rows = await db
     .select()
     .from(supplierPayments)
-    .where(
-      and(
-        eq(supplierPayments.orderSupplierId, orderSupplierId),
-        // OUTBOUND only. A row linked to a supplier invoice is money coming BACK
-        // from a supplier against commission they funded — a receipt, not a
-        // payment we made — and must not appear as one.
-        isNull(supplierPayments.supplierInvoiceId),
-      ),
-    )
+    .where(eq(supplierPayments.orderSupplierId, orderSupplierId))
     .orderBy(desc(supplierPayments.paidAt));
   return rows.map(mapSupplierPaymentRow);
 }
@@ -2447,14 +2438,7 @@ export async function updateOrderSupplierAmountPaid(orderSupplierId: string): Pr
   const [{ paidTotal }] = await db
     .select({ paidTotal: sql<number>`COALESCE(SUM(${supplierPayments.amount}), 0)::float` })
     .from(supplierPayments)
-    .where(
-      and(
-        eq(supplierPayments.orderSupplierId, orderSupplierId),
-        // OUTBOUND only: counting a receipt here would mark the leg as paid for
-        // fuel on the strength of money the supplier sent US.
-        isNull(supplierPayments.supplierInvoiceId),
-      ),
-    );
+    .where(eq(supplierPayments.orderSupplierId, orderSupplierId));
 
   const [{ costTotal }] = await db
     .select({ costTotal: sql<number>`COALESCE(SUM(${orderItems.costPrice}::numeric * ${orderItems.quantity}::numeric), 0)::float` })
@@ -2485,12 +2469,6 @@ export async function createSupplierPayment(orderSupplierId: string, input: {
   method?: string | null;
   note?: string | null;
   createdBy?: string | null;
-  /**
-   * Which SUPPLIER invoice this receipt settles, when the payment is money
-   * coming back from a supplier against commission they funded. Omitted for the
-   * ordinary case (money we paid out for fuel).
-   */
-  supplierInvoiceId?: string | null;
 }) {
   const [leg] = await db
     .select({
@@ -2505,12 +2483,6 @@ export async function createSupplierPayment(orderSupplierId: string, input: {
     .limit(1);
 
   if (!leg) return null;
-
-  // Validated BEFORE the insert. Throwing afterwards would leave a persisted,
-  // unlinked receipt plus an error, and the operator's retry would double it.
-  if (input.supplierInvoiceId) {
-    await assertReceiptCurrencyMatchesInvoice(input.currency, input.supplierInvoiceId);
-  }
 
   const [created] = await db
     .insert(supplierPayments)
@@ -2529,11 +2501,6 @@ export async function createSupplierPayment(orderSupplierId: string, input: {
     .returning();
 
   if (created) {
-    // The invoice link moves the invoice's received figure, so it is applied
-    // through the service that owns that invariant rather than written raw.
-    if (input.supplierInvoiceId) {
-      await applySupplierPaymentToInvoice(created.id, input.supplierInvoiceId);
-    }
     await updateOrderSupplierAmountPaid(orderSupplierId);
   }
   return created ? mapSupplierPaymentRow(created) : null;

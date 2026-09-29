@@ -13,6 +13,7 @@ import {
   index,
   uniqueIndex,
   primaryKey,
+  check,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
@@ -1191,6 +1192,53 @@ export const supplierInvoices = pgTable('supplier_invoices', {
 }));
 
 /**
+ * Money RECEIVED from a supplier, settling a supplier invoice.
+ *
+ * Deliberately its own ledger rather than a link on `supplier_payments`: that
+ * table is the outbound ledger ("money we paid a supplier for fuel") and every
+ * reader sums it as such, so a receipt parked there counted as money paid out —
+ * marking a supplier leg paid for fuel on the strength of commission the
+ * supplier sent us. Direction lives in the table, not in a WHERE clause.
+ */
+export const supplierReceipts = pgTable('supplier_receipts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  /**
+   * The invoice this receipt settled. Nullable and `SET NULL`, and NOT deleted
+   * when its invoice is voided: a receipt records cash that actually moved, so
+   * destroying it would leave a reissued invoice starting at zero while the
+   * money is real. The voided invoice keeps showing what was received.
+   */
+  supplierInvoiceId: uuid('supplier_invoice_id').references(() => supplierInvoices.id, { onDelete: 'set null' }),
+  supplierId: uuid('supplier_id').notNull().references(() => counterparties.id),
+  /**
+   * The supplier leg the commission arose on. Context only — a receipt must NOT
+   * contribute to that leg's paid amount, which is exactly what went wrong when
+   * this lived on `supplier_payments`.
+   */
+  orderSupplierId: uuid('order_supplier_id').references(() => orderSuppliers.id, { onDelete: 'set null' }),
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  currency: text('currency').notNull().default('USD'),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  method: text('method'),
+  note: text('note'),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  invoiceIdx: index('supplier_receipts_invoice_idx').on(table.supplierInvoiceId),
+  tenantSupplierIdx: index('supplier_receipts_tenant_supplier_idx').on(table.tenantId, table.supplierId),
+  // The FK columns are SET NULL, so an index keeps a leg/order delete from
+  // seq-scanning this table.
+  orderSupplierIdx: index('supplier_receipts_order_supplier_idx').on(table.orderSupplierId),
+  orderIdx: index('supplier_receipts_order_idx').on(table.orderId),
+  // Enforced in the table, not only in the app — the same argument that moved
+  // direction out of a WHERE clause.
+  amountPositive: check('supplier_receipts_amount_positive', sql`${table.amount} > 0`),
+}));
+
+/**
  * One row per commissioned line, captured at ISSUE as values rather than as a
  * join back to orders/order_items. An issued invoice must keep serving the
  * figures it was issued with: renaming a company, editing a rate or delivering
@@ -1787,13 +1835,6 @@ export const supplierPayments = pgTable('supplier_payments', {
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
   supplierId: uuid('supplier_id').notNull().references(() => counterparties.id),
   invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'set null' }),
-  /**
-   * Settles a SUPPLIER invoice (money owed to us BY a supplier). Distinct from
-   * `invoiceId` above, which points at the customer receivable ledger and has
-   * never been written. A receipt from a supplier is not a payment against a
-   * customer receivable, so the two links cannot share a column.
-   */
-  supplierInvoiceId: uuid('supplier_invoice_id').references(() => supplierInvoices.id, { onDelete: 'set null' }),
   amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
   currency: text('currency').notNull().default('USD'),
   paidAt: timestamp('paid_at', { withTimezone: true }).notNull().defaultNow(),

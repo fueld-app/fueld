@@ -10,7 +10,12 @@ import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, CreateSupplierInvoicesResultDto, SupplierCommissionReportDto } from '@fueld/types';
+import type {
+  ApiResponse,
+  CreateSupplierInvoicesResultDto,
+  SupplierCommissionReportDto,
+  SupplierInvoiceCandidatesDto,
+} from '@fueld/types';
 import { API } from '@app/core/config/api';
 import { SupplierInvoicesService } from '../supplier-invoices/supplier-invoices.service';
 
@@ -76,6 +81,33 @@ import { SupplierInvoicesService } from '../supplier-invoices/supplier-invoices.
           </div>
         }
       </div>
+
+      <!-- What issuing would do, shown BEFORE the button is pressed -->
+      @if (candidates(); as c) {
+        <div class="mb-4 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-4 shadow-sm">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">If you invoice this period</h3>
+          <p class="mt-2 text-sm text-gray-700 dark:text-ink-dim">
+            {{ c.suppliers.length }} supplier(s) would be billed
+            @if (alreadyInvoicedCount(c) > 0) {
+              — <span class="font-semibold text-gray-900 dark:text-ink">{{ alreadyInvoicedCount(c) }}</span> already invoiced for this period
+            }
+            .
+          </p>
+          @if (c.willSkip.length) {
+            <div class="mt-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-3 py-2">
+              <p class="text-sm font-medium text-amber-900 dark:text-amber-200">
+                These will produce NO invoice — {{ formatAmount(skippedTotal(c)) }} {{ c.currency }} not billed:
+              </p>
+              @for (skip of c.willSkip; track skip.reason) {
+                <p class="text-sm text-amber-800 dark:text-amber-300 mt-1">
+                  <span class="font-mono">{{ orderNumbersOf(skip) }}</span> — {{ skip.reason }}
+                  <span class="font-semibold">({{ formatAmount(skip.commissionAmount) }} {{ c.currency }})</span>
+                </p>
+              }
+            </div>
+          }
+        </div>
+      }
 
       <!-- Result of the last "Invoice suppliers" run -->
       @if (invoiceResult(); as run) {
@@ -251,6 +283,8 @@ export class SupplierCommissionReportPageComponent implements OnInit {
   readonly loading = signal(false);
   readonly report = signal<SupplierCommissionReportDto | null>(null);
   readonly invoicing = signal(false);
+  /** What issuing would do for the current period, fetched with the report. */
+  readonly candidates = signal<SupplierInvoiceCandidatesDto | null>(null);
   /**
    * The last create run, with the period it was posted for. The period is
    * snapshotted rather than read from the date inputs: editing the dates after a
@@ -294,6 +328,20 @@ export class SupplierCommissionReportPageComponent implements OnInit {
    * a repeat click creates nothing — which is why created/already-invoiced/skipped
    * are all reported: a silent omission must never read as "nothing was owed".
    */
+  alreadyInvoicedCount(c: SupplierInvoiceCandidatesDto): number {
+    return c.suppliers.filter((s) => !!s.alreadyInvoiced).length;
+  }
+
+  orderNumbersOf(skip: SupplierInvoiceCandidatesDto['willSkip'][number]): string {
+    return skip.skipped.map((s) => s.orderNumber).join(', ');
+  }
+
+  /** Total commission that will NOT be billed in this period. */
+  skippedTotal(c: SupplierInvoiceCandidatesDto): string {
+    const total = c.willSkip.reduce((sum, skip) => sum + (parseFloat(skip.commissionAmount) || 0), 0);
+    return total.toFixed(2);
+  }
+
   async invoiceSuppliers(): Promise<void> {
     if (this.invoicing() || !this.canGenerate()) return;
     const from = this.fromDate();
@@ -303,6 +351,7 @@ export class SupplierCommissionReportPageComponent implements OnInit {
       const result = await this.supplierInvoices.create(from, to);
       if (!result) return;
       this.invoiceResult.set({ ...result, from, to });
+      await this.loadCandidates();
 
       if (result.created.length) {
         const ids: Record<string, string> = { ...this.invoiceIds() };
@@ -330,10 +379,27 @@ export class SupplierCommissionReportPageComponent implements OnInit {
       if (res.success && res.data) {
         this.report.set(res.data);
       }
+      // Loaded alongside the report so the operator can see what issuing would
+      // do — including the deals that would be SKIPPED — before pressing the
+      // button. Without this a missing invoice reads as "nothing was owed".
+      await this.loadCandidates();
     } catch {
       // ignore
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async loadCandidates(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<SupplierInvoiceCandidatesDto>>(
+          `${API}/supplier-invoices/candidates?from=${this.fromDate()}&to=${this.toDate()}`,
+        ),
+      );
+      this.candidates.set(res.success ? res.data ?? null : null);
+    } catch {
+      this.candidates.set(null);
     }
   }
 

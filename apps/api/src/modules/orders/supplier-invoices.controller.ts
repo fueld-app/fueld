@@ -31,6 +31,7 @@ import {
   listSuppliersWithSupplierCommission,
   voidSupplierInvoice,
 } from './supplier-invoice.service';
+import { SupplierReceiptError, createSupplierReceipt, deleteSupplierReceipt } from './supplier-invoice-ledger';
 
 const DateOnly = t.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' });
 
@@ -194,6 +195,80 @@ export const supplierInvoicesController = new Elysia({ prefix: '/supplier-invoic
   }, {
     params: t.Object({ id: t.String() }),
     detail: { tags: ['Supplier Invoices'], summary: 'Supplier invoice PDF', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── Record money received from the supplier ────────────────────────
+  .post('/:id/receipts', async ({ auth, params, body, set }) => {
+    if (!(await assertSupplierInvoicesEnabled(auth.tenantId))) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Broker deals are not enabled for this tenant' } satisfies ApiResponse<null>;
+    }
+    if (auth.role !== 'ADMIN') {
+      set.status = 403;
+      return { success: false, data: null, message: 'Admin access required' } satisfies ApiResponse<null>;
+    }
+    // Ownership first: a foreign id must not reach the write below.
+    const owned = await getSupplierInvoice(params.id, auth.tenantId);
+    if (!owned) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Supplier invoice not found' } satisfies ApiResponse<null>;
+    }
+    try {
+      await createSupplierReceipt({
+        invoiceId: params.id,
+        tenantId: auth.tenantId,
+        amount: body.amount,
+        currency: body.currency,
+        receivedAt: body.receivedAt ?? null,
+        method: body.method ?? null,
+        note: body.note ?? null,
+        createdBy: auth.sub,
+      });
+    } catch (err) {
+      // A currency mismatch, an overpayment, a bad amount or a voided invoice is
+      // a user-fixable state, and the message says which.
+      set.status = err instanceof SupplierReceiptError ? err.status : 500;
+      return { success: false, data: null, message: err instanceof Error ? err.message : 'Could not record the receipt' } satisfies ApiResponse<null>;
+    }
+    const invoice = await getSupplierInvoice(params.id, auth.tenantId);
+    return { success: true, data: invoice } satisfies ApiResponse<SupplierInvoiceDto | null>;
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({
+      amount: t.String({ pattern: '^\\d+(\\.\\d{1,2})?$' }),
+      currency: t.String({ minLength: 3, maxLength: 3 }),
+      receivedAt: t.Optional(t.Nullable(t.String({ format: 'date-time' }))),
+      method: t.Optional(t.Nullable(t.String())),
+      note: t.Optional(t.Nullable(t.String())),
+    }),
+    detail: { tags: ['Supplier Invoices'], summary: 'Record money received from the supplier against an invoice', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── Delete a receipt (recorded in error) ───────────────────────────
+  .delete('/:id/receipts/:receiptId', async ({ auth, params, set }) => {
+    if (!(await assertSupplierInvoicesEnabled(auth.tenantId))) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Broker deals are not enabled for this tenant' } satisfies ApiResponse<null>;
+    }
+    if (auth.role !== 'ADMIN') {
+      set.status = 403;
+      return { success: false, data: null, message: 'Admin access required' } satisfies ApiResponse<null>;
+    }
+    const owned = await getSupplierInvoice(params.id, auth.tenantId);
+    if (!owned) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Supplier invoice not found' } satisfies ApiResponse<null>;
+    }
+    const removed = await deleteSupplierReceipt(params.receiptId, auth.tenantId);
+    if (!removed) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Receipt not found' } satisfies ApiResponse<null>;
+    }
+    const invoice = await getSupplierInvoice(params.id, auth.tenantId);
+    return { success: true, data: invoice } satisfies ApiResponse<SupplierInvoiceDto | null>;
+  }, {
+    params: t.Object({ id: t.String(), receiptId: t.String() }),
+    detail: { tags: ['Supplier Invoices'], summary: 'Delete a supplier receipt', security: [{ bearerAuth: [] }] },
   })
 
   // ── Void ───────────────────────────────────────────────────────────

@@ -32,6 +32,7 @@
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type {
   CreateSupplierInvoicesResultDto,
+  SupplierInvoiceCandidatesDto,
   SupplierInvoiceDto,
   SupplierInvoiceLineDto,
 } from '@fueld/types';
@@ -43,7 +44,7 @@ import {
   supplierInvoiceLines,
   supplierInvoiceNumberSequences,
   supplierInvoices,
-  supplierPayments,
+  supplierReceipts,
   tenants,
   type SupplierInvoiceBankDetails,
   type TenantSettings,
@@ -148,25 +149,25 @@ export async function getSupplierInvoice(id: string, tenantId: string): Promise<
   // reading it. `amount_received` is a cache, and a payment written by any path
   // that does not go through the ledger helper (support SQL, a future bulk tool)
   // would otherwise leave a stale outstanding figure with no way to self-heal.
-  await recomputeSupplierInvoiceReceived(id);
+  await recomputeSupplierInvoiceReceived(id, tenantId);
 
   const [row] = await db.select().from(supplierInvoices).where(eq(supplierInvoices.id, id)).limit(1);
   if (!row) return null;
 
-  const [lines, payments] = await Promise.all([
+  const [lines, receipts] = await Promise.all([
     db.select().from(supplierInvoiceLines)
       .where(eq(supplierInvoiceLines.supplierInvoiceId, id))
       .orderBy(asc(supplierInvoiceLines.sortOrder), asc(supplierInvoiceLines.createdAt)),
     db.select({
-      id: supplierPayments.id,
-      amount: supplierPayments.amount,
-      paidAt: supplierPayments.paidAt,
-      method: supplierPayments.method,
-      note: supplierPayments.note,
+      id: supplierReceipts.id,
+      amount: supplierReceipts.amount,
+      receivedAt: supplierReceipts.receivedAt,
+      method: supplierReceipts.method,
+      note: supplierReceipts.note,
     })
-      .from(supplierPayments)
-      .where(eq(supplierPayments.supplierInvoiceId, id))
-      .orderBy(desc(supplierPayments.paidAt)),
+      .from(supplierReceipts)
+      .where(eq(supplierReceipts.supplierInvoiceId, id))
+      .orderBy(desc(supplierReceipts.receivedAt)),
   ]);
 
   const amount = parseFloat(row.amount ?? '0') || 0;
@@ -198,12 +199,12 @@ export async function getSupplierInvoice(id: string, tenantId: string): Promise<
     voidedAt: row.voidedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     lines: lines.map(toLineDto),
-    payments: payments.map((p) => ({
-      id: p.id,
-      amount: p.amount,
-      paidAt: p.paidAt.toISOString(),
-      method: p.method ?? null,
-      note: p.note ?? null,
+    receipts: receipts.map((r) => ({
+      id: r.id,
+      amount: r.amount,
+      receivedAt: r.receivedAt.toISOString(),
+      method: r.method ?? null,
+      note: r.note ?? null,
     })),
   };
 }
@@ -229,7 +230,7 @@ export async function listSupplierInvoices(
   // Two batched reads rather than one round trip per row. `getSupplierInvoice`
   // is right for a single invoice but would issue three queries per row here.
   const ids = rows.map((r) => r.id);
-  const [headers, allLines, allPayments] = await Promise.all([
+  const [headers, allLines, allReceipts] = await Promise.all([
     // Ordered explicitly: `inArray` has no inherent order, and the response order
     // follows this map. Without it the list is arbitrary rather than newest-first.
     db.select().from(supplierInvoices)
@@ -239,17 +240,17 @@ export async function listSupplierInvoices(
       .where(inArray(supplierInvoiceLines.supplierInvoiceId, ids))
       .orderBy(asc(supplierInvoiceLines.sortOrder), asc(supplierInvoiceLines.createdAt)),
     db.select({
-      id: supplierPayments.id,
-      supplierInvoiceId: supplierPayments.supplierInvoiceId,
-      amount: supplierPayments.amount,
-      currency: supplierPayments.currency,
-      paidAt: supplierPayments.paidAt,
-      method: supplierPayments.method,
-      note: supplierPayments.note,
+      id: supplierReceipts.id,
+      supplierInvoiceId: supplierReceipts.supplierInvoiceId,
+      amount: supplierReceipts.amount,
+      currency: supplierReceipts.currency,
+      receivedAt: supplierReceipts.receivedAt,
+      method: supplierReceipts.method,
+      note: supplierReceipts.note,
     })
-      .from(supplierPayments)
-      .where(inArray(supplierPayments.supplierInvoiceId, ids))
-      .orderBy(desc(supplierPayments.paidAt)),
+      .from(supplierReceipts)
+      .where(inArray(supplierReceipts.supplierInvoiceId, ids))
+      .orderBy(desc(supplierReceipts.receivedAt)),
   ]);
 
   const linesByInvoice = new Map<string, typeof allLines>();
@@ -258,26 +259,28 @@ export async function listSupplierInvoices(
     list.push(line);
     linesByInvoice.set(line.supplierInvoiceId, list);
   }
-  const paymentsByInvoice = new Map<string, typeof allPayments>();
-  for (const p of allPayments) {
-    if (!p.supplierInvoiceId) continue;
-    const list = paymentsByInvoice.get(p.supplierInvoiceId) ?? [];
-    list.push(p);
-    paymentsByInvoice.set(p.supplierInvoiceId, list);
+  const receiptsByInvoice = new Map<string, typeof allReceipts>();
+  for (const r of allReceipts) {
+    // Nullable once an invoice is deleted (SET NULL), so an unattached receipt
+    // belongs to no row in this list rather than to an undefined key.
+    if (!r.supplierInvoiceId) continue;
+    const list = receiptsByInvoice.get(r.supplierInvoiceId) ?? [];
+    list.push(r);
+    receiptsByInvoice.set(r.supplierInvoiceId, list);
   }
 
   // `amount_received` is derived from the payments already in hand, so the list
   // shows the same figure a detail read would without a query per row.
   return headers.map((row) => {
     const lines = linesByInvoice.get(row.id) ?? [];
-    const payments = paymentsByInvoice.get(row.id) ?? [];
+    const receipts = receiptsByInvoice.get(row.id) ?? [];
     // ONLY receipts in the invoice's own currency count. The detail path applies
     // the same filter in `recomputeSupplierInvoiceReceived`; without it here the
     // list and the detail could report different outstanding figures for the
     // same invoice, which is worse than either alone.
-    const received = payments
-      .filter((p) => (p.currency ?? '').toUpperCase() === (row.currency ?? '').toUpperCase())
-      .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    const received = receipts
+      .filter((r) => (r.currency ?? '').toUpperCase() === (row.currency ?? '').toUpperCase())
+      .reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
     const amount = parseFloat(row.amount ?? '0') || 0;
     return {
       id: row.id,
@@ -305,12 +308,12 @@ export async function listSupplierInvoices(
       voidedAt: row.voidedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       lines: lines.map(toLineDto),
-      payments: payments.map((p) => ({
-        id: p.id,
-        amount: p.amount,
-        paidAt: p.paidAt.toISOString(),
-        method: p.method ?? null,
-        note: p.note ?? null,
+      receipts: receipts.map((r) => ({
+        id: r.id,
+        amount: r.amount,
+        receivedAt: r.receivedAt.toISOString(),
+        method: r.method ?? null,
+        note: r.note ?? null,
       })),
     };
   });
@@ -627,12 +630,15 @@ export async function voidSupplierInvoice(id: string, tenantId: string, reason?:
       })
       .where(eq(supplierInvoices.id, id));
 
-    // Payments already logged against it must not keep pointing at a voided
-    // document, or a settled invoice would strand its money.
-    await tx
-      .update(supplierPayments)
-      .set({ supplierInvoiceId: null, updatedAt: new Date() })
-      .where(eq(supplierPayments.supplierInvoiceId, id));
+    /**
+     * Receipts are KEPT. They record cash that actually moved.
+     *
+     * Deleting them would leave a reissued invoice starting at zero while the
+     * money is real and no longer traceable — the operator would have to re-key
+     * it or invent a row. The voided invoice keeps displaying what was received
+     * against it, and `deriveSupplierInvoiceStatus` keeps it VOID regardless of
+     * its amounts, so a settled-but-void invoice cannot read as collectible.
+     */
   });
 
   return getSupplierInvoice(id, tenantId);
@@ -643,7 +649,7 @@ export async function listSuppliersWithSupplierCommission(
   tenantId: string,
   from: string,
   to: string,
-): Promise<Array<{ supplierId: string; supplierName: string; totalCommission: string; alreadyInvoiced: string | null }>> {
+): Promise<SupplierInvoiceCandidatesDto> {
   const report = await buildSupplierCommissionReport(tenantId, from, to);
   const existing = await db
     .select({ supplierId: supplierInvoices.supplierId, invoiceNumber: supplierInvoices.invoiceNumber })
@@ -658,12 +664,48 @@ export async function listSuppliersWithSupplierCommission(
     );
   const bySupplier = new Map(existing.map((e) => [e.supplierId, e.invoiceNumber]));
 
-  return report.bySupplier.map((s) => ({
-    supplierId: s.supplierId,
-    supplierName: s.supplierName,
-    totalCommission: s.totalCommission,
-    alreadyInvoiced: bySupplier.get(s.supplierId) ?? null,
-  }));
+  /**
+   * The exclusions the issuing call reports only AFTER the fact. Surfacing them
+   * here is the point: without it, a deal that will produce no invoice is
+   * invisible until someone reads the result, and a missing invoice then reads
+   * exactly like "nothing was owed".
+   */
+  const buildSkip = (reason: string, orderNumbers: string[]): SupplierInvoiceCandidatesDto['willSkip'][number] => {
+    const skipped = orderNumbers.map((orderNumber) => ({
+      orderNumber,
+      commissionAmount: report.withheldByOrder?.[orderNumber] ?? null,
+    }));
+    const total = skipped.reduce((sum, s) => sum + (parseFloat(s.commissionAmount ?? '0') || 0), 0);
+    return { reason, skipped, commissionAmount: total.toFixed(2) };
+  };
+
+  const willSkip: SupplierInvoiceCandidatesDto['willSkip'] = [];
+  if (report.attributedToMultipleSuppliers.length > 0) {
+    willSkip.push(
+      buildSkip(
+        'more than one supplier leg, so the commission cannot be attributed to one supplier',
+        report.attributedToMultipleSuppliers,
+      ),
+    );
+  }
+  if (report.excludedOtherCurrency.length > 0) {
+    willSkip.push(
+      buildSkip(`not in ${report.currency} (this report does not convert)`, report.excludedOtherCurrency),
+    );
+  }
+
+  return {
+    period: { from, to },
+    currency: report.currency,
+    suppliers: report.bySupplier.map((s) => ({
+      supplierId: s.supplierId,
+      supplierName: s.supplierName,
+      totalCommission: s.totalCommission,
+      lineCount: s.lineCount,
+      alreadyInvoiced: bySupplier.get(s.supplierId) ?? null,
+    })),
+    willSkip,
+  };
 }
 
 /** Guard used by the routes; exported so the gate has one definition. */

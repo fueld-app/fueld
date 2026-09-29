@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
@@ -25,7 +26,7 @@ import { SupplierInvoicesService } from './supplier-invoices.service';
 @Component({
   selector: 'app-supplier-invoice-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateFormatPipe, DecimalPipe, RouterLink, StatusBadgeComponent],
+  imports: [DateFormatPipe, DecimalPipe, FormsModule, RouterLink, StatusBadgeComponent],
   template: `
     <div>
       <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -177,9 +178,9 @@ import { SupplierInvoicesService } from './supplier-invoices.service';
         <!-- Payments -->
         <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <div class="border-b border-gray-100 dark:border-line bg-gray-50 dark:bg-surface-2 px-5 py-3">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Payments</h2>
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Receipts from the supplier</h2>
           </div>
-          @if (inv.payments?.length) {
+          @if (inv.receipts?.length) {
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-gray-100 dark:border-line">
@@ -187,21 +188,49 @@ import { SupplierInvoicesService } from './supplier-invoices.service';
                   <th class="px-4 py-2 text-left font-medium text-gray-500 dark:text-muted">Method</th>
                   <th class="px-4 py-2 text-left font-medium text-gray-500 dark:text-muted">Note</th>
                   <th class="px-4 py-2 text-right font-medium text-gray-500 dark:text-muted">Amount</th>
+                  <th class="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-50 dark:divide-line">
-                @for (payment of inv.payments; track payment.id) {
+                @for (receipt of inv.receipts; track receipt.id) {
                   <tr class="hover:bg-gray-50/50 dark:hover:bg-surface-tint">
-                    <td class="px-4 py-2 text-gray-600 dark:text-ink-dim">{{ payment.paidAt | dateFormat }}</td>
-                    <td class="px-4 py-2 text-gray-600 dark:text-ink-dim">{{ payment.method ?? '—' }}</td>
-                    <td class="px-4 py-2 text-gray-600 dark:text-ink-dim">{{ payment.note ?? '—' }}</td>
-                    <td class="px-4 py-2 text-right tabular-nums font-medium text-gray-900 dark:text-ink">{{ payment.amount | number: '1.2-2' }} {{ inv.currency }}</td>
+                    <td class="px-4 py-2 text-gray-600 dark:text-ink-dim">{{ receipt.receivedAt | dateFormat }}</td>
+                    <td class="px-4 py-2 text-gray-600 dark:text-ink-dim">{{ receipt.method ?? '—' }}</td>
+                    <td class="px-4 py-2 text-gray-600 dark:text-ink-dim">{{ receipt.note ?? '—' }}</td>
+                    <td class="px-4 py-2 text-right tabular-nums font-medium text-gray-900 dark:text-ink">{{ receipt.amount | number: '1.2-2' }} {{ inv.currency }}</td>
+                    <td class="px-4 py-2 text-right">
+                      <button (click)="removeReceipt(receipt.id)" [disabled]="busy() || inv.status === 'VOID'"
+                        class="text-xs text-red-600 hover:text-red-700 disabled:opacity-40">Remove</button>
+                    </td>
                   </tr>
                 }
               </tbody>
             </table>
           } @else {
-            <div class="px-5 py-6 text-center text-sm text-gray-400 dark:text-muted">No payments recorded against this invoice.</div>
+            <div class="px-5 py-6 text-center text-sm text-gray-400 dark:text-muted">No receipts recorded against this invoice.</div>
+          }
+
+          @if (inv.status !== 'VOID' && parseFloat(inv.amountOutstanding) > 0) {
+            <div class="border-t border-gray-100 dark:border-line px-5 py-4">
+              <h3 class="text-xs font-semibold text-gray-500 dark:text-muted mb-2">Record a receipt</h3>
+              <div class="flex flex-wrap items-end gap-2">
+                <div>
+                  <label class="block text-xs text-gray-500 dark:text-muted mb-1">Amount</label>
+                  <input type="number" step="0.01" min="0" [ngModel]="receiptAmount()" (ngModelChange)="receiptAmount.set($any($event))"
+                    class="w-28 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums" />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 dark:text-muted mb-1">Method</label>
+                  <input type="text" [ngModel]="receiptMethod()" (ngModelChange)="receiptMethod.set($any($event))" placeholder="Bank transfer"
+                    class="w-40 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm" />
+                </div>
+                <button (click)="addReceipt()" [disabled]="busy() || !receiptAmount()"
+                  class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                  Add receipt
+                </button>
+                <p class="text-xs text-gray-400 dark:text-muted">In {{ inv.currency }} — a receipt in another currency is refused.</p>
+              </div>
+            </div>
           }
         </div>
       }
@@ -222,9 +251,57 @@ export class SupplierInvoiceDetailPageComponent {
   readonly loading = signal(false);
   readonly downloading = signal(false);
   readonly voiding = signal(false);
+  readonly busy = signal(false);
+  readonly receiptAmount = signal('');
+  readonly receiptMethod = signal('');
   readonly error = signal<string | null>(null);
 
   readonly isVoid = computed(() => this.invoice()?.status === 'VOID');
+
+  /** Money received from the supplier against this invoice. */
+  async addReceipt(): Promise<void> {
+    const invoice = this.invoice();
+    if (!invoice || this.busy()) return;
+    this.busy.set(true);
+    try {
+      const updated = await this.api.addReceipt(invoice.id, {
+        amount: this.receiptAmount(),
+        currency: invoice.currency,
+        method: this.receiptMethod() || null,
+      });
+      if (updated) {
+        this.invoice.set(updated);
+        this.receiptAmount.set('');
+        this.receiptMethod.set('');
+        this.toast.success('Receipt recorded');
+      }
+    } catch (err) {
+      // A currency mismatch or a voided invoice is a user-fixable state, and the
+      // API's message says which.
+      this.toast.error(err instanceof Error ? err.message : 'Could not record the receipt');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async removeReceipt(receiptId: string): Promise<void> {
+    const invoice = this.invoice();
+    if (!invoice || this.busy()) return;
+    this.busy.set(true);
+    try {
+      const updated = await this.api.deleteReceipt(invoice.id, receiptId);
+      if (updated) this.invoice.set(updated);
+    } catch {
+      this.toast.error('Could not remove the receipt');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Exposed for the template's outstanding check. */
+  parseFloat(value: string): number {
+    return Number.parseFloat(value) || 0;
+  }
   /** The API answers 400 for a voided invoice, so the action is disabled here. */
   readonly canDownloadPdf = computed(() => !!this.invoice() && !this.isVoid());
 

@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import type {
   ApiResponse,
   CreateSupplierInvoicesResultDto,
+  SupplierInvoiceCandidatesDto,
   SupplierInvoiceDto,
 } from '@fueld/types';
 import { API } from '@app/core/config/api';
@@ -47,6 +48,44 @@ export class SupplierInvoicesService {
   async create(from: string, to: string): Promise<CreateSupplierInvoicesResultDto | null> {
     const res = await firstValueFrom(
       this.http.post<ApiResponse<CreateSupplierInvoicesResultDto>>(`${API}/supplier-invoices`, { from, to }),
+    );
+    return res.success ? res.data ?? null : null;
+  }
+
+  /**
+   * What WOULD be invoiced for a period, and what will be skipped.
+   *
+   * Fetched BEFORE the operator presses the button: the skipped deals otherwise
+   * only surface in the result afterwards, and a missing invoice then reads as
+   * "nothing was owed".
+   */
+  async candidates(from: string, to: string): Promise<SupplierInvoiceCandidatesDto | null> {
+    const params = new HttpParams().set('from', from).set('to', to);
+    const res = await firstValueFrom(
+      this.http.get<ApiResponse<SupplierInvoiceCandidatesDto>>(`${API}/supplier-invoices/candidates`, { params }),
+    );
+    return res.success ? res.data ?? null : null;
+  }
+
+  /** Money received from the supplier against an invoice. */
+  async addReceipt(
+    id: string,
+    body: { amount: string; currency: string; receivedAt?: string | null; method?: string | null; note?: string | null },
+  ): Promise<SupplierInvoiceDto | null> {
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<SupplierInvoiceDto | null>>(
+        `${API}/supplier-invoices/${encodeURIComponent(id)}/receipts`,
+        body,
+      ),
+    );
+    return res.success ? res.data ?? null : null;
+  }
+
+  async deleteReceipt(id: string, receiptId: string): Promise<SupplierInvoiceDto | null> {
+    const res = await firstValueFrom(
+      this.http.delete<ApiResponse<SupplierInvoiceDto | null>>(
+        `${API}/supplier-invoices/${encodeURIComponent(id)}/receipts/${encodeURIComponent(receiptId)}`,
+      ),
     );
     return res.success ? res.data ?? null : null;
   }

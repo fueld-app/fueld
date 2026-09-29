@@ -9,6 +9,7 @@ import {
   supplierInvoiceLines,
   supplierInvoices,
   supplierPayments,
+  supplierReceipts,
   tenants,
 } from '../src/db/schema';
 
@@ -249,18 +250,18 @@ describe('supplier invoices e2e', () => {
     expect(leg).toBeTruthy();
 
 
-    // A receipt recorded through the ORDERS route — the real path an operator
-    // uses — must settle the invoice. Asserted unconditionally: a conditional
-    // check here would silently pass if the route stopped accepting
-    // `supplierInvoiceId` altogether.
-    const viaApi = await requestJson(`/orders/${orderId}/suppliers/${leg!.id}/payments`, {
+    // A receipt recorded through the SUPPLIER-INVOICE route — money coming in.
+    const viaApi = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
       method: 'POST',
       token,
-      body: { amount: '400', currency: 'USD', supplierInvoiceId: invoice!.id },
+      body: { amount: '400', currency: 'USD' },
     });
     expect(viaApi.status).toBe(200);
-    const [receipt] = await db.select().from(supplierPayments).limit(1);
-    expect(receipt?.supplierInvoiceId).toBe(invoice!.id);
+    const receipts = await db.select().from(supplierReceipts);
+    expect(receipts.length).toBe(1);
+    expect(receipts[0]!.supplierInvoiceId).toBe(invoice!.id);
+    // It must NOT land in the outbound ledger.
+    expect((await db.select().from(supplierPayments)).length).toBe(0);
 
     let view = await requestJson(`/supplier-invoices/${invoice!.id}`, { token });
     expect(view.data?.data?.status).toBe('PARTIALLY_PAID');
@@ -269,21 +270,21 @@ describe('supplier invoices e2e', () => {
 
     // A receipt in another currency must be REFUSED, not silently ignored by the
     // settlement sum — otherwise a EUR receipt could mark a USD invoice paid.
-    const mismatched = await requestJson(`/orders/${orderId}/suppliers/${leg!.id}/payments`, {
+    const mismatched = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
       method: 'POST',
       token,
-      body: { amount: '100', currency: 'EUR', supplierInvoiceId: invoice!.id },
+      body: { amount: '100', currency: 'EUR' },
     });
-    expect(mismatched.data?.success).toBe(false);
+    expect(mismatched.status).toBe(400);
+    // Refused BEFORE any write: no phantom receipt to retry against.
+    expect((await db.select().from(supplierReceipts)).length).toBe(1);
 
     // Settle the balance, then remove it: amounts are the truth, so the invoice
     // must reopen rather than keep a stale PAID flag.
-    const [balance] = await db.insert(supplierPayments).values({
+    const [balance] = await db.insert(supplierReceipts).values({
       tenantId: seeded.tenant.id,
-      orderSupplierId: leg!.id,
-      orderId,
-      supplierId,
       supplierInvoiceId: invoice!.id,
+      supplierId,
       amount: '600',
       currency: 'USD',
     }).returning();
@@ -291,7 +292,7 @@ describe('supplier invoices e2e', () => {
     expect(view.data?.data?.status).toBe('PAID');
     expect(parseFloat(view.data?.data?.amountOutstanding)).toBe(0);
 
-    await db.delete(supplierPayments).where(eq(supplierPayments.id, balance!.id));
+    await db.delete(supplierReceipts).where(eq(supplierReceipts.id, balance!.id));
 
     // No manual recompute: the detail read must self-heal, which is what makes a
     // payment written outside the ledger helper safe.
@@ -351,8 +352,70 @@ describe('supplier invoices e2e', () => {
     // Nothing to bill, and the caller can tell that apart from "no commission".
     expect(res.data?.data?.created.length).toBe(0);
 
+    // The richer candidates shape: no suppliers, and the period still explains
+    // itself rather than returning a bare empty list.
     const candidates = await requestJson('/supplier-invoices/candidates?from=2026-09-01&to=2026-09-30', { token });
-    expect(candidates.data?.data.length).toBe(0);
+    expect(candidates.data?.data?.suppliers.length).toBe(0);
+    expect(Array.isArray(candidates.data?.data?.willSkip)).toBe(true);
+  });
+
+  it('shows what will be invoiced AND what will be skipped, before anything is raised', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Visible Ltd');
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '19' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+
+    // Before issuing: the supplier is listed with what it WOULD bill, and nothing
+    // is flagged as already invoiced.
+    const before = await requestJson('/supplier-invoices/candidates?from=2026-09-01&to=2026-09-30', { token });
+    const candidates = before.data?.data;
+    expect(candidates.suppliers.length).toBe(1);
+    expect(candidates.suppliers[0].supplierName).toBe('Visible Ltd');
+    expect(parseFloat(candidates.suppliers[0].totalCommission)).toBe(1900);
+    expect(candidates.suppliers[0].alreadyInvoiced).toBeNull();
+
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+
+    // After issuing: the same call now names the invoice that covers it, so the
+    // picker cannot imply a second one is available.
+    const after = await requestJson('/supplier-invoices/candidates?from=2026-09-01&to=2026-09-30', { token });
+    expect(after.data?.data?.suppliers[0].alreadyInvoiced).toMatch(/^SINV-/);
+  });
+
+  it('flags a multi-leg deal as skipped BEFORE issuing, not only after', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const primary = await createSupplier(seeded.tenant.id, 'Primary Leg Ltd');
+    const secondary = await createSupplier(seeded.tenant.id, 'Secondary Leg Ltd');
+
+    const orderId = await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '19' }],
+      { supplierId: primary, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    const db = await getDb();
+    const { orderSuppliers } = await import('../src/db/schema');
+    await db.insert(orderSuppliers).values({ orderId, companyId: secondary, isPrimary: false, sortOrder: 1 });
+
+    // The whole point: an operator must learn this BEFORE pressing the button,
+    // otherwise a missing invoice reads as "nothing was owed".
+    const candidates = await requestJson('/supplier-invoices/candidates?from=2026-09-01&to=2026-09-30', { token });
+    const skip = candidates.data?.data?.willSkip ?? [];
+    expect(skip.length).toBeGreaterThan(0);
+    expect(String(skip[0].reason)).toContain('supplier leg');
+    expect(skip[0].skipped.length).toBe(1);
+    // The AMOUNT withheld, not just which order: an unquantified skip list only
+    // half-warns.
+    expect(parseFloat(skip[0].commissionAmount)).toBe(1900); // 100 MT x 19
   });
 
   it('hides everything when the tenant does not have broker deals enabled', async () => {
@@ -417,13 +480,14 @@ describe('supplier invoices e2e', () => {
 
     // A USD receipt and a EUR one written straight to the table — the foreign
     // one must count in NEITHER view.
-    await db.insert(supplierPayments).values({
-      tenantId: seeded.tenant.id, orderSupplierId: leg!.id, orderId, supplierId,
-      supplierInvoiceId: invoice!.id, amount: '250', currency: 'USD',
+    await db.insert(supplierReceipts).values({
+      tenantId: seeded.tenant.id, supplierInvoiceId: invoice!.id, supplierId,
+      amount: '250', currency: 'USD',
     });
-    await db.insert(supplierPayments).values({
-      tenantId: seeded.tenant.id, orderSupplierId: leg!.id, orderId, supplierId,
-      supplierInvoiceId: invoice!.id, amount: '9999', currency: 'EUR',
+    // A foreign-currency receipt written straight to the table.
+    await db.insert(supplierReceipts).values({
+      tenantId: seeded.tenant.id, supplierInvoiceId: invoice!.id, supplierId,
+      amount: '9999', currency: 'EUR',
     });
 
     const detail = await requestJson(`/supplier-invoices/${invoice!.id}`, { token });
@@ -462,11 +526,12 @@ describe('supplier invoices e2e', () => {
       tenantId: seeded.tenant.id, orderSupplierId: leg!.id, orderId, supplierId,
       amount: '500', currency: 'USD',
     });
-    // A receipt FROM the supplier settling their commission invoice.
-    await requestJson(`/orders/${orderId}/suppliers/${leg!.id}/payments`, {
+    // A receipt FROM the supplier settling their commission invoice. It lives in
+    // its own ledger and must not touch the leg's paid figure.
+    await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
       method: 'POST',
       token,
-      body: { amount: '400', currency: 'USD', supplierInvoiceId: invoice!.id },
+      body: { amount: '400', currency: 'USD' },
     });
 
     // The leg's "amount paid" is what WE paid: 500, not 900.
@@ -511,6 +576,143 @@ describe('supplier invoices e2e', () => {
     const db = await getDb();
     const all = await db.select().from(supplierInvoices);
     expect(all.length).toBe(1);
+  });
+
+  it('refuses an overpayment, a zero amount and a bad date, leaving no receipt behind', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Guards Ltd');
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '10' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+    const db = await getDb();
+    const [invoice] = await db.select().from(supplierInvoices);
+    // 100 x 10 = 1000
+
+    // More than outstanding: refused, and nothing written.
+    const over = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+      method: 'POST', token, body: { amount: '1500', currency: 'USD' },
+    });
+    expect(over.status).toBe(400);
+    expect((await db.select().from(supplierReceipts)).length).toBe(0);
+
+    // Zero and malformed amounts.
+    for (const amount of ['0', '0.00', 'abc', '10.555']) {
+      const bad = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+        method: 'POST', token, body: { amount, currency: 'USD' },
+      });
+      expect(bad.status).toBeGreaterThanOrEqual(400);
+    }
+
+    // A bad date is refused rather than reaching the driver as an Invalid Date.
+    const badDate = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+      method: 'POST', token, body: { amount: '100', currency: 'USD', receivedAt: 'not-a-date' },
+    });
+    expect(badDate.status).toBeGreaterThanOrEqual(400);
+
+    expect((await db.select().from(supplierReceipts)).length).toBe(0);
+
+    // Exactly the outstanding is accepted.
+    const ok = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+      method: 'POST', token, body: { amount: '1000', currency: 'USD' },
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.data?.data?.status).toBe('PAID');
+  });
+
+  it('caps a second receipt at the remaining outstanding balance', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Cap Ltd');
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '10' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+    const db = await getDb();
+    const [invoice] = await db.select().from(supplierInvoices);
+
+    await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, { method: 'POST', token, body: { amount: '600', currency: 'USD' } });
+    const tooMuch = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+      method: 'POST', token, body: { amount: '500', currency: 'USD' },
+    });
+    expect(tooMuch.status).toBe(400);
+    expect(String(tooMuch.data?.message)).toContain('400.00');
+
+    const rest = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+      method: 'POST', token, body: { amount: '400', currency: 'USD' },
+    });
+    expect(rest.status).toBe(200);
+    expect(rest.data?.data?.status).toBe('PAID');
+  });
+
+  it('refuses a receipt against a voided invoice', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Void Receipt Ltd');
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '10' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+    const db = await getDb();
+    const [invoice] = await db.select().from(supplierInvoices);
+    await requestJson(`/supplier-invoices/${invoice!.id}/void`, { method: 'POST', token, body: { reason: 'test' } });
+
+    const res = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+      method: 'POST', token, body: { amount: '100', currency: 'USD' },
+    });
+    expect(res.status).toBe(400);
+    expect((await db.select().from(supplierReceipts)).length).toBe(0);
+  });
+
+  it('keeps receipts after a void, for audit, and blocks them on a voided invoice', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Audit Ltd');
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '10' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+    const db = await getDb();
+    const [invoice] = await db.select().from(supplierInvoices);
+
+    const paid = await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+      method: 'POST', token, body: { amount: '400', currency: 'USD' },
+    });
+    expect(paid.status).toBe(200);
+
+    await requestJson(`/supplier-invoices/${invoice!.id}/void`, { method: 'POST', token, body: { reason: 'wrong rate' } });
+
+    // The cash moved, so the record must survive the void — destroying it would
+    // leave a reissue starting at zero with no trail.
+    const rows = await db.select().from(supplierReceipts);
+    expect(rows.length).toBe(1);
+    expect(rows[0]!.supplierInvoiceId).toBe(invoice!.id);
+
+    // And a voided invoice stays VOID and non-collectible despite the receipt.
+    const view = await requestJson(`/supplier-invoices/${invoice!.id}`, { token });
+    expect(view.data?.data?.status).toBe('VOID');
+    expect(view.data?.data?.receipts.length).toBe(1);
   });
 
   it('keeps supplier invoices out of the customer receivable ledger', async () => {
