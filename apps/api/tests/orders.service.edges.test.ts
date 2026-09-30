@@ -144,9 +144,17 @@ describe('orders.service edge branches', () => {
       salesRepId: user.id,
     });
 
+    /**
+     * Both payments in the ORDER's currency. They used to be EUR + USD, which
+     * incidentally pinned that a ledger could hold mixed currencies — but a payment
+     * is now refused when its currency differs from the order's, because the cap
+     * compares it against the order-currency payable and there is no FX rate to
+     * convert with. This test is about payment ORDERING, so the currency is not its
+     * subject.
+     */
     const older = await createOrderPayment(order.id, {
       amount: '10.00',
-      currency: 'EUR',
+      currency: 'USD',
       receivedAt: '2025-01-01T00:00:00.000Z',
       createdBy: user.id,
     });

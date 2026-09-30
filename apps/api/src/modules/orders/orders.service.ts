@@ -4,7 +4,7 @@
 //  An "inquiry" is simply an order with status INQUIRY or OFFER.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, desc, asc, sql, ilike, inArray, or, isNull, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, ilike, inArray, notInArray, or, isNull, gte, lte } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { isCommissionableLine } from '@fueld/types';
 import { db } from '../../db';
@@ -22,6 +22,7 @@ import {
   tenants,
   customerPayments,
   supplierPayments,
+  invoices,
   companyContacts,
   priceReferences,
   creditLines,
@@ -30,6 +31,7 @@ import {
 import type { Order, TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
 import { recomputeInvoiceAmountPaid, resolvePaymentInvoiceTarget } from './invoice.service';
+import { computeInvoiceAmount, type InvoiceAmountExecutor } from './invoice-amounts';
 import { checkCreditAvailability } from '../credit/credit.service';
 import { sendTemplatedGroupMessage, buildProductTemplateVariables } from '../whatsapp/whatsapp.service';
 import {
@@ -1594,8 +1596,28 @@ export async function getOrderById(idOrNumber: string) {
 
   const deliveredAtIso = deriveOrderDeliveredAtIso(row.deliveredAt ?? null, orderSupplierRows);
 
+  /**
+   * What the customer still owes on this order, computed ONCE on the server.
+   *
+   * The page used to derive its own "total due" from the item rows, which are
+   * empty once the order is completed — so its mark-as-paid guard compared against
+   * 0, silently disabled itself, and the operator was told to pay an order that
+   * was already settled. Serving the figure keeps the button, the payment cap and
+   * the invoice on one arithmetic.
+   */
+  /**
+   * A payment's currency, for the balance shown. Payments in other currencies are
+   * not netted (that needs an FX rate); the page shows the order-currency balance,
+   * which is the figure its payment modal and the cap both use.
+   */
+  const orderAmountDue = (Math.max(
+    (await orderPayableBase(row.id)) - (await sumOrderPayments(row.id, row.currency)),
+    0,
+  )).toFixed(2);
+
   return {
     ...row,
+    amountDue: orderAmountDue,
     orderNumber: row.orderNumber,
     eta: row.eta?.toISOString() ?? null,
     etd: row.etd?.toISOString() ?? null,
@@ -2345,6 +2367,93 @@ export async function listOrderPayments(orderId: string) {
   });
 }
 
+/**
+ * A user-fixable payment problem (over the outstanding balance). The route maps it
+ * to a 400 with the message, the way the supplier-receipt ledger does, so the
+ * operator is told why instead of seeing a generic failure.
+ */
+export class OrderPaymentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OrderPaymentError';
+  }
+}
+
+/**
+ * Payments already received on an order.
+ *
+ * Summed from the rows, not read from a cached column, so the cap cannot be
+ * defeated by a stale total — the same reasoning as the invoice's received
+ * figure.
+ */
+export async function sumOrderPayments(
+  orderId: string,
+  currency?: string,
+  /** Run inside a caller's transaction (the payment cap locks the order first). */
+  executor: InvoiceAmountExecutor = db,
+): Promise<number> {
+  const [row] = await executor
+    .select({ total: sql<string>`COALESCE(SUM(${customerPayments.amount}::numeric), 0)::text` })
+    .from(customerPayments)
+    .where(and(
+      eq(customerPayments.orderId, orderId),
+      /**
+       * Currency-scoped when a currency is given. A payable is denominated in the
+       * order's currency, so a payment in another currency must not be subtracted
+       * from it — 4,000 EUR against a 10,000 USD payable would otherwise read as
+       * 6,000 outstanding USD. Cross-currency netting needs an FX rate, and
+       * guessing one here would be worse than not netting at all.
+       *
+       * Callers that only want a total (the UI's "Total paid") pass no currency.
+       */
+      ...(currency ? [eq(customerPayments.currency, currency)] : []),
+    ));
+  return parseFloat(row?.total ?? '0') || 0;
+}
+
+/**
+ * What this order can actually be paid for.
+ *
+ * The GREATER of what has been issued and what the lines are worth.
+ *
+ * Both are real claims, and which is larger depends on the workflow. An issued
+ * invoice is the document the customer holds and it can exist where there are no
+ * priced lines at all (so it must not be ignored). The line total is the whole
+ * deal's value, and a deposit against the part that is not yet invoiced is a real
+ * thing to do (so a partial invoice must not cap the order at its own amount).
+ *
+ * Taking only one of them was wrong either way: invoiced-only refused prepayment
+ * of an uninvoiced balance, lines-only ignored a billed amount the lines do not
+ * express. `max` admits both without ever letting a payment exceed the deal.
+ *
+ * `computeInvoiceAmount` throws on genuinely mixed-currency billable lines — a
+ * data problem that makes the order uninvoiceable, not something a payment should
+ * turn into a 500. That is treated as "no line basis" and the invoice total (if
+ * any) stands; callers guard the throw.
+ */
+export async function orderPayableBase(
+  orderId: string,
+  /** Run inside a caller's transaction; the payment cap evaluates it under the lock. */
+  executor: InvoiceAmountExecutor = db,
+): Promise<number> {
+  const [existing] = await executor
+    .select({ total: sql<string>`COALESCE(SUM(${invoices.amount}::numeric), 0)::text` })
+    .from(invoices)
+    .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID'])));
+  const invoiced = parseFloat(existing?.total ?? '0') || 0;
+
+  let lines = 0;
+  try {
+    lines = parseFloat(await computeInvoiceAmount(orderId, executor)) || 0;
+  } catch (err) {
+    // Mixed currency: no single line total exists. The invoice total still stands.
+    if (invoiced > 0) return invoiced;
+    console.warn('[Orders] No payable basis for order', orderId, err instanceof Error ? err.message : err);
+    return 0;
+  }
+  return Math.max(invoiced, lines);
+}
+
 export async function createOrderPayment(orderId: string, input: {
   amount: string;
   currency: string;
@@ -2354,33 +2463,109 @@ export async function createOrderPayment(orderId: string, input: {
   createdBy?: string | null;
 }) {
   const [orderRow] = await db
-    .select({ tenantId: orders.tenantId, clientId: orders.clientId })
+    .select({ tenantId: orders.tenantId, clientId: orders.clientId, currency: orders.currency })
     .from(orders)
     .where(eq(orders.id, orderId))
     .limit(1);
 
   if (!orderRow) return null;
 
-  // A payment settles ONE invoice. Stamping the newest invoice (the old
-  // behaviour) sent every payment to the balance invoice the moment an order
-  // carried more than one.
-  const invoice = await resolvePaymentInvoiceTarget(orderId);
+  /**
+   * A payment must be in the order's own currency.
+   *
+   * The payable is denominated in the order currency, so a payment in another one
+   * cannot be compared against it without an FX rate — and there is none here.
+   * Allowing it meant the cap compared unlike quantities (a EUR payment subtracted
+   * from a USD payable) and the refusal message stated the wrong denomination
+   * ("3,000 USD outstanding" on a EUR payment). Refusing with a clear reason is the
+   * honest option; cross-currency settlement belongs with an explicit rate, not a
+   * guess in a ledger write.
+   */
+  if (input.currency && orderRow.currency && input.currency !== orderRow.currency) {
+    throw new OrderPaymentError(
+      `This order is in ${orderRow.currency}; a ${input.currency} payment cannot be recorded against it.`,
+    );
+  }
 
-  const [created] = await db
-    .insert(customerPayments)
-    .values({
-      tenantId: orderRow.tenantId,
-      customerId: orderRow.clientId,
-      orderId,
-      invoiceId: invoice?.id ?? null,
-      amount: input.amount,
-      currency: input.currency || 'USD',
-      receivedAt: input.receivedAt ? new Date(input.receivedAt) : new Date(),
-      method: input.method ?? null,
-      note: input.note ?? null,
-      createdBy: input.createdBy ?? null,
-    })
-    .returning();
+  /**
+   * A payment above the outstanding balance is refused, not absorbed.
+   *
+   * Nothing used to check this, so a customer could pay an order twice and both
+   * rows were accepted: on channeltx one order was paid 34,694.66 twice within 62
+   * seconds and read "Total paid: 69,389.32" against a 34,694.66 receivable. The
+   * page's own "mark as paid" guard is a courtesy, not a control — this is the
+   * control.
+   *
+   * `computeInvoiceAmount` is the same figure the invoice bills and the customer
+   * card shows, so the cap agrees with the document instead of a second
+   * arithmetic. Half a cent of tolerance, matching the existing precedent for
+   * float/rounding noise elsewhere in this file.
+   */
+  const incoming = parseFloat(input.amount) || 0;
+
+  /**
+   * The cap, the basis it is measured against, and the insert are ONE transaction
+   * holding a lock on the order row.
+   *
+   * Check-then-insert without a lock is not a control: two concurrent posts both
+   * read the same `alreadyPaid`, both find room, and both insert — the duplicate
+   * this whole change exists to stop. The UI guard only removes the easy path; two
+   * tabs, a retry or an API client would still get through.
+   *
+   * The BASIS is read under the same lock, not before it. Reading `payable` outside
+   * would let an invoice be issued, a line edited or a credit note posted between
+   * the read and the lock, and the second transaction would then enforce against a
+   * figure that is no longer true — the same staleness the paid-sum re-read exists
+   * to avoid. `orderPayableBase` and `resolvePaymentInvoiceTarget` therefore both
+   * take the transaction; their own reads then see a consistent snapshot AND are
+   * serialised against concurrent writers to the same order.
+   */
+  const { created, invoice } = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM ${orders} WHERE id = ${orderId} FOR UPDATE`);
+
+    const payable = await orderPayableBase(orderId, tx);
+    const alreadyPaid = await sumOrderPayments(orderId, input.currency, tx);
+    const outstanding = payable - alreadyPaid;
+
+    /**
+     * Enforced only when there is a definite payable. An order with no issued
+     * invoice and no priced lines has `payable` 0, and taking a deposit or advance
+     * against a deal still being built is a real workflow (pinned by
+     * `orders.service.edges`: a no-invoice order accepts two payments). Refusing
+     * those would be a regression, and there is no figure to enforce against — the
+     * cap exists to stop overpaying a known debt, not to forbid payment before
+     * anything is billed.
+     */
+    if (payable > 0 && incoming > outstanding + 0.005) {
+      throw new OrderPaymentError(
+        outstanding <= 0.005
+          ? `This order is already settled in full (${payable.toFixed(2)} ${input.currency}).`
+          : `Payment exceeds the ${outstanding.toFixed(2)} ${input.currency} still outstanding on this order.`,
+      );
+    }
+
+    // Resolved inside the lock too: which invoice a payment settles must not be
+    // chosen from a list that another writer can change in the same window.
+    const invoice = await resolvePaymentInvoiceTarget(orderId, tx);
+
+    const [inserted] = await tx
+      .insert(customerPayments)
+      .values({
+        tenantId: orderRow.tenantId,
+        customerId: orderRow.clientId,
+        orderId,
+        invoiceId: invoice?.id ?? null,
+        amount: input.amount,
+        currency: input.currency || 'USD',
+        receivedAt: input.receivedAt ? new Date(input.receivedAt) : new Date(),
+        method: input.method ?? null,
+        note: input.note ?? null,
+        createdBy: input.createdBy ?? null,
+      })
+      .returning();
+
+    return { created: inserted, invoice };
+  });
 
   if (invoice?.id) {
     await recomputeInvoiceAmountPaid(invoice.id);

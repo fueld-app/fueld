@@ -858,18 +858,36 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.paymentSchedule().reduce((sum, t) => sum + (parseFloat(t.issuedAmount ?? t.amount) || 0), 0),
   );
 
-  readonly totalDueForMarkPaid = computed(() =>
-    this.itemRows().reduce((sum, item) => {
-      const qty = Number(item.deliveredQuantity ?? item.quantity ?? 0);
-      const unitPrice = Number(item.salesPrice ?? 0);
-      return sum + qty * unitPrice;
-    }, 0),
-  );
+  /**
+   * What is still owed, from the SERVER (`amountDue` on the order).
+   *
+   * This used to be derived from `itemRows()`, which is empty once an order is
+   * completed — so `due` was 0, `hasEnoughPaymentsForMarkPaid` returned false, and
+   * `markPaid`'s own guard on it silently stopped guarding. That is one way an
+   * operator ends up unable to move an order to paid, and it also meant the figure
+   * the button compared against could disagree with the payable the payment modal
+   * showed. One source now: the same number the API caps payments against.
+   */
+  readonly totalDueForMarkPaid = computed(() => parseFloat(this.order()?.amountDue ?? '') || 0);
 
+  /**
+   * Whether the recorded payments cover what is owed.
+   *
+   * `undefined` and `0` are DIFFERENT and are treated differently. A missing
+   * `amountDue` (an older cached order, a response that predates the field) means
+   * "cannot tell", and refuses — the previous version collapsed it to 0 and
+   * therefore answered "yes, paid" for any order whose figure was absent, which
+   * would let an operator mark an unpaid order as paid. An explicit 0 means nothing
+   * is owed, which is a legitimate thing to mark paid, and `due <= 0 → false` was
+   * what silently disabled this guard in the first place.
+   */
   readonly hasEnoughPaymentsForMarkPaid = computed(() => {
-    const due = this.totalDueForMarkPaid();
-    if (due <= 0) return false;
-    return this.paymentsTotal() >= due;
+    const raw = this.order()?.amountDue;
+    if (raw === undefined || raw === null || raw === '') return false;
+    const due = Number(raw);
+    if (!Number.isFinite(due)) return false;
+    if (due <= 0) return true;
+    return this.paymentsTotal() >= due - 0.005;
   });
 
   // ─── Supplier-side settlement (two-sided order settlement) ──────────

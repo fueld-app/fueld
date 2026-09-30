@@ -107,6 +107,10 @@ export class OrderPaymentModalComponent {
   }
 
   async submit(): Promise<void> {
+    // The button is already disabled while saving, but a keyboard submit or a
+    // second click in the same tick would otherwise post twice — and two identical
+    // payment rows is exactly how an order came to read a doubled "Total paid".
+    if (this.saving()) return;
     const id = this.orderId();
     const amountStr = String(this.amount() ?? '').trim();
     if (!amountStr) {

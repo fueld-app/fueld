@@ -37,6 +37,7 @@ import {
   deleteOrderAttachment,
   listOrderPayments,
   createOrderPayment,
+  OrderPaymentError,
   listSupplierPayments,
   createSupplierPayment,
   updateSupplierPayment,
@@ -1284,6 +1285,12 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         if (!created) return { success: false, data: null, message: 'Order not found' };
         return { success: true, data: created } satisfies ApiResponse<typeof created>;
       } catch (err) {
+        // An overpayment is user-fixable and says how much is outstanding; a
+        // generic failure message would leave the operator guessing.
+        if (err instanceof OrderPaymentError) {
+          set.status = 400;
+          return { success: false, data: null, message: err.message };
+        }
         console.error('[Orders] Create payment failed:', err);
         return { success: false, data: null, message: 'Failed to add payment' };
       }

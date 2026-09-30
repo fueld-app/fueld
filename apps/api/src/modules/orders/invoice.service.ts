@@ -807,8 +807,14 @@ export function deriveInvoiceDisplayStatus(
  */
 export async function resolvePaymentInvoiceTarget(
   orderId: string,
+  /**
+   * Run inside a caller's transaction. The payment cap resolves the target under
+   * the same lock that measures the outstanding balance, so which invoice a payment
+   * settles cannot be picked from a list another writer changes in between.
+   */
+  executor: { select: typeof db.select } = db,
 ): Promise<typeof invoices.$inferSelect | null> {
-  const candidates = await db
+  const candidates = await executor
     .select()
     .from(invoices)
     .where(and(eq(invoices.orderId, orderId), notInArray(invoices.status, ['VOID', 'DRAFT'])))

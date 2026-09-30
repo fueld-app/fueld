@@ -625,6 +625,17 @@ export interface OrderDto {
   financingRateAnnual?: number;
   financingDayCountConvention?: number;
   financingDays?: number;
+  /**
+   * What the customer still owes on this order (payable − payments received),
+   * computed ONCE on the server.
+   *
+   * The page previously derived its own total from the item rows, which are empty
+   * once an order is completed — so its mark-as-paid guard compared against 0 and
+   * disabled itself, and the operator was pushed to pay an order that was already
+   * settled. Server-computed keeps the button, the payment cap and the invoice on
+   * one arithmetic.
+   */
+  amountDue: string;
   totalFinancingCost?: string;
   financingCostPerMt?: string | null;
   totalNetProfit?: string;

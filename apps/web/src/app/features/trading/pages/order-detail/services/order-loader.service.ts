@@ -59,6 +59,9 @@ export class OrderLoaderService {
       clientId: d.clientId, vesselId: d.vesselId, placeId: d.placeId,
       salesRepId: d.salesRepId, invoicingCompanyId: d.invoicingCompanyId,
       bankAccountId: d.bankAccountId ?? null, currency: d.currency ?? 'USD',
+      // Required on the DTO: the mark-as-paid gate distinguishes a missing value
+      // (cannot tell — refuse) from an explicit 0 (nothing owed — allow).
+      amountDue: d.amountDue ?? '',
       status: d.status, eta: d.eta, etd: d.etd,
       customerPaymentTermType: d.customerPaymentTermType ?? null,
       customerCreditDays: d.customerCreditDays ?? null, customerNote: d.customerNote ?? null,

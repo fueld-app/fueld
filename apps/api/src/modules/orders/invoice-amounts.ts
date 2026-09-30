@@ -9,7 +9,17 @@ import { db } from '../../db';
 import { orderItems } from '../../db/schema';
 import { customerFacingItems } from '../documents/customer-facing-items';
 
-type InvoiceAmountExecutor = typeof db;
+/**
+ * `db`, or the transaction handle `db.transaction` hands to its callback.
+ *
+ * The transaction type is DERIVED from `db.transaction` rather than written out,
+ * so it cannot drift from the Drizzle version. Previously this was `typeof db`
+ * alone, which is why these helpers could only ever be used outside a transaction
+ * — the payment cap now needs them evaluated under a row lock.
+ */
+export type InvoiceAmountExecutor =
+  | typeof db
+  | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * Due date for an invoice or tranche.
