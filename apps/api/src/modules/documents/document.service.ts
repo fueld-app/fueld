@@ -494,6 +494,14 @@ async function getAnyDocumentRevisionByInvoiceId(invoiceId: string): Promise<Doc
  * revisions carry. It is unambiguous while an order has a single invoice; an
  * order with several (split payment terms) names its invoice, and then the
  * invoice_id lookup above matches first and wins.
+ *
+ * VOIDED revisions never match. A void+reissue leaves the voided revision as the
+ * order's most recent INVOICE revision while the replacement has none of its
+ * own, so this fallback used to hand the replacement the VOIDED document — and,
+ * because that made the caller return early, the replacement could never render
+ * one of its own. The customer would be sent a PDF bearing a number that had
+ * been cancelled. The live-invoice count below passes in exactly that case (the
+ * replacement is the one live invoice), so the status check has to be separate.
  */
 async function getAnyDocumentRevisionByOrderId(orderId: string): Promise<DocumentRevisionInfo | null> {
   const [revision] = await db
@@ -508,6 +516,11 @@ async function getAnyDocumentRevisionByOrderId(orderId: string): Promise<Documen
       // An ambiguous order returns null and re-renders from current data instead,
       // which is the lesser evil: the alternative is serving the wrong invoice.
       sql`(select count(*) from ${invoices} i where i.order_id = ${orderId} and i.status <> 'VOID') = 1`,
+      // …and the revision itself must not belong to a voided invoice.
+      sql`not exists (
+        select 1 from ${invoices} v
+         where v.id = ${documentRevisions.invoiceId} and v.status = 'VOID'
+      )`,
     ))
     .orderBy(desc(documentRevisions.revisionNumber))
     .limit(1);

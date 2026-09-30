@@ -32,15 +32,16 @@ import {
   recomputeInvoiceAmountPaid,
   resolvePaymentInvoiceTarget,
   voidOrderInvoice,
+  generateOrderInvoicePdfBuffer,
   AmbiguousInvoiceError,
   UnpricedScheduleError,
   InvoiceAlreadyVoidError,
   InvoiceNotFoundError,
   InvoiceLinesChangedError,
 } from '../src/modules/orders/invoice.service';
+import { documentRevisions } from '../src/db/schema';
 import { seedBasics, truncateAll } from './helpers/db';
 import { listOrderPayments } from '../src/modules/orders/orders.service';
-import { documentRevisions } from '../src/db/schema';
 import { assertValidSchedule, InvalidScheduleError, listOrderPaymentSchedule, setOrderPaymentSchedule } from '../src/modules/orders/payment-schedule.service';
 import { splitAmountByPercent } from '../src/modules/orders/invoice-amounts';
 import { __documentTestUtils, generateOrderInvoicePdfBuffer } from '../src/modules/documents/document.service';
@@ -191,6 +192,32 @@ describe('void and reissue', () => {
     const [payment] = await db.select().from(customerPayments).where(eq(customerPayments.orderId, order.id));
     expect(payment!.invoiceId).toBe(replacement!.id);
     expect((await resolvePaymentInvoiceTarget(order.id))?.id).toBe(replacement!.id);
+  });
+
+  it('renders the REPLACEMENT after a reissue, never the voided invoice', async () => {
+    const { order } = await seedOrderWithItems();
+    const original = await ensureOrderInvoice(order.id);
+
+    // Render the original so it has a persisted revision, then correct it. The
+    // voided revision is now the order's most recent INVOICE revision while the
+    // replacement has none of its own — the exact state that made the
+    // order-level fallback hand the replacement the VOIDED document, and, by
+    // returning early, stopped it ever rendering one of its own.
+    const firstDoc = await generateOrderInvoicePdfBuffer(order.id);
+    expect(firstDoc.invoiceNumber).toBe(original.invoiceNumber);
+
+    const { voided, replacement } = await voidOrderInvoice(order.id);
+    expect(voided.status).toBe('VOID');
+
+    const doc = await generateOrderInvoicePdfBuffer(order.id);
+    expect(doc.invoiceNumber).toBe(replacement!.invoiceNumber);
+    expect(doc.fileName).toContain(replacement!.invoiceNumber);
+    // Must be a fresh artifact, not the cancelled one's bytes.
+    expect(doc.buffer.equals(firstDoc.buffer)).toBe(false);
+    // And the replacement now owns a revision of its own.
+    const [rev] = await db.select().from(documentRevisions)
+      .where(eq(documentRevisions.invoiceId, replacement!.id));
+    expect(rev).toBeDefined();
   });
 });
 
@@ -927,3 +954,4 @@ describe('split receipt keeps one identity', () => {
     expect(left.length).toBe(0);
   });
 });
+
