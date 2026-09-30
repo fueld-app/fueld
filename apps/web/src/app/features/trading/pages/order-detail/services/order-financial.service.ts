@@ -112,6 +112,25 @@ export class OrderFinancialService {
     }
   }
 
+  /**
+   * Remove a customer payment recorded in error.
+   *
+   * The customer side had no equivalent of the supplier delete, so a doubled
+   * payment could not be corrected in the app at all.
+   */
+  async deleteCustomerPayment(paymentId: string): Promise<boolean> {
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<boolean>>(`${API_URL}/orders/payments/${paymentId}`),
+      );
+      // The page reloads the order and its payments after a successful delete; the
+      // order's `amountDue` changes too, so that refresh is not optional.
+      return res.success;
+    } catch {
+      return false;
+    }
+  }
+
   async deleteSupplierPayment(orderId: string, orderSupplierId: string, paymentId: string): Promise<boolean> {
     try {
       const res = await firstValueFrom(

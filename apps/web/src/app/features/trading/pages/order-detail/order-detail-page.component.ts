@@ -1807,6 +1807,27 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.refreshOrderSilently();
   }
 
+  /**
+   * Remove a customer payment recorded in error.
+   *
+   * The API refuses to record a payment above what is owed, but a payment already
+   * banked as a duplicate still has to be removable — that is exactly how the
+   * doubled "Total paid" on a real order got corrected. Reloading the order (not
+   * just the payment list) matters: `amountDue` changes with it.
+   */
+  async onCustomerPaymentDeleted(paymentId: string): Promise<void> {
+    const orderId = this.orderId();
+    if (!orderId) return;
+    const ok = await this.financialSvc.deleteCustomerPayment(paymentId);
+    if (!ok) {
+      this.showToast('error', 'Failed to delete payment.');
+      return;
+    }
+    await this.loadPayments();
+    this.refreshOrderSilently();
+    this.showToast('success', 'Payment removed.');
+  }
+
   async onSupplierPaymentDeleted(paymentId: string): Promise<void> {
     const orderId = this.orderId();
     const legId = this.activeSupplierLegId();

@@ -57,7 +57,18 @@ import type { CustomerPaymentDto } from '@fueld/types';
                       <div class="mt-1 text-xs text-gray-600 dark:text-ink-dim whitespace-pre-line">{{ payment.note }}</div>
                     }
                   </div>
-                  <div class="text-xs text-gray-400 dark:text-muted">{{ payment.createdAt | date : 'short' }}</div>
+                  @if (canRecordPayment()) {
+                    <button
+                      type="button"
+                      (click)="deletePayment.emit(payment.id)"
+                      class="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                      aria-label="Delete payment"
+                    >
+                      Remove
+                    </button>
+                  } @else {
+                    <div class="text-xs text-gray-400 dark:text-muted">{{ payment.createdAt | date : 'short' }}</div>
+                  }
                 </li>
               }
             </ul>
@@ -80,4 +91,5 @@ export class OrderPaymentsCardComponent {
   readonly canRecordPayment = input(false);
 
   readonly addPayment = output<void>();
+  readonly deletePayment = output<string>();
 }

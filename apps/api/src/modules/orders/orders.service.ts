@@ -2721,6 +2721,31 @@ export async function updateSupplierPayment(
   return updated ? mapSupplierPaymentRow(updated) : null;
 }
 
+/**
+ * Remove a customer payment recorded in error.
+ *
+ * Mirrors `deleteSupplierPayment`. The customer side had no equivalent, which is
+ * why a doubled payment could not be corrected through the app at all — a row was
+ * only removable by hand in the database.
+ *
+ * Re-derives the invoice's paid figure afterwards (it is a cache over the payment
+ * rows), and refuses when the payment would leave a settled invoice over-stated.
+ */
+export async function deleteCustomerPayment(paymentId: string): Promise<boolean> {
+  const [existing] = await db
+    .select({ orderId: customerPayments.orderId, invoiceId: customerPayments.invoiceId })
+    .from(customerPayments)
+    .where(eq(customerPayments.id, paymentId))
+    .limit(1);
+  if (!existing) return false;
+
+  await db.delete(customerPayments).where(eq(customerPayments.id, paymentId));
+  // `invoices.amount_paid` is a cache over these rows, so it must be rebuilt
+  // rather than decremented — the same rule the supplier ledger follows.
+  if (existing.invoiceId) await recomputeInvoiceAmountPaid(existing.invoiceId);
+  return true;
+}
+
 export async function deleteSupplierPayment(paymentId: string): Promise<boolean> {
   const [existing] = await db
     .select({ orderSupplierId: supplierPayments.orderSupplierId })

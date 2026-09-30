@@ -422,6 +422,7 @@
         [canSeePrices]="auth.canSeePrices()"
         [canRecordPayment]="canRecordPayment() && auth.canSeePrices()"
         (addPayment)="openPaymentModal()"
+        (deletePayment)="onCustomerPaymentDeleted($event)"
       />
     }
 } @placeholder { <div></div> }

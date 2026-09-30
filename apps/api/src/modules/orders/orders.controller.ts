@@ -37,6 +37,7 @@ import {
   deleteOrderAttachment,
   listOrderPayments,
   createOrderPayment,
+  deleteCustomerPayment,
   OrderPaymentError,
   listSupplierPayments,
   createSupplierPayment,
@@ -665,6 +666,30 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         note: t.Optional(t.Nullable(t.String())),
       }),
       detail: { tags: ['Orders'], summary: 'Update a supplier payment' },
+    },
+  )
+  .delete(
+    '/payments/:paymentId',
+    async ({ params, auth }) => {
+      try {
+        const deleted = await deleteCustomerPayment(params.paymentId);
+        if (!deleted) return { success: false, data: null, message: 'Payment not found' };
+        await logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: 'customer-payment',
+          metadata: { action: 'delete_customer_payment', paymentId: params.paymentId },
+        });
+        return { success: true, data: deleted } satisfies ApiResponse<boolean>;
+      } catch (err) {
+        console.error('[Orders] Delete customer payment failed:', err);
+        return { success: false, data: null, message: 'Failed to delete payment' };
+      }
+    },
+    {
+      params: t.Object({ paymentId: t.String() }),
+      detail: { tags: ['Orders'], summary: 'Delete a customer payment recorded in error' },
     },
   )
   .delete(

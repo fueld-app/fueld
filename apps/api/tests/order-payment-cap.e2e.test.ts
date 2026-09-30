@@ -216,6 +216,64 @@ describe('order payment cap e2e', () => {
     expect(usd.status).toBe(200);
   });
 
+  it('lets a payment recorded in error be removed, restoring the balance', async () => {
+    const seeded = await seedAuthBasics();
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const orderId = await orderWithLine(token, seeded);
+    const db = await getDb();
+
+    // Two payments — the shape the cap now makes impossible for the SAME amount,
+    // but a duplicate already banked still has to be removable.
+    const a = await requestJson(`/orders/${orderId}/payments`, {
+      method: 'POST', token, body: { amount: '4000', currency: 'USD' },
+    });
+    const b = await requestJson(`/orders/${orderId}/payments`, {
+      method: 'POST', token, body: { amount: '2500', currency: 'USD' },
+    });
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+
+    const before = await requestJson(`/orders/${orderId}`, { token });
+    expect(before.data?.data?.amountDue).toBe('3500.00');
+
+    const removed = await requestJson(`/orders/payments/${b.data?.data?.id}`, { method: 'DELETE', token });
+    expect(removed.status).toBe(200);
+
+    const rows = await db.select().from(customerPayments).where(eq(customerPayments.orderId, orderId));
+    expect(rows.length).toBe(1);
+
+    // The order's balance reflects the removal.
+    const after = await requestJson(`/orders/${orderId}`, { token });
+    expect(after.data?.data?.amountDue).toBe('6000.00');
+  });
+
+  it('rebuilds the invoice paid figure when a payment is removed', async () => {
+    const seeded = await seedAuthBasics();
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const orderId = await orderWithLine(token, seeded);
+    const db = await getDb();
+    const { invoices } = await import('../src/db/schema');
+
+    const [invoice] = await db.insert(invoices).values({
+      orderId, invoiceNumber: 'INV-DEL-001', status: 'SENT', dueDate: '2030-01-01', amount: '10000.00',
+    }).returning();
+
+    const pay = await requestJson(`/orders/${orderId}/payments`, {
+      method: 'POST', token, body: { amount: '4000', currency: 'USD' },
+    });
+    expect(pay.status).toBe(200);
+
+    const [afterPay] = await db.select().from(invoices).where(eq(invoices.id, invoice!.id));
+    expect(afterPay!.amountPaid).toBe('4000.00');
+
+    await requestJson(`/orders/payments/${pay.data?.data?.id}`, { method: 'DELETE', token });
+
+    // amount_paid is a CACHE over the payment rows, so deleting the row must
+    // rebuild it — decrementing would drift.
+    const [afterDelete] = await db.select().from(invoices).where(eq(invoices.id, invoice!.id));
+    expect(afterDelete!.amountPaid).toBe('0.00');
+  });
+
   it('exposes the outstanding balance on the order so the UI need not derive it', async () => {
     const seeded = await seedAuthBasics();
     const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
