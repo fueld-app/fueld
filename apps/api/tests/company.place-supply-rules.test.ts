@@ -18,10 +18,10 @@ beforeEach(async () => {
 describe('company place supply rules', () => {
   it('creates a rule and backfills existing matching places', async () => {
     const db = await getDb();
-    const { user } = await seedBasics();
+    const { tenant, user } = await seedBasics();
     const { createCompany, createCompanyPlaceSupplyRule } = await loadCompanyService();
 
-    const supplier = await createCompany({
+    const supplier = await createCompany(tenant.id, {
       name: 'DCC Energy A/S',
       types: ['SUPPLIER'],
       country: 'Denmark',
@@ -83,10 +83,10 @@ describe('company place supply rules', () => {
   });
 
   it('rejects overlapping active rules for the same country and place types', async () => {
-    const { user } = await seedBasics();
+    const { tenant, user } = await seedBasics();
     const { createCompany, createCompanyPlaceSupplyRule } = await loadCompanyService();
 
-    const supplier = await createCompany({
+    const supplier = await createCompany(tenant.id, {
       name: 'Overlap Supplier',
       types: ['SUPPLIER'],
       country: 'Denmark',
@@ -118,11 +118,11 @@ describe('company place supply rules', () => {
 
   it('updates linked rows only after reapply and auto-applies to newly created matching places', async () => {
     const db = await getDb();
-    const { user } = await seedBasics();
+    const { tenant, user } = await seedBasics();
     const { createCompany, createCompanyPlaceSupplyRule, updateCompanyPlaceSupplyRule, reapplyCompanyPlaceSupplyRule } = await loadCompanyService();
     const { createPlace } = await loadLliService();
 
-    const supplier = await createCompany({
+    const supplier = await createCompany(tenant.id, {
       name: 'Auto Apply Supplier',
       types: ['SUPPLIER'],
       country: 'Denmark',
@@ -215,11 +215,11 @@ describe('company place supply rules', () => {
 
   it('stops future auto-apply after deleting a rule without removing existing links', async () => {
     const db = await getDb();
-    const { user } = await seedBasics();
+    const { tenant, user } = await seedBasics();
     const { createCompany, createCompanyPlaceSupplyRule, deleteCompanyPlaceSupplyRule } = await loadCompanyService();
     const { createPlace } = await loadLliService();
 
-    const supplier = await createCompany({
+    const supplier = await createCompany(tenant.id, {
       name: 'Delete Rule Supplier',
       types: ['SUPPLIER'],
       country: 'Denmark',

@@ -24,7 +24,7 @@ describe('company.service local flows', () => {
       deleteCompany,
     } = await loadCompanyService();
 
-    const created = await createCompany({
+    const created = await createCompany(tenant.id, {
       name: 'Nordic Bunkers',
       types: ['CLIENT', 'SUPPLIER'],
       country: 'Denmark',
@@ -35,17 +35,17 @@ describe('company.service local flows', () => {
     expect(created.id).toBeTruthy();
     expect(created.type).toBe('CLIENT');
 
-    const listed = await listCompanies({ search: 'Nordic', limit: 10, page: 1 });
+    const listed = await listCompanies(tenant.id, { search: 'Nordic', limit: 10, page: 1 });
     expect(listed.total).toBeGreaterThanOrEqual(1);
     expect(listed.companies.some((c) => c.id === created.id)).toBe(true);
 
-    await updateCompanyResponsibleUser(created.id, user.id);
+    await updateCompanyResponsibleUser(created.id, user.id, tenant.id);
 
-    const fetched = await getCompanyById(created.id);
+    const fetched = await getCompanyById(created.id, tenant.id);
     expect(fetched?.id).toBe(created.id);
     expect(fetched?.responsibleUserName).toBe(user.name);
 
-    const updated = await updateCompany(created.id, {
+    const updated = await updateCompany(created.id, tenant.id, {
       name: 'Nordic Bunkers A/S',
       country: 'Denmark',
       website: 'https://nordic.example',
@@ -60,30 +60,30 @@ describe('company.service local flows', () => {
     expect(updated?.manualOverrides).toContain('name');
     expect(updated?.manualOverrides).toContain('website');
 
-    const typed = await updateCompanyTypes(created.id, ['SUPPLIER', 'CLIENT']);
+    const typed = await updateCompanyTypes(created.id, ['SUPPLIER', 'CLIENT'], tenant.id);
     expect(typed?.type).toBe('SUPPLIER');
     expect(typed?.types).toEqual(['SUPPLIER', 'CLIENT']);
 
-    const deleted = await deleteCompany(created.id);
+    const deleted = await deleteCompany(created.id, tenant.id);
     expect(deleted?.id).toBe(created.id);
 
-    const missing = await getCompanyById(created.id);
+    const missing = await getCompanyById(created.id, tenant.id);
     expect(missing).toBeNull();
   });
 
   it('returns null when updating a missing company', async () => {
-    const { user } = await seedBasics();
+    const { tenant, user } = await seedBasics();
     const { updateCompany } = await loadCompanyService();
 
-    const missing = await updateCompany('123e4567-e89b-12d3-a456-426614174000', { name: 'X' });
+    const missing = await updateCompany('123e4567-e89b-12d3-a456-426614174000', tenant.id, { name: 'X' });
     expect(missing).toBeNull();
   });
 
   it('persists and returns the manual KYC date fields', async () => {
-    const { } = await seedBasics();
+    const { tenant } = await seedBasics();
     const { createCompany, getCompanyById, updateCompany } = await loadCompanyService();
 
-    const created = await createCompany({
+    const created = await createCompany(tenant.id, {
       name: 'KYC Co',
       types: ['CLIENT'],
       country: 'Denmark',
@@ -91,12 +91,12 @@ describe('company.service local flows', () => {
     });
 
     // Initially null (not verified, no expiry).
-    const initial = await getCompanyById(created.id);
+    const initial = await getCompanyById(created.id, tenant.id);
     expect(initial?.kycVerifiedDate).toBeNull();
     expect(initial?.kycExpiryDate).toBeNull();
 
     // Set both dates.
-    const updated = await updateCompany(created.id, {
+    const updated = await updateCompany(created.id, tenant.id, {
       kycVerifiedDate: '2025-01-15',
       kycExpiryDate: '2026-01-15',
     });
@@ -107,12 +107,12 @@ describe('company.service local flows', () => {
     expect(updated?.manualOverrides ?? []).not.toContain('kycExpiryDate');
 
     // getCompanyById returns them too.
-    const fetched = await getCompanyById(created.id);
+    const fetched = await getCompanyById(created.id, tenant.id);
     expect(fetched?.kycVerifiedDate).toBe('2025-01-15');
     expect(fetched?.kycExpiryDate).toBe('2026-01-15');
 
     // Clearing (null) is persisted.
-    const cleared = await updateCompany(created.id, {
+    const cleared = await updateCompany(created.id, tenant.id, {
       kycVerifiedDate: null,
       kycExpiryDate: null,
     });
@@ -125,14 +125,14 @@ describe('company.service local flows', () => {
     const db = await getDb();
     const { createCompany, deleteCompany } = await loadCompanyService();
 
-    const primarySupplier = await createCompany({
+    const primarySupplier = await createCompany(tenant.id, {
       name: 'Primary Supplier',
       types: ['SUPPLIER'],
       country: 'Denmark',
       countryIso: 'DK',
     });
 
-    const additionalSupplier = await createCompany({
+    const additionalSupplier = await createCompany(tenant.id, {
       name: 'Additional Supplier',
       types: ['SUPPLIER'],
       country: 'Sweden',
@@ -167,7 +167,7 @@ describe('company.service local flows', () => {
       },
     ]);
 
-    await expect(deleteCompany(additionalSupplier.id)).rejects.toMatchObject({
+    await expect(deleteCompany(additionalSupplier.id, tenant.id)).rejects.toMatchObject({
       code: 'HAS_ORDERS',
       count: 1,
     });
@@ -233,7 +233,7 @@ describe('company.service local flows', () => {
       creditUsed: '0',
     });
 
-    const groups = await getTopCreditGroups(10);
+    const groups = await getTopCreditGroups(tenant.id, 10);
 
     expect(groups).toHaveLength(1);
     expect(groups[0]?.id).toBe(parentWithExposure!.id);
@@ -258,7 +258,7 @@ describe('company.service local flows', () => {
       syncContactsFromSeasearcher,
     } = await loadCompanyService();
 
-    const company = await createCompany({
+    const company = await createCompany(tenant.id, {
       name: 'Contact Test Co',
       types: ['CLIENT'],
       country: 'Norway',
@@ -274,7 +274,7 @@ describe('company.service local flows', () => {
 
     expect(manual.id).toBeTruthy();
 
-    const updated = await updateCompanyContact(manual.id, { role: 'Senior Trader' });
+    const updated = await updateCompanyContact(manual.id, { role: 'Senior Trader' }, tenant.id);
     expect(updated?.role).toBe('Senior Trader');
 
     await syncContactsFromSeasearcher(company.id, {
@@ -300,7 +300,7 @@ describe('company.service local flows', () => {
     expect(contacts.some((c) => c.name === 'Manual Person')).toBe(true);
     expect(contacts.some((c) => c.name === 'Sea Contact')).toBe(true);
 
-    await deleteCompanyContact(manual.id);
+    await deleteCompanyContact(manual.id, tenant.id);
     const afterDelete = await getCompanyContacts(company.id);
     expect(afterDelete.some((c) => c.id === manual.id)).toBe(false);
 
@@ -313,7 +313,7 @@ describe('company.service local flows', () => {
   });
 
   it('keeps deleted legacy seasearcher contacts hidden on future syncs', async () => {
-    await seedBasics();
+    const { tenant } = await seedBasics();
     const db = await getDb();
     const {
       createCompany,
@@ -322,7 +322,7 @@ describe('company.service local flows', () => {
       syncContactsFromSeasearcher,
     } = await loadCompanyService();
 
-    const company = await createCompany({
+    const company = await createCompany(tenant.id, {
       name: 'Legacy Contact Co',
       types: ['CLIENT'],
       country: 'Singapore',
@@ -342,7 +342,7 @@ describe('company.service local flows', () => {
       })
       .returning();
 
-    await deleteCompanyContact(legacyImported.id);
+    await deleteCompanyContact(legacyImported.id, tenant.id);
 
     await syncContactsFromSeasearcher(company.id, {
       officeId: 1,
@@ -376,7 +376,7 @@ describe('company.service local flows', () => {
   });
 
   it('supports company email add/update/delete including primary switch', async () => {
-    const { user } = await seedBasics();
+    const { tenant, user } = await seedBasics();
     const {
       createCompany,
       addCompanyEmail,
@@ -385,7 +385,7 @@ describe('company.service local flows', () => {
       deleteCompanyEmail,
     } = await loadCompanyService();
 
-    const company = await createCompany({
+    const company = await createCompany(tenant.id, {
       name: 'Email Test Co',
       types: ['CLIENT'],
       country: 'Denmark',
@@ -412,7 +412,7 @@ describe('company.service local flows', () => {
     expect(firstAfterAdd?.isPrimary).toBe(false);
     expect(secondAfterAdd?.isPrimary).toBe(true);
 
-    const updated = await updateCompanyEmail(first.id, { isPrimary: true });
+    const updated = await updateCompanyEmail(first.id, { isPrimary: true }, tenant.id);
     expect(updated?.id).toBe(first.id);
     expect(updated?.isPrimary).toBe(true);
 
@@ -422,7 +422,7 @@ describe('company.service local flows', () => {
     expect(firstAfterUpdate?.isPrimary).toBe(true);
     expect(secondAfterUpdate?.isPrimary).toBe(false);
 
-    const deleted = await deleteCompanyEmail(second.id);
+    const deleted = await deleteCompanyEmail(second.id, tenant.id);
     expect(deleted?.id).toBe(second.id);
 
     const rows = await getCompanyEmails(company.id);

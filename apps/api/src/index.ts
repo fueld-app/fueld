@@ -31,6 +31,7 @@ import { securityController } from './modules/admin/security.controller';
 import { llmController } from './modules/admin/llm.controller';
 import { activityController, adminActivityController } from './modules/activity/activity.controller';
 import { ordersController } from './modules/orders/orders.controller';
+import { findUserById } from './modules/auth/auth.service';
 import { supplierInvoicesController } from './modules/orders/supplier-invoices.controller';
 import { commentsController } from './modules/comments/comments.controller';
 import { portDocumentationController } from './modules/port-documentation/port-documentation.controller';
@@ -47,6 +48,7 @@ import {
   subscribeSocketTopic,
   unsubscribeSocketTopic,
   onEntityView,
+  getSessionTenant,
   sendToSocket,
   extractClientIp,
 } from './modules/activity/session-tracker';
@@ -284,13 +286,29 @@ function serveUpload(subdir: string) {
 function registerAutoSyncHooks() {
   onEntityView(async (socketId, entityType, entityId) => {
     try {
+      /**
+       * Scoped to the socket's own tenant: the company sync now reads by id AND
+       * tenant (`getCompanyById` requires one), and without this an unscoped
+       * auto-sync would be the one path that could still fetch a foreign company.
+       * An unknown socket yields null and the sync is skipped.
+       */
+      const tenantId = await getSessionTenant(socketId);
+      if (!tenantId) {
+        /**
+         * Fail closed, but SAY SO. A silent skip would look identical to "this
+         * entity never needs syncing", so an unknown socket (or a user with no
+         * tenant) would hide a broken auto-sync indefinitely.
+         */
+        console.warn(`[AutoSync] Skipped ${entityType} ${entityId}: no tenant for socket ${socketId}`);
+        return;
+      }
       if (entityType === 'Vessel') {
         const synced = await syncVesselFromSeasearcher(entityId);
         if (synced) {
           sendToSocket(socketId, { type: 'vessel-synced', data: synced });
         }
       } else if (entityType === 'Company') {
-        const result = await syncCompanyFromSeasearcher(entityId);
+        const result = await syncCompanyFromSeasearcher(entityId, tenantId);
         if (result) {
           sendToSocket(socketId, { type: 'company-synced', data: result.company });
           if (result.conflicts.length > 0) {
@@ -605,8 +623,14 @@ export async function createApp(options: CreateAppOptions = {}) {
             ?? (ws as any).remoteAddress
             ?? null;
 
+          // Resolve the tenant ONCE here: the websocket auto-sync needs it, the
+          // route guard cannot cover a non-HTTP entry point, and a per-view lookup
+          // would be a DB hit on a hot path.
+          const wsUser = await findUserById(raw['sub'] as string);
+
           addSession(socketId, ws, {
             userId: raw['sub'] as string,
+            tenantId: wsUser?.tenantId ?? null,
             email: raw['email'] as string,
             name: userName,
             role: raw['role'] as string,

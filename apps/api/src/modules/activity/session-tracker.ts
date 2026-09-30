@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { logActivity } from './activity.service';
+import { findUserById } from '../auth/auth.service';
 import { lookupIp } from './geoip';
 import { extractClientIp as extractRequestClientIp } from '../../utils/client-ip';
 
@@ -53,6 +54,12 @@ function parsePageEntity(url: string, pageTitle: string | null): {
 export interface SessionInfo {
   socketId: string;
   userId: string;
+  /**
+   * Resolved once when the session is created. The user's tenant cannot change
+   * within a session, so looking it up per entity view was a pointless DB hit on
+   * a hot path.
+   */
+  tenantId: string | null;
   email: string;
   name: string;
   role: string;
@@ -106,6 +113,8 @@ export function addSession(
   ws: any,
   info: {
     userId: string;
+    /** Resolved from the user at connect time; see SessionInfo.tenantId. */
+    tenantId?: string | null;
     email: string;
     name: string;
     role: string;
@@ -115,6 +124,7 @@ export function addSession(
 ): void {
   const now = new Date().toISOString();
   sessions.set(socketId, {
+    tenantId: info.tenantId ?? null,
     socketId,
     ...info,
     platform: parsePlatform(info.userAgent),
@@ -311,6 +321,19 @@ export function getAllSessions(): SessionInfo[] {
 /** Get sessions serialised to the DTO shape for the frontend. */
 export function getAllSessionDtos() {
   return Array.from(sessions.values()).map(toDto);
+}
+
+/**
+ * Resolve the tenant a live socket belongs to.
+ *
+ * The session record carries the user, not the tenant, and the callback contract
+ * is `(socketId, entityType, entityId)`. Passing the session's user through keeps
+ * that contract while letting the auto-sync hook scope its read: `getCompanyById`
+ * now demands a tenant, and an unscoped sync would fetch another tenant's company
+ * by id. Returns null for an unknown socket, which is treated as "skip".
+ */
+export async function getSessionTenant(socketId: string): Promise<string | null> {
+  return sessions.get(socketId)?.tenantId ?? null;
 }
 
 export function getSessionsByUser(userId: string): SessionInfo[] {

@@ -5,7 +5,7 @@
 import { eq, ilike, or, and, sql, asc, desc, inArray, isNull, ne, notInArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { escapeLikePattern } from '../../utils/like';
-import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderItems, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, supplierPayments, supplierInvoices, supplierReceipts, invoices, creditApplications, portSuppliers, companyPlaceSupplyRules, creditLines, creditLineCounterparties } from '../../db/schema';
+import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderItems, orderSuppliers, tenants, vessels, places, users, vesselCompanies, customerPayments, supplierPayments, supplierInvoices, supplierReceipts, invoices, creditApplications, portSuppliers, companyPlaceSupplyRules, creditLines, creditLineCounterparties } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import { matchLocalVessels } from '../vessels/vessel.service';
 import {
@@ -436,7 +436,14 @@ const GROUP_FLEET_MAX_COMPANIES = 12;
 //  LIST COMPANIES (local DB, paginated)
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function listCompanies(query?: {
+export async function listCompanies(
+  /**
+   * Owning tenant. REQUIRED — `counterparties.tenant_id` is NOT NULL, so every
+   * company belongs to exactly one tenant, and an unscoped query returns another
+   * tenant's customer and supplier names, addresses and contact details.
+   */
+  tenantId: string,
+  query?: {
   search?: string;
   type?: string;
   country?: string;
@@ -448,7 +455,7 @@ export async function listCompanies(query?: {
   limit?: number;
   page?: number;
 }) {
-  const conditions = [];
+  const conditions = [eq(counterparties.tenantId, tenantId)];
   if (query?.search) conditions.push(ilike(counterparties.name, `%${escapeLikePattern(query.search)}%`));
   if (query?.type) {
     const types = query.type.split(',').filter(Boolean);
@@ -560,19 +567,47 @@ export async function listCompanies(query?: {
 //  GET SINGLE COMPANY BY ID
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function getCompanyById(id: string) {
+/**
+ * Does this company belong to this tenant?
+ *
+ * `counterparties.tenant_id` is NOT NULL, so every company has exactly one owner
+ * and this is a total answer. Used by the controller's route guard, which is the
+ * single place `:id` ownership is enforced for the whole module — one check that
+ * cannot be forgotten when a route is added, rather than thirty-six.
+ */
+export async function companyBelongsToTenant(companyId: string, tenantId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: counterparties.id })
+    .from(counterparties)
+    .where(and(eq(counterparties.id, companyId), eq(counterparties.tenantId, tenantId)))
+    .limit(1);
+  return !!row;
+}
+
+export async function getCompanyById(
+  id: string,
+  /**
+   * Owning tenant. REQUIRED: `counterparties.name` is not unique across tenants,
+   * so an unscoped read can serve another tenant's company — and everything
+   * hanging off it (contacts, emails, ledger, credit).
+   */
+  tenantId: string,
+) {
   let row: typeof counterparties.$inferSelect | null = null;
   try {
     const [selected] = await db
       .select()
       .from(counterparties)
-      .where(eq(counterparties.id, id))
+      .where(and(eq(counterparties.id, id), eq(counterparties.tenantId, tenantId)))
       .limit(1);
     row = selected ?? null;
   } catch (error) {
     if (!isMissingCompanyRegistrationColumnError(error)) throw error;
+    // The fallback fires during a schema-migration window, so it must carry the
+    // SAME tenant predicate as the primary — otherwise scoping silently
+    // disappears exactly when the fallback path runs.
     row = await db.query.counterparties.findFirst({
-      where: eq(counterparties.id, id),
+      where: and(eq(counterparties.id, id), eq(counterparties.tenantId, tenantId)),
       columns: {
         companyRegistrationNumber: false,
       },
@@ -610,19 +645,29 @@ export async function getCompanyById(id: string) {
 //  GET COMPANY BY SEASEARCHER ID
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function getCompanyBySeasearcherId(seasearcherId: string) {
+export async function getCompanyBySeasearcherId(
+  seasearcherId: string,
+  /**
+   * Owning tenant. Seasearcher itself is a GLOBAL directory (the enrichment,
+   * fleet, hierarchy, seizures and sanctions functions stay unscoped, correctly),
+   * but a company we have IMPORTED is tenant data — two tenants can hold their own
+   * record of the same Seasearcher company, so a lookup by Seasearcher id must not
+   * return another tenant's copy.
+   */
+  tenantId: string,
+) {
   let row: typeof counterparties.$inferSelect | null = null;
   try {
     const [selected] = await db
       .select()
       .from(counterparties)
-      .where(eq(counterparties.seasearcherId, seasearcherId))
+      .where(and(eq(counterparties.seasearcherId, seasearcherId), eq(counterparties.tenantId, tenantId)))
       .limit(1);
     row = selected ?? null;
   } catch (error) {
     if (!isMissingCompanyRegistrationColumnError(error)) throw error;
     row = await db.query.counterparties.findFirst({
-      where: eq(counterparties.seasearcherId, seasearcherId),
+      where: and(eq(counterparties.seasearcherId, seasearcherId), eq(counterparties.tenantId, tenantId)),
       columns: {
         companyRegistrationNumber: false,
       },
@@ -635,7 +680,13 @@ export async function getCompanyBySeasearcherId(seasearcherId: string) {
 //  CREATE COMPANY (manual entry)
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function createCompany(data: {
+export async function createCompany(
+  /**
+   * Owning tenant, REQUIRED. The company must land under the caller's tenant, not
+   * under whichever tenant happened to be first in the table.
+   */
+  tenantId: string,
+  data: {
   name: string;
   types: string[];
   country?: string;
@@ -645,8 +696,18 @@ export async function createCompany(data: {
   seasearcherId?: string;
 }) {
   // Use first tenant (single-tenant for now)
-  const tenantRow = await db.query.tenants.findFirst();
-  if (!tenantRow) throw new Error('No tenant found');
+  /**
+   * The owning tenant, passed in. This previously used
+   * `db.query.tenants.findFirst()` — the FIRST tenant in the database — so a
+   * company created by any tenant landed under whichever tenant happened to sort
+   * first. Same class of bug as the unscoped reads; there is no default tenant.
+   */
+  const [tenantRow] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!tenantRow) throw new Error('Tenant not found');
 
   const primaryType = data.types[0] ?? 'CLIENT';
 
@@ -678,7 +739,7 @@ export async function createCompany(data: {
   const createdId = (inserted[0] as { id?: string } | undefined)?.id;
   if (!createdId) throw new Error('Failed to create company');
 
-  const created = await getCompanyById(createdId);
+  const created = await getCompanyById(createdId, tenantId);
   if (!created) throw new Error('Failed to load created company');
 
   return created;
@@ -688,9 +749,14 @@ export async function createCompany(data: {
 //  IMPORT COMPANY FROM SEASEARCHER
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function importCompanyFromSeasearcher(seasearcherId: string) {
-  // Check if already imported
-  const existing = await getCompanyBySeasearcherId(seasearcherId);
+export async function importCompanyFromSeasearcher(seasearcherId: string, tenantId: string) {
+  /**
+   * Dedupe within THIS tenant. Scoping this to the tenant is what makes the
+   * import idempotent per tenant: two tenants may each hold their own record of
+   * the same Seasearcher company, and an unscoped lookup here would hand tenant B
+   * tenant A's company — id, credit data and all — and then skip creating B's own.
+   */
+  const existing = await getCompanyBySeasearcherId(seasearcherId, tenantId);
   if (existing) return existing;
 
   // Fetch from Seasearcher
@@ -759,7 +825,7 @@ export async function importCompanyFromSeasearcher(seasearcherId: string) {
 //  IMPORT COMPANY BY NAME (search Seasearcher, import first match)
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function importCompanyByName(companyName: string) {
+export async function importCompanyByName(companyName: string, tenantId: string) {
   const searchResult = await seasearcherCompanySearch<{ results: { id: string; companyName: string }[] }>(companyName, 5);
   const match = searchResult.results?.find(
     (r) => r.companyName.toLowerCase() === companyName.toLowerCase(),
@@ -769,7 +835,7 @@ export async function importCompanyByName(companyName: string) {
     throw new Error(`No Seasearcher company found for name: ${companyName}`);
   }
 
-  return importCompanyFromSeasearcher(match.id);
+  return importCompanyFromSeasearcher(match.id, tenantId);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -792,8 +858,8 @@ export interface SyncResult {
   conflicts: SyncConflict[];
 }
 
-export async function syncCompanyFromSeasearcher(companyId: string): Promise<SyncResult | null> {
-  const local = await getCompanyById(companyId);
+export async function syncCompanyFromSeasearcher(companyId: string, tenantId: string): Promise<SyncResult | null> {
+  const local = await getCompanyById(companyId, tenantId);
   if (!local || !local.seasearcherId) return null;
 
   const detail = await seasearcherCompanyDetail<SeasearcherCompanyDetail>(local.seasearcherId);
@@ -872,7 +938,7 @@ export async function syncCompanyFromSeasearcher(companyId: string): Promise<Syn
   const [updated] = await db
     .update(counterparties)
     .set(setFields)
-    .where(eq(counterparties.id, companyId))
+    .where(and(eq(counterparties.id, companyId), eq(counterparties.tenantId, tenantId)))
     .returning();
 
   // Sync contacts from Seasearcher (only source='seasearcher' contacts get replaced)
@@ -890,8 +956,8 @@ export async function syncCompanyFromSeasearcher(companyId: string): Promise<Syn
 //  ACCEPT SEASEARCHER VALUE (resolve a conflict by accepting SS data)
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function acceptSeasearcherValue(companyId: string, field: string) {
-  const local = await getCompanyById(companyId);
+export async function acceptSeasearcherValue(companyId: string, field: string, tenantId: string) {
+  const local = await getCompanyById(companyId, tenantId);
   if (!local || !local.seasearcherId) return null;
 
   // Remove the field from manualOverrides
@@ -945,7 +1011,7 @@ export async function acceptSeasearcherValue(companyId: string, field: string) {
   const [updated] = await db
     .update(counterparties)
     .set(setFields)
-    .where(eq(counterparties.id, companyId))
+    .where(and(eq(counterparties.id, companyId), eq(counterparties.tenantId, tenantId)))
     .returning();
   return updated ?? null;
 }
@@ -954,8 +1020,8 @@ export async function acceptSeasearcherValue(companyId: string, field: string) {
 //  KEEP MINE (dismiss a conflict by storing the SS value we're ignoring)
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function keepMineValue(companyId: string, field: string, seasearcherValue: string | number | null) {
-  const local = await getCompanyById(companyId);
+export async function keepMineValue(companyId: string, field: string, seasearcherValue: string | number | null, tenantId: string) {
+  const local = await getCompanyById(companyId, tenantId);
   if (!local) return null;
 
   const dismissed: Record<string, any> = { ...((local.dismissedConflicts as Record<string, any>) ?? {}) };
@@ -964,7 +1030,7 @@ export async function keepMineValue(companyId: string, field: string, seasearche
   const [updated] = await db
     .update(counterparties)
     .set({ dismissedConflicts: dismissed, updatedAt: new Date() })
-    .where(eq(counterparties.id, companyId))
+    .where(and(eq(counterparties.id, companyId), eq(counterparties.tenantId, tenantId)))
     .returning();
   return updated ?? null;
 }
@@ -982,6 +1048,11 @@ const OVERRIDABLE_FIELDS = [
 
 export async function updateCompany(
   companyId: string,
+  /**
+   * Owning tenant. Threaded through to the read and the UPDATE so a foreign id
+   * cannot be read or written even if a caller forgets the route guard.
+   */
+  tenantId: string,
   data: {
     name?: string;
     country?: string | null;
@@ -1002,7 +1073,7 @@ export async function updateCompany(
   },
 ) {
   // Load current company to merge manualOverrides
-  const current = await getCompanyById(companyId);
+  const current = await getCompanyById(companyId, tenantId);
   if (!current) return null;
 
   const setFields: Record<string, any> = { updatedAt: new Date() };
@@ -1035,7 +1106,7 @@ export async function updateCompany(
   const [updated] = await db
     .update(counterparties)
     .set(setFields)
-    .where(eq(counterparties.id, companyId))
+    .where(and(eq(counterparties.id, companyId), eq(counterparties.tenantId, tenantId)))
     .returning();
   return updated ?? null;
 }
@@ -1044,7 +1115,7 @@ export async function updateCompany(
 //  UPDATE COMPANY TYPES
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function updateCompanyTypes(companyId: string, types: string[]) {
+export async function updateCompanyTypes(companyId: string, types: string[], tenantId: string) {
   const primaryType = types[0] ?? 'CLIENT';
   const [updated] = await db
     .update(counterparties)
@@ -1053,7 +1124,7 @@ export async function updateCompanyTypes(companyId: string, types: string[]) {
       types,
       updatedAt: new Date(),
     })
-    .where(eq(counterparties.id, companyId))
+    .where(and(eq(counterparties.id, companyId), eq(counterparties.tenantId, tenantId)))
     .returning();
   return updated ?? null;
 }
@@ -1062,11 +1133,11 @@ export async function updateCompanyTypes(companyId: string, types: string[]) {
 //  UPDATE COMPANY SEGMENTS
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function updateCompanySegments(companyId: string, segments: Record<string, string | string[]>) {
+export async function updateCompanySegments(companyId: string, segments: Record<string, string | string[]>, tenantId: string) {
   const [updated] = await db
     .update(counterparties)
     .set({ segments, updatedAt: new Date() })
-    .where(eq(counterparties.id, companyId))
+    .where(and(eq(counterparties.id, companyId), eq(counterparties.tenantId, tenantId)))
     .returning();
   return updated ?? null;
 }
@@ -1075,14 +1146,14 @@ export async function updateCompanySegments(companyId: string, segments: Record<
 //  UPDATE COMPANY RESPONSIBLE USER
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function updateCompanyResponsibleUser(companyId: string, userId: string | null) {
+export async function updateCompanyResponsibleUser(companyId: string, userId: string | null, tenantId: string) {
   const [updated] = await db
     .update(counterparties)
     .set({
       responsibleUserId: userId,
       updatedAt: new Date(),
     })
-    .where(eq(counterparties.id, companyId))
+    .where(and(eq(counterparties.id, companyId), eq(counterparties.tenantId, tenantId)))
     .returning();
   return updated ?? null;
 }
@@ -1091,7 +1162,7 @@ export async function updateCompanyResponsibleUser(companyId: string, userId: st
 //  DELETE COMPANY
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function deleteCompany(id: string) {
+export async function deleteCompany(id: string, tenantId: string) {
   // Pre-check: refuse if any orders/inquiries reference this company
   const [linked] = await db
     .select({ count: sql<number>`count(distinct ${orders.id})::int` })
@@ -1120,7 +1191,7 @@ export async function deleteCompany(id: string) {
 
   const [deleted] = await db
     .delete(counterparties)
-    .where(eq(counterparties.id, id))
+    .where(and(eq(counterparties.id, id), eq(counterparties.tenantId, tenantId)))
     .returning({ id: counterparties.id });
   return deleted ?? null;
 }
@@ -1143,6 +1214,12 @@ export interface CompanyTypeaheadResult {
 }
 
 export async function searchCompaniesTypeahead(
+  /**
+   * Owning tenant. REQUIRED: the local half of this search reads
+   * `counterparties` and would otherwise offer another tenant's companies in the
+   * picker. (The Seasearcher half is a global directory and is not tenant data.)
+   */
+  tenantId: string,
   term: string,
 ): Promise<CompanyTypeaheadResult[]> {
   const results: CompanyTypeaheadResult[] = [];
@@ -1160,7 +1237,7 @@ export async function searchCompaniesTypeahead(
       isSanctioned: counterparties.isSanctioned,
     })
     .from(counterparties)
-    .where(ilike(counterparties.name, `%${escapeLikePattern(term)}%`))
+    .where(and(eq(counterparties.tenantId, tenantId), ilike(counterparties.name, `%${escapeLikePattern(term)}%`)))
     .limit(20);
 
   const localSeasearcherIds = new Set<string>();
@@ -1342,9 +1419,27 @@ export async function createCompanyContact(
   return contact;
 }
 
+/**
+ * The caller's own company ids, as a subquery.
+ *
+ * Child rows (contacts, emails, offices, attachments) carry `counterparty_id`,
+ * not a tenant, so they are scoped by constraining that column to the caller's
+ * companies. Their routes take the CHILD id (`/contacts/:contactId`), which the
+ * `params.id` route guard never sees — so the tenant predicate has to live in the
+ * query itself. Typed, and the same `inArray` + subquery idiom used elsewhere.
+ */
+function ownedCompanyIds(tenantId: string) {
+  return db.select({ id: counterparties.id }).from(counterparties).where(eq(counterparties.tenantId, tenantId));
+}
+
 export async function updateCompanyContact(
   contactId: string,
   data: { name?: string; role?: string; phone?: string; fax?: string; email?: string; notes?: string },
+  /**
+   * Owning tenant. The route is `/contacts/:contactId` — the guard on
+   * `params.id` never sees it — so ownership is enforced here.
+   */
+  tenantId: string,
 ) {
   const [current] = await db
     .select({
@@ -1353,7 +1448,9 @@ export async function updateCompanyContact(
       seasearcherPersonId: companyContacts.seasearcherPersonId,
     })
     .from(companyContacts)
-    .where(eq(companyContacts.id, contactId))
+    // Scoped on the READ as well as the write: an unscoped read would still load
+    // a foreign row into memory and run this function's branching on it.
+    .where(and(eq(companyContacts.id, contactId), inArray(companyContacts.counterpartyId, ownedCompanyIds(tenantId))))
     .limit(1);
   if (!current) return null;
 
@@ -1365,12 +1462,12 @@ export async function updateCompanyContact(
       deletedAt: null,
       updatedAt: new Date(),
     })
-    .where(eq(companyContacts.id, contactId))
+    .where(and(eq(companyContacts.id, contactId), inArray(companyContacts.counterpartyId, ownedCompanyIds(tenantId))))
     .returning();
   return updated;
 }
 
-export async function deleteCompanyContact(contactId: string) {
+export async function deleteCompanyContact(contactId: string, tenantId: string): Promise<boolean> {
   const [current] = await db
     .select({
       id: companyContacts.id,
@@ -1378,9 +1475,10 @@ export async function deleteCompanyContact(contactId: string) {
       seasearcherPersonId: companyContacts.seasearcherPersonId,
     })
     .from(companyContacts)
-    .where(eq(companyContacts.id, contactId))
+    .where(and(eq(companyContacts.id, contactId), inArray(companyContacts.counterpartyId, ownedCompanyIds(tenantId))))
     .limit(1);
-  if (!current) return;
+  // Absent, or not this tenant's: the caller cannot tell the two apart.
+  if (!current) return false;
 
   if (current.source === 'seasearcher' || current.seasearcherPersonId !== null) {
     await db
@@ -1390,10 +1488,11 @@ export async function deleteCompanyContact(contactId: string) {
         updatedAt: new Date(),
       })
       .where(eq(companyContacts.id, contactId));
-    return;
+    return true;
   }
 
   await db.delete(companyContacts).where(eq(companyContacts.id, contactId));
+  return true;
 }
 
 /**
@@ -1583,14 +1682,20 @@ export async function addCompanyEmail(
 
 export async function updateCompanyEmail(
   id: string,
-  data: { emailType?: CompanyEmailType; email?: string; label?: string; isPrimary?: boolean }
+  data: { emailType?: CompanyEmailType; email?: string; label?: string; isPrimary?: boolean },
+  tenantId: string,
 ) {
   // If setting as primary, fetch counterpartyId and emailType first
   if (data.isPrimary) {
     const [existing] = await db
       .select({ counterpartyId: companyEmails.counterpartyId, emailType: companyEmails.emailType })
       .from(companyEmails)
-      .where(eq(companyEmails.id, id));
+      // Scoped: this drives the "unset the previous primary" step, so an
+      // unscoped read would let a foreign id steer a write.
+      .where(and(eq(companyEmails.id, id), inArray(companyEmails.counterpartyId, ownedCompanyIds(tenantId))));
+    // Not this tenant's email: nothing to unset, and the scoped UPDATE below
+    // will match nothing, so the route answers 404.
+    if (!existing) return null;
     if (existing) {
       const typeToUse = data.emailType ?? existing.emailType;
       await db
@@ -1615,15 +1720,15 @@ export async function updateCompanyEmail(
       ...(data.isPrimary !== undefined && { isPrimary: data.isPrimary }),
       updatedAt: new Date(),
     })
-    .where(eq(companyEmails.id, id))
+    .where(and(eq(companyEmails.id, id), inArray(companyEmails.counterpartyId, ownedCompanyIds(tenantId))))
     .returning();
   return updated ?? null;
 }
 
-export async function deleteCompanyEmail(id: string) {
+export async function deleteCompanyEmail(id: string, tenantId: string) {
   const [deleted] = await db
     .delete(companyEmails)
-    .where(eq(companyEmails.id, id))
+    .where(and(eq(companyEmails.id, id), inArray(companyEmails.counterpartyId, ownedCompanyIds(tenantId))))
     .returning({ id: companyEmails.id, email: companyEmails.email, emailType: companyEmails.emailType });
   return deleted ?? null;
 }
@@ -1664,6 +1769,7 @@ export async function addCompanyOffice(
 export async function updateCompanyOffice(
   id: string,
   data: { city?: string; country?: string; countryCode?: string; address?: string; phone?: string; email?: string },
+  tenantId: string,
 ) {
   const [updated] = await db
     .update(companyOffices)
@@ -1676,15 +1782,15 @@ export async function updateCompanyOffice(
       ...(data.email !== undefined && { email: data.email }),
       updatedAt: new Date(),
     })
-    .where(eq(companyOffices.id, id))
+    .where(and(eq(companyOffices.id, id), inArray(companyOffices.counterpartyId, ownedCompanyIds(tenantId))))
     .returning();
   return updated ?? null;
 }
 
-export async function deleteCompanyOffice(id: string) {
+export async function deleteCompanyOffice(id: string, tenantId: string) {
   const [deleted] = await db
     .delete(companyOffices)
-    .where(eq(companyOffices.id, id))
+    .where(and(eq(companyOffices.id, id), inArray(companyOffices.counterpartyId, ownedCompanyIds(tenantId))))
     .returning({ id: companyOffices.id, city: companyOffices.city });
   return deleted ?? null;
 }
@@ -1743,10 +1849,10 @@ export async function createCompanyAttachment(input: {
   };
 }
 
-export async function deleteCompanyAttachment(id: string) {
+export async function deleteCompanyAttachment(id: string, tenantId: string) {
   const [deleted] = await db
     .delete(companyAttachments)
-    .where(eq(companyAttachments.id, id))
+    .where(and(eq(companyAttachments.id, id), inArray(companyAttachments.counterpartyId, ownedCompanyIds(tenantId))))
     .returning({
       id: companyAttachments.id,
       counterpartyId: companyAttachments.counterpartyId,
@@ -1844,19 +1950,37 @@ export async function getParentCompany(childId: string) {
   return parent ?? null;
 }
 
-/** Set the parent for a child company (link). Enforces single-level constraint. */
-export async function setParentCompany(childId: string, parentId: string) {
+/**
+ * Set the parent for a child company (link). Enforces single-level constraint.
+ *
+ * Both ends are constrained to the tenant. The `params.id` route guard covers the
+ * CHILD (it is in the path), but `parentId` comes from the BODY, so it was
+ * unchecked: a caller could link their own company under another tenant's parent,
+ * and every hierarchy route (`getChildCompanies`, `getGroupOrdersForCompany`, the
+ * group fleet/vessel/aggregate reads) then traverses that link. Cross-tenant
+ * links are refused outright, and the child is verified here too so the function
+ * is safe without the route guard.
+ */
+export async function setParentCompany(childId: string, parentId: string, tenantId: string) {
+  const [child] = await db
+    .select({ id: counterparties.id })
+    .from(counterparties)
+    .where(and(eq(counterparties.id, childId), eq(counterparties.tenantId, tenantId)))
+    .limit(1);
+  if (!child) throw Object.assign(new Error('Company not found.'), { code: 'NOT_FOUND' });
   if (childId === parentId) {
     throw Object.assign(new Error('A company cannot be its own parent.'), { code: 'SELF_REFERENCE' });
   }
 
-  // The target parent must not itself be a child
+  // The target parent must be in the SAME tenant, and must not itself be a child.
   const [parentRow] = await db
-    .select({ parentId: counterparties.parentId })
+    .select({ parentId: counterparties.parentId, tenantId: counterparties.tenantId })
     .from(counterparties)
     .where(eq(counterparties.id, parentId))
     .limit(1);
-  if (!parentRow) throw Object.assign(new Error('Parent company not found.'), { code: 'NOT_FOUND' });
+  if (!parentRow || parentRow.tenantId !== tenantId) {
+    throw Object.assign(new Error('Parent company not found.'), { code: 'NOT_FOUND' });
+  }
   if (parentRow.parentId) {
     throw Object.assign(new Error('Cannot link to a company that is already a child of another company.'), { code: 'ALREADY_CHILD' });
   }
@@ -1876,17 +2000,17 @@ export async function setParentCompany(childId: string, parentId: string) {
   const [updated] = await db
     .update(counterparties)
     .set({ parentId, updatedAt: new Date() })
-    .where(eq(counterparties.id, childId))
+    .where(and(eq(counterparties.id, childId), eq(counterparties.tenantId, tenantId)))
     .returning();
   return updated ?? null;
 }
 
 /** Remove the parent link from a child company (unlink). */
-export async function removeParentCompany(childId: string) {
+export async function removeParentCompany(childId: string, tenantId: string) {
   const [updated] = await db
     .update(counterparties)
     .set({ parentId: null, updatedAt: new Date() })
-    .where(eq(counterparties.id, childId))
+    .where(and(eq(counterparties.id, childId), eq(counterparties.tenantId, tenantId)))
     .returning();
   return updated ?? null;
 }
@@ -2151,8 +2275,20 @@ export async function getGroupVesselsForCompany(companyId: string) {
   });
 }
 
-/** Top parent companies by aggregated credit exposure (parent + children). */
-export async function getTopCreditGroups(limit = 10) {
+/**
+ * Top parent companies by aggregated credit exposure (parent + children), for one
+ * tenant. Unscoped it listed every tenant's credit groups and limits on the
+ * dashboard.
+ *
+ * The filter is on the PARENT only, and the join (`c.parent_id = p.id`) does NOT
+ * imply the children share the tenant — a cross-tenant link would pull foreign
+ * children in. That cannot arise any more (`setParentCompany` refuses to link
+ * across tenants), and the children are aggregated into the parent's figures
+ * rather than returned as rows, so a foreign child could only distort a total,
+ * never be read directly. Filtering the child side too would be the belt-and-
+ * braces version if that invariant is ever relaxed.
+ */
+export async function getTopCreditGroups(tenantId: string, limit = 10) {
   const rows = await db.execute(sql`
     WITH grouped AS (
       SELECT
@@ -2164,6 +2300,7 @@ export async function getTopCreditGroups(limit = 10) {
         1 + COUNT(c.id)::int AS "childCount"
       FROM counterparties p
       INNER JOIN counterparties c ON c.parent_id = p.id
+      WHERE p.tenant_id = ${tenantId}
       GROUP BY p.id, p.name, p.country, p.credit_limit, p.credit_used
     )
     SELECT *
@@ -2388,11 +2525,19 @@ export async function applyMatchingCompanyPlaceSupplyRulesForPlace(placeId: stri
 export async function getCustomerPaymentLedger(
   companyId: string,
   opts: { limit?: number; offset?: number; sort?: 'date' | 'amount'; dateFrom?: string; dateTo?: string } = {},
+  /**
+   * Owning tenant. The route guard already proves the COMPANY is the caller's,
+   * and receipts hang off that company — but scoping here too keeps the two
+   * sibling ledgers symmetric and means the function is not correct only because
+   * of a check made elsewhere.
+   */
+  tenantId: string | null = null,
 ) {
   const limit = Math.min(opts.limit ?? 50, 200);
   const offset = opts.offset ?? 0;
   // Build date filter conditions
   const conditions = [eq(customerPayments.customerId, companyId)];
+  if (tenantId) conditions.push(eq(customerPayments.tenantId, tenantId));
   if (opts.dateFrom) conditions.push(sql`${customerPayments.receivedAt} >= ${opts.dateFrom}`);
   if (opts.dateTo) conditions.push(sql`${customerPayments.receivedAt} <= ${opts.dateTo}`);
 
