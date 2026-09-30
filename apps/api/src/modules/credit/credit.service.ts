@@ -46,6 +46,16 @@ async function calcUsedAmountForSupplier(
   if (!counterpartyIds.length) return '0';
   const [row] = await db
     .select({
+      /**
+       * ORDERED quantity, deliberately NOT changed with the customer side above.
+       *
+       * `updateOrderSupplierAmountPaid` settles a leg against costPrice x quantity
+       * on the ordered figure, and that is what defines a leg as fully paid. Making
+       * this read delivered instead would make "settled" and "fully paid" disagree
+       * for every open leg — a change to supplier settlement semantics, not a
+       * consistency fix, and one that deserves its own PR and tests. The customer
+       * side had no such counterpart rule, which is why it was safe to align there.
+       */
       total: sql<string>`coalesce(sum(${orderItems.costPrice}::numeric * ${orderItems.quantity}::numeric), 0)::text`,
     })
     .from(orderItems)
@@ -115,7 +125,17 @@ async function calcUsedAmountForCustomer(counterpartyIds: string[], currency?: s
   const orderValues = db
     .select({
       orderId: orderItems.orderId,
-      value: sql<string>`sum(${orderItems.salesPrice}::numeric * ${orderItems.quantity}::numeric)`.as('value'),
+      /**
+       * DELIVERED quantity, not ordered.
+       *
+       * This measured the ORDERED figure while the customer is billed on the
+       * delivered one, so credit usage and the receivable were computed from
+       * different quantities and could never agree — the exposure held after a
+       * part-delivery was larger than anything the customer owed. `order-financing`,
+       * the invoice and the payment cap all use the delivered basis; this is the
+       * last reader that did not.
+       */
+      value: sql<string>`sum(${orderItems.salesPrice}::numeric * COALESCE(${orderItems.deliveredQuantity}, ${orderItems.quantity})::numeric)`.as('value'),
     })
     .from(orderItems)
     .groupBy(orderItems.orderId)
