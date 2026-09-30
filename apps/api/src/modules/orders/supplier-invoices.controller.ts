@@ -14,21 +14,17 @@ import { and, eq } from 'drizzle-orm';
 import type { ApiResponse, SupplierInvoiceDto, CreateSupplierInvoicesResultDto } from '@fueld/types';
 import { authGuard } from '../auth/auth.guard';
 import { db } from '../../db';
-import { counterparties, supplierInvoices, tenants, type TenantSettings } from '../../db/schema';
-import { getDateFormatSettings, getDocumentBrandingSettings } from '../admin/settings.service';
-import {
-  buildDocumentFooter,
-  createPdfBuffer,
-  resolveTenantDocAccent,
-  tryLoadLogoDataUrl,
-} from '../documents/document.service';
-import { buildSupplierInvoiceDocument } from '../documents/supplier-invoice-document';
+import { companyEmails, supplierInvoices, users } from '../../db/schema';
+import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject } from '../documents/mail.service';
+import { renderSupplierInvoicePdf } from './supplier-invoice-pdf';
 import {
   assertSupplierInvoicesEnabled,
   createSupplierInvoicesFromReport,
   getSupplierInvoice,
   listSupplierInvoices,
   listSuppliersWithSupplierCommission,
+  markSupplierInvoiceSent,
+  selectSupplierRecipients,
   voidSupplierInvoice,
 } from './supplier-invoice.service';
 import { SupplierReceiptError, createSupplierReceipt, deleteSupplierReceipt } from './supplier-invoice-ledger';
@@ -126,75 +122,134 @@ export const supplierInvoicesController = new Elysia({ prefix: '/supplier-invoic
       return { success: false, data: null, message: 'This invoice was voided and is kept for audit only.' };
     }
 
-    const [tenant] = await db
-      .select({ settings: tenants.settings, name: tenants.name })
-      .from(tenants)
-      .where(eq(tenants.id, auth.tenantId))
-      .limit(1);
-    const settings = (tenant?.settings ?? {}) as TenantSettings;
-
-    // Issuer branding is resolved live (it is our letterhead, not the billed
-    // party's) but every figure and party below comes from the frozen snapshot.
-    /**
-     * Resolved by id AND tenant, never by name. `counterparties.name` is not
-     * unique across tenants, so a name lookup could pull another tenant's logo,
-     * address and VAT onto our invoice. The id is stored at issue for exactly
-     * this reason; the frozen name is only a display fallback.
-     */
-    const [company] = invoice.invoicingCompanyId
-      ? await db
-        .select({
-          name: counterparties.name,
-          address: counterparties.headOfficeAddress,
-          phone: counterparties.headOfficePhone,
-          email: counterparties.headOfficeEmail,
-          vatNumber: counterparties.vatNumber,
-          logoUrl: counterparties.logoUrl,
-          brandColor: counterparties.brandColor,
-        })
-        .from(counterparties)
-        .where(and(eq(counterparties.id, invoice.invoicingCompanyId), eq(counterparties.tenantId, auth.tenantId)))
-        .limit(1)
-      : [];
-
-    const { dateFormat } = await getDateFormatSettings(auth.tenantId);
-    const { enabled: brandingEnabled, layout } = await getDocumentBrandingSettings(auth.tenantId);
-    const accent = resolveTenantDocAccent(company?.brandColor ?? null, brandingEnabled) ?? '#0f766e';
-
-    const footer = buildDocumentFooter({
-      senderName: invoice.invoicingCompanyName ?? company?.name ?? tenant?.name ?? '',
-      companyAddress: company?.address ?? null,
-      companyPhone: company?.phone ?? null,
-      companyEmail: company?.email ?? null,
-      vatNumber: company?.vatNumber ?? null,
-      companyRegistrationNumber: null,
-      printMeta: null,
-      dateFormat,
-      accent,
-    });
-
-    // The remittance block was snapshotted at issue, so an issued invoice keeps
-    // printing the account it was issued with.
-    const bankDetails = invoice.bankDetails;
-
-    const docDefinition = buildSupplierInvoiceDocument({
-      invoice,
-      bankDetails,
-      logoDataUrl: tryLoadLogoDataUrl(company?.logoUrl ?? null),
-      layout,
-      footer,
-    });
-
-    const buffer = await createPdfBuffer(docDefinition as never);
-    const safeNumber = invoice.invoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_');
+    const { buffer, fileName } = await renderSupplierInvoicePdf(invoice, auth.tenantId);
 
     set.headers['Content-Type'] = 'application/pdf';
-    set.headers['Content-Disposition'] = `attachment; filename="Supplier_Invoice_${safeNumber}.pdf"`;
+    set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
     set.headers['Content-Length'] = String(buffer.length);
     return buffer;
   }, {
     params: t.Object({ id: t.String() }),
     detail: { tags: ['Supplier Invoices'], summary: 'Supplier invoice PDF', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── Send the invoice to the supplier ───────────────────────────────
+  //
+  // A supplier invoice covers a PERIOD and many deals, so it cannot ride the
+  // order-scoped document endpoint: there is no vessel, no port and no single
+  // order to hang it on. The recipient defaults to the supplier's billing/general
+  // addresses and is resolved server-side, because the supplier is the party who
+  // owes the money and a mistyped recipient on a payable is a real loss.
+  .post('/:id/send', async ({ auth, params, body, set }) => {
+    if (!(await assertSupplierInvoicesEnabled(auth.tenantId))) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Broker deals are not enabled for this tenant' };
+    }
+    const invoice = await getSupplierInvoice(params.id, auth.tenantId);
+    if (!invoice) {
+      set.status = 404;
+      return { success: false, data: null, message: 'Supplier invoice not found' };
+    }
+    if (invoice.status === 'VOID') {
+      set.status = 400;
+      return { success: false, data: null, message: 'This invoice was voided and is kept for audit only.' };
+    }
+
+    const [sender] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, auth.userId))
+      .limit(1);
+
+    /**
+     * Recipient resolution: the caller may override, otherwise the supplier's
+     * own addresses are used — 'invoice' first, then 'general', because on a
+     * payable the billing address is the right default and only one address is
+     * needed. `counterpartyId` is the invoice's frozen `supplierId`, so this
+     * cannot pick up another tenant's or another company's address.
+     */
+    // Resolution rule lives in the service as a pure function: billing address
+    // first, then general, deterministic when several share a rank.
+    const supplierEmails = await db
+      .select({ email: companyEmails.email, emailType: companyEmails.emailType, isPrimary: companyEmails.isPrimary })
+      .from(companyEmails)
+      .where(eq(companyEmails.counterpartyId, invoice.supplierId));
+
+    const recipientEmails = selectSupplierRecipients(supplierEmails, body.recipientEmails ?? []);
+    if (recipientEmails.length === 0) {
+      set.status = 400;
+      return {
+        success: false,
+        data: null,
+        message: `${invoice.supplierName} has no email address on file. Add one on the company, or enter a recipient.`,
+      };
+    }
+
+    const periodLabel = `${invoice.periodFrom} – ${invoice.periodTo}`;
+    const subject = body.subject?.trim()
+      || buildDocumentEmailSubject({
+        documentType: 'SUPPLIER_INVOICE',
+        invoiceNumber: invoice.invoiceNumber,
+        periodLabel,
+      });
+    const htmlBody = body.htmlBody?.trim()
+      || buildDocumentEmailHtml({
+        documentType: 'SUPPLIER_INVOICE',
+        senderName: sender?.name ?? 'Fueld User',
+        periodLabel,
+        invoiceNumber: invoice.invoiceNumber,
+        totalAmount: `${invoice.currency} ${invoice.amount}`,
+        dueDate: invoice.dueDate,
+        companyName: invoice.invoicingCompanyName,
+      });
+
+    try {
+      // Rendered INSIDE the handler so a render failure returns the same JSON
+      // error shape as a send failure instead of a bare 500.
+      const { buffer, fileName } = await renderSupplierInvoicePdf(invoice, auth.tenantId);
+      const result = await sendDocumentEmail({
+        documentType: 'SUPPLIER_INVOICE',
+        tenantId: auth.tenantId,
+        sentByUserId: auth.userId,
+        senderEmail: auth.email,
+        senderName: sender?.name ?? 'Fueld User',
+        recipientEmails,
+        ccEmails: body.ccEmails ?? [],
+        bccEmails: body.bccEmails ?? [],
+        subject,
+        htmlBody,
+        pdfBuffer: buffer,
+        pdfFileName: fileName,
+      });
+      // Summarised on the invoice so the page can answer "has this been sent?",
+      // the question the route exists to make answerable. Best-effort: the email
+      // has already gone, so a failure here must not report the send as failed.
+      try {
+        await markSupplierInvoiceSent(invoice.id, auth.tenantId, recipientEmails);
+      } catch (err) {
+        console.error('[SupplierInvoices] Failed to record the send on the invoice:', err);
+      }
+      return {
+        success: true,
+        data: { sentTo: recipientEmails, channel: result.channel, pdfFileName: fileName },
+        message: `Invoice sent to ${recipientEmails.join(', ')} via ${result.channel}`,
+        ...(result.tokenExpiredWarning ? { tokenExpiredWarning: result.tokenExpiredWarning } : {}),
+      } satisfies ApiResponse<{ sentTo: string[]; channel: string; pdfFileName: string }>;
+    } catch (err) {
+      console.error('[SupplierInvoices] Send failed:', err);
+      set.status = 500;
+      return { success: false, data: null, message: err instanceof Error ? err.message : 'Failed to send invoice' };
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({
+      recipientEmails: t.Optional(t.Array(t.String({ format: 'email' }))),
+      ccEmails: t.Optional(t.Array(t.String({ format: 'email' }))),
+      bccEmails: t.Optional(t.Array(t.String({ format: 'email' }))),
+      subject: t.Optional(t.String()),
+      htmlBody: t.Optional(t.String()),
+    }),
+    detail: { tags: ['Supplier Invoices'], summary: 'Email the supplier invoice PDF to the supplier', security: [{ bearerAuth: [] }] },
   })
 
   // ── Record money received from the supplier ────────────────────────

@@ -52,6 +52,32 @@ export async function requestRaw(path: string, options: RawRequestOptions = {}) 
   };
 }
 
+/**
+ * Like `requestRaw`, but returns the response as BYTES.
+ *
+ * `requestRaw` decodes the body as text, which corrupts a binary response (a
+ * PDF) and makes byte comparison impossible.
+ */
+export async function requestBytes(path: string, options: RawRequestOptions = {}) {
+  const app = await getE2EApp();
+  const headers = new Headers(options.headers ?? {});
+  if (options.token) headers.set('authorization', `Bearer ${options.token}`);
+
+  const response = await app.handle(
+    new Request(`http://localhost${path}`, {
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body,
+    }),
+  );
+
+  return {
+    status: response.status,
+    bytes: Buffer.from(await response.arrayBuffer()),
+    headers: response.headers,
+  };
+}
+
 export async function requestJson(path: string, options: JsonRequestOptions = {}) {
   const app = await getE2EApp();
   const headers = new Headers();

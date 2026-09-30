@@ -863,6 +863,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         INQUIRY: 'Inquiry',
         BUNKER_BOOKING: 'Bunker Booking',
         BROKER_CONFIRMATION: 'Broker Confirmation',
+        SUPPLIER_INVOICE: 'Supplier Invoice',
       };
 
       // Determine recipient based on document type

@@ -196,6 +196,8 @@ export async function getSupplierInvoice(id: string, tenantId: string): Promise<
     bankDetails: row.bankDetails ?? null,
     note: row.note ?? null,
     issuedAt: row.issuedAt?.toISOString() ?? null,
+    sentAt: row.sentAt?.toISOString() ?? null,
+    sentTo: row.sentTo ?? null,
     voidedAt: row.voidedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     lines: lines.map(toLineDto),
@@ -305,6 +307,8 @@ export async function listSupplierInvoices(
       bankDetails: row.bankDetails ?? null,
       note: row.note ?? null,
       issuedAt: row.issuedAt?.toISOString() ?? null,
+      sentAt: row.sentAt?.toISOString() ?? null,
+      sentTo: row.sentTo ?? null,
       voidedAt: row.voidedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       lines: lines.map(toLineDto),
@@ -571,6 +575,52 @@ export async function createSupplierInvoicesFromReport(
  * correction is a void plus a reissue — same rule as the customer side. The
  * number is NOT reused, so the two documents stay independently traceable.
  */
+/**
+ * Choose which of a supplier's addresses an invoice should go to.
+ *
+ * Pure, so the rule can be tested without a database or a mail transport: billing
+ * (`invoice`) beats `general`, `isPrimary` wins within a class, and the tie-break
+ * is the address itself. That last part matters — several addresses can share
+ * `isPrimary`, and which one wins a PAYABLE must not depend on row order.
+ *
+ * Falls back to any primary address, then to nothing at all, which the caller
+ * reports as a refusal rather than sending a payable nowhere.
+ */
+export function selectSupplierRecipients(
+  rows: Array<{ email: string; emailType: string; isPrimary: boolean }>,
+  override: string[],
+): string[] {
+  const chosen = override.map((e) => e.trim()).filter(Boolean);
+  if (chosen.length > 0) return chosen;
+  if (rows.length === 0) return [];
+
+  const billing = rows.filter((r) => r.emailType === 'invoice');
+  const general = rows.filter((r) => r.emailType === 'general');
+  const preferred = (billing.length > 0 ? billing : general)
+    .slice()
+    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.email.localeCompare(b.email));
+  if (preferred.length > 0) return [preferred[0]!.email];
+
+  const anyPrimary = rows
+    .filter((r) => r.isPrimary)
+    .slice()
+    .sort((a, b) => a.email.localeCompare(b.email));
+  return anyPrimary.length > 0 ? [anyPrimary[0]!.email] : [];
+}
+
+/**
+ * Record that an invoice has been emailed.
+ *
+ * Kept out of the ledger module: this is invoice HEADER state, not settlement.
+ * A resend overwrites, because the invoice page wants the latest send.
+ */
+export async function markSupplierInvoiceSent(id: string, tenantId: string, sentTo: string[]): Promise<void> {
+  await db
+    .update(supplierInvoices)
+    .set({ sentAt: new Date(), sentTo: sentTo.join(', ') })
+    .where(and(eq(supplierInvoices.id, id), eq(supplierInvoices.tenantId, tenantId)));
+}
+
 export async function voidSupplierInvoice(id: string, tenantId: string, reason?: string | null): Promise<SupplierInvoiceDto | null> {
   const [tenant] = await db
     .select({ tenantId: supplierInvoices.tenantId })

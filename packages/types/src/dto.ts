@@ -3195,6 +3195,9 @@ export interface SupplierInvoiceDto {
   note: string | null;
   issuedAt: string | null;
   voidedAt: string | null;
+  /** When the invoice was last emailed, and to whom. Null until first sent. */
+  sentAt: string | null;
+  sentTo: string | null;
   createdAt: string;
   lines: SupplierInvoiceLineDto[];
   /**

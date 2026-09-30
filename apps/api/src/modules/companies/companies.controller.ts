@@ -1602,7 +1602,7 @@ export const companiesController = new Elysia({ prefix: '/companies' })
   )
   .get(
     '/local/:id/ledger/supplier',
-    async ({ params, query }) => {
+    async ({ params, query, auth }) => {
       try {
         const ledger = await getSupplierPaymentLedger(params.id, {
           limit: query?.limit ? Number(query.limit) : undefined,
@@ -1610,7 +1610,7 @@ export const companiesController = new Elysia({ prefix: '/companies' })
           sort: query?.sort as 'date' | 'amount' | undefined,
           dateFrom: query?.dateFrom,
           dateTo: query?.dateTo,
-        });
+        }, auth.tenantId);
         return { success: true, data: ledger } satisfies ApiResponse<typeof ledger>;
       } catch (err: any) {
         console.error('[Companies] Supplier ledger failed:', err);

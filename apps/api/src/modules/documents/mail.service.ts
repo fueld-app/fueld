@@ -31,13 +31,18 @@ function isLightColor(hex: string): boolean {
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'INQUIRY' | 'BUNKER_BOOKING' | 'BROKER_CONFIRMATION';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'INQUIRY' | 'BUNKER_BOOKING' | 'BROKER_CONFIRMATION' | 'SUPPLIER_INVOICE';
 
 export interface SendDocumentEmailOptions {
   /** Document type being sent */
   documentType: DocumentEmailType;
-  /** Order ID (for logging) */
-  orderId: string;
+  /**
+   * Order ID, for the email log. Optional because a supplier invoice covers a
+   * whole PERIOD and many orders, so there is no single order to attribute it
+   * to; `email_log.order_id` is nullable and the document number is in the log's
+   * subject.
+   */
+  orderId?: string | null;
   /** Tenant ID (for logging) */
   tenantId: string;
   /** User ID of the sender (for logging and Graph token acquisition) */
@@ -272,7 +277,7 @@ async function logEmail(
   try {
     await db.insert(emailLog).values({
       tenantId: options.tenantId,
-      orderId: options.orderId,
+      orderId: options.orderId ?? null,
       documentType: options.documentType,
       sentByUserId: options.sentByUserId,
       sentFromEmail: options.senderEmail,
@@ -424,13 +429,37 @@ function buildPortDocumentationEmailHtml(params: {
   `;
 }
 
+/**
+ * Minimal HTML escape for values interpolated into an email body.
+ *
+ * The order-scoped fields in this builder have always been interpolated raw; the
+ * supplier-invoice fields added here come from a frozen snapshot, so today they
+ * are server-generated. Escaping the new ones at least keeps a future free-text
+ * value (a period label, a note) from turning into markup in a document a
+ * counterparty receives. It is deliberately not applied to the surrounding
+ * template strings, which contain intentional markup.
+ */
+function escapeHtml(value: string | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export function buildDocumentEmailHtml(params: {
   documentType: DocumentEmailType;
   senderName: string;
-  vesselName: string;
+  /** Order-shaped. Absent on a supplier invoice, which covers a period. */
+  vesselName?: string | null;
   vesselImo?: string | null;
-  portName: string;
-  orderNumber: string;
+  portName?: string | null;
+  orderNumber?: string | null;
+  /** Supplier invoice figures, so the email body is not just a bare attachment. */
+  invoiceNumber?: string | null;
+  totalAmount?: string | null;
+  dueDate?: string | null;
   documentLabel?: string;
   paymentTerms?: string | null;
   eta?: string | null;
@@ -442,37 +471,39 @@ export function buildDocumentEmailHtml(params: {
   companyLogoUrl?: string | null;
   companyAddress?: string | null;
   brandColor?: string | null;
+  /** Period the supplier invoice covers, e.g. "1–30 Sep 2026". */
+  periodLabel?: string | null;
 }): string {
   const labels: Record<DocumentEmailType, { title: string; greeting: string; intro: string }> = {
     OFFER: {
       title: 'Offer',
       greeting: 'Dear Customer',
-      intro: `Please find attached our offer for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+      intro: `Please find attached our offer for bunker delivery to <strong>${params.vesselName ?? ''}</strong> at <strong>${params.portName ?? ''}</strong>.`,
     },
     CONFIRMATION: {
       title: 'Confirmation',
       greeting: 'Dear Customer',
-      intro: `Please find attached our confirmation for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+      intro: `Please find attached our confirmation for bunker delivery to <strong>${params.vesselName ?? ''}</strong> at <strong>${params.portName ?? ''}</strong>.`,
     },
     NOMINATION: {
       title: 'Nomination',
       greeting: 'Dear Supplier',
-      intro: `Please find attached our nomination for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+      intro: `Please find attached our nomination for bunker delivery to <strong>${params.vesselName ?? ''}</strong> at <strong>${params.portName ?? ''}</strong>.`,
     },
     PROFORMA: {
       title: 'Proforma Invoice',
       greeting: 'Dear Customer',
-      intro: `Please find attached the proforma invoice for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+      intro: `Please find attached the proforma invoice for bunker delivery to <strong>${params.vesselName ?? ''}</strong> at <strong>${params.portName ?? ''}</strong>.`,
     },
     INVOICE: {
       title: 'Invoice',
       greeting: 'Dear Customer',
-      intro: `Please find attached the invoice for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+      intro: `Please find attached the invoice for bunker delivery to <strong>${params.vesselName ?? ''}</strong> at <strong>${params.portName ?? ''}</strong>.`,
     },
     PORT_DOCUMENTATION: {
       title: 'Port Documentation',
       greeting: 'Dear Customer',
-      intro: `Please find attached the port-documentation package for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+      intro: `Please find attached the port-documentation package for bunker delivery to <strong>${params.vesselName ?? ''}</strong> at <strong>${params.portName ?? ''}</strong>.`,
     },
     INQUIRY: {
       title: 'Inquiry',
@@ -482,19 +513,32 @@ export function buildDocumentEmailHtml(params: {
     BUNKER_BOOKING: {
       title: 'Bunker Booking',
       greeting: 'Dear Captain',
-      intro: `Bunkers have been booked for <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+      intro: `Bunkers have been booked for <strong>${params.vesselName ?? ''}</strong> at <strong>${params.portName ?? ''}</strong>.`,
+    },
+    SUPPLIER_INVOICE: {
+      title: 'Invoice',
+      // Addressed to the supplier: it is a claim on THEIR money, and the
+      // "delivery" wording of the customer invoice would misdescribe it.
+      greeting: 'Dear Supplier',
+      intro: `Please find attached our invoice for broker commission on your deliveries during the period <strong>${escapeHtml(params.periodLabel)}</strong>.`,
     },
     BROKER_CONFIRMATION: {
       title: 'Broker Confirmation',
       greeting: 'Dear Broker',
-      intro: `Please find attached the broker confirmation for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+      intro: `Please find attached the broker confirmation for bunker delivery to <strong>${params.vesselName ?? ''}</strong> at <strong>${params.portName ?? ''}</strong>.`,
     },
   };
 
   const l = labels[params.documentType];
 
   if (params.documentType === 'PORT_DOCUMENTATION') {
-    return buildPortDocumentationEmailHtml(params);
+    // Port documentation is inherently order-scoped, so the order fields are
+    // always present here; the fallbacks exist only to satisfy the narrower type.
+    return buildPortDocumentationEmailHtml({
+      ...params,
+      vesselName: params.vesselName ?? '',
+      portName: params.portName ?? '',
+    });
   }
 
   const paymentTermsRow = params.paymentTerms
@@ -540,14 +584,26 @@ export function buildDocumentEmailHtml(params: {
         <p>${l.greeting},</p>
         <p>${l.intro}</p>
         <table style="margin: 16px 0; border-collapse: collapse;">
-          <tr>
+          ${params.vesselName ? `<tr>
             <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Vessel:</td>
             <td style="padding: 4px 0; font-weight: 600;">${params.vesselName}</td>
-          </tr>
-          <tr>
+          </tr>` : ''}
+          ${params.portName ? `<tr>
             <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Port:</td>
             <td style="padding: 4px 0; font-weight: 600;">${params.portName}</td>
-          </tr>
+          </tr>` : ''}
+          ${params.invoiceNumber ? `<tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Invoice number:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${escapeHtml(params.invoiceNumber)}</td>
+          </tr>` : ''}
+          ${params.totalAmount ? `<tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Amount:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${escapeHtml(params.totalAmount)}</td>
+          </tr>` : ''}
+          ${params.dueDate ? `<tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Due date:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${escapeHtml(params.dueDate)}</td>
+          </tr>` : ''}
           ${deliveryDateRow}
           ${paymentTermsRow}
         </table>
@@ -565,10 +621,17 @@ export function buildDocumentEmailHtml(params: {
 
 export function buildDocumentEmailSubject(params: {
   documentType: DocumentEmailType;
-  orderNumber: string;
-  vesselName: string;
-  portName: string;
+  /**
+   * Order-shaped fields. Optional because a supplier invoice covers a period
+   * and many orders, so it has none of them — requiring them would force the
+   * caller to pass empty strings and print a line of punctuation.
+   */
+  orderNumber?: string;
+  vesselName?: string;
+  portName?: string;
   invoiceNumber?: string;
+  /** Supplier invoice: the period it covers, e.g. "2026-09-01 – 2026-09-30". */
+  periodLabel?: string;
 }): string {
   const labels: Record<DocumentEmailType, string> = {
     OFFER: 'Offer',
@@ -580,13 +643,26 @@ export function buildDocumentEmailSubject(params: {
     INQUIRY: 'Inquiry',
     BUNKER_BOOKING: 'Bunker Booking',
     BROKER_CONFIRMATION: 'Broker Confirmation',
+    SUPPLIER_INVOICE: 'Supplier Invoice',
   };
 
   if (params.documentType === 'INVOICE' && params.invoiceNumber) {
-    return `Invoice ${params.invoiceNumber} — Bunker Delivery (${params.vesselName})`;
+    return `Invoice ${params.invoiceNumber} — Bunker Delivery (${params.vesselName ?? ''})`;
   }
 
-  return `${labels[params.documentType]} — ${params.orderNumber} — ${params.vesselName}, ${params.portName}`;
+  /**
+   * A supplier invoice is not tied to one delivery — it covers a period and
+   * several deals — so it carries neither an order number nor a vessel, and it
+   * is a claim on the SUPPLIER. Its own subject beats a line of punctuation.
+   */
+  if (params.documentType === 'SUPPLIER_INVOICE') {
+    // Joined, not interpolated: `invoiceNumber` and `periodLabel` are both
+    // optional, and a template would emit "Invoice  — period" (double space) or
+    // "Invoice " (trailing) for a caller that omits one.
+    return ['Invoice', params.invoiceNumber, params.periodLabel].filter(Boolean).join(' — ');
+  }
+
+  return `${labels[params.documentType]} — ${params.orderNumber ?? ''} — ${params.vesselName ?? ''}, ${params.portName ?? ''}`;
 }
 
 // ─── Inquiry-specific Email HTML ─────────────────────────────────────

@@ -38,6 +38,10 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 
   **Reports → Supplier Invoices** lists them newest first, with a toggle for voided ones, and each row opens a detail page showing the frozen lines, the payments booked against it, and the PDF download. A voided invoice is marked and its PDF is disabled — it is kept for audit, not reissued.
 
+  **Send it straight from the invoice.** The detail page has a **Send** button: leave the recipient blank and it goes to the supplier's billing address on file, or enter one yourself. The invoice is marked with when it was sent and to whom, so you can see at a glance which payables have actually gone out — an invoice nobody sent is money nobody owes. The PDF you mail is the same document as the PDF you download.
+
+  Money received from a supplier now shows on that supplier's own page too, kept clearly apart from money you paid *them*: the two run in opposite directions, so the received figure sits alongside the fuel payable rather than inside it. If you void an invoice that money had already been received against, the cash is not lost — it is listed as an **unapplied receipt** for you to apply to the reissued invoice or refund.
+
 - **Commission funded by the supplier can now be tracked and reported.** On some deals the commission Moxie negotiates is paid by the supplier rather than the customer — sometimes only the part above the usual $3/MT, sometimes the whole rate. Each line item now carries two commission rates: **Comm./Unit** (what the customer is billed, as before) and a new **Supp./Unit** (what the supplier pays). Both feed the deal's profit figure, so a deal where the supplier funds the commission no longer reads as earning nothing.
 
   A new **Supplier Commission Report** (Reports → Supplier Commission) turns those supplier-side rates into a statement per supplier for a period, with CSV and XLSX exports, alongside the figure the customer is billed on the same lines for reconciliation. It is a statement Moxie sends itself — it creates no invoice and no receivable, so nothing about customer billing, collections, ageing or QuickBooks changes.

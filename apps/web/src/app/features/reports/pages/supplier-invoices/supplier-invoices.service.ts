@@ -17,6 +17,22 @@ import { filenameFromResponse } from '@app/features/trading/pages/order-detail/s
 //  is hidden in that case, but a stale tab must not read a 404 as "no invoices".
 // ═══════════════════════════════════════════════════════════════════════
 
+export interface SendSupplierInvoiceResult {
+  sentTo: string[];
+  channel: string;
+  pdfFileName: string;
+}
+
+/**
+ * The send route reports a fallback channel OUTSIDE `data`; the shared
+ * ApiResponse has no slot for it, so it is added here rather than widening the
+ * shared DTO for one endpoint.
+ */
+export interface SendSupplierInvoiceResponse extends ApiResponse<SendSupplierInvoiceResult> {
+  /** Present when the Microsoft connection expired and SMTP was used instead. */
+  tokenExpiredWarning?: string;
+}
+
 @Service()
 export class SupplierInvoicesService {
   private readonly http = inject(HttpClient);
@@ -98,6 +114,26 @@ export class SupplierInvoicesService {
       ),
     );
     return res.success ? res.data ?? null : null;
+  }
+
+  /**
+   * Email the invoice PDF to the supplier.
+   *
+   * The whole response is returned, not just `data`: the page must surface
+   * `message` (no address on file, void invoice) and `tokenExpiredWarning`
+   * (the Microsoft connection expired and SMTP was used instead) — an error
+   * toast would misreport the latter.
+   */
+  async send(
+    id: string,
+    body: { recipientEmails?: string[]; ccEmails?: string[]; bccEmails?: string[]; subject?: string; htmlBody?: string },
+  ): Promise<SendSupplierInvoiceResponse> {
+    return firstValueFrom(
+      this.http.post<SendSupplierInvoiceResponse>(
+        `${API}/supplier-invoices/${encodeURIComponent(id)}/send`,
+        body,
+      ),
+    );
   }
 
   /**

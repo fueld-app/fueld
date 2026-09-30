@@ -5,7 +5,7 @@
 import { eq, ilike, or, and, sql, asc, desc, inArray, isNull, ne, notInArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { escapeLikePattern } from '../../utils/like';
-import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderItems, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, supplierPayments, invoices, creditApplications, portSuppliers, companyPlaceSupplyRules, creditLines, creditLineCounterparties } from '../../db/schema';
+import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderItems, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, supplierPayments, supplierInvoices, supplierReceipts, invoices, creditApplications, portSuppliers, companyPlaceSupplyRules, creditLines, creditLineCounterparties } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import { matchLocalVessels } from '../vessels/vessel.service';
 import {
@@ -2523,6 +2523,12 @@ export async function getCustomerPaymentLedger(
 export async function getSupplierPaymentLedger(
   companyId: string,
   opts: { limit?: number; offset?: number; sort?: 'date' | 'amount'; dateFrom?: string; dateTo?: string } = {},
+  /**
+   * Owning tenant. `companyId` alone does not bind a query to a tenant, and this
+   * ledger now reads `supplier_invoices`/`supplier_receipts`, so the supplier
+   * scope is asserted against the invoice's own tenant column as well.
+   */
+  tenantId: string | null = null,
 ) {
   const limit = Math.min(opts.limit ?? 50, 200);
   const offset = opts.offset ?? 0;
@@ -2591,13 +2597,101 @@ export async function getSupplierPaymentLedger(
     if (entry.totalCost === 0 && entry.totalPaid > 0) entry.outstanding = -entry.totalPaid;
   }
 
-  const totals = Array.from(totalsByCurrency.entries()).map(([currency, t]) => ({
-    currency,
-    totalPaid: t.totalPaid.toFixed(2),
-    totalCost: t.totalCost.toFixed(2),
-    outstanding: t.outstanding.toFixed(2),
-    count: t.count,
-  }));
+  /**
+   * Money the SUPPLIER paid US — broker commission they fund.
+   *
+   * The opposite direction to `totalPaid`, and deliberately NOT summed into it:
+   * that would report commission received as fuel we paid for, which is the exact
+   * confusion the separate `supplier_receipts` table exists to prevent.
+   *
+   * It is REPORTED, not netted into `outstanding`. `outstanding` is the fuel
+   * payable (cost − paid), and a receipt is the SETTLEMENT of a different
+   * receivable — the supplier's commission balance — which this function never
+   * counts. Subtracting a settlement while omitting the claim it settles makes
+   * `outstanding` neither the payable nor a net position: on a fully settled
+   * 1,000 commission invoice against a 10,000 payable it reported 9,000, a
+   * figure that understates what we owe by the whole commission and that grows
+   * more wrong as the supplier pays MORE. Netting only becomes meaningful when
+   * the commission claim is summed too; until then the honest thing is to
+   * report receipts beside the payable and leave the payable alone.
+   *
+   * Only settled invoices count — a receipt on a VOID invoice still moved cash
+   * (we keep those rows for audit) but is not a live credit, so it belongs in
+   * `unappliedReceipts` instead.
+   */
+  const receivedByCurrency = await db
+    .select({
+      currency: supplierReceipts.currency,
+      totalReceived: sql<string>`COALESCE(SUM(${supplierReceipts.amount}), 0)::numeric(14,2)`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(supplierReceipts)
+    .innerJoin(supplierInvoices, eq(supplierInvoices.id, supplierReceipts.supplierInvoiceId))
+    .where(and(
+      ...(tenantId ? [eq(supplierInvoices.tenantId, tenantId)] : []),
+      eq(supplierReceipts.supplierId, companyId),
+      ne(supplierInvoices.status, 'VOID'),
+      ...(opts.dateFrom ? [sql`${supplierReceipts.receivedAt} >= ${opts.dateFrom}`] : []),
+      ...(opts.dateTo ? [sql`${supplierReceipts.receivedAt} <= ${opts.dateTo}`] : []),
+    ))
+    .groupBy(supplierReceipts.currency);
+
+  /**
+   * Receipts held against a VOIDED invoice — "unapplied".
+   *
+   * These are real cash we hold, but they are not a live credit against any
+   * claim, so they stay out of `totalReceived` and out of `outstanding`. Silently
+   * dropping them would be the mirror of the bug this table exists to fix: money
+   * that vanished from the page. So they are reported as their own figure, which
+   * is what the money is — held, pending reissue or refund — and the operator can
+   * see it rather than having to remember.
+   */
+  const unappliedRows = await db
+    .select({
+      currency: supplierReceipts.currency,
+      amount: sql<string>`COALESCE(SUM(${supplierReceipts.amount}), 0)::numeric(14,2)`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(supplierReceipts)
+    .innerJoin(supplierInvoices, eq(supplierInvoices.id, supplierReceipts.supplierInvoiceId))
+    .where(and(
+      ...(tenantId ? [eq(supplierInvoices.tenantId, tenantId)] : []),
+      eq(supplierReceipts.supplierId, companyId),
+      eq(supplierInvoices.status, 'VOID'),
+    ))
+    .groupBy(supplierReceipts.currency);
+
+  const totals = Array.from(totalsByCurrency.entries()).map(([currency, t]) => {
+    const received = receivedByCurrency.find((r) => r.currency === currency);
+    const totalReceived = Number(received?.totalReceived ?? 0);
+    return {
+      currency,
+      totalPaid: t.totalPaid.toFixed(2),
+      totalCost: t.totalCost.toFixed(2),
+      totalReceived: totalReceived.toFixed(2),
+      // The fuel payable, un-netted. See the note on `receivedByCurrency`.
+      outstanding: t.outstanding.toFixed(2),
+      count: t.count,
+      receivedCount: received?.count ?? 0,
+    };
+  });
+
+  // A receipt in a currency with no fuel cost at all still has to appear, or the
+  // money vanishes from the page and the totals stop adding up.
+  for (const r of receivedByCurrency) {
+    if (totalsByCurrency.has(r.currency)) continue;
+    totals.push({
+      currency: r.currency,
+      totalPaid: '0.00',
+      totalCost: '0.00',
+      totalReceived: Number(r.totalReceived).toFixed(2),
+      // No fuel cost at all, so no payable: `outstanding` stays 0 rather than
+      // turning the commission received into a payable in the wrong direction.
+      outstanding: '0.00',
+      count: 0,
+      receivedCount: r.count,
+    });
+  }
 
   return {
     payments: rows.map((r) => ({
@@ -2613,6 +2707,15 @@ export async function getSupplierPaymentLedger(
       createdAt: r.createdAt.toISOString(),
     })),
     totals,
+    /**
+     * Cash held against voided invoices, per currency. Not netted into
+     * `outstanding` (a voided claim is not a live one) but never hidden either.
+     */
+    unappliedReceipts: unappliedRows.map((r) => ({
+      currency: r.currency,
+      amount: Number(r.amount).toFixed(2),
+      count: r.count,
+    })),
     pagination: { limit, offset, hasMore: rows.length === limit },
   };
 }

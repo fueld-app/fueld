@@ -26,6 +26,7 @@ interface LedgerPayment {
 interface LedgerTotal {
   currency: string;
   totalReceived?: string;
+  receivedCount?: number;
   totalPaid?: string;
   totalInvoiced?: string;
   totalCost?: string;
@@ -33,9 +34,22 @@ interface LedgerTotal {
   count: number;
 }
 
+/**
+ * Cash held against VOIDED supplier invoices. Real money, but not a live credit,
+ * so the API keeps it out of `outstanding` and reports it here instead of
+ * dropping it — a receipt must never vanish from the page just because its
+ * invoice was voided.
+ */
+interface UnappliedReceipt {
+  currency: string;
+  amount: string;
+  count: number;
+}
+
 interface LedgerResponse {
   payments: LedgerPayment[];
   totals: LedgerTotal[];
+  unappliedReceipts?: UnappliedReceipt[];
   pagination: { limit: number; offset: number; hasMore: boolean };
 }
 
@@ -187,6 +201,15 @@ interface NetPosition {
                   <div class="text-sm">
                     <span class="font-semibold text-gray-600 dark:text-muted">{{ t.currency }}</span>
                     <span class="ml-2 text-gray-500">Paid: {{ t.totalPaid | number:'1.2-2' }}</span>
+                    <!-- Opposite direction: money this supplier paid US (broker commission they fund).
+                         Deliberately separate from Paid: which is the outbound ledger only. -->
+                    @if (t.totalReceived && isPositive(t.totalReceived)) {
+                      <span
+                        class="ml-2 text-gray-500"
+                        title="Commission received from this supplier"
+                        aria-label="Commission received from this supplier"
+                      >Received: {{ t.totalReceived | number:'1.2-2' }}</span>
+                    }
                     <span class="ml-2 text-gray-500">Cost: {{ t.totalCost | number:'1.2-2' }}</span>
                     <span class="ml-2 font-medium" [class.text-red-600]="isPositive(t.outstanding)" [class.text-green-600]="!isPositive(t.outstanding)">
                       Outstanding: {{ t.outstanding | number:'1.2-2' }}
@@ -194,6 +217,25 @@ interface NetPosition {
                   </div>
                 }
               </div>
+            </div>
+          }
+
+          @if (supplierUnapplied().length > 0) {
+            <!-- Cash we hold against an invoice that was voided. Real money, not a
+                 live credit, so it is deliberately outside Outstanding — but it
+                 must be visible, or the operator has to remember it exists. -->
+            <div class="px-5 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+              <p class="text-xs font-semibold text-amber-900 dark:text-amber-200 uppercase tracking-wide">
+                Unapplied receipts — held against voided invoices
+              </p>
+              @for (u of supplierUnapplied(); track u.currency) {
+                <p class="mt-1 text-sm text-amber-900 dark:text-amber-200">
+                  {{ u.currency }} {{ u.amount | number:'1.2-2' }}
+                  <span class="text-amber-700 dark:text-amber-300">
+                    ({{ u.count }} receipt{{ u.count === 1 ? '' : 's' }}) — reissue the invoice to apply it, or refund it.
+                  </span>
+                </p>
+              }
             </div>
           }
 
@@ -258,6 +300,8 @@ export class PaymentsTabComponent {
   // Supplier (payables) data
   readonly supplierPayments = signal<LedgerPayment[]>([]);
   readonly supplierTotals = signal<LedgerTotal[]>([]);
+  /** Cash held against voided invoices — visible, but outside Outstanding. */
+  readonly supplierUnapplied = signal<UnappliedReceipt[]>([]);
   readonly supplierPagination = signal({ limit: 50, offset: 0, hasMore: false });
 
   // Net position: merge currencies from both sides
@@ -348,6 +392,7 @@ export class PaymentsTabComponent {
         this.supplierPayments.update((prev) => [...prev, ...res.data!.payments]);
       }
       this.supplierTotals.set(res.data.totals);
+      this.supplierUnapplied.set(res.data.unappliedReceipts ?? []);
       this.supplierPagination.set(res.data.pagination);
     }
   }

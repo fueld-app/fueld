@@ -680,6 +680,125 @@ describe('supplier invoices e2e', () => {
     expect((await db.select().from(supplierReceipts)).length).toBe(0);
   });
 
+  it('reports receipts beside the fuel payable without netting them into it', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Netted Ltd');
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '10' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+    const db = await getDb();
+    const [invoice] = await db.select().from(supplierInvoices);
+
+    const before = await requestJson(`/companies/local/${supplierId}/ledger/supplier`, { token });
+    const totalBefore = (before.data?.data?.totals ?? []).find((t: any) => t.currency === 'USD');
+    // Nothing received yet: outstanding is what we owe for the fuel leg.
+    expect(Number(totalBefore.totalReceived)).toBe(0);
+    expect(Number(totalBefore.outstanding)).toBe(Number(totalBefore.totalCost) - Number(totalBefore.totalPaid));
+
+    // Settle the commission invoice IN FULL (100 MT x 10).
+    await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+      method: 'POST', token, body: { amount: '1000', currency: 'USD' },
+    });
+
+    const after = await requestJson(`/companies/local/${supplierId}/ledger/supplier`, { token });
+    const totalAfter = (after.data?.data?.totals ?? []).find((t: any) => t.currency === 'USD');
+
+    expect(Number(totalAfter.totalReceived)).toBe(1000);
+    // The receipt is the OPPOSITE direction, so it must NOT appear as money we paid.
+    expect(Number(totalAfter.totalPaid)).toBe(Number(totalBefore.totalPaid));
+    /**
+     * And it must NOT net into the payable. `outstanding` is cost - paid for the
+     * FUEL; a receipt settles the supplier's commission balance, which this
+     * function never counts. Subtracting the settlement while omitting the claim
+     * would understate the payable by the whole commission — and by MORE the more
+     * the supplier pays. So the fuel payable is unchanged by a receipt.
+     */
+    expect(Number(totalAfter.outstanding)).toBe(Number(totalBefore.outstanding));
+  });
+
+  it('shows a receipt in a currency with no fuel cost at all rather than dropping it', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Euro Only Ltd');
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '100', commissionPerUnit: '0', supplierCommissionPerUnit: '10' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+    const db = await getDb();
+    const [invoice] = await db.select().from(supplierInvoices);
+
+    /**
+     * Written directly, not through the API: a receipt must match its invoice's
+     * currency (the route enforces it), so a EUR row can only arise from a path
+     * outside the app — support SQL, an import, a future tool. The ledger reads
+     * `supplier_receipts` regardless of who wrote it, so this is the case the
+     * zero-cost-currency branch defends, and the money must not vanish from the
+     * page just because no fuel leg is priced in EUR.
+     */
+    await db.insert(supplierReceipts).values({
+      tenantId: seeded.tenant.id,
+      supplierInvoiceId: invoice!.id,
+      supplierId,
+      amount: '300',
+      currency: 'EUR',
+      receivedAt: new Date('2026-09-20'),
+    });
+
+    const ledger = await requestJson(`/companies/local/${supplierId}/ledger/supplier`, { token });
+    const eur = (ledger.data?.data?.totals ?? []).find((t: any) => t.currency === 'EUR');
+    expect(eur).toBeDefined();
+    expect(Number(eur.totalReceived)).toBe(300);
+    // No EUR fuel cost, so no EUR payable: the receipt must not become one.
+    expect(Number(eur.outstanding)).toBe(0);
+    expect(Number(eur.totalPaid)).toBe(0);
+  });
+
+  it('does not treat a receipt on a VOID invoice as a live credit', async () => {
+    const seeded = await seedAuthBasics();
+    await enableBrokerDeals(seeded.tenant.id);
+    await promoteToAdmin(seeded.user.id);
+    const token = (await loginE2E(seeded.user.email, seeded.password)).accessToken;
+    const supplierId = await createSupplier(seeded.tenant.id, 'Voided Receipt Ltd');
+
+    await createBrokerDealWithLines(
+      token, seeded.client.id, seeded.vessel.id, seeded.place.id,
+      [{ productType: 'VLSFO', quantity: '50', commissionPerUnit: '0', supplierCommissionPerUnit: '10' }],
+      { supplierId, status: 'CONFIRMED', deliveredAt: '2026-09-15' },
+    );
+    await requestJson('/supplier-invoices', { method: 'POST', token, body: { from: '2026-09-01', to: '2026-09-30' } });
+    const db = await getDb();
+    const [invoice] = await db.select().from(supplierInvoices);
+
+    await requestJson(`/supplier-invoices/${invoice!.id}/receipts`, {
+      method: 'POST', token, body: { amount: '250', currency: 'USD' },
+    });
+    await requestJson(`/supplier-invoices/${invoice!.id}/void`, { method: 'POST', token, body: { reason: 'wrong rate' } });
+
+    const ledger = await requestJson(`/companies/local/${supplierId}/ledger/supplier`, { token });
+    const total = (ledger.data?.data?.totals ?? []).find((t: any) => t.currency === 'USD');
+    // The rows survive for audit, but a voided claim is not a credit: counting
+    // it would understate what we owe on the reissued invoice.
+    expect(Number(total?.totalReceived ?? 0)).toBe(0);
+
+    // It must not vanish either — real cash we hold, reported as unapplied so the
+    // operator can reapply or refund it instead of having to remember it.
+    const unapplied = (ledger.data?.data?.unappliedReceipts ?? []).find((u: any) => u.currency === 'USD');
+    expect(Number(unapplied?.amount ?? 0)).toBe(250);
+    expect(unapplied?.count).toBe(1);
+  });
+
   it('keeps receipts after a void, for audit, and blocks them on a voided invoice', async () => {
     const seeded = await seedAuthBasics();
     await enableBrokerDeals(seeded.tenant.id);

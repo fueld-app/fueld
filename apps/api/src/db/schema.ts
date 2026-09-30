@@ -1141,6 +1141,13 @@ export const supplierInvoices = pgTable('supplier_invoices', {
    */
   invoiceNumber: text('invoice_number').notNull(),
   status: supplierInvoiceStatusEnum('status').notNull().default('DRAFT'),
+  /**
+   * Set when the invoice is emailed. A SUMMARY, not a second log: `email_log`
+   * keeps the per-message record, while these answer the question the invoice
+   * page asks — has this been sent, when, and to whom. A resend overwrites them.
+   */
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  sentTo: text('sent_to'),
 
   /** The commission period this statement covers. */
   periodFrom: date('period_from').notNull(),

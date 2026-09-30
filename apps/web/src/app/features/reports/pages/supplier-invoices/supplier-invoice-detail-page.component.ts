@@ -41,6 +41,11 @@ import { SupplierInvoicesService } from './supplier-invoices.service';
           <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Commission owed to us by {{ invoice()?.supplierName ?? '—' }}
           </p>
+          @if (invoice()?.sentAt) {
+            <p class="mt-1 text-xs text-gray-400 dark:text-muted">
+              Sent {{ invoice()!.sentAt | dateFormat }} to {{ invoice()!.sentTo }}
+            </p>
+          }
         </div>
         <div class="flex flex-wrap gap-2">
           <button (click)="downloadPdf()" [disabled]="!canDownloadPdf() || downloading()"
@@ -48,6 +53,12 @@ import { SupplierInvoicesService } from './supplier-invoices.service';
             class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:cursor-not-allowed disabled:opacity-40">
             {{ downloading() ? 'Downloading…' : 'Download PDF' }}
           </button>
+          @if (invoice() && !isVoid()) {
+            <button (click)="openSendModal()" [disabled]="sending()"
+              class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:cursor-not-allowed disabled:opacity-40">
+              {{ sending() ? 'Sending…' : 'Send' }}
+            </button>
+          }
           @if (invoice() && !isVoid()) {
             <button (click)="voidInvoice()" [disabled]="voiding()"
               class="rounded-lg border border-red-300 dark:border-red-500/40 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50">
@@ -235,6 +246,75 @@ import { SupplierInvoicesService } from './supplier-invoices.service';
         </div>
       }
     </div>
+
+    @if (sendModalOpen()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="mx-4 w-full max-w-lg rounded-xl bg-white dark:bg-surface p-6 shadow-xl">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Send invoice {{ invoice()?.invoiceNumber ?? '' }}</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">Commission owed to us by {{ invoice()?.supplierName ?? '—' }}.</p>
+
+          <form class="mt-4 space-y-4" (ngSubmit)="send()">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">To</label>
+              <input type="text" name="sendTo" [ngModel]="sendTo()" (ngModelChange)="sendTo.set($any($event))"
+                placeholder="billing@supplier.com"
+                class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
+              <p class="mt-1 text-xs text-gray-400 dark:text-muted">
+                Leave blank to use the supplier's billing address on file. Separate multiple addresses with commas.
+              </p>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">CC</label>
+              <input type="text" name="sendCc" [ngModel]="sendCc()" (ngModelChange)="sendCc.set($any($event))"
+                placeholder="optional"
+                class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Subject</label>
+              <input type="text" name="sendSubject" [ngModel]="sendSubject()" (ngModelChange)="sendSubject.set($any($event))"
+                placeholder="optional"
+                class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
+              <p class="mt-1 text-xs text-gray-400 dark:text-muted">Leave blank to use the default subject.</p>
+            </div>
+            <p class="text-xs text-gray-400 dark:text-muted">
+              The invoice PDF ({{ invoice()?.invoiceNumber ?? '' }}) is attached automatically.
+            </p>
+
+            @if (sendValidationError()) {
+              <div class="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+                {{ sendValidationError() }}
+              </div>
+            }
+            @if (sendError()) {
+              <div class="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+                {{ sendError() }}
+              </div>
+            }
+            @if (sendSuccess()) {
+              <div class="rounded-lg border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
+                {{ sendSuccess() }}
+              </div>
+            }
+            @if (sendWarning()) {
+              <div class="rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                {{ sendWarning() }}
+              </div>
+            }
+
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" (click)="closeSendModal()" [disabled]="sending()"
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50">
+                Close
+              </button>
+              <button type="submit" [disabled]="sending()"
+                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                {{ sending() ? 'Sending…' : 'Send' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
   `,
 })
 export class SupplierInvoiceDetailPageComponent {
@@ -255,6 +335,18 @@ export class SupplierInvoiceDetailPageComponent {
   readonly receiptAmount = signal('');
   readonly receiptMethod = signal('');
   readonly error = signal<string | null>(null);
+
+  // Send modal. `sending` is separate from `busy` so a receipt form's state does
+  // not disable the dialog, and the dialog's in-flight state does not lock the page.
+  readonly sendModalOpen = signal(false);
+  readonly sending = signal(false);
+  readonly sendTo = signal('');
+  readonly sendCc = signal('');
+  readonly sendSubject = signal('');
+  readonly sendValidationError = signal<string | null>(null);
+  readonly sendError = signal<string | null>(null);
+  readonly sendSuccess = signal<string | null>(null);
+  readonly sendWarning = signal<string | null>(null);
 
   readonly isVoid = computed(() => this.invoice()?.status === 'VOID');
 
@@ -304,6 +396,84 @@ export class SupplierInvoiceDetailPageComponent {
   }
   /** The API answers 400 for a voided invoice, so the action is disabled here. */
   readonly canDownloadPdf = computed(() => !!this.invoice() && !this.isVoid());
+
+  openSendModal(): void {
+    this.sendTo.set('');
+    this.sendCc.set('');
+    this.sendSubject.set('');
+    this.sendValidationError.set(null);
+    this.sendError.set(null);
+    this.sendSuccess.set(null);
+    this.sendWarning.set(null);
+    this.sendModalOpen.set(true);
+  }
+
+  closeSendModal(): void {
+    if (this.sending()) return;
+    this.sendModalOpen.set(false);
+  }
+
+  /** Splits a comma/semicolon-separated list; blank entries are dropped, not sent. */
+  private static parseAddressList(raw: string): string[] {
+    return raw
+      .split(/[,;]/)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+  }
+
+  async send(): Promise<void> {
+    const inv = this.invoice();
+    if (!inv || this.sending() || this.isVoid()) return;
+
+    const recipients = SupplierInvoiceDetailPageComponent.parseAddressList(this.sendTo());
+    const ccs = SupplierInvoiceDetailPageComponent.parseAddressList(this.sendCc());
+    const invalid = [...recipients, ...ccs].find((addr) => !addr.includes('@'));
+    if (invalid) {
+      this.sendValidationError.set(`“${invalid}” is not a valid email address.`);
+      this.sendSuccess.set(null);
+      this.sendWarning.set(null);
+      this.sendError.set(null);
+      return;
+    }
+
+    this.sendValidationError.set(null);
+    this.sendError.set(null);
+    this.sendSuccess.set(null);
+    this.sendWarning.set(null);
+    this.sending.set(true);
+    try {
+      const res = await this.api.send(inv.id, {
+        recipientEmails: recipients.length ? recipients : undefined,
+        ccEmails: ccs.length ? ccs : undefined,
+        subject: this.sendSubject().trim() || undefined,
+      });
+
+      if (res.success && res.data) {
+        const via = res.data.channel === 'GRAPH' ? 'Microsoft 365' : res.data.channel;
+        this.sendSuccess.set(`Sent to ${res.data.sentTo.join(', ')} via ${via}.`);
+        if (res.tokenExpiredWarning) this.sendWarning.set(res.tokenExpiredWarning);
+        // The API stamps the send (sentAt / sentTo) on the invoice, so refetch:
+        // the header line then shows the server's timestamp and the recipients it
+        // actually resolved (a blank To means the billing address on file).
+        // Sending does not otherwise change the invoice; the success box stays.
+        try {
+          const refreshed = await this.api.get(inv.id);
+          if (refreshed) this.invoice.set(refreshed);
+        } catch {
+          // The send succeeded; a failed refresh must not be reported as one.
+        }
+      } else {
+        this.sendError.set(res.message || 'Failed to send invoice');
+        if (res.tokenExpiredWarning) this.sendWarning.set(res.tokenExpiredWarning);
+      }
+    } catch (err) {
+      // The API answers 400 with a message naming the supplier when there is no
+      // address on file — surface it verbatim.
+      this.sendError.set(apiMessage(err) || 'Failed to send invoice');
+    } finally {
+      this.sending.set(false);
+    }
+  }
 
   readonly outstandingClass = computed(() => {
     const inv = this.invoice();
@@ -385,4 +555,17 @@ export class SupplierInvoiceDetailPageComponent {
     if (Number.isNaN(num)) return value;
     return num.toLocaleString('en-US', { maximumFractionDigits: 3 });
   }
+}
+
+/** The API's `message` on an error body (HttpErrorResponse) or an Error's text. */
+function apiMessage(err: unknown): string | null {
+  if (err instanceof Error && err.message) return err.message;
+  if (err && typeof err === 'object' && 'error' in err) {
+    const body: unknown = err.error;
+    if (body && typeof body === 'object' && 'message' in body) {
+      const message: unknown = body.message;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+  }
+  return null;
 }

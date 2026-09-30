@@ -9,7 +9,15 @@ let mockTokenExpired = false;
 let mockSmtpSuccess = false;
 let lastTokenUserId: string | null = null;
 
+// Spread the ORIGINAL: a partial replacement is process-global and is only
+// re-evaluated when the module is FIRST imported. Whichever test file imports the
+// app graph first installs the mock for every file after it, so a replacement
+// carrying only `acquireGraphTokenForUser` breaks any later file that loads the
+// auth controller (`buildAuthorizationUrl` missing). Every other mock of this
+// module in the suite spreads the original for exactly this reason.
+const originalMicrosoftOAuth = await import('../src/modules/auth/microsoft-oauth.service');
 mock.module('../src/modules/auth/microsoft-oauth.service', () => ({
+  ...originalMicrosoftOAuth,
   acquireGraphTokenForUser: async (userId: string) => {
     lastTokenUserId = userId;
     return { token: mockGraphToken, tokenExpired: mockTokenExpired };
@@ -17,7 +25,13 @@ mock.module('../src/modules/auth/microsoft-oauth.service', () => ({
 }));
 
 // ── Mock the email (SMTP) module so we can test the SMTP fallback path ──
+// Spread the original here too — same process-global reason as above. Without it
+// every later file that loads the app graph dies importing `src/lib/email`
+// (`sendNotificationEmail` missing), because the mock wins in whichever file
+// imports the module first.
+const originalEmailModule = await import('../src/lib/email');
 mock.module('../src/lib/email', () => ({
+  ...originalEmailModule,
   getSmtpConfig: async () => mockSmtpSuccess
     ? { host: 'smtp.test.com', port: 587, user: 'test', pass: 'test', from: 'test@fueld.app', secure: false }
     : null,
