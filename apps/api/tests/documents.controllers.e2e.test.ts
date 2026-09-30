@@ -1,6 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, mock } from 'bun:test';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { and, eq } from 'drizzle-orm';
-import { bankAccounts, companyContacts, counterparties, documentRevisions, supplierNominations, tenants } from '../src/db/schema';
+import { bankAccounts, companyContacts, counterparties, documentRevisions, orderAttachments, orders, supplierNominations, tenants } from '../src/db/schema';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { listLiveOrderInvoices } from '../src/modules/orders/invoice.service';
 import { setOrderPaymentSchedule } from '../src/modules/orders/payment-schedule.service';
@@ -350,6 +352,70 @@ describe('documents + verify controller e2e', () => {
     }
   });
 
+  it('attaches an uploaded file to a BUNKER_BOOKING email', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+    const db = await getDb();
+    mockGraphToken = 'graph-booking-attachment-token';
+
+    // A calling sheet on the order. It is typed OTHER, which is the case that
+    // used to be impossible to send: BUNKER_BOOKING rejected attachments
+    // outright, and the INVOICE path filtered them out because OTHER is not in
+    // the tenant's deliveryDocumentationTypes (default ['BDR']).
+    // The send route loads attachment bytes from disk, so the row alone is not
+    // enough. A tiny PDF on disk makes this exercise the real read path.
+    const relPath = 'uploads/attachments/calling-sheet-test.pdf';
+    const absPath = join(process.cwd(), relPath);
+    mkdirSync(join(process.cwd(), 'uploads', 'attachments'), { recursive: true });
+    const bytes = Buffer.from('%PDF-1.4\n%%EOF\n');
+    writeFileSync(absPath, bytes);
+
+    const [attachment] = await db
+      .insert(orderAttachments)
+      .values({
+        orderId,
+        type: 'OTHER',
+        fileName: 'Calling Sheet Celtic.pdf',
+        filePath: `/${relPath}`,
+        mimeType: 'application/pdf',
+        fileSize: bytes.length,
+      })
+      .returning();
+
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return new Response('', { status: 202 });
+    }) as typeof fetch;
+
+    try {
+      const sent = await requestJson(`/orders/${orderId}/send-email`, {
+        method: 'POST',
+        token,
+        body: {
+          documentType: 'BUNKER_BOOKING',
+          recipientEmails: ['captain@example.com'],
+          subject: 'Bunker Booking',
+          htmlBody: '<p>Booking</p>',
+          attachmentIds: [attachment!.id],
+        },
+      });
+
+      expect(sent.status).toBe(200);
+      expect(sent.data?.success).toBe(true);
+
+      const graphPayload = JSON.parse(String(calls[0]?.init?.body));
+      const names = (graphPayload.message.attachments ?? []).map(
+        (a: { name: string }) => a.name,
+      );
+      expect(names).toContain('Calling Sheet Celtic.pdf');
+    } finally {
+      globalThis.fetch = originalFetch;
+      mockGraphToken = null;
+      rmSync(absPath, { force: true });
+    }
+  });
+
   it('sends offer email via /send-email with correct PDF attachment', async () => {
     const { token, orderId } = await seedDocumentReadyOrder();
     mockGraphToken = 'graph-offer-token';
@@ -655,10 +721,47 @@ describe('documents + verify controller e2e', () => {
 
     // HTML body should contain vessel name and branding
     expect(String(d?.htmlBody ?? '')).toContain('Fueld');
+    // No contact person on this order, so the greeting stays generic. It must
+    // NOT fall back to the client COMPANY name: "Dear Test Client" from a mail
+    // addressed to a person reads worse than "Dear Customer".
     expect(String(d?.htmlBody ?? '')).toContain('Dear Customer');
+    expect(String(d?.htmlBody ?? '')).not.toContain('Dear Test Client');
 
     // CC should include sender email
     expect(d?.ccEmails?.length).toBeGreaterThanOrEqual(1);
+  });
+
+
+  it('greets the selected customer contact by name, not "Dear Customer"', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+    const db = await getDb();
+
+    // Pick a contact for the order, which is what "tager navnet på den
+    // kontaktperson, der er valgt" asks for: the greeting should name whoever
+    // the recipient was chosen from.
+    const [contact] = await db
+      .insert(companyContacts)
+      .values({
+        counterpartyId: (await db.query.orders.findFirst({
+          where: (o: any, { eq }: any) => eq(o.id, orderId),
+          columns: { clientId: true },
+        }))!.clientId!,
+        name: 'Kasper Vendersen',
+        email: 'kasper@example.com',
+      })
+      .returning();
+    await db.update(orders).set({ customerContactId: contact!.id }).where(eq(orders.id, orderId));
+
+    const res = await requestJson(`/orders/${orderId}/email-defaults`, {
+      method: 'POST',
+      token,
+      body: { documentType: 'INVOICE', orderSupplierId: null },
+    });
+
+    expect(res.status).toBe(200);
+    const html = String(res.data?.data?.htmlBody ?? '');
+    expect(html).toContain('Dear Kasper Vendersen');
+    expect(html).not.toContain('Dear Customer');
   });
 
   it('returns pre-filled email defaults via /email-defaults for CONFIRMATION', async () => {
@@ -688,7 +791,9 @@ describe('documents + verify controller e2e', () => {
     expect(res.status).toBe(200);
     expect(res.data?.success).toBe(true);
     expect(String(res.data?.data?.subject ?? '')).toContain('Nomination');
-    expect(String(res.data?.data?.htmlBody ?? '')).toContain('Dear Supplier');
+    // The seeded supplier contact, named because they are the recipient —
+    // not the generic "Dear Supplier".
+    expect(String(res.data?.data?.htmlBody ?? '')).toContain('Dear Primary Supplier Contact');
   });
 
   it('returns pre-filled email defaults via /email-defaults for OFFER', async () => {

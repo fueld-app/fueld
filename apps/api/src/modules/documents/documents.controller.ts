@@ -11,7 +11,7 @@ import { sendWhatsAppGroupMessage, sendWhatsAppMessage, sendTemplatedGroupMessag
 import { db } from '../../db';
 import { users, counterparties, invoices, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderPortDocuments, orderSuppliers, orderTransferSides } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
-import { getInquirySettings, getDeliveryDocumentationSettings } from '../admin/settings.service';
+import { getInquirySettings } from '../admin/settings.service';
 import { composeBookingEmail, resolveBookingRecipients } from './booking-email.service';
 import { setOrderBunkerBookingSent } from '../orders/orders.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
@@ -142,12 +142,15 @@ async function loadSelectedOrderAttachments(orderId: string, attachmentIds: stri
     throw new Error('One or more selected attachments were not found on this order');
   }
 
-  const docSettings = await getDeliveryDocumentationSettings();
-  const allowedTypes = docSettings.deliveryDocumentationTypes;
-  if (rows.some((row) => !allowedTypes.includes(String(row.type ?? '').toUpperCase()))) {
-    throw new Error(`Only ${allowedTypes.join('/')} attachments can be added to invoice emails`);
-  }
-
+  // No TYPE allowlist here. There used to be one, against the tenant's
+  // `deliveryDocumentationTypes` (default ['BDR']), which meant an attachment
+  // was only ever attachable if it happened to be a delivery document: a
+  // bunker-booking calling sheet, a customer invoice, any OTHER-typed file was
+  // rejected with "Only BDR attachments can be added to invoice emails". The
+  // list the trader picks from already shows exactly these rows, and the
+  // attachment list is the tenant's own curated upload set — re-filtering it by
+  // an unrelated delivery-document setting only produced failures the trader
+  // could not act on. Order scoping and existence are what make this safe.
   return Promise.all(rows.map(async (row) => {
     const normalizedPath = row.filePath.startsWith('/') ? row.filePath : `/${row.filePath}`;
     const file = Bun.file(`${process.cwd()}${normalizedPath}`);
@@ -695,10 +698,12 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       }
 
       const attachmentIds = [...new Set((body.attachmentIds ?? []).filter(Boolean))];
-      if (attachmentIds.length > 0 && docType !== 'INVOICE' && docType !== 'PORT_DOCUMENTATION') {
-        set.status = 400;
-        return { success: false, message: 'Additional attachments are only supported for invoice and Port Documentation emails' };
-      }
+      // Attachments are allowed on ANY document email. BUNKER_BOOKING used to
+      // be excluded, which is precisely the case a trader needs most: a booking
+      // goes out with the calling sheet / port agent instructions attached, and
+      // the booking email is the only comms that reaches the agent. The
+      // document-type restriction produced a modal with no attachment list at
+      // all, so there was nothing to click and no error to explain the absence.
       if (docType === 'PORT_DOCUMENTATION' && attachmentIds.length === 0) {
         set.status = 400;
         return { success: false, message: 'Select at least one Port Documentation file to send' };
@@ -710,10 +715,32 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           attachments = docType === 'PORT_DOCUMENTATION'
             ? await loadSelectedOrderPortDocuments(orderId, attachmentIds)
             : await loadSelectedOrderAttachments(orderId, attachmentIds);
-        } catch (error: any) {
+        } catch (error) {
           set.status = 400;
-          return { success: false, message: error?.message ?? 'Failed to load selected attachments' };
+          return { success: false, message: error instanceof Error ? error.message : 'Failed to load selected attachments' };
         }
+      }
+
+      const totalAttachmentBytes = attachments.reduce((sum, a) => sum + a.content.length, 0);
+
+      // The ceiling is on what LEAVES the process, not on what arrives. The
+      // message body is JSON, the document PDF is attached too, and each
+      // attachment is base64-encoded at 4/3 plus MIME line breaks — so the
+      // encoded size is roughly 1.37x the raw bytes. A cap on raw attachments
+      // alone would let a selection pass here and then be rejected by the mail
+      // provider with exactly the non-actionable error this guard exists to
+      // prevent; the primary document bytes are therefore counted in.
+      const encodedOverhead = 1.37;
+      const primaryDocumentBytes = pdfBuffer?.length ?? 0;
+      const MAX_ENCODED_BYTES = 22 * 1024 * 1024;
+      const estimatedEncodedBytes = (totalAttachmentBytes + primaryDocumentBytes) * encodedOverhead;
+      if (estimatedEncodedBytes > MAX_ENCODED_BYTES) {
+        const rawBudgetMb = MAX_ENCODED_BYTES / encodedOverhead / 1024 / 1024;
+        set.status = 400;
+        return {
+          success: false,
+          message: `The selected attachments and the document total about ${(estimatedEncodedBytes / 1024 / 1024).toFixed(1)} MB once encoded, which is over the ${MAX_ENCODED_BYTES / 1024 / 1024} MB limit for one email (roughly ${rawBudgetMb.toFixed(1)} MB of files, less the document PDF). Deselect some and try again.`,
+        };
       }
 
       const rawHtmlBody = docType === 'NOMINATION' && nominationResponseUrl
@@ -869,6 +896,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       // Determine recipient based on document type
       let recipientEmail = '';
       let recipientName = '';
+      // Held from the NOMINATION branch so the greeting does not re-resolve the
+      // supplier leg (which runs a query) a second time.
+      let nominationContactName: string | null = null;
       if (docType === 'BROKER_CONFIRMATION') {
         recipientEmail = order.brokerContact?.email ?? '';
         recipientName = order.brokerContact?.name ?? order.broker?.name ?? '';
@@ -881,6 +911,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
         recipientEmail = nominationSupplier.supplier.contact?.email ?? '';
         recipientName = nominationSupplier.supplier.contact?.name ?? nominationSupplier.supplier.company?.name ?? '';
+        nominationContactName = nominationSupplier.supplier.contact?.name ?? null;
       } else if (docType === 'PORT_DOCUMENTATION') {
         recipientEmail = order.agentContact?.email ?? '';
         recipientName = order.agentContact?.name ?? order.agent?.name ?? '';
@@ -892,6 +923,21 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         recipientEmail = order.customerContact?.email ?? '';
         recipientName = order.customerContact?.name ?? order.client?.name ?? '';
       }
+
+      // The name the greeting may address: the CONTACT PERSON only, never the
+      // company these chains fall back to. `recipientName` doubles as the
+      // company-name fallback so the recipient list stays useful, but greeting
+      // "Dear Global Seatrade BV" from a mail addressed to a person reads worse
+      // than the generic "Dear Customer" it replaced.
+      const greetingName = docType === 'BROKER_CONFIRMATION'
+        ? (order.brokerContact?.name ?? null)
+        : docType === 'NOMINATION'
+          ? nominationContactName
+          : docType === 'PORT_DOCUMENTATION'
+            ? (order.agentContact?.name ?? null)
+            : order.brokerGetsAll && order.brokerContact
+              ? (order.brokerContact.name ?? null)
+              : (order.customerContact?.name ?? null);
 
       // Build recipient emails list: contact person + company primary/general email.
       // Split semicolon-separated emails (some contacts store multiple addresses in one field).
@@ -1058,6 +1104,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             paymentTerms,
             eta: order.eta ?? null,
             agentName: order.agent?.name ?? null,
+            // The contact the recipient came from, so the greeting names them
+            // rather than saying "Dear Customer".
+            contactName: greetingName,
             customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
             items: order.items?.map((item: any) => ({
               quantity: item.quantity,
@@ -1090,6 +1139,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           paymentTerms,
           eta: order.eta ?? null,
           agentName: order.agent?.name ?? null,
+          contactName: greetingName,
           customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
           items: order.items?.map((item: any) => ({
             quantity: item.quantity,

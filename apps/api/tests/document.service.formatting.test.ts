@@ -1217,6 +1217,56 @@ describe('document.service formatting helpers', () => {
     }
   });
 
+  it('prints the real invoice number, keeps the order reference, and never overflows the meta row', () => {
+    // ── Invoice reference block ──────────────────────────────────────
+    // The number a customer pays against must be the INVOICE number, and the
+    // order reference must still be on the page (payments quote it). The meta
+    // row stays at THREE non-wrapping entries: it shares its line with the title
+    // and four entries overflow it, so the reference and PO go on stacked lines.
+    const refCase = (invoiceNumber: string | null, purchaseOrderNumber: string | null) =>
+      __documentTestUtils.buildProformaDocument({
+        orderNumber: '20260916-000130', clientName: 'C', clientCountry: 'DK', clientAddress: null,
+        customerContactName: null, customerContactRole: null, customerContactPhone: null,
+        customerContactEmail: null, vesselName: 'V', vesselImo: null, portName: 'P',
+        eta: null, etd: null, timezone: 'UTC', currency: 'USD', fromName: null, fromEmail: null,
+        fromPhone: null, paymentTerms: null, customerNote: null, termsAndConditions: null,
+        placeRemark: null, companyName: 'C', companyAddress: null, companyPhone: null,
+        companyEmail: null, companyWebsite: null, companyLogoDataUrl: null, itemNotes: [],
+        items: [{ productType: 'VLSFO', description: null, quantity: '1', unit: 'MT', salesPrice: '1', salesCurrency: 'USD' }],
+        createdAt: new Date('2026-09-24T00:00:00Z'), dateFormat: 'ISO', layout: 'SLEEK',
+        dueDate: '2026-10-23',
+        invoiceNumber, purchaseOrderNumber,
+        referenceLine: invoiceNumber ? { label: 'Reference', value: '20260916-000130' } : null,
+      }) as never as { content: unknown[] };
+    const flat = collectTextValues;
+  
+    const withNumber = flat(refCase('INV-2026-0004', 'REF : AE088125')).join(' | ');
+    expect(withNumber).toContain('INV-2026-0004');
+    expect(withNumber).toContain('PO number:');
+    expect(withNumber).toContain('REF : AE088125');
+    // The order reference is still present, labelled as the reference it is.
+    expect(withNumber).toContain('20260916-000130');
+    // …and the label that was the bug: the ORDER number under "Invoice number".
+    const metaEntries = (): string[] => {
+      const cell = (refCase('INV-2026-0004', null).content as any[])
+        .flatMap((c: any) => (Array.isArray(c?.columns) ? c.columns : []))
+        .find((col: any) => Array.isArray(col?.stack?.[0]?.columns));
+      return cell ? cell.stack[0].columns.flatMap((c: any) => collectTextValues(c)) : [];
+    };
+    const entries = metaEntries().filter((t) => t.includes(':'));
+    // Three entries, never four: the row does not wrap and four overflow it.
+    expect(entries.length).toBe(3);
+    expect(entries[0]).toBe('Invoice number: ');
+    expect(entries.join('')).not.toContain('20260916-000130');
+  
+    // A PROFORMA has no invoice number, so the meta row shows the order
+    // reference alone — and no stacked reference line duplicating it.
+    const proformaRefs = flat(refCase(null, 'REF : AE088125')).join(' | ');
+    expect(proformaRefs).toContain('Reference:');
+    expect(proformaRefs).not.toContain('Invoice number:');
+    expect(proformaRefs.split('20260916-000130').length - 1).toBe(1);
+  });
+
   it('resolves the tenant accent, rejecting malformed or unreadable colours', async () => {
     const FUELD = '#1a56db';
     // Offers adopt SLEEK too. They are structurally different from invoices, so

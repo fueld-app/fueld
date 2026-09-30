@@ -98,6 +98,21 @@ export interface SleekDocumentInput {
   title: string;
   /** Top-right metadata line. Every entry already formatted. */
   meta: Array<{ label: string; value: string }>;
+  /**
+   * The buyer's own PO reference, printed on its own right-aligned line under
+   * the heading rule.
+   *
+   * It gets a line rather than joining `meta` because `metaRow` lays its entries
+   * out as a single non-wrapping columns row sharing the heading line with the
+   * document title: a fifth entry there would either collide with the title or
+   * push a date off the page for a tenant with a long reference.
+   */
+  purchaseOrderNumber?: string | null;
+  /**
+   * Order reference for the stacked reference block. Null when the meta row
+   * already carries it (no invoice number yet), which is the proforma case.
+   */
+  referenceLine?: { label: string; value: string } | null;
   issuer: SleekIssuer;
   party: SleekParty;
   /** Vessel / delivery block — only for fuel orders, omitted for offers. */
@@ -337,6 +352,54 @@ export function buildSleekDocument(input: SleekDocumentInput): TDocumentDefiniti
     canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 487, y2: 0, lineWidth: 0.6, lineColor: RULE }],
     margin: [0, 6, 0, 0],
   } as Content);
+
+  // ── PO / order reference ───────────────────────────────────────────
+  // The buyer's own reference, so their AP can match this invoice to their
+  // purchase order. CLASSIC prints the same pair as a "PO.:" header row; here it
+  // sits under the rule, in the same tabular form so the labels stay
+  // column-aligned and a long value WRAPS in its own cell.
+  //
+  // A table, not a text array: pdfmake overdraws a label whose value wraps to a
+  // second line when the two are spans of one text node (the label stays on line
+  // one and the wrapped remainder starts at the left edge, on top of it). This is
+  // the same pattern `buildDocumentHeader` uses for Date/Ref/PO in CLASSIC.
+  const secondaryRows: Array<Array<{ text: string; fontSize?: number; bold?: boolean; color?: string; alignment?: 'right'; noWrap?: boolean; margin?: [number, number, number, number] }>> = [];
+  if (input.purchaseOrderNumber?.trim()) {
+    secondaryRows.push([
+      { text: 'PO number:', fontSize: 9.5, color: MUTED, bold: true, alignment: 'right', noWrap: true, margin: [0, 0, 4, 0] },
+      { text: input.purchaseOrderNumber.trim(), fontSize: 9.5, bold: true, color: INK },
+    ]);
+  }
+  if (input.referenceLine?.value?.trim()) {
+    secondaryRows.push([
+      { text: `${input.referenceLine.label}:`, fontSize: 9.5, color: MUTED, bold: true, alignment: 'right', noWrap: true, margin: [0, 0, 4, 0] },
+      { text: input.referenceLine.value.trim(), fontSize: 9.5, bold: true, color: INK },
+    ]);
+  }
+  if (secondaryRows.length > 0) {
+    // Wrapped in `columns` with a flexible first column: `alignment` is not a
+    // property a pdfmake TABLE honours (tables draw at the current left x), so
+    // setting it on the table node left the block flush left under a
+    // right-aligned metadata row.
+    content.push({
+      columns: [
+        { width: '*', text: '' },
+        {
+          width: 'auto',
+          table: { widths: ['auto', 'auto'], body: secondaryRows },
+          layout: {
+            hLineWidth: () => 0,
+            vLineWidth: () => 0,
+            paddingLeft: () => 0,
+            paddingRight: () => 0,
+            paddingTop: () => 1,
+            paddingBottom: () => 1,
+          },
+        },
+      ],
+      margin: [0, 6, 0, 0] as [number, number, number, number],
+    } as Content);
+  }
 
   // ── Account (broker deals) ─────────────────────────────────────────
   // The nomination is for the account of the deal's customer rather than our own

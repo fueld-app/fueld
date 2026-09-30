@@ -473,6 +473,16 @@ export function buildDocumentEmailHtml(params: {
   brandColor?: string | null;
   /** Period the supplier invoice covers, e.g. "1–30 Sep 2026". */
   periodLabel?: string | null;
+  /**
+   * The contact person this email is addressed to — the one whose address was
+   * chosen as the recipient. When present the greeting names them ("Dear Kasper")
+   * instead of the generic "Dear Customer"/"Dear Supplier", which is what a
+   * trader who picked a specific contact expects to see in the sent mail.
+   *
+   * Optional: an order with no contact falls back to the document type's generic
+   * greeting rather than addressing nobody.
+   */
+  contactName?: string | null;
 }): string {
   const labels: Record<DocumentEmailType, { title: string; greeting: string; intro: string }> = {
     OFFER: {
@@ -530,6 +540,14 @@ export function buildDocumentEmailHtml(params: {
   };
 
   const l = labels[params.documentType];
+  // Name the contact when we know it. A trader who picked "Kasper" out of the
+  // contact list and sent to his address should not have the mail open with
+  // "Dear Customer"; the generic greeting stays as the fallback for an order
+  // with no contact on file, which must not read "Dear ,".
+  // Escaped: a contact name is user-supplied free text going into HTML.
+  const greeting = params.contactName?.trim()
+    ? `Dear ${escapeHtml(params.contactName.trim())}`
+    : l.greeting;
 
   if (params.documentType === 'PORT_DOCUMENTATION') {
     // Port documentation is inherently order-scoped, so the order fields are
@@ -581,7 +599,7 @@ export function buildDocumentEmailHtml(params: {
         ${addressHtml}
       </div>
       <div style="background: #ffffff; padding: 32px; border-top: 1px solid #e5e7eb;">
-        <p>${l.greeting},</p>
+        <p>${greeting},</p>
         <p>${l.intro}</p>
         <table style="margin: 16px 0; border-collapse: collapse;">
           ${params.vesselName ? `<tr>

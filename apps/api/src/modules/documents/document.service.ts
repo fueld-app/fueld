@@ -1564,6 +1564,9 @@ export async function generateOrderInvoicePdfBuffer(
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
     latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     docTitle: 'INVOICE',
+    // The number the customer will be told to pay against. The SLEEK layout
+    // reads it; CLASSIC prints it in its own header block.
+    invoiceNumber,
     printMeta: null as DocumentPrintMeta | null,
     // The invoice's OWN frozen total, not a fresh sum of the lines: the two can
     // differ if the order was edited between issuance and the first render.
@@ -1572,6 +1575,12 @@ export async function generateOrderInvoicePdfBuffer(
     tranchePercent: invoice.tranchePercent,
     orderLinesTotal: invoice.trancheSeq == null ? null : await computeInvoiceAmountForItems(order.items),
     trancheSeq: invoice.trancheSeq,
+    // Printed under the PO line, in the same font. Only when a real invoice
+    // number took the `Reference:` slot in the meta row — otherwise the order
+    // number is already there and this would duplicate it.
+    referenceLine: invoiceNumber?.trim() && order.orderNumber?.trim()
+      ? { label: 'Reference', value: order.orderNumber.trim() }
+      : null,
   };
 
   const docDefinition = buildProformaDocument(docData);
@@ -2761,7 +2770,21 @@ function buildSleekProformaInput(data: ProformaDocumentData, accentText: string,
     : null;
 
   const meta: Array<{ label: string; value: string }> = [];
-  if (data.orderNumber?.trim()) meta.push({ label: 'Invoice number', value: data.orderNumber.trim() });
+  // The number on the document must be the number the customer was told. This
+  // used to print `data.orderNumber` under the "Invoice number" label, so a
+  // customer reconciling against INV-2026-0004 found no such invoice on the
+  // page. A proforma has no invoice number yet (it is not a receivable), so it
+  // shows the order reference, as CLASSIC does.
+  //
+  // Deliberately STILL three entries: the row is a single non-wrapping columns
+  // row sharing its line with the title, and four entries overflow it (four
+  // noWrap cells plus inter-entry margins exceed the 487pt rule width, and
+  // pdfmake does not shrink `auto` columns). The order reference and the PO
+  // therefore go on their own stacked lines below — see `purchaseOrderNumber`.
+  const primaryRef = data.invoiceNumber?.trim()
+    ? { label: 'Invoice number', value: data.invoiceNumber.trim() }
+    : (data.orderNumber?.trim() ? { label: 'Reference', value: data.orderNumber.trim() } : null);
+  if (primaryRef) meta.push(primaryRef);
   const createdDate = formatDateTimeForDisplay(data.createdAt.toISOString(), data.timezone, false, data.dateFormat ?? undefined);
   if (createdDate) meta.push({ label: 'Invoice date', value: createdDate });
   if (dueFormatted) meta.push({ label: 'Due date', value: dueFormatted });
@@ -2796,6 +2819,8 @@ function buildSleekProformaInput(data: ProformaDocumentData, accentText: string,
     logoDataUrl: data.companyLogoDataUrl,
     title: sleekTitleFor(data),
     meta,
+    purchaseOrderNumber: data.purchaseOrderNumber ?? null,
+    referenceLine: data.referenceLine ?? null,
     issuer: {
       name: data.companyName?.trim() || 'Fueld Trading',
       address: data.companyAddress,
@@ -2912,6 +2937,20 @@ export type ProformaDocumentData = {
   docTitle?: string;
   printMeta?: DocumentPrintMeta | null;
   purchaseOrderNumber?: string | null;
+  /**
+   * The REAL invoice number from the invoices row. Only an INVOICE has one — a
+   * proforma is a quote, not a receivable — and without it the SLEEK layout
+   * printed the ORDER number under the "Invoice number" label, so a customer
+   * reconciling against the number we told them would find no such invoice.
+   */
+  invoiceNumber?: string | null;
+  /**
+   * Order reference, printed on its own line under the PO. Set only when a real
+   * invoice number occupies the `Reference:` slot in the meta row, so the page
+   * always shows both the number the customer pays against and the order the
+   * payment will quote — without a fourth meta entry.
+   */
+  referenceLine?: { label: string; value: string } | null;
   deliveredAt?: Date | null;
   /**
    * Total already frozen on the invoice row. When present it wins over the sum

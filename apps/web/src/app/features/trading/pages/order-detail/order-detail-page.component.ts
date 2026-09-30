@@ -654,17 +654,24 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       !this.hasDeliveryDocumentation()
     );
   });
-  readonly invoiceEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() => {
-    const allowedTypes = this.refData.deliveryDocumentationSettings().deliveryDocumentationTypes;
-    return this.attachments()
-      .filter((att) => allowedTypes.includes((att.type ?? '').toUpperCase()))
-      .map((att) => ({
-        id: att.id,
-        fileName: att.fileName,
-        label: `${att.type ?? 'Doc'} uploaded ${new Date(att.createdAt).toLocaleDateString('en-GB')}`,
-        previewUrl: att.filePath.startsWith('http') ? att.filePath : `${API_URL}${att.filePath}`,
-      }));
-  });
+  /**
+   * Files uploaded to this order that any document email can carry.
+   *
+   * No type filter. It used to keep only the tenant's `deliveryDocumentationTypes`
+   * (BDR), on the assumption that the only thing ever attached to an invoice was
+   * delivery documentation — so Moxie's 84 OTHER attachments (customer invoices,
+   * calling sheets) could never be selected from any email, and a Bunker Booking
+   * had no list at all. The types are still visible per row via the Attachments
+   * card; the email modal shows what the order holds.
+   */
+  readonly orderEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() =>
+    this.attachments().map((att) => ({
+      id: att.id,
+      fileName: att.fileName,
+      label: `${att.type ?? 'Doc'} uploaded ${new Date(att.createdAt).toLocaleDateString('en-GB')}`,
+      previewUrl: att.filePath.startsWith('http') ? att.filePath : `${API_URL}${att.filePath}`,
+    })),
+  );
   readonly portDocumentationEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() =>
     (this.portDocumentationContext()?.documents ?? [])
       .filter((doc) => String(doc.status ?? '').toUpperCase() === 'ACTIVE')
@@ -676,13 +683,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       })),
   );
   readonly emailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() => {
-    if (this.emailDocumentType() === 'INVOICE') {
-      return this.invoiceEmailAttachmentOptions();
-    }
+    // PORT_DOCUMENTATION sends its own generated package rather than the order's
+    // uploads, and it must send at least one — the server enforces that.
     if (this.emailDocumentType() === 'PORT_DOCUMENTATION') {
       return this.portDocumentationEmailAttachmentOptions();
     }
-    return [];
+    // Everything else — invoice, proforma, offer, nomination, booking — offers
+    // the order's attachments, so a booking can carry the calling sheet.
+    return this.orderEmailAttachmentOptions();
   });
 
   readonly isPaidOrCancelled = computed(() => {
@@ -2124,6 +2132,16 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   onAttachmentSelected(file: File): void {
     this.selectedAttachment = file;
+  }
+
+  /**
+   * The send-email modal uploaded a file itself. Reload the order's attachments
+   * so the modal's `emailAttachmentOptions()` picks the new row up — the modal
+   * selects it by id, and the list it renders must contain that id or the
+   * checkbox it just ticked would vanish.
+   */
+  async onModalAttachmentsUploaded(): Promise<void> {
+    await this.loadAttachments();
   }
 
   /** Handle files dragged and dropped onto the attachments card — upload each with the selected type. */

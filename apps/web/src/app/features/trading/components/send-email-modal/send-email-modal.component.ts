@@ -11,6 +11,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import type { ApiResponse } from '@fueld/types';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import {
   EmailTagInputComponent,
@@ -81,6 +83,8 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
       <!-- Backdrop -->
       <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+        (dragover)="swallowDrop($event)"
+        (drop)="swallowDrop($event)"
       >
         <!-- Modal panel -->
         <div
@@ -409,6 +413,16 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                   </span>
                 </div>
                 <div class="mt-3 space-y-2">
+                  @if (visibleExtraAttachments().length === 0) {
+                    <p class="text-xs text-gray-400 dark:text-muted">
+                      @if (canUploadAttachments()) {
+                        Nothing uploaded to this order yet — add a file below.
+                      } @else {
+                        No port documentation files are available for this order. Generate them from the Port
+                        Documentation card before sending.
+                      }
+                    </p>
+                  }
                   @for (attachment of visibleExtraAttachments(); track attachment.id) {
                     <div class="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface px-3 py-2.5 text-sm text-gray-700 dark:text-ink-dim transition-colors hover:border-brand-300 hover:bg-brand-50/40">
                       <input
@@ -451,6 +465,48 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                     </div>
                   }
                 </div>
+
+                <!-- Upload straight from the modal. A calling sheet arrives while
+                     the trader is composing the booking, not before it, so making
+                     him close the modal, go to the Attachments card, upload,
+                     re-open and re-compose was the whole cost of the missing
+                     feature. The file is uploaded to the order first and then
+                     selected, so what gets emailed is the same row the
+                     Attachments card shows. -->
+                @if (canUploadAttachments()) {
+                  <div
+                    class="mt-3 rounded-lg border border-dashed px-3 py-2.5 transition-colors"
+                    [class.border-brand-400]="draggingFiles()"
+                    [class.bg-brand-50]="draggingFiles()"
+                    [class.border-gray-300]="!draggingFiles()"
+                    (dragover)="onDragOver($event)"
+                    (dragleave)="onDragLeave($event)"
+                    (drop)="onDrop($event)"
+                  >
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p class="text-xs text-gray-500 dark:text-muted">
+                        @if (uploadingFile()) {
+                          Uploading…
+                        } @else {
+                          Drag files here to upload and attach them.
+                        }
+                      </p>
+                      <div class="flex items-center gap-2">
+                        <input
+                          #modalFileInput
+                          type="file"
+                          multiple
+                          (change)="onFilesPicked($event)"
+                          accept="application/pdf,image/*"
+                          class="w-full text-xs text-gray-600 dark:text-ink-dim file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-gray-700 hover:file:bg-gray-200"
+                        />
+                      </div>
+                    </div>
+                    @if (uploadError()) {
+                      <p class="mt-2 text-xs text-red-600 dark:text-red-400">{{ uploadError() }}</p>
+                    }
+                  </div>
+                }
               </div>
             }
 
@@ -566,7 +622,8 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             <!-- Send email -->
             <button
               (click)="doSend()"
-              [disabled]="sending() || !hasRecipient()"
+              [disabled]="sending() || !hasRecipient() || uploadingFile()"
+              [title]="uploadingFile() ? 'Waiting for the upload to finish' : ''"
               class="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold
                      text-white shadow-sm transition-colors hover:bg-brand-800 disabled:opacity-50
                      disabled:cursor-not-allowed"
@@ -643,6 +700,12 @@ export class SendEmailModalComponent {
   // ── Outputs ──
   readonly sendEmail = output<SendEmailPayload>();
   readonly sendWhatsApp = output<SendWhatsAppPayload>();
+  /**
+   * A file the modal uploaded itself landed on the order. The parent reloads its
+   * attachment list and re-supplies `extraAttachments`, so the new row is the
+   * same one the Attachments card shows.
+   */
+  readonly attachmentsChanged = output<void>();
 
   // ── ViewChildren ──
   private readonly toInput = viewChild<EmailTagInputComponent>('toInput');
@@ -661,6 +724,23 @@ export class SendEmailModalComponent {
   readonly pdfPreviewUrl = signal<SafeResourceUrl | null>(null);
   readonly previewingAttachmentId = signal<string | null>(null);
   readonly selectedAttachmentIds = signal<string[]>([]);
+  readonly uploadingFile = signal(false);
+  /**
+   * Files this modal uploaded itself, in this session.
+   *
+   * They are known to be `orderAttachments` rows, so for a non-PORT_DOCUMENTATION
+   * send they resolve against the same table the server will use. They are kept
+   * separately from `selectedAttachmentIds` because `effectiveSelectedAttachmentIds`
+   * intersects the selection with what is RENDERED — and between the upload
+   * returning and the parent's `loadAttachments()` round-trip completing, the new
+   * id is selected but not yet rendered, which would silently drop the file the
+   * trader had just dropped in.
+   */
+  readonly uploadedAttachmentIds = signal<string[]>([]);
+  /** In-flight upload batches; `uploadingFile` is true while this is > 0. */
+  private readonly pendingUploadBatches = signal(0);
+  readonly draggingFiles = signal(false);
+  readonly uploadError = signal<string | null>(null);
   readonly isMobilePreview = isMobilePdfPreviewUserAgent(navigator.userAgent);
 
   subject = '';
@@ -678,20 +758,66 @@ export class SendEmailModalComponent {
   readonly recipientScope = computed<'customer' | 'supplier'>(() =>
     this.documentType() === 'NOMINATION' ? 'supplier' : 'customer',
   );
-  readonly visibleExtraAttachments = computed(() =>
-    this.documentType() === 'INVOICE' || this.documentType() === 'PORT_DOCUMENTATION'
-      ? this.extraAttachments()
-      : [],
+  // Attachments are offered for EVERY document type. It used to be INVOICE and
+  // PORT_DOCUMENTATION only, so a Bunker Booking — the one mail that reaches the
+  // port agent — could not carry the calling sheet at all, and the modal simply
+  // had no attachment section to notice the absence of.
+  //
+  // BUNKER_BOOKING is the exception to `hasPrimaryDocument` (it has no PDF), not
+  // to attachments, so the two are decided separately.
+  readonly visibleExtraAttachments = computed(() => this.extraAttachments());
+  /**
+   * The attachment section is shown when there is a list to render OR when the
+   * modal can upload. Keying it on `list.length > 0` alone hid the upload zone in
+   * exactly the scenario it exists for — an order with no attachments yet, where
+   * the calling arrives while the booking is being written. PORT_DOCUMENTATION
+   * also always shows it: with no ACTIVE port documents the section is the only
+   * place the requirement can be explained, and hiding it left a Send button
+   * that the server was always going to refuse.
+   */
+  readonly showExtraAttachments = computed(() =>
+    this.visibleExtraAttachments().length > 0
+    || this.canUploadAttachments()
+    || this.documentType() === 'PORT_DOCUMENTATION',
   );
-  readonly showExtraAttachments = computed(() => this.visibleExtraAttachments().length > 0);
   readonly attachmentSectionTitle = computed(() =>
     this.documentType() === 'PORT_DOCUMENTATION' ? 'Port Documentation files' : 'Additional attachments',
   );
   readonly attachmentSectionDescription = computed(() =>
     this.documentType() === 'PORT_DOCUMENTATION'
       ? 'Select the generated or included port-document files to attach to this email.'
-      : 'Select delivery documentation files to include with the invoice email.',
+      : 'Select files already uploaded to this order to include with the email.',
   );
+
+  /**
+   * Whether this modal may upload a NEW file to the order.
+   *
+   * Not for PORT_DOCUMENTATION: its attachment list is the order's generated
+   * port-document package (`orderPortDocuments`), a different entity from the
+   * order's uploads (`orderAttachments`). An upload there would create an
+   * orderAttachments row, auto-select its id, and then the server would resolve
+   * that id against orderPortDocuments and refuse the send — with the offending
+   * id invisible in the list and therefore impossible to untick.
+   */
+  readonly canUploadAttachments = computed(() => this.documentType() !== 'PORT_DOCUMENTATION');
+
+  /**
+   * Selected ids that the CURRENT list renders, plus files this modal uploaded
+   * itself this session.
+   *
+   * The selection is kept across a document-type switch, and an upload can add
+   * an id the current list does not yet contain (the parent's refresh is an
+   * async round-trip). Sending such an id makes the server resolve it against a
+   * table the list does not read and fail the whole email, so the send is
+   * reconciled against what is on screen — except for ids we uploaded ourselves,
+   * which are provably correct for this document type (`canUploadAttachments`
+   * gates the upload) and must not be dropped while the list catches up.
+   */
+  readonly effectiveSelectedAttachmentIds = computed(() => {
+    const rendered = new Set(this.visibleExtraAttachments().map((a) => a.id));
+    const own = new Set(this.uploadedAttachmentIds());
+    return this.selectedAttachmentIds().filter((id) => rendered.has(id) || own.has(id));
+  });
 
   hasRecipient(): boolean {
     return (this.toInput()?.getEmails()?.length ?? 0) > 0;
@@ -719,6 +845,11 @@ export class SendEmailModalComponent {
     this.htmlBody = defaults.htmlBody;
     this.waPhoneNumber = defaults.defaultPhoneOverride ?? this.defaultPhone() ?? '';
     this.pdfPreviewUrl.set(null);
+    // A new compose is a new session: ids uploaded during a PREVIOUS open belong
+    // to no current selection and must not be unioned into this send.
+    this.uploadedAttachmentIds.set([]);
+    this.uploadError.set(null);
+    this.draggingFiles.set(false);
     const availableAttachmentIds = this.visibleExtraAttachments().map((attachment) => attachment.id);
     this.selectedAttachmentIds.set(
       this.documentType() === 'PORT_DOCUMENTATION'
@@ -922,6 +1053,9 @@ export class SendEmailModalComponent {
   doSend(): void {
     const toEmails = this.toInput()?.getEmails() ?? [];
     if (toEmails.length === 0) return;
+    // An upload still in flight has no id yet, so sending now would silently drop
+    // the file the trader just dropped in.
+    if (this.uploadingFile()) return;
     this.sending.set(true);
 
     this.onBodyInput();
@@ -934,13 +1068,112 @@ export class SendEmailModalComponent {
       bccEmails: this.bccInput()?.getEmails() ?? [],
       subject: this.subject,
       htmlBody: this.htmlBody,
-      attachmentIds: this.selectedAttachmentIds(),
+      attachmentIds: this.effectiveSelectedAttachmentIds(),
       invoiceId: this.invoiceId(),
     });
   }
 
   isAttachmentSelected(attachmentId: string): boolean {
     return this.selectedAttachmentIds().includes(attachmentId);
+  }
+
+  // ── Upload from the modal ──────────────────────────────────────────
+
+  /**
+   * Upload each file to the ORDER, then select it. The email send route takes
+   * attachment IDS, so a file that only lived in the browser could not be
+   * attached — it is stored against the order first, which is also what makes it
+   * visible on the Attachments card afterwards.
+   *
+   * Sequential on purpose: a partial failure must leave the ones that succeeded
+   * selected and report the rest, rather than aborting the batch and leaving the
+   * user unable to tell which landed.
+   */
+  private async uploadFiles(files: File[]): Promise<void> {
+    const oid = this.orderId();
+    // See `canUploadAttachments`: an upload for PORT_DOCUMENTATION would create
+    // an id the current list does not render.
+    if (!oid || files.length === 0 || !this.canUploadAttachments()) return;
+
+    this.uploadError.set(null);
+    // A count, not a boolean: two overlapping drops would otherwise let the
+    // first batch's completion clear the flag while the second is in flight,
+    // re-opening the send-while-uploading window.
+    this.pendingUploadBatches.update((n) => n + 1);
+    this.uploadingFile.set(true);
+    const failures: string[] = [];
+    let uploaded = 0;
+
+    try {
+      for (const file of files) {
+        const form = new FormData();
+        form.append('file', file);
+        // OTHER, not a delivery-document type. Filing a calling sheet as BDR would
+        // flip the delivery-documentation gates that read BDR-typed rows; a
+        // calling is not a BDR. The Attachments card re-types it if needed.
+        form.append('type', 'OTHER');
+
+        try {
+          const res = await firstValueFrom(
+            this.http.post<ApiResponse<{ id: string }>>(`${API_URL}/orders/${oid}/attachments`, form),
+          );
+          const createdId = res.success ? res.data?.id : undefined;
+          if (createdId) {
+            this.selectedAttachmentIds.update((current) => [...current, createdId]);
+            this.uploadedAttachmentIds.update((current) => [...current, createdId]);
+            uploaded += 1;
+          } else {
+            failures.push(`${file.name}: ${res.message ?? 'upload failed'}`);
+          }
+        } catch (err) {
+          // Prefer the server's message: "Attachment must be under 10 MB" and
+          // "Only PDF or image files are allowed" are both actionable, and a
+          // generic failure would leave the user guessing which rule it hit.
+          const message = (err as { error?: { message?: string } })?.error?.message;
+          failures.push(`${file.name}: ${message ?? 'upload failed'}`);
+        }
+      }
+    } finally {
+      this.pendingUploadBatches.update((n) => Math.max(0, n - 1));
+      this.uploadingFile.set(this.pendingUploadBatches() > 0);
+    }
+
+    if (uploaded > 0) this.attachmentsChanged.emit();
+    if (failures.length > 0) this.uploadError.set(failures.join('; '));
+  }
+
+  onFilesPicked(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    // Reset so picking the SAME file again still fires a change event.
+    input.value = '';
+    void this.uploadFiles(files);
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.draggingFiles.set(true);
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    this.draggingFiles.set(false);
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.draggingFiles.set(false);
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    void this.uploadFiles(files);
+  }
+
+  /**
+   * A file dropped anywhere else on the modal would otherwise be handled by the
+   * browser's default: it navigates to the file, destroying the composed email.
+   * Swallowing dragover/drop at the modal shell makes an off-target drop inert.
+   */
+  swallowDrop(event: DragEvent): void {
+    event.preventDefault();
   }
 
   toggleAttachmentSelection(attachmentId: string, checked: boolean): void {
