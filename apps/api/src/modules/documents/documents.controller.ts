@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { and, desc, eq, inArray, isNull, ne, notInArray } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
-import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError, InvoiceLinesChangedError, InvoiceNotFoundError, UnpricedScheduleError } from '../orders/invoice.service';
+import { InternalTransferHasNoInvoiceError, MixedCurrencyInvoiceError, InvoiceLinesChangedError, InvoiceNotFoundError, UnpricedScheduleError, UnpricedOrderError, ReissueAmountChangedError } from '../orders/invoice.service';
 import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, generateBrokerConfirmationPdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms, hasPayableBankDetails } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById, updateOrderStatus } from '../orders/orders.service';
@@ -510,7 +510,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           set.status = 404;
           return { success: false, message: err.message };
         }
-        if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError) && !(err instanceof UnpricedScheduleError)) throw err;
+        if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError) && !(err instanceof UnpricedScheduleError) && !(err instanceof UnpricedOrderError) && !(err instanceof ReissueAmountChangedError)) throw err;
         set.status = 400;
         return { success: false, message: err.message };
       }
@@ -673,7 +673,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
               set.status = 404;
               return { success: false, message: err.message };
             }
-            if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError) && !(err instanceof UnpricedScheduleError)) throw err;
+            if (!(err instanceof InternalTransferHasNoInvoiceError) && !(err instanceof MixedCurrencyInvoiceError) && !(err instanceof InvoiceLinesChangedError) && !(err instanceof UnpricedScheduleError) && !(err instanceof UnpricedOrderError) && !(err instanceof ReissueAmountChangedError)) throw err;
             set.status = 400;
             return { success: false, message: err.message };
           }
