@@ -144,7 +144,7 @@ export async function allocateInvoiceNumber(tenantId: string, now = new Date()):
  */
 export async function voidOrderInvoice(
   orderId: string,
-  options: { reissue?: boolean; dueDate?: string; invoiceId?: string } = {},
+  options: { reissue?: boolean; dueDate?: string; invoiceId?: string; reprice?: boolean } = {},
 ): Promise<{ voided: typeof invoices.$inferSelect; replacement: typeof invoices.$inferSelect | null }> {
   // With split payment terms an order has one invoice PER TRANCHE, so a caller
   // that means "the invoice" must say which. Without an id this acts on the
@@ -197,6 +197,25 @@ export async function voidOrderInvoice(
     const amount = current.trancheSeq == null
       ? await computeInvoiceAmount(orderId)
       : current.amount ?? '0.00';
+
+    // The single-invoice replacement RE-DERIVES from the order's current state
+    // rather than copying the voided figure. When the reissue IS the correction
+    // (bill the delivered quantity, fix a rate) that is what is wanted — but it
+    // also means an edit made after the void was requested rides silently into
+    // the replacement. A replacement billing a materially different figure from
+    // the document it replaces is a deliberate re-pricing, so it must be asked
+    // for by name rather than inferred.
+    if (current.trancheSeq == null) {
+      const from = parseFloat(current.amount ?? '0');
+      const to = parseFloat(amount);
+      if (!Number.isFinite(to) || to <= 0) {
+        throw new UnpricedOrderError(orderId);
+      }
+      if (Math.abs(to - from) > 0.005 && options.reprice !== true) {
+        throw new ReissueAmountChangedError(current.invoiceNumber, from.toFixed(2), to.toFixed(2));
+      }
+    }
+
     reissueContext = {
       tenantId: order.tenantId,
       dueDate: options.dueDate ?? current.dueDate,
@@ -520,6 +539,41 @@ export class UnpricedScheduleError extends Error {
   }
 }
 
+/**
+ * The order has no invoiceable value yet — every line is unpriced, zero, or
+ * hidden from documents — so issuing would freeze a zero-value invoice.
+ *
+ * The scheduled path has always refused this (`UnpricedScheduleError`), but the
+ * single-invoice path did not: it froze whatever the lines summed to at that
+ * instant. Measured consequence on Moxie (2026-10-01): order 20260915-000129 was
+ * issued mid-edit with no usable priced line and froze **368,400.47** against a
+ * 9,288.00 commission. A zero is easier to spot than a plausible wrong number,
+ * but both are documents the customer must never receive.
+ */
+export class UnpricedOrderError extends Error {
+  constructor(orderId: string) {
+    super(`Price the line items before issuing this order's invoice (order ${orderId})`);
+    this.name = 'UnpricedOrderError';
+    void orderId;
+  }
+}
+
+/**
+ * Thrown when a reissue would bill a materially different figure from the
+ * document it replaces, and the caller did not ask for a re-price.
+ *
+ * The replacement re-derives from the order's current state, so this refuses
+ * rather than silently issuing a document nobody reviewed. Callers surface the
+ * two figures; a deliberate correction re-runs with `reprice: true`.
+ */
+export class ReissueAmountChangedError extends Error {
+  constructor(invoiceNumber: string, from: string, to: string) {
+    super(`Reissuing ${invoiceNumber} would bill ${to} instead of ${from} — the order changed after this invoice was issued. Reissue again with reprice to confirm the new figure.`);
+    this.name = 'ReissueAmountChangedError';
+    void invoiceNumber;
+  }
+}
+
 /** Thrown when an order has no invoice to act on. */
 export class InvoiceNotFoundError extends Error {
   constructor(orderId: string) {
@@ -659,6 +713,15 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
     order.customerCreditDays,
   );
   const amount = await computeInvoiceAmount(orderId);
+
+  // Same invariant the scheduled path already enforced, applied to the
+  // single-invoice path, which had none. A line can be unpriced, zero, or hidden
+  // from documents while the order is mid-edit, and `computeInvoiceAmount`
+  // happily returns 0.00 — which would freeze (and email) a zero-value invoice
+  // and burn an invoice number on a document that is not a receivable.
+  if (parseFloat(amount) <= 0) {
+    throw new UnpricedOrderError(orderId);
+  }
 
   const created = await insertInvoiceWithRetry({ orderId, tenantId: order.tenantId, dueDate, amount });
   if (created) {

@@ -32,8 +32,9 @@ import {
   recomputeInvoiceAmountPaid,
   resolvePaymentInvoiceTarget,
   voidOrderInvoice,
-  generateOrderInvoicePdfBuffer,
   AmbiguousInvoiceError,
+  UnpricedOrderError,
+  ReissueAmountChangedError,
   UnpricedScheduleError,
   InvoiceAlreadyVoidError,
   InvoiceNotFoundError,
@@ -100,6 +101,58 @@ async function seedOrderWithItems(overrides: Partial<typeof orders.$inferInsert>
   const basics = await seedBasics();
   return { ...basics, order: await createOrderWithItems(basics, overrides) };
 }
+
+describe('issuance guard — an unpriced order must not become a receivable', () => {
+  it('refuses to issue when no line is invoiceable, instead of freezing zero', async () => {
+    // Without this the single-invoice path froze whatever the lines summed to,
+    // including 0.00 and including a mid-edit intermediate (Moxie order
+    // 20260915-000129 froze 368,400.47 while mid-edit). The scheduled path had
+    // always refused this; the single-invoice path had no check at all.
+    const basics = await seedBasics();
+    const [order] = await db.insert(orders).values({
+      tenantId: basics.tenant.id, clientId: basics.client.id,
+      vesselId: basics.vessel.id, placeId: basics.place.id,
+      orderNumber: `UNPRICED-${Date.now()}`, currency: 'USD', status: 'CONFIRMED',
+      customerPaymentTermType: 'CREDIT', customerCreditDays: 21,
+      eta: new Date('2026-09-20T10:00:00Z'),
+    }).returning();
+    await db.insert(orderItems).values({
+      orderId: order!.id, productType: 'LSMGO', quantity: '402', unit: 'MT',
+      sortOrder: 0, salesPrice: null, salesCurrency: 'USD',
+    });
+
+    expect(await computeInvoiceAmount(order!.id)).toBe('0.00');
+    await expect(ensureOrderInvoice(order!.id)).rejects.toThrow(UnpricedOrderError);
+
+    // And nothing was allocated: a refused issuance must not burn a number or
+    // leave a half-written receivable behind.
+    const rows = await db.select().from(invoices).where(eq(invoices.orderId, order!.id));
+    expect(rows.length).toBe(0);
+  });
+
+  it('still issues for a CONFIRMED order with priced lines (pre-delivery invoicing)', async () => {
+    // Riviera invoices before delivery (order 20260924-000577: CONFIRMED, no
+    // deliveredAt, due = ETA + credit days). The guard must key on PRICE, never
+    // on status, or it would refuse a workflow already in production.
+    const basics = await seedBasics();
+    const [order] = await db.insert(orders).values({
+      tenantId: basics.tenant.id, clientId: basics.client.id,
+      vesselId: basics.vessel.id, placeId: basics.place.id,
+      orderNumber: `PREDELIV-${Date.now()}`, currency: 'USD', status: 'CONFIRMED',
+      customerPaymentTermType: 'CREDIT', customerCreditDays: 21,
+      eta: new Date('2026-09-20T10:00:00Z'),
+    }).returning();
+    await db.insert(orderItems).values({
+      orderId: order!.id, productType: 'LSMGO', quantity: '100', unit: 'MT',
+      sortOrder: 0, salesPrice: '500', salesCurrency: 'USD',
+    });
+
+    const invoice = await ensureOrderInvoice(order!.id);
+    expect(invoice.amount).toBe('50000.00');
+    // Anchored on ETA because there is no deliveredAt yet.
+    expect(invoice.dueDate).toBe('2026-10-11');
+  });
+});
 
 describe('invoice due date', () => {
   it('anchors CREDIT on the delivery date plus credit days', () => {
@@ -192,6 +245,31 @@ describe('void and reissue', () => {
     const [payment] = await db.select().from(customerPayments).where(eq(customerPayments.orderId, order.id));
     expect(payment!.invoiceId).toBe(replacement!.id);
     expect((await resolvePaymentInvoiceTarget(order.id))?.id).toBe(replacement!.id);
+  });
+
+  it('refuses a reissue that would bill a different figure unless repricing is confirmed', async () => {
+    // The replacement re-derives from the order's CURRENT state, so an edit made
+    // after the void was requested would otherwise ride silently into a document
+    // nobody reviewed.
+    const { order } = await seedOrderWithItems();
+    const original = await ensureOrderInvoice(order.id);
+
+    // Change a priced line the way a trader would (the delivered quantity).
+    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+    const priced = items.find((i) => i.salesPrice && !i.hideOnDocuments)!;
+    await db.update(orderItems).set({ deliveredQuantity: '399' }).where(eq(orderItems.id, priced.id));
+
+    await expect(voidOrderInvoice(order.id)).rejects.toThrow(ReissueAmountChangedError);
+
+    // Nothing was voided by the refusal.
+    const [stillLive] = await db.select().from(invoices).where(eq(invoices.id, original.id));
+    expect(stillLive!.status).toBe('SENT');
+
+    // Confirming the re-price completes it, at the NEW figure.
+    const { voided, replacement } = await voidOrderInvoice(order.id, { reprice: true });
+    expect(voided.status).toBe('VOID');
+    expect(replacement!.amount).not.toBe(original.amount);
+    expect(replacement!.amount).toBe(await computeInvoiceAmount(order.id));
   });
 
   it('renders the REPLACEMENT after a reissue, never the voided invoice', async () => {

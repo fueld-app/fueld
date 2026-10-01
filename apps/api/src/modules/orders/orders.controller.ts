@@ -48,7 +48,7 @@ import {
 } from './orders.service';
 import { logActivity } from '../activity/activity.service';
 import { listOrderPaymentSchedule, setOrderPaymentSchedule, InvalidScheduleError } from './payment-schedule.service';
-import { voidOrderInvoice, InvoiceNotFoundError, InvoiceAlreadyVoidError, AmbiguousInvoiceError, MixedCurrencyInvoiceError, InternalTransferHasNoInvoiceError, InvoiceLinesChangedError, UnpricedScheduleError } from './invoice.service';
+import { voidOrderInvoice, InvoiceNotFoundError, InvoiceAlreadyVoidError, AmbiguousInvoiceError, MixedCurrencyInvoiceError, InternalTransferHasNoInvoiceError, InvoiceLinesChangedError, UnpricedScheduleError, UnpricedOrderError, ReissueAmountChangedError } from './invoice.service';
 import {
   SupplierCreditNoteError,
   createSupplierCreditNote,
@@ -1587,6 +1587,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           reissue: body.reissue ?? true,
           ...(body.dueDate ? { dueDate: body.dueDate } : {}),
           ...(body.invoiceId ? { invoiceId: body.invoiceId } : {}),
+          ...(body.reprice ? { reprice: true } : {}),
         });
 
         await logActivity({
@@ -1613,6 +1614,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           || err instanceof MixedCurrencyInvoiceError
           || err instanceof InvoiceLinesChangedError
           || err instanceof UnpricedScheduleError
+          || err instanceof UnpricedOrderError
+          || err instanceof ReissueAmountChangedError
           || err instanceof AmbiguousInvoiceError
           || err instanceof InternalTransferHasNoInvoiceError;
         set.status = isDomainRefusal ? 400 : 500;
@@ -1627,6 +1630,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         reason: t.Optional(t.Nullable(t.String({ description: 'Why the invoice is being voided (audit log)' }))),
         dueDate: t.Optional(t.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: 'Correct the replacement due date (YYYY-MM-DD); defaults to the original' })),
         invoiceId: t.Optional(t.String({ description: 'With split payment terms, which tranche invoice to void (required when the order has several live invoices)' })),
+        reprice: t.Optional(t.Boolean({ description: 'Confirm a replacement that bills a materially different figure from the voided invoice (the order changed after issuance)' })),
       }),
       detail: {
         tags: ['Orders'],
