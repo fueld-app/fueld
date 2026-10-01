@@ -1,6 +1,8 @@
 # Moxie — invoice reissue runbook
 
-**Status: DONE (2026-09-30 and 2026-10-01).**
+**Status: DONE (2026-09-30 and 2026-10-01).** All four Moxie divergences are
+resolved and the divergence report (`scripts/check-invoice-divergence.sh`) returns
+zero rows for both amount and due date.
 - `20260916-000130` reissued as `INV-2026-0005`; `INV-2026-0004` VOID.
 - `20260915-000129` — `INV-2026-0006` (368,400.47) **VOID, no reissue**: the order
   was an abandoned duplicate; the same commission is already correctly billed as
@@ -116,17 +118,30 @@ issued afterwards.
 
 ## Still open
 
-Two invoices still print the order number under "Invoice number": `INV-2026-0001`
-(89,186.00) and `INV-2026-0002` (43,847.89). Neither carries a PO, so nothing is
+One invoice still prints the order number under "Invoice number": `INV-2026-0002`
+(43,847.89). Neither carries a PO, so nothing is
 missing from them and the reference they print still works — mislabelled, not
 broken. Reissuing would change the number for no gain. **Recommendation: leave.**
 
-`INV-2026-0001` needs nothing else: its due date 30/10 was correctly frozen as
-delivered 09/10 + 21 days. The order's 01/10 edit moved `deliveredAt` to 09/09
-afterwards, which is an internal divergence only.
+`20260916-000131` — **the due date WAS wrong**, and I initially told the panel and
+Patrick otherwise. The BDN attached to the order (Moeve S.A., `Fecha Ent. / Dlv.Date`)
+shows delivery **19/09**, while the order carried **09/09** (a 09<->19 transposition)
+and held **09/10** when the invoice was issued — three different dates for one
+delivery. Credit 21 days from 19/09 gives **10/10**, not the 30/10 that was frozen.
+
+Corrected: `orders.delivered_at` and the supplier leg both set to 19/09 (the leg is
+what the aggregation re-derives the order field from, so fixing only the order
+would be reverted), then `INV-2026-0001` reissued as **`INV-2026-0010`, due 10/10**.
+Amount unchanged at 89,186.00.
+
+Lesson: a wrong `deliveredAt` is not detectable by the divergence report, which
+compares the invoice against `orders.delivered_at` — itself the wrong data. Only
+the delivery document settles it.
 
 **Two customers hold superseded documents** and Moxie must send the replacements:
 - Global Seatrade was emailed the now-void `INV-2026-0004` → send `INV-2026-0005`.
 - Dan Bunkering was emailed the now-void `INV-2026-0003` at 08:23 on 2026-10-01,
   billing 6,880.45 → send `INV-2026-0009` (7,079.24, due 13/10). Until they get
   it they are being asked for 198.79 less than they owe.
+- MyriadSea was emailed the now-void `INV-2026-0001` (due 30/10) → send
+  `INV-2026-0010` (due 10/10).
