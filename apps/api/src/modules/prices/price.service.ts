@@ -147,6 +147,16 @@ let fxRates: FxRates = {
   changes: {},
   updatedAt: null,
 };
+/**
+ * Same rates as `fxRates.rates` but WITHOUT the display rounding (`round2`),
+ * which leaves an FX quote like 1.1370 stored as 1.14 — a ~0.44% error on a
+ * ~1.14 pair. Every existing consumer (dashboards, margin conversion) was
+ * written against the rounded figure and is left on it; this map exists for the
+ * two places that need a real quoted rate: the Kantox `entry_rate` we send to a
+ * partner, and the sanity check that it is not >10% off spot, which Kantox
+ * rejects outright.
+ */
+let fxRatesPrecise: Record<string, number> = { [FX_BASE]: 1 };
 
 // Yahoo WS state
 let yahooWs: WebSocket | null = null;
@@ -531,6 +541,9 @@ function connectYahooWs(): void {
         const fxChange = obj.change ?? (fxPrevClose ? fxPrice - fxPrevClose : 0);
         const fxChangePct = obj.changePercent ?? (fxPrevClose ? ((fxPrice - fxPrevClose) / fxPrevClose) * 100 : 0);
 
+        if (Number.isFinite(fxPrice) && fxPrice > 0) {
+          fxRatesPrecise = { ...fxRatesPrecise, [currency]: fxPrice };
+        }
         const didUpdateFx = updateFxRates({
           base: FX_BASE,
           rates: {
@@ -674,6 +687,8 @@ async function fetchFxRates(): Promise<void> {
       const data = await fetchYahooChart(ticker, `${currency}/${FX_BASE}`);
       if (data?.price) {
         nextRates[currency] = data.price;
+        const raw = data.rawPrice ?? data.price;
+        if (Number.isFinite(raw) && raw > 0) fxRatesPrecise = { ...fxRatesPrecise, [currency]: raw };
         nextChanges[currency] = { change: round2(data.change), changePercent: round2(data.changePercent) };
         updated = true;
       }
@@ -691,7 +706,16 @@ async function fetchFxRates(): Promise<void> {
   }
 }
 
-async function fetchYahooChart(ticker: string, name: string): Promise<CommodityPrice | null> {
+/**
+ * `rawPrice` carries the unrounded Yahoo quote. `price` stays rounded because
+ * consumers render it; `fetchFxRates` needs the real figure, and `round2` turns
+ * EURUSD 1.1370 into 1.14.
+ */
+interface YahooChartResult extends CommodityPrice {
+  rawPrice?: number;
+}
+
+async function fetchYahooChart(ticker: string, name: string): Promise<YahooChartResult | null> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1d&interval=1d`;
     const res = await fetch(url, { headers: { 'User-Agent': UA } });
@@ -713,6 +737,7 @@ async function fetchYahooChart(ticker: string, name: string): Promise<CommodityP
       ticker,
       name,
       price: round2(price),
+      rawPrice: price,
       change: round2(change),
       changePercent: round2(changePercent),
       currency: meta.currency ?? 'USD',
@@ -802,6 +827,21 @@ export function getFxRate(currency: string): number {
   const code = currency.toUpperCase();
   if (code === FX_BASE) return 1;
   return fxRates.rates[code] ?? 1;
+}
+
+/**
+ * The unrounded quote. Use this — NOT `getFxRate` — wherever the actual traded
+ * rate matters: `getFxRate` returns the display-rounded figure (round2), which
+ * for EURUSD is 1.14 against a real 1.1370.
+ *
+ * Returns `undefined` (never 1) when no rate has been loaded, so a caller cannot
+ * mistake "unknown" for "parity".
+ */
+export function getPreciseFxRate(currency: string): number | undefined {
+  const code = currency.toUpperCase();
+  if (code === FX_BASE) return 1;
+  const rate = fxRatesPrecise[code];
+  return rate != null && Number.isFinite(rate) && rate > 0 ? rate : undefined;
 }
 
 /**

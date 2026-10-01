@@ -309,7 +309,7 @@ export interface TenantSettings {
                                            // ratio ramp is a Kantox platform business rule (17/09 call)
     paymentDateBufferDays?: number;        // default 7
     dailyHedgeLimitUsd?: number;           // default 200000 (FDDR, warn-and-proceed)
-    valueDateRounding?: 'NONE' | 'WEEKLY_MONDAY' | 'TWICE_MONTHLY' | 'MONTHLY';  // default 'WEEKLY_MONDAY' (pending Pierre)
+    valueDateRounding?: 'NONE' | 'WEEKLY_MONDAY' | 'TWICE_MONTHLY' | 'MONTHLY' | 'MONTH_END';  // default 'WEEKLY_MONDAY'; Riviera uses MONTH_END (Pierre, 01/10/2026)
     hedgeCodPrepay?: boolean;              // default true — hedge near-term deals (pending Pierre)
     amountBasis?: 'MINIMUM' | 'EXACT_AT_INVOICE';  // floating-quantity basis (pending Pierre)
   };

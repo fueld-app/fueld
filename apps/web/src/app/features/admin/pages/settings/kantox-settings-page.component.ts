@@ -194,7 +194,8 @@ import { SettingsToastService } from './settings-toast.service';
                     class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none">
                     <option value="WEEKLY_MONDAY">Weekly — round up to Monday</option>
                     <option value="TWICE_MONTHLY">Twice monthly</option>
-                    <option value="MONTHLY">Monthly</option>
+                    <option value="MONTHLY">Monthly (1st of next month)</option>
+                    <option value="MONTH_END">Month end (last day)</option>
                     <option value="NONE">No rounding</option>
                   </select>
                   <p class="text-xs text-gray-500 dark:text-muted mt-1">

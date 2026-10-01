@@ -72,6 +72,12 @@ export interface KantoxEntry {
   hedgedRatePair: string | null;
   deltaResult: number | null;
   cancellationRatePercent: number | null;
+  /** Why Kantox executed the entry (`take_profit_rate`,
+   *  `execution_requested_by_client`, …). Populated on every executed entry and
+   *  null on every open one — measured across all 20 live entries 2026-09-30.
+   *  This is the only field that distinguishes an EXECUTED close from a
+   *  CANCELLED one, because `entryStatus` is `closed` for both. */
+  executionReason: string | null;
   notes: string | null;
   createdTimeStamp: string | null;
 }
@@ -279,6 +285,7 @@ function normalizeEntry(raw: any): KantoxEntry {
     rate: Number(raw.rate ?? 0),
     ratePair: raw.ratePair ?? null,
     cancellationRatePercent: raw.cancellationRatePercent != null ? Number(raw.cancellationRatePercent) : null,
+    executionReason: raw.executionReason ?? null,
     counterValue: raw.counterValue != null ? Number(raw.counterValue) : null,
     executionRate: raw.executionRate != null ? Number(raw.executionRate) : null,
     hedgedRate: raw.hedgedRate != null ? Number(raw.hedgedRate) : null,

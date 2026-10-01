@@ -1,5 +1,10 @@
 # Kantox integration — current status (23 Sep 2026)
 
+> ⚠️ **SUPERSEDED for the open-questions section.** Clément answered all nine questions on
+> 29 Sep 2026 — see `kantox-emails-2026-09-30.md`. The "Open questions with Kantox" list and
+> the `executionRate` / `entries[]` rows of "Known gaps" below are now resolved; the
+> `mapKantoxStatus()` gap is CONFIRMED (Kantox's terminal status is `closed`, we never map it).
+
 > Ground truth as of 2026-09-23, replacing the stale sections of
 > `kantox-minutes-2026-09-17.md`. Every claim below was verified against the
 > live preprod API, the Riviera production database, or the mailbox — not carried
@@ -59,8 +64,10 @@ refs (`PS-…`); 2 `KANTOX_PUSH` activity rows, `user_id = null` (the corrected 
 
 | Gap | Detail |
 |---|---|
-| **Closure is invisible to our status mapper** | `mapKantoxStatus()` (`kantox.service.ts:699`) maps only `hedg`/`execut` → `HEDGED`. Kantox also returns **`closed`** and **`in_order`**. `20260922-000564#S` is `closed` at Kantox but still `SENT` in our DB (`hedged_rate` synced, status not). Effects: the order card's open counter never clears, and once value date 09/11 passes, `findLateHedgeEntries()` + the card's `isLate()` will raise **false late-payment flags to Pierre** on an already-closed hedge. |
-| `executionRate` never populates | Kantox returns `0.0`, so the column stays empty. `hedgedRate` **is** populated, so the order card's "indicative — per-entry rate never observed" caveat is now out of date. |
+| ~~**Closure is invisible to our status mapper**~~ **FIXED 2026-09-30** | `mapKantoxStatus()` now maps Kantox's terminal `closed` → `CLOSED` (the enum member already existed). Confirmed by Clément 29/09 that `closed` means executed-and-settled with nothing left for Pierre — see `kantox-emails-2026-09-30.md`. The open counter on the order card now clears, and `findLateHedgeEntries()` no longer raises false late-payment flags on an executed hedge. The reconciler was also extracted to the pure `reconcileUpdates()` and made precision-aware: a `numeric(14,8)` column holding Kantox's 9-decimal rate was re-writing `hedged_rate` + `updated_at` on **every** 15-minute tick, and `executionRate: 0.0` (the client-requested execution path) could overwrite a real take-profit rate. |
+| ~~Cancelled close vs executed close~~ **FIXED 2026-09-30** | `entryStatus` is `closed` for both, so a cancelled entry could never be told from an executed one. The discriminator is `executionReason` — populated on every executed entry, null on every open one (measured). A reasonless `closed` now maps to **`CANCELLED`**, which both `onOrderCancelledForKantox` and the payment-close filter already skip. This removes the last path by which a **naked negative close** could be sent against a hedge that never executed. Open question to Kantox (does cancellation really surface as `closed`?) is now verification, not a blocker. |
+| ~~Remote-only entries are invisible~~ **FIXED 2026-09-30** | Nothing inserts a local row for a Kantox entry we did not push, so a platform-side roll (or a push that never landed) produced no leg, no payment planning, and no flag — the one silent failure mode. The sync tick now logs **`KANTOX_UNMATCHED_ENTRY`** for any remote `entryRef` with no local match, deduped on `entryRef\|valueDate`. Deliberately an alert, not an auto-insert (the local row needs deal context only the original push knows). 0 unmatched today. |
+| `executionRate` never populates | **Explained 29/09.** Kantox returns `0.0` on entries executed by client request (`executionReason = execution_requested_by_client`); every `take_profit_rate` execution carries a real rate (565 → 1.1337, 556 → 1.1335, 513 → 1.1337). `0.0` is a not-populated field, not a zero: we never write it, and `hedgedRate` is the achieved rate of record. The order card's "per-entry rate never observed" caveat was wrong — per-entry `hedgedRate` IS populated — and has been corrected. |
 | PO value dates ignore supplier due-date override | `TODO(supplier-due-date)` in `kantox.service.ts`: PO legs use the customer-anchored value date, not `order_suppliers.supplier_due_date`. |
 | `orders.due_date` is a phantom input | Highest-priority source in `deriveValueDate()` with **zero writers** anywhere in `src`. |
 | Late-payment flag has never fired | Built and deduped correctly, but **0 rows** — no open leg is past its value date yet. |

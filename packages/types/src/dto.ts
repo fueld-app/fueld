@@ -3271,7 +3271,7 @@ export interface CreateSupplierInvoicesResultDto {
 // password is stored in the encrypted credential vault and is never part
 // of these DTOs — `hasPassword` only reports whether one is configured.
 
-export type KantoxValueDateRounding = 'NONE' | 'WEEKLY_MONDAY' | 'TWICE_MONTHLY' | 'MONTHLY';
+export type KantoxValueDateRounding = 'NONE' | 'WEEKLY_MONDAY' | 'TWICE_MONTHLY' | 'MONTHLY' | 'MONTH_END';
 export type KantoxAmountBasis = 'MINIMUM' | 'EXACT_AT_INVOICE';
 export type KantoxHedgeDirection = 'BUY' | 'SELL';
 export type KantoxHedgeEntryKind = 'INITIAL' | 'AMEND' | 'CANCEL' | 'REISSUE';

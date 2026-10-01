@@ -142,6 +142,7 @@ export const kantoxController = new Elysia({ prefix: '/kantox' })
         t.Literal('WEEKLY_MONDAY'),
         t.Literal('TWICE_MONTHLY'),
         t.Literal('MONTHLY'),
+        t.Literal('MONTH_END'),
       ])),
       hedgeCodPrepay: t.Optional(t.Boolean()),
       amountBasis: t.Optional(t.Union([

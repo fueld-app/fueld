@@ -12,10 +12,12 @@ import type { KantoxHedgeEntryDto, KantoxPositionDto } from '@fueld/types';
  *
  * Read-only. Two things worth knowing before editing the copy:
  *
- *  - Kantox nets entries per value-date bucket, so the rate is a *bucket*
- *    weighted average, not a per-entry rate. It is labelled "indicative"
- *    because per-entry `hedgedRate` was never observed populated in preprod
- *    (the schema allows it; no executed entry has ever been returned to us).
+ *  - Kantox nets entries per value-date bucket, so the rate shown in the header
+ *    is a *bucket* weighted average, not a per-entry rate — hence "indicative"
+ *    there. Per-entry rates ARE populated (verified live 2026-09-30): each leg
+ *    shows its own `hedgedRate`, which is the rate of record. Kantox's
+ *    `executionRate` comes back `0.0` on entries executed by client request,
+ *    so it is deliberately not shown.
  *  - Past-due open legs are shown as "Value date passed" rather than an
  *    error. Rolls are handled manually by Pierre on the Kantox platform —
  *    nothing here retries or amends.

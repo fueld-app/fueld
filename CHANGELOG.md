@@ -104,6 +104,7 @@ Here's a summary of the improvements and fixes rolled out over the past couple o
 - **QuickBooks invoice sync** added — invoices can now be synced to QuickBooks with token expiry warnings.
 - **Argentina** added to the country dropdown list.
 - **Manual KYC date fields** added to company records.
+- **FX hedging status is now tracked correctly.** Hedges executed on the Kantox side are marked as such here too, instead of staying "sent" forever — which had left the order card showing an open hedge that no longer existed and would have raised a false "value date passed" warning on a hedge that had already executed. A rolled hedge now picks up Kantox's new value date (a roll keeps the same reference and changes only the date, so nothing else would notice it), and a hedge present on the Kantox platform with no matching record here raises an alert instead of being silently invisible. Hedge rates are also no longer re-written on every sync, so the stored rate matches what Kantox reports to its own precision.
 
 ## Reports & Dashboard
 

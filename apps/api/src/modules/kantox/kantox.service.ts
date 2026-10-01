@@ -22,6 +22,7 @@ import {
   tenants,
   type TenantSettings,
 } from '../../db/schema';
+import { getPreciseFxRate } from '../prices/price.service';
 import {
   KantoxClient,
   KantoxDuplicateRefError,
@@ -157,7 +158,7 @@ export function deriveValueDate(input: {
   customerPaymentTermType?: string | null;
   customerCreditDays?: number | null;
   bufferDays: number;
-  rounding?: 'NONE' | 'WEEKLY_MONDAY' | 'TWICE_MONTHLY' | 'MONTHLY';
+  rounding?: NonNullable<TenantSettings['kantoxSettings']>['valueDateRounding'];
 }): string {
   const asDate = (v: unknown): Date | null => {
     if (v == null) return null;
@@ -184,6 +185,18 @@ export function deriveValueDate(input: {
     const dow = d.getUTCDay(); // 0 Sun … 6 Sat
     const toMonday = (8 - dow) % 7 || 7; // Sun→Mon(1), Mon→next Mon(7), Tue→Mon(6)…
     if (dow !== 1) d.setUTCDate(d.getUTCDate() + toMonday);
+  } else if (rounding === 'MONTH_END') {
+    // Pierre's choice (01/10/2026): "round up Value Dates to the last opening
+    // date of the month" — one settlement a month, at month end. Note this is
+    // NOT the existing MONTHLY mode below, which jumps to the FIRST of the NEXT
+    // month.
+    //
+    // "Last OPENING date" implies business days, but only the CALENDAR month end
+    // is knowable here: this function is pure and has no holiday calendar, so a
+    // public holiday on the last day would be missed. That coincides with
+    // Pierre's own example (Oct 2026 → 30/10, a Friday) and is recorded as an
+    // accepted limitation rather than silently pretending to be calendar-aware.
+    d.setUTCMonth(d.getUTCMonth() + 1, 0);
   } else if (rounding === 'TWICE_MONTHLY') {
     if (d.getUTCDate() <= 15) d.setUTCDate(15);
     else d.setUTCMonth(d.getUTCMonth() + 1, 1);
@@ -329,6 +342,17 @@ export interface PlannedHedgeEntry {
   amountBasis: string;
   valueDate?: string;                // undefined → dateless bucket (rare; cancels MUST repeat the original's date)
   entryRef: string;
+  /** Booking rate at deal creation, sent as `entry_rate`/`entry_rate_pair`.
+   *  Kantox compares it against spot at reception for pricing-risk analytics
+   *  (asked 09/09, re-confirmed 29/09: "very useful to receive for Analytics
+   *  later if you are able to send it"). Only INITIAL pushes carry it — a
+   *  lifecycle close has no "booking rate", and the original entry already
+   *  supplied one. NOTE the semantic we are accepting: we push at CONFIRMED, so
+   *  this is the rate at confirmation, not at a separate "deal creation" step.
+   *  A typed per-order rate would only earn its keep if the booked rate actually
+   *  diverges (see docs/kantox-emails-2026-09-30.md). */
+  entryRate?: number;
+  entryRatePair?: string;
 }
 
 export interface HedgePlan {
@@ -437,7 +461,10 @@ export function splitSellLegByTranche(
 
 export function buildHedgePlan(
   snap: KantoxOrderSnapshot,
-  settings: Pick<KantoxSettingsResolved, 'marginHedgePercent' | 'paymentDateBufferDays' | 'valueDateRounding' | 'hedgeCurrency' | 'hedgeCounterCurrency'>,
+  settings: Pick<KantoxSettingsResolved, 'marginHedgePercent' | 'paymentDateBufferDays' | 'valueDateRounding' | 'hedgeCurrency' | 'hedgeCounterCurrency'>
+    // Injected rather than read from the FX module here, so this stays a pure
+    // function (like deriveValueDate) and can be tested without a live feed.
+    & { bookingRate?: number },
 ): HedgePlan {
   const valueDate = deriveValueDate({
     dueDate: snap.dueDate ?? null,
@@ -459,6 +486,15 @@ export function buildHedgePlan(
   }
   soAmount = Math.round(soAmount * 100) / 100;
   if (soAmount <= 0) return { entries: [], skipped: 'no USD sell exposure' };
+
+  // Booking rate for `entry_rate`, supplied by the caller (see the settings
+  // param). The feed reports USD-per-unit — base USD — so the EUR figure IS the
+  // EURUSD quote Kantox itself reports (verified live: our 564/565 entries came
+  // back `rate: 1.1461` beside `hedgedRate: 1.1449`). Omitted, never guessed,
+  // when the caller has no real rate to give.
+  const bookingRate = settings.bookingRate;
+  const entryRate = bookingRate != null && Number.isFinite(bookingRate) && bookingRate > 0 ? bookingRate : undefined;
+  const entryRatePair = entryRate != null ? `${(settings.hedgeCounterCurrency ?? '').toUpperCase()}${USD}` : undefined;
 
   // PO (buy) legs: group USD-cost items per supplier leg.
   const buyByLeg = new Map<string, number>();
@@ -519,6 +555,7 @@ export function buildHedgePlan(
         // different payload. The bare `#S` is reserved for orders with no
         // schedule, so unscheduled behaviour is unchanged.
         entryRef: `${orderNumberSafe(orderRef)}#S${split.refIndex}`,
+        ...(entryRate != null ? { entryRate, entryRatePair } : {}),
       }))
     : [{
         leg: 'SO',
@@ -527,6 +564,7 @@ export function buildHedgePlan(
         amountBasis: soAmount.toFixed(2),
         valueDate,
         entryRef: entryRef(orderNumberSafe(orderRef), 'SO', undefined, 'INITIAL', 0),
+        ...(entryRate != null ? { entryRate, entryRatePair } : {}),
       }];
 
   const entries: PlannedHedgeEntry[] = [
@@ -538,6 +576,7 @@ export function buildHedgePlan(
       amountBasis: po.amount.toFixed(2),
       valueDate,
       entryRef: entryRef(orderNumberSafe(orderRef), 'PO', i + 1, 'INITIAL', 0),
+      ...(entryRate != null ? { entryRate, entryRatePair } : {}),
     })),
   ];
   return { entries };
@@ -623,6 +662,12 @@ async function pushPlannedEntry(
         kind: ctx.kind,
         status: 'PENDING_SEND',
         notes: ctx.notes,
+        // Persist the booking rate so a retry re-sends the rate captured at the
+        // original push, not whatever the feed says 15 minutes later — the whole
+        // point of `entry_rate` is the rate the deal was booked at.
+        ...(planned.entryRate != null
+          ? { entryRate: String(planned.entryRate), entryRatePair: planned.entryRatePair }
+          : {}),
       })
       .returning({ id: kantoxHedgeEntries.id });
     rowId = row.id;
@@ -654,6 +699,9 @@ async function pushPlannedEntry(
       amount: planned.amount,
       valueDate: planned.valueDate,
       notes: ctx.notes,
+      ...(planned.entryRate != null
+        ? { entryRate: String(planned.entryRate), entryRatePair: planned.entryRatePair }
+        : {}),
     });
     await db
       .update(kantoxHedgeEntries)
@@ -712,7 +760,17 @@ export async function onOrderConfirmedForKantox(order: {
     );
     if (!resolved) return; // tenant has no Kantox — fast no-op
     const snap: KantoxOrderSnapshot = { ...order, orderId: order.id, items };
-    const plan = buildHedgePlan(snap, resolved);
+    // The booking rate is captured HERE, at push time, and from the live feed:
+    // it is the rate the exposure is actually being hedged at. A typed
+    // per-order rate would only be needed if the booked rate genuinely diverged.
+    // getPreciseFxRate, NOT getFxRate: the latter returns the display-rounded
+    // figure (round2), which reports EURUSD as 1.14 against a real 1.1370 — a
+    // ~0.44% error on a ~1.14 pair, which would swamp the very rate-vs-spot
+    // comparison Kantox asked for. It returns undefined when nothing is loaded,
+    // so an unknown rate is omitted rather than sent as a parity claim.
+    const counterCode = (resolved.hedgeCounterCurrency ?? '').toUpperCase();
+    const bookingRate = counterCode && counterCode !== USD ? getPreciseFxRate(counterCode) : undefined;
+    const plan = buildHedgePlan(snap, { ...resolved, bookingRate });
     if (plan.skipped || plan.entries.length === 0) {
       console.log(`[Kantox] order ${order.orderNumber ?? order.id} not hedged: ${plan.skipped}`);
       return;
@@ -844,6 +902,15 @@ export async function onCustomerPaymentForKantox(
     const resolved = await resolveKantoxSettings(tenantId, (tenant?.settings as any) ?? null);
     if (!resolved) return;
     const rows = await listHedgesForOrder(tenantId, orderId);
+    // 'closed' has TWO meanings on this table — settled-by-payment (this path)
+    // and executed-at-Kantox (the sync reconciler) — and both correctly mean
+    // "send no further delta". A close is a NEGATIVE entry: it does not settle
+    // the hedge, it opens an opposite one. Once Kantox has executed the hedge
+    // there is nothing left to net against, so a close sent here would be a
+    // naked new position. This is why the reconciler mapping `closed` protects
+    // the money: before it, an executed-but-unpaid hedge stayed SENT and a later
+    // customer payment would fire exactly that close.
+    // (Same guard, same reason as onOrderCancelledForKantox below.)
     const sellRows = rows.filter((r) => r.direction === 'SELL' && (r.status === 'SENT' || r.status === 'HEDGED'));
     if (sellRows.length === 0) return; // nothing open (e.g. payment before push)
     // A payment must be CONSUMED across the order's open sell entries, not
@@ -989,13 +1056,160 @@ async function pushLifecycleEntry(
 const SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const MAX_RETRIES = 5;
 
-/** Map Kantox entryStatus → our row status. Enums incomplete (meeting Q3) —
- *  mapping stays lenient; unknown values leave the row untouched. */
-function mapKantoxStatus(entryStatus: string | null): 'SENT' | 'HEDGED' | null {
+/** Map a Kantox entry → our row status. Unknown values leave the row
+ *  untouched, so a new Kantox status can never downgrade a row we already
+ *  settled.
+ *
+ *  Confirmed by Clément 29/09/2026 (`docs/kantox-emails-2026-09-30.md`, Q4):
+ *  `in_position` = still monitoring the conditional order (TP/SL set),
+ *  `pending` = Pierre must execute manually on the platform, and an entry shows
+ *  `closed` **only once the order has executed**. So `closed` is terminal —
+ *  nothing is left for Pierre to do on it.
+ *
+ *  Missing this mapping was not cosmetic. `findLateHedgeEntries()` treats any
+ *  open row past its value date as late, so an entry Kantox had already closed
+ *  kept raising false late-payment flags to Pierre once its value date passed.
+ *  Worse for money: an executed-but-unpaid hedge stayed SENT, and
+ *  `onCustomerPaymentForKantox` then treated the later customer payment as a
+ *  delta to close — sending a NEGATIVE entry, which opens an opposite position
+ *  rather than settling anything. CLOSED is what makes that path skip it.
+ *
+ *  `closed` is matched by EQUALITY, not `includes`: a false positive here
+ *  silences a real late-payment flag, so a future status like `not_closed` or
+ *  `pending_closure` must never read as terminal.
+ *
+ *  EVERY `closed` ENTRY IS EXECUTED — there is no "cancelled close". Confirmed
+ *  by Clément 01/10/2026 (`docs/kantox-emails-2026-10-01.md`): "An entry cannot
+ *  be Closed without being executed. It can be cancelled before being executed.
+ *  If it has been executed (closed) status the only way to cancel it is to send
+ *  a new entry with inverted sign/amount." Cancellation is therefore something
+ *  WE SEND (the `…C{n}` close entries), never a status Kantox reports.
+ *
+ *  An earlier cut of this function read a reasonless `closed` as CANCELLED, on
+ *  the theory that `executionReason` distinguishes the two. That inference is
+ *  unsound: a null reason on a closed entry does not mean cancelled, it means
+ *  only that the field is absent — and treating it as CANCELLED would suppress
+ *  BOTH the late-payment flag and the payment close on a hedge that really did
+ *  execute. `executionReason` is still read, for nothing more than a warning. */
+export function mapKantoxStatus(
+  entryStatus: string | null,
+  executionReason?: string | null,
+): 'HEDGED' | 'CLOSED' | 'CANCELLED' | null {
   if (!entryStatus) return null;
-  const s = entryStatus.toLowerCase();
+  const s = entryStatus.trim().toLowerCase();
+  if (s === 'closed') {
+    // Kantox guarantees an executed entry is closed, so CLOSED is correct
+    // regardless. Warn anyway: if a reasonless closed entry ever appears it
+    // contradicts the observed data (every live executed entry carries a
+    // reason) and is worth looking at before trusting it further.
+    if (!executionReason) {
+      console.warn('[Kantox] closed entry carries no executionReason — treating as CLOSED (per Kantox: closed implies executed)');
+    }
+    return 'CLOSED';
+  }
+  // 'cancelled' is not a documented Kantox status, but map it defensively: our
+  // own model has the state, and if Kantox ever did report it we want it, not a
+  // silently-open row.
+  if (s === 'cancelled' || s === 'canceled') return 'CANCELLED';
+  // Legacy guesses from before the enum was known, kept as a belt-and-braces
+  // terminal mapping. 'execut' also matches `unexecuted` / `execution_failed`,
+  // neither of which is terminal — so this is a genuine hazard, not a safe
+  // fallback. No live status matches it today (the observed enum is
+  // closed/in_order/in_position/accumulating), so it is dead weight that can
+  // misfire; remove it once a few weeks pass with no hit.
   if (s.includes('hedg') || s.includes('execut')) return 'HEDGED';
-  return null; // 'in_position', 'accumulating', etc. stay SENT
+  return null; // 'in_position', 'in_order', 'accumulating', 'pending' stay open
+}
+
+/** The local row fields the reconciler reads. A subset of the row so this stays
+ *  testable without a database. */
+export interface ReconcilableHedgeRow {
+  status: string;
+  hedgedRate: string | number | null;
+  executionRate: string | number | null;
+  /** ISO 'YYYY-MM-DD' as stored; Kantox returns 'DD/MM/YYYY'. */
+  valueDate: string | null;
+}
+
+/** Kantox responses date as DD/MM/YYYY ('02/11/2026'); we store ISO
+ *  ('YYYY-MM-DD'). Returns null rather than a guess for anything unparseable —
+ *  a wrong date here moves a late-payment flag. */
+function toIsoDate(remote: string | null): string | null {
+  if (!remote) return null;
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(remote.trim());
+  if (!m) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+/** Both rate columns are `numeric(14, 8)`, but Kantox returns up to 9 decimals
+ *  (`hedgedRate: 1.144906585`). The stored value is therefore always the ROUNDED
+ *  one (`1.14490659`), so a plain `stored !== remote` can never converge — it
+ *  re-wrote `hedged_rate` and `updated_at` on every one of the 15-minute ticks,
+ *  for every row that has a rate. Compare at the column's own precision instead:
+ *  a difference below the last representable digit is not a change (verified:
+ *  the rounding error is at most 5e-9, so 1e-8 clears it), and a genuine change
+ *  at that precision (a roll to a new rate) still writes. */
+const RATE_EPSILON = 1e-8;
+
+function rateChanged(stored: string | number | null, remote: number | null): boolean {
+  if (remote == null) return false;
+  // No stored value at all is always a change — comparing it as 0 would silently
+  // drop a genuine remote rate that happens to round below 1e-8.
+  if (stored == null) return true;
+  return Math.abs(Number(stored) - remote) >= RATE_EPSILON;
+}
+
+/** The only fields the reconciler ever writes. Typed against the table so a
+ *  mistyped column is a compile error rather than a silently dropped update. */
+export type ReconcileUpdate = Partial<
+  Pick<typeof kantoxHedgeEntries.$inferInsert, 'status' | 'hedgedRate' | 'executionRate' | 'valueDate' | 'updatedAt'>
+>;
+
+/**
+ * What (if anything) to write for one row from its Kantox entry.
+ *
+ * Rules, each with a reason:
+ *  - Status moves only to a status we recognise, and only when it differs.
+ *    Unknown statuses return null, so a new Kantox value can never downgrade a
+ *    row we already settled (a terminal row is also never re-read — callers
+ *    skip anything that is not SENT/HEDGED).
+ *  - Rate writes are change-only, at the column's precision, so a reconcile
+ *    that finds nothing new does not churn `updated_at` every 15 minutes.
+ *  - `executionRate` must additionally be POSITIVE to be written. Kantox returns
+ *    0.0 on entries executed by client request (`executionReason`
+ *    `execution_requested_by_client`) while every take-profit execution carries
+ *    a real rate — see docs/kantox-emails-2026-09-30.md Q5. 0.0 means "not
+ *    populated on this execution path", not "executed at zero", so it must not
+ *    overwrite a real rate. Latent, not observed: the 0.0 rows on file have no
+ *    real rate to lose yet, but the take-profit rows would.
+ */
+export function reconcileUpdates(
+  row: ReconcilableHedgeRow,
+  remote: Pick<KantoxEntry, 'entryStatus' | 'hedgedRate' | 'executionRate' | 'executionReason' | 'valueDate'>,
+): ReconcileUpdate {
+  const updates: ReconcileUpdate = {};
+  const mapped = mapKantoxStatus(remote.entryStatus, remote.executionReason);
+  if (mapped && mapped !== row.status) updates.status = mapped;
+  // A ROLL keeps the same entryRef and changes only the value date (Clément,
+  // 01/10/2026: "An entry that is rolled keep the same entryRef, the only
+  // difference is the new VD"). Without this the stored date goes stale after a
+  // roll and the late-payment flag keys off a date Kantox no longer uses.
+  // Only written when the stored value is actually different, and only from a
+  // parseable remote date — a malformed one must not blank a good local date.
+  const remoteDate = toIsoDate(remote.valueDate);
+  if (remoteDate && remoteDate !== row.valueDate) updates.valueDate = remoteDate;
+  // The RAW remote value is written, and Postgres rounds it to the column's 8
+  // decimals. Deliberately NOT `Number.prototype.toFixed(8)`: on a double,
+  // 1.144906585.toFixed(8) is "1.14490658" (the stored double is a hair below
+  // the decimal), whereas Postgres rounds the decimal string to "…659". Verified
+  // against the real column — toFixed would store an off-by-one-in-the-8th digit
+  // rate for no benefit. Convergence does not depend on which is written, because
+  // `rateChanged` compares at the column's precision either way.
+  if (rateChanged(row.hedgedRate, remote.hedgedRate)) updates.hedgedRate = String(remote.hedgedRate);
+  if (remote.executionRate != null && remote.executionRate > 0 && rateChanged(row.executionRate, remote.executionRate)) {
+    updates.executionRate = String(remote.executionRate);
+  }
+  return updates;
 }
 
 async function syncTenant(tenantId: string, settings: TenantSettings | null): Promise<void> {
@@ -1021,6 +1235,12 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
           amount: row.amount,
           valueDate: row.valueDate ?? undefined,
           notes: row.notes ?? undefined,
+          // Re-send the rate stored at the original push. A retry must not
+          // silently swap in the current feed rate — Kantox compares entry_rate
+          // against spot, and the stored value is the booking rate.
+          ...(row.entryRate != null
+            ? { entryRate: String(row.entryRate), entryRatePair: row.entryRatePair ?? `${row.counterCurrency}${row.currency}` }
+            : {}),
         });
         await markSent(row.id, { kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef });
       } else if (row.status === 'FAILED' && row.retryCount < MAX_RETRIES && row.entryRef && row.amount && row.direction && row.currency) {
@@ -1035,6 +1255,12 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
           amount: row.amount,
           valueDate: row.valueDate ?? undefined,
           notes: row.notes ?? undefined,
+          // Re-send the rate stored at the original push. A retry must not
+          // silently swap in the current feed rate — Kantox compares entry_rate
+          // against spot, and the stored value is the booking rate.
+          ...(row.entryRate != null
+            ? { entryRate: String(row.entryRate), entryRatePair: row.entryRatePair ?? `${row.counterCurrency}${row.currency}` }
+            : {}),
         });
         await markSent(row.id, { kantoxEntryId: entry.reference, kantoxPositionRef: entry.positionRef, errorMessage: null });
       }
@@ -1050,12 +1276,31 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
         continue;
       }
       const bump = { retryCount: (row.retryCount ?? 0) + 1, errorMessage: String(err?.message ?? err).slice(0, 500), updatedAt: new Date() };
+      // A SENDING row is one whose push claimed it and then the process died, or
+      // whose response was lost with a non-duplicate error. NOTHING else in the
+      // system ever re-pushes it: the retry branch above only admits FAILED, and
+      // markSent only admits PENDING_SEND/FAILED. Before this, such a row was
+      // stranded forever and its parent's exposure never recovered. There is no
+      // retryCount bump here (the row was never counted as a failed attempt) —
+      // the attempt count advances only when the push itself fails.
+      if (row.status === 'SENDING') {
+        await db
+          .update(kantoxHedgeEntries)
+          .set({ status: 'PENDING_SEND', updatedAt: new Date() })
+          .where(and(eq(kantoxHedgeEntries.id, row.id), eq(kantoxHedgeEntries.status, 'SENDING')));
+        continue;
+      }
       if (row.retryCount + 1 >= MAX_RETRIES) await db.update(kantoxHedgeEntries).set({ ...bump, status: 'FAILED' }).where(eq(kantoxHedgeEntries.id, row.id));
       else if (row.status === 'PENDING_SEND') await db.update(kantoxHedgeEntries).set(bump).where(eq(kantoxHedgeEntries.id, row.id));
     }
   }
 
   // 2. Reconcile statuses from GET entries (per-entry hedgedRate etc).
+  //    `candidates` is re-read after this step, because step 3 decides lateness
+  //    from the row statuses and step 2 is what moves them to CLOSED. Using the
+  //    pre-step-2 snapshot leaves exactly one tick (15 minutes) in which a hedge
+  //    Kantox has already executed is still read as open and flagged late to
+  //    Pierre — the very false flag this reconcile exists to stop.
   try {
     const remote = await client.listEntries();
     const byRef = new Map(remote.map((e) => [e.entryRef, e]));
@@ -1063,14 +1308,70 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
       if (row.status !== 'SENT' && row.status !== 'HEDGED') continue;
       const remoteEntry = byRef.get(row.entryRef);
       if (!remoteEntry) continue;
-      const mapped = mapKantoxStatus(remoteEntry.entryStatus);
-      const updates: Record<string, unknown> = {};
-      if (mapped && mapped !== row.status) updates.status = mapped;
-      if (remoteEntry.hedgedRate != null && Number(row.hedgedRate ?? 0) !== remoteEntry.hedgedRate) updates.hedgedRate = String(remoteEntry.hedgedRate);
-      if (remoteEntry.executionRate != null && Number(row.executionRate ?? 0) !== remoteEntry.executionRate) updates.executionRate = String(remoteEntry.executionRate);
+      const updates = reconcileUpdates(row, remoteEntry);
       if (Object.keys(updates).length > 0) {
-        updates.updatedAt = new Date();
-        await db.update(kantoxHedgeEntries).set(updates).where(eq(kantoxHedgeEntries.id, row.id));
+        await db
+          .update(kantoxHedgeEntries)
+          .set({ ...updates, updatedAt: new Date() })
+          .where(eq(kantoxHedgeEntries.id, row.id));
+      }
+    }
+
+    // 2b. Remote entries with no local row. Nothing in this service INSERTS a
+    //     row for a Kantox entry it did not push, so an entry created on the
+    //     platform — a manual roll by Pierre, or a push that never landed and
+    //     was never retried — is invisible to Fueld: no leg on the order card,
+    //     no payment planning, no late flag. That silence is the one hedge
+    //     failure mode with no alert anywhere.
+    //     Deliberately an ALERT, not an auto-insert: the local row needs the
+    //     deal context (order, leg, basis) that only the original push knows,
+    //     and inventing it would feed the payment planner rows it cannot place.
+    //     `entityId` is a uuid column, so the ref rides in metadata.
+    const localRefs = new Set(candidates.map((r) => r.entryRef));
+    const unmatched = remote.filter((e) => !localRefs.has(e.entryRef));
+    if (unmatched.length > 0) {
+      // Same dedup shape as the late flag, but its OWN action: keying on
+      // (ref, value date) stops this repeating every 15 minutes forever, and
+      // sharing the late-payment action would collide with that dedup.
+      const refs = unmatched.map((e) => e.entryRef);
+      // `inArray` over a SQL expression, NOT `= ANY(${refs})`: drizzle does not
+      // bind a JS array into a `sql` placeholder (it passes the array through as
+      // one parameter, producing a malformed `ANY(($3))`), so the array form
+      // silently never matched. Verified against real SQL.
+      const alreadyFlagged = await db
+        .select({ metadata: activityLogs.metadata })
+        .from(activityLogs)
+        .where(
+          and(
+            eq(activityLogs.tenantId, tenantId),
+            eq(activityLogs.action, 'KANTOX_UNMATCHED_ENTRY'),
+            inArray(sql`${activityLogs.metadata}->>'entryRef'`, refs),
+          ),
+        );
+      const flagged = new Set(
+        alreadyFlagged.map((r) => {
+          const m = r.metadata as { entryRef?: string; valueDate?: string } | null;
+          return `${m?.entryRef ?? ''}|${m?.valueDate ?? ''}`;
+        }),
+      );
+      for (const entry of unmatched) {
+        if (flagged.has(`${entry.entryRef}|${entry.valueDate ?? ''}`)) continue;
+        await logActivity({
+          userId: null,
+          tenantId,
+          action: 'KANTOX_UNMATCHED_ENTRY',
+          entityType: 'kantox_hedge_entry',
+          entityId: null, // uuid column — the ref is not a uuid
+          metadata: {
+            entryRef: entry.entryRef,
+            valueDate: entry.valueDate,
+            amount: entry.amount,
+            currency: entry.currency,
+            entryStatus: entry.entryStatus,
+            positionRef: entry.positionRef,
+            note: 'Kantox holds this entry but Fueld has no matching row — a platform-side roll, or a push that never landed',
+          },
+        });
       }
     }
   } catch (err: any) {
@@ -1085,7 +1386,18 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
   //    rolls it once (the leg becomes late again against its new value date).
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const lateIds = findLateHedgeEntries(candidates, today);
+    // Post-reconcile statuses, not the snapshot taken before step 2.
+    const current = await db
+      .select({
+        id: kantoxHedgeEntries.id,
+        status: kantoxHedgeEntries.status,
+        valueDate: kantoxHedgeEntries.valueDate,
+        amount: kantoxHedgeEntries.amount,
+        cancelledAmount: kantoxHedgeEntries.cancelledAmount,
+      })
+      .from(kantoxHedgeEntries)
+      .where(eq(kantoxHedgeEntries.tenantId, tenantId));
+    const lateIds = findLateHedgeEntries(current, today);
     if (lateIds.length > 0) {
       const alreadyFlagged = await db
         .select({ entityId: activityLogs.entityId, metadata: activityLogs.metadata })
@@ -1101,8 +1413,13 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
         alreadyFlagged.map((r) => `${r.entityId}|${(r.metadata as { valueDate?: string } | null)?.valueDate ?? ''}`),
       );
       for (const id of lateIds) {
-        const row = candidates.find((c) => c.id === id);
+        const row = current.find((c) => c.id === id);
         if (flagged.has(`${id}|${row?.valueDate ?? ''}`)) continue;
+        const [detail] = await db
+          .select({ entryRef: kantoxHedgeEntries.entryRef, orderId: kantoxHedgeEntries.orderId })
+          .from(kantoxHedgeEntries)
+          .where(eq(kantoxHedgeEntries.id, id))
+          .limit(1);
         await logActivity({
           userId: null,
           tenantId,
@@ -1110,9 +1427,9 @@ async function syncTenant(tenantId: string, settings: TenantSettings | null): Pr
           entityType: 'kantox_hedge_entry',
           entityId: id,
           metadata: {
-            entryRef: row?.entryRef ?? null,
+            entryRef: detail?.entryRef ?? null,
             valueDate: row?.valueDate ?? null,
-            orderId: row?.orderId ?? null,
+            orderId: detail?.orderId ?? null,
             note: 'Value date passed with exposure still open — Pierre rolls manually on the Kantox platform',
           },
         });

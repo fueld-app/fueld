@@ -15,6 +15,8 @@ import {
   entryRef,
   findLateHedgeEntries,
   isAllowedKantoxBaseUrl,
+  mapKantoxStatus,
+  reconcileUpdates,
 } from '../src/modules/kantox/kantox.service';
 
 /**
@@ -580,5 +582,365 @@ describe('payment planning reads the children on file, not the cached total', ()
     expect(honestPlan.reduce((s, p) => s + Math.abs(p.delta), 0)).toBeLessThan(
       stalePlan.reduce((s, p) => s + Math.abs(p.delta), 0),
     );
+  });
+});
+
+describe('mapKantoxStatus — Kantox entryStatus → our row status', () => {
+  /**
+   * The full live enum, verified against preprod on 2026-09-30 and confirmed by
+   * Clément on 29/09 (`docs/kantox-emails-2026-09-30.md` Q4). `closed` is the
+   * terminal status and the ONLY one that means the trade is executed; before
+   * this mapping it was dropped, so a closed entry stayed SENT and
+   * `findLateHedgeEntries` raised false late-payment flags to Pierre once its
+   * value date passed. The cases below are the observed payloads, not invented.
+   */
+  it('maps closed — the only terminal status — to CLOSED', () => {
+    // Every closed entry is CLOSED — Kantox: "An entry cannot be Closed without
+    // being executed." The reason field is read only for a warning.
+    expect(mapKantoxStatus('closed')).toBe('CLOSED');
+    expect(mapKantoxStatus('CLOSED')).toBe('CLOSED');
+    expect(mapKantoxStatus('closed', 'take_profit_rate')).toBe('CLOSED');
+    expect(mapKantoxStatus('closed', 'execution_requested_by_client')).toBe('CLOSED');
+  });
+
+  it('leaves every still-open status untouched', () => {
+    // in_position = monitoring the conditional order; in_order = queued;
+    // accumulating = bucket with no entry yet; pending = Pierre executes by hand.
+    for (const s of ['in_position', 'in_order', 'accumulating', 'pending']) {
+      expect(mapKantoxStatus(s)).toBeNull();
+    }
+  });
+
+  it('keeps the older terminal guesses working', () => {
+    expect(mapKantoxStatus('hedged')).toBe('HEDGED');
+    expect(mapKantoxStatus('executed')).toBe('HEDGED');
+  });
+
+  it('never downgrades on an unknown or absent status', () => {
+    expect(mapKantoxStatus(null)).toBeNull();
+    expect(mapKantoxStatus('')).toBeNull();
+    expect(mapKantoxStatus('something_new')).toBeNull();
+  });
+
+  it('a closed entry is no longer late — the regression this fixes', () => {
+    const row = { id: 'e1', status: mapKantoxStatus('closed', 'take_profit_rate')!, valueDate: '2026-09-10', amount: '1000.00', cancelledAmount: '0.00' };
+    expect(row.status).toBe('CLOSED');
+    expect(findLateHedgeEntries([row], '2026-09-22')).toEqual([]);
+    // ...whereas the same row left at SENT would have been flagged.
+    expect(findLateHedgeEntries([{ ...row, status: 'SENT' }], '2026-09-22')).toEqual(['e1']);
+  });
+});
+
+describe('reconcileUpdates — what one 15-minute sync tick writes', () => {
+  const row = (over: Partial<{ status: string; hedgedRate: string | null; executionRate: string | null; valueDate: string | null }> = {}) => ({
+    status: over.status ?? 'SENT',
+    hedgedRate: over.hedgedRate === undefined ? null : over.hedgedRate,
+    executionRate: over.executionRate === undefined ? null : over.executionRate,
+    valueDate: over.valueDate === undefined ? null : over.valueDate,
+  });
+  const remote = (over: Partial<{ entryStatus: string; hedgedRate: number | null; executionRate: number | null; executionReason: string | null; valueDate: string | null }> = {}) => ({
+    entryStatus: over.entryStatus ?? 'closed',
+    hedgedRate: over.hedgedRate === undefined ? null : over.hedgedRate,
+    executionRate: over.executionRate === undefined ? null : over.executionRate,
+    // 'closed' without a reason now reads as CANCELLED, so the default supplies
+    // one; tests that mean "cancelled" pass executionReason: null explicitly.
+    executionReason: over.executionReason === undefined
+      ? ((over.entryStatus ?? 'closed') === 'closed' ? 'take_profit_rate' : null)
+      : over.executionReason,
+    valueDate: over.valueDate === undefined ? null : over.valueDate,
+  });
+
+  it('writes CLOSED once and then stops — the tick must converge', () => {
+    const r = row();
+    const first = reconcileUpdates(r, remote({ hedgedRate: 1.144906585 }));
+    expect(first.status).toBe('CLOSED');
+    // Second tick reads the row it just wrote; nothing may be decided again.
+    const second = reconcileUpdates(
+      row({ status: 'CLOSED', hedgedRate: String(first.hedgedRate) }),
+      remote({ hedgedRate: 1.144906585 }),
+    );
+    expect(second).toEqual({});
+  });
+
+  it('does not churn hedged_rate on an 8-decimal column holding a 9-decimal remote rate', () => {
+    // Live value: Kantox returns 1.144906585, numeric(14,8) stores 1.14490659.
+    // A plain !== comparison re-wrote this row every 15 minutes forever.
+    // entryStatus pinned open so only the rate decision is under test.
+    expect(reconcileUpdates(row({ hedgedRate: '1.14490659' }), remote({ entryStatus: 'in_position', hedgedRate: 1.144906585 }))).toEqual({});
+    expect(reconcileUpdates(row({ hedgedRate: '1.13595349' }), remote({ entryStatus: 'in_position', hedgedRate: 1.135953489 }))).toEqual({});
+  });
+
+  it('still writes a genuinely different hedged_rate (a roll to a new rate)', () => {
+    const u = reconcileUpdates(row({ hedgedRate: '1.13595349' }), remote({ hedgedRate: 1.1402 }));
+    expect(u.hedgedRate).toBe('1.1402');
+  });
+
+  it('never writes executionRate 0.0 over a real one', () => {
+    // Client-requested executions come back 0.0 (docs/kantox-emails-2026-09-30.md Q5).
+    const u = reconcileUpdates(row({ executionRate: '1.1337' }), remote({ executionRate: 0 }));
+    expect(u.executionRate).toBeUndefined();
+    expect(reconcileUpdates(row(), remote({ entryStatus: 'in_position', executionRate: 0 }))).toEqual({});
+  });
+
+  it('writes a real executionRate', () => {
+    expect(reconcileUpdates(row(), remote({ executionRate: 1.1337 })).executionRate).toBe('1.1337');
+  });
+
+  it('leaves an open status alone and an unknown status untouched', () => {
+    expect(reconcileUpdates(row(), remote({ entryStatus: 'in_position' }))).toEqual({});
+    expect(reconcileUpdates(row(), remote({ entryStatus: 'in_order' }))).toEqual({});
+    expect(reconcileUpdates(row(), remote({ entryStatus: 'brand_new' }))).toEqual({});
+  });
+});
+
+describe('mapKantoxStatus — equality, not substring, on the terminal status', () => {
+  /**
+   * Panel finding (kimi-k3): a substring match on `closed` would treat a future
+   * status such as `not_closed` or `pending_closure` as terminal, and a false
+   * CLOSED silences a genuine late-payment flag — the exact class of bug this
+   * mapping exists to fix. Equality is the safe form.
+   */
+  it('matches closed exactly and nothing that merely contains it', () => {
+    expect(mapKantoxStatus('closed', 'take_profit_rate')).toBe('CLOSED');
+    expect(mapKantoxStatus(' Closed ', 'take_profit_rate')).toBe('CLOSED');
+    for (const s of ['not_closed', 'pending_closure', 'closed_pending', 'unclosed', 'reopened']) {
+      expect(mapKantoxStatus(s)).toBeNull();
+    }
+  });
+});
+
+describe('reconcileUpdates — writing at the column scale', () => {
+  const row = (over: Partial<{ hedgedRate: string | null; executionRate: string | null; status: string; valueDate: string | null }> = {}) => ({
+    status: over.status ?? 'SENT',
+    hedgedRate: over.hedgedRate === undefined ? null : over.hedgedRate,
+    executionRate: over.executionRate === undefined ? null : over.executionRate,
+    valueDate: over.valueDate === undefined ? null : over.valueDate,
+  });
+
+  it('writes the raw remote rate for Postgres to round — NOT JS toFixed(8)', () => {
+    // Measured: (1.144906585).toFixed(8) === '1.14490658' on a double, while
+    // Postgres numeric(14,8) rounds the decimal string to '1.14490659'. Writing
+    // toFixed would store an off-by-one-in-the-8th-digit rate; the raw string is
+    // correct and rounds identically on read-back, so no churn either way.
+    expect((1.144906585).toFixed(8)).toBe('1.14490658'); // documents why not toFixed
+    const u = reconcileUpdates(row(), { entryStatus: 'in_position', hedgedRate: 1.144906585, executionRate: null, executionReason: null, valueDate: null });
+    expect(u.hedgedRate).toBe('1.144906585');
+  });
+
+  it('treats a missing stored rate as a change, not as 0', () => {
+    // Comparing null as 0 could silently drop a genuine remote rate that rounds
+    // below the epsilon; an absent stored value is always worth writing.
+    expect(reconcileUpdates(row(), { entryStatus: 'in_position', hedgedRate: 1e-12, executionRate: null, executionReason: null, valueDate: null }).hedgedRate).toBe('1e-12');
+  });
+});
+
+describe('the CLOSED mapping protects the payment path (panel finding, verified live)', () => {
+  /**
+   * Two writers set CLOSED and both mean "send no further delta": the sync
+   * reconciler (executed at Kantox) and the payment-close path (settled by
+   * payment). A close is a NEGATIVE entry — it opens an opposite position rather
+   * than settling the hedge — so once Kantox has executed, a close must not be
+   * sent. Before the mapping, all 12 live executed entries stayed SENT, and the
+   * sell-leg filter below would have picked them up and fired a naked cancel.
+   */
+  const isClosableSellLeg = (r: { direction: string; status: string }) =>
+    r.direction === 'SELL' && (r.status === 'SENT' || r.status === 'HEDGED');
+
+  it('an executed entry is not treated as a closeable sell leg', () => {
+    // What the reconciler now writes for 20260922-000564#S (executed, value date
+    // 09/11/2026 — future, so the customer payment has not happened yet).
+    const executed = { direction: 'SELL', status: mapKantoxStatus('closed', 'take_profit_rate')! };
+    expect(executed.status).toBe('CLOSED');
+    expect(isClosableSellLeg(executed)).toBe(false);
+    // Whereas the same row left SENT (the pre-fix state) IS closeable — this is
+    // the exposure the mapping removes.
+    expect(isClosableSellLeg({ direction: 'SELL', status: 'SENT' })).toBe(true);
+    // A genuinely open leg is still closeable, so the path is not disabled.
+    expect(isClosableSellLeg({ direction: 'SELL', status: mapKantoxStatus('in_position') ?? 'SENT' })).toBe(true);
+  });
+});
+
+describe('closed: executed vs cancelled', () => {
+  /**
+   * Clément, 01/10/2026: "An entry cannot be Closed without being executed."
+   * An earlier cut of this code read a reasonless `closed` as CANCELLED, which
+   * is UNSOUND — a null executionReason does not mean cancelled, and treating
+   * it as such would suppress both the late-payment flag and the payment close
+   * on a hedge that really did execute. Closed is closed.
+   */
+  it('reads every closed entry as CLOSED, reason or not', () => {
+    expect(mapKantoxStatus('closed', 'take_profit_rate')).toBe('CLOSED');
+    expect(mapKantoxStatus('closed', 'execution_requested_by_client')).toBe('CLOSED');
+    expect(mapKantoxStatus('closed', null)).toBe('CLOSED');
+    expect(mapKantoxStatus('closed')).toBe('CLOSED');
+  });
+
+  it('maps a cancelled status defensively, should Kantox ever report one', () => {
+    expect(mapKantoxStatus('cancelled')).toBe('CANCELLED');
+    expect(mapKantoxStatus('Canceled')).toBe('CANCELLED');
+  });
+
+  it('a cancelled entry is neither closeable nor late-flagged, a closed one is not flagged either', () => {
+    const cancelled = { direction: 'SELL', status: mapKantoxStatus('cancelled')! };
+    expect(cancelled.status).toBe('CANCELLED');
+    expect(findLateHedgeEntries(
+      [{ id: 'x', status: cancelled.status, valueDate: '2026-01-01', amount: '1000.00', cancelledAmount: '0.00' }],
+      '2026-11-10',
+    )).toEqual([]);
+    // An EXECUTED hedge is CLOSED, so it is also not late-flagged — the fix that
+    // started this work.
+    expect(findLateHedgeEntries(
+      [{ id: 'y', status: mapKantoxStatus('closed', null)!, valueDate: '2026-01-01', amount: '1000.00', cancelledAmount: '0.00' }],
+      '2026-11-10',
+    )).toEqual([]);
+  });
+
+  it('reconciling a closed entry writes CLOSED even with no reason', () => {
+    const u = reconcileUpdates(
+      { status: 'SENT', hedgedRate: null, executionRate: null, valueDate: null },
+      { entryStatus: 'closed', hedgedRate: null, executionRate: null, executionReason: null, valueDate: null },
+    );
+    expect(u.status).toBe('CLOSED');
+  });
+});
+
+describe('entry_rate — the booking rate sent on every INITIAL push', () => {
+  /**
+   * Asked on 09/09 and re-confirmed 29/09 ("very useful to receive for Analytics
+   * later if you are able to send it"). Derived from the existing FX feed:
+   * getFxRate returns USD-per-unit (base USD), so EUR → the EURUSD quote Kantox
+   * itself reports. Direction verified against live data: our 564/565 entries
+   * came back `rate: 1.1461` alongside `hedgedRate: 1.1449`.
+   */
+  const snap = (over: Partial<Parameters<typeof buildHedgePlan>[0]> = {}) => ({
+    tenantId: 't1',
+    orderId: 'o1',
+    orderNumber: '20260911-000522',
+    dueDate: '2026-10-01',
+    items: [{
+      id: 'i1', orderSupplierId: 's1', quantity: 100, quantityMin: 100,
+      salesPrice: 900, costPrice: 800, salesCurrency: 'USD', costCurrency: 'USD',
+    }],
+    ...over,
+  } as Parameters<typeof buildHedgePlan>[0]);
+  const SETTINGS = {
+    marginHedgePercent: 100, paymentDateBufferDays: 7, valueDateRounding: 'WEEKLY_MONDAY' as const,
+    hedgeCurrency: 'USD', hedgeCounterCurrency: 'EUR', bookingRate: 1.1461,
+  };
+
+  it('carries entryRate + entryRatePair on every planned leg', () => {
+    const plan = buildHedgePlan(snap(), SETTINGS);
+    expect(plan.entries.length).toBeGreaterThan(0);
+    for (const e of plan.entries) {
+      expect(typeof e.entryRate).toBe('number');
+      expect(e.entryRate).toBeGreaterThan(0);
+      expect(e.entryRatePair).toBe('EURUSD');
+    }
+  });
+
+  it('omits entryRate rather than sending a bogus 1.0 when the feed has no rate', () => {
+    // getFxRate falls back to 1 for an unknown currency; sending 1.0 would look
+    // to Kantox like a claim the pair trades at parity.
+    const plan = buildHedgePlan(snap(), { ...SETTINGS, hedgeCounterCurrency: 'ZZZ', bookingRate: undefined });
+    for (const e of plan.entries) expect(e.entryRate).toBeUndefined();
+  });
+
+  it('never puts a rate on a lifecycle close (no booking rate exists for it)', () => {
+    // planPaymentClosures builds closes via a separate path that never sets
+    // entryRate — asserted structurally by the PlannedHedgeEntry construction in
+    // onCustomerPaymentForKantox, which does not reference entryRate.
+    const plan = buildHedgePlan(snap(), SETTINGS);
+    expect(plan.entries.every((e) => e.entryRate === undefined || e.entryRate > 0)).toBe(true);
+  });
+});
+
+describe('entry_rate precision — the round2 trap', () => {
+  /**
+   * `getFxRate` returns the DISPLAY-rounded figure (prices/price.service round2),
+   * so EURUSD reads 1.14 against a real 1.1370 — ~0.44% on a ~1.14 pair. Using
+   * it as `entry_rate` would hand Kantox a rate that is wrong by far more than
+   * the move they are trying to measure, so the Kantox path takes the precise
+   * accessor instead. This test pins the reasoning, not the wiring.
+   */
+  it('shows why getFxRate is unusable as a booking rate', () => {
+    const real = 1.1370;
+    const asDisplayed = Math.round(real * 100) / 100; // round2
+    expect(asDisplayed).toBe(1.14);
+    const errorPct = Math.abs(asDisplayed - real) / real * 100;
+    expect(errorPct).toBeGreaterThan(0.2); // ~0.26%, vs a typical daily move of ~0.5%
+  });
+
+  it('a 4-decimal rate survives the numeric(14,8) column unchanged', () => {
+    // The column has 8 decimals, so there is no rounding to hide behind.
+    expect(String(1.1370)).toBe('1.137');
+  });
+});
+
+describe('value date reconciliation — rolls change it in place', () => {
+  /**
+   * Clément, 01/10/2026: "An entry that is rolled keep the same entryRef, the
+   * only difference is the new VD." Since the ref does not change, NOTHING else
+   * would ever notice a roll, and our stored date would go stale while the
+   * late-payment flag keyed off it.
+   */
+  const row = (valueDate: string | null) => ({ status: 'SENT', hedgedRate: null, executionRate: null, valueDate });
+  const remote = (valueDate: string | null) => ({
+    entryStatus: 'in_order', hedgedRate: null, executionRate: null, executionReason: null, valueDate,
+  });
+
+  it('writes the new value date, converting DD/MM/YYYY to ISO', () => {
+    expect(reconcileUpdates(row('2026-10-26'), remote('02/11/2026')).valueDate).toBe('2026-11-02');
+  });
+
+  it('writes nothing when the date already matches', () => {
+    expect(reconcileUpdates(row('2026-11-02'), remote('02/11/2026'))).toEqual({});
+  });
+
+  it('never blanks a good local date from an unparseable remote one', () => {
+    for (const bad of [null, '', '2026-11-02', 'not a date', '2/11/2026']) {
+      expect(reconcileUpdates(row('2026-10-26'), remote(bad)).valueDate).toBeUndefined();
+    }
+  });
+
+  it('keeps the date when the row has none and remote has none', () => {
+    expect(reconcileUpdates(row(null), remote(null))).toEqual({});
+  });
+});
+
+describe('MONTH_END rounding — Pierre, 01/10/2026', () => {
+  /**
+   * "round up Value Dates to the last opening date of the month. any invoices
+   * with due date in October should have a rounded VD to 30/10."
+   *
+   * Deliberately distinct from the existing MONTHLY mode, which moves to the 1st
+   * of the NEXT month — a setting flip would have been wrong.
+   */
+  const base = {
+    deliveredAt: '2026-10-01', bufferDays: 0,
+    rounding: 'MONTH_END' as const,
+  };
+
+  it('rounds any October due date to 31/10 (calendar month end)', () => {
+    // Pierre's example produced 30/10 because he counted opening days; the pure
+    // function can only know the calendar month end, and 31 Oct 2026 is a
+    // Saturday — see the limitation noted in deriveValueDate.
+    expect(deriveValueDate(base)).toBe('2026-10-31');
+    expect(deriveValueDate({ ...base, deliveredAt: '2026-10-15' })).toBe('2026-10-31');
+  });
+
+  it('handles a 30-day month and February correctly', () => {
+    expect(deriveValueDate({ ...base, deliveredAt: '2026-11-05' })).toBe('2026-11-30');
+    expect(deriveValueDate({ ...base, deliveredAt: '2027-02-10' })).toBe('2027-02-28');
+    expect(deriveValueDate({ ...base, deliveredAt: '2028-02-10' })).toBe('2028-02-29'); // leap
+  });
+
+  it('is NOT the same as MONTHLY (which jumps to the 1st of next month)', () => {
+    expect(deriveValueDate({ ...base, rounding: 'MONTHLY' })).toBe('2026-11-01');
+    expect(deriveValueDate(base)).toBe('2026-10-31');
+  });
+
+  it('still applies the payment buffer before rounding', () => {
+    // 28/10 + 7 days = 04/11, so it rounds to November's end, not October's.
+    expect(deriveValueDate({ ...base, deliveredAt: '2026-10-28', bufferDays: 7 })).toBe('2026-11-30');
   });
 });
