@@ -1,8 +1,14 @@
 # Moxie — invoice reissue runbook
 
-**Status: DONE for `20260916-000130` (2026-09-30).** It was reissued as
-`INV-2026-0005`; `INV-2026-0004` is VOID and kept for audit. The other three
-remain as issued and are mislabelled but usable — see "Still open" at the end.
+**Status: DONE (2026-09-30 and 2026-10-01).**
+- `20260916-000130` reissued as `INV-2026-0005`; `INV-2026-0004` VOID.
+- `20260915-000129` — `INV-2026-0006` (368,400.47) **VOID, no reissue**: the order
+  was an abandoned duplicate; the same commission is already correctly billed as
+  `INV-2026-0007` (9,288.00). A replacement would have double-billed it.
+- `20260902-000108` reissued as `INV-2026-0009` (7,079.24); `INV-2026-0003` VOID.
+  It had billed 6,880.45 from a quantity of 91.568 MT while the order was
+  mid-edit, and was emailed with that stale figure; the delivered 94.214 MT bills
+  7,079.24.
 
 Four invoices were issued before the Sleek invoice layout was corrected. They keep
 the bytes they were issued with (an issued invoice is a frozen artifact: the PDF
@@ -110,14 +116,17 @@ issued afterwards.
 
 ## Still open
 
-Three Moxie invoices still print the order number under "Invoice number":
-`INV-2026-0001` (89,186.00), `INV-2026-0002` (43,847.89), `INV-2026-0003`
-(6,880.45). None carries a PO, so nothing is missing from them and the reference
-they print still works — they are mislabelled, not broken. Reissuing each would
-change its number, which is a worse trade than leaving them when there is no PO
-to add. **Recommendation: leave them.**
+Two invoices still print the order number under "Invoice number": `INV-2026-0001`
+(89,186.00) and `INV-2026-0002` (43,847.89). Neither carries a PO, so nothing is
+missing from them and the reference they print still works — mislabelled, not
+broken. Reissuing would change the number for no gain. **Recommendation: leave.**
 
-Global Seatrade was emailed the voided `INV-2026-0004` at 08:59 on 2026-09-30 and
-has not been sent the replacement. Someone at Moxie needs to send
-`INV-2026-0005`, or the customer holds a copy of a cancelled invoice and has never
-seen the live one.
+`INV-2026-0001` needs nothing else: its due date 30/10 was correctly frozen as
+delivered 09/10 + 21 days. The order's 01/10 edit moved `deliveredAt` to 09/09
+afterwards, which is an internal divergence only.
+
+**Two customers hold superseded documents** and Moxie must send the replacements:
+- Global Seatrade was emailed the now-void `INV-2026-0004` → send `INV-2026-0005`.
+- Dan Bunkering was emailed the now-void `INV-2026-0003` at 08:23 on 2026-10-01,
+  billing 6,880.45 → send `INV-2026-0009` (7,079.24, due 13/10). Until they get
+  it they are being asked for 198.79 less than they owe.
