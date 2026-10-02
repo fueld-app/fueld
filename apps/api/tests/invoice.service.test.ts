@@ -40,7 +40,7 @@ import {
   InvoiceNotFoundError,
   InvoiceLinesChangedError,
 } from '../src/modules/orders/invoice.service';
-import { documentRevisions } from '../src/db/schema';
+import { documentRevisions, tenants } from '../src/db/schema';
 import { seedBasics, truncateAll } from './helpers/db';
 import { listOrderPayments } from '../src/modules/orders/orders.service';
 import { assertValidSchedule, InvalidScheduleError, listOrderPaymentSchedule, setOrderPaymentSchedule } from '../src/modules/orders/payment-schedule.service';
@@ -166,6 +166,69 @@ describe('invoice due date', () => {
   it('does not grant COD or PREPAY a credit term', () => {
     expect(computeInvoiceDueDate('2026-09-27T10:00:00Z', 'COD', null)).toBe('2026-09-27');
     expect(computeInvoiceDueDate('2026-09-27T10:00:00Z', 'PREPAY', 30)).toBe('2026-09-27');
+  });
+});
+
+describe('order-derived invoice numbers (opt-in)', () => {
+  it('renders INVOICE-<order number> when the tenant opts in, and leaves the sequence alone otherwise', async () => {
+    const { tenant, order } = await seedOrderWithItems();
+
+    // Default: the sequence scheme is untouched — this is the byte-stability
+    // guarantee every existing tenant depends on.
+    const before = await allocateInvoiceNumber(tenant.id, new Date(), order.orderNumber ?? '');
+    expect(before).toMatch(/^INV-\d{4}-\d{4}$/);
+
+    await db.update(tenants)
+      .set({ settings: { ...(tenant.settings as object), invoiceNumberFromOrder: true } })
+      .where(eq(tenants.id, tenant.id));
+
+    const number = await allocateInvoiceNumber(tenant.id, new Date(), order.orderNumber ?? '');
+    expect(number).toBe(`INVOICE-${order.orderNumber}`);
+    // Regression guard: the normalizer appends {SEQ:4} to a template with no
+    // sequence token, which made this 'INVOICE-<order>0004'. The exact match above
+    // catches it; this states the intent for a reader.
+    expect(number).toBe(`INVOICE-${order.orderNumber}`);
+  });
+
+  it('refuses to render a template that needs the order number when none is supplied', async () => {
+    // Otherwise the number comes out as 'INVOICE-' — a document whose number
+    // names nothing.
+    const { tenant } = await seedOrderWithItems();
+    await db.update(tenants)
+      .set({ settings: { ...(tenant.settings as object), invoiceNumberFromOrder: true } })
+      .where(eq(tenants.id, tenant.id));
+
+    await expect(allocateInvoiceNumber(tenant.id, new Date(), '')).rejects.toThrow(/order number/i);
+  });
+
+  it('suffixes a replacement with its revision so it differs from the voided document', async () => {
+    // Under this scheme a replacement re-derives the SAME string as the document
+    // it voids, so -R<n> is the only thing separating them (and avoiding the
+    // unique index).
+    const { tenant, order } = await seedOrderWithItems();
+    await db.update(tenants)
+      .set({ settings: { ...(tenant.settings as object), invoiceNumberFromOrder: true } })
+      .where(eq(tenants.id, tenant.id));
+
+    const original = await ensureOrderInvoice(order.id);
+    expect(original.invoiceNumber).toBe(`INVOICE-${order.orderNumber}`);
+
+    const { replacement } = await voidOrderInvoice(order.id, { reprice: true });
+    expect(replacement!.invoiceNumber).toBe(`INVOICE-${order.orderNumber}-R1`);
+    expect(replacement!.invoiceNumber).not.toBe(original.invoiceNumber);
+
+    // A second correction moves to R2 rather than reusing R1.
+    const second = await voidOrderInvoice(order.id, { reprice: true });
+    expect(second.replacement!.invoiceNumber).toBe(`INVOICE-${order.orderNumber}-R2`);
+  });
+
+  it('still gives a sequence tenant a fresh number on reissue (no suffix needed)', async () => {
+    const { order } = await seedOrderWithItems();
+    const original = await ensureOrderInvoice(order.id);
+    const { replacement } = await voidOrderInvoice(order.id, { reprice: true });
+    expect(replacement!.invoiceNumber).toMatch(/^INV-\d{4}-\d{4}$/);
+    expect(replacement!.invoiceNumber).not.toBe(original.invoiceNumber);
+    expect(replacement!.invoiceNumber).not.toContain('-R');
   });
 });
 

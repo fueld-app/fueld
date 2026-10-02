@@ -63,17 +63,45 @@ export function isInvoiceSettled(amount: string | null, amountPaid: string | nul
 }
 export const DEFAULT_INVOICE_NUMBER_PREFIX = 'INV-';
 
-/** Same token contract as order numbers ({PREFIX}/{YYYY}/{MM}/{DD}/{SEQ:n}). */
+/**
+ * Same token contract as order numbers ({PREFIX}/{YYYY}/{MM}/{DD}/{SEQ:n}).
+ *
+ * A template carrying `{ORDER_NUMBER}` is left alone: appending `{SEQ:4}` to it
+ * would produce 'INVOICE-20260916-0001300004' — the order number with a sequence
+ * stuck on the end, which is not the single stable reference the order-derived
+ * scheme exists to provide.
+ */
 export function normalizeInvoiceNumberTemplate(template: string): string {
   const trimmed = template.trim();
   if (!trimmed) return DEFAULT_INVOICE_NUMBER_TEMPLATE;
   if (/\{SEQ(?::\d+)?\}/.test(trimmed)) return trimmed;
+  if (/\{ORDER_NUMBER\}/.test(trimmed)) return trimmed;
   return `${trimmed}{SEQ:4}`;
 }
 
-export function renderInvoiceNumber(template: string, prefix: string, seq: number, now = new Date()): string {
+/**
+ * Render an invoice number.
+ *
+ * `{ORDER_NUMBER}` is the opt-in alternative to the sequence: with it the number
+ * is derived from the order ('INVOICE-20260916-000130') so the order, the emails
+ * and the invoice all quote one reference — the one the customer's remittance
+ * advice already carries. `{SEQ:n}` remains the default because a sequence also
+ * tells you how many invoices exist.
+ *
+ * A template that uses `{ORDER_NUMBER}` must still be given one; without it the
+ * token renders empty and `INVOICE-20260916-000130` would come out as `INVOICE-`.
+ * `allocateInvoiceNumber` refuses that combination rather than issuing it.
+ */
+export function renderInvoiceNumber(
+  template: string,
+  prefix: string,
+  seq: number,
+  now = new Date(),
+  orderNumber = '',
+): string {
   let result = normalizeInvoiceNumberTemplate(template)
     .replace('{PREFIX}', prefix)
+    .replace('{ORDER_NUMBER}', orderNumber)
     .replace('{YYYY}', now.getUTCFullYear().toString())
     .replace('{MM}', String(now.getUTCMonth() + 1).padStart(2, '0'))
     .replace('{DD}', String(now.getUTCDate()).padStart(2, '0'));
@@ -91,7 +119,24 @@ export function renderInvoiceNumber(template: string, prefix: string, seq: numbe
  * consumed even when the caller later fails — invoice numbers must never be
  * reused, so a gap is the correct outcome rather than a bug to fix.
  */
-export async function allocateInvoiceNumber(tenantId: string, now = new Date()): Promise<string> {
+/**
+ * Whether this tenant derives invoice numbers from the order number.
+ *
+ * Read in one place so the reissue and the issuance cannot disagree about the
+ * scheme — the two must make the same decision, or a replacement could collide
+ * with the document it replaces.
+ */
+async function isOrderNumberedScheme(tenantId: string): Promise<boolean> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  return settings.invoiceNumberFromOrder === true;
+}
+
+export async function allocateInvoiceNumber(tenantId: string, now = new Date(), orderNumber = ''): Promise<string> {
   const [seq] = await db
     .insert(invoiceNumberSequences)
     .values({ tenantId, lastSeq: 1 })
@@ -111,11 +156,27 @@ export async function allocateInvoiceNumber(tenantId: string, now = new Date()):
     .limit(1);
   const settings = (tenant?.settings ?? {}) as TenantSettings;
 
+  // The opt-in order-derived scheme, applied as a template rather than a
+  // hardcoded shape so a tenant can still adjust the wording around it. Note the
+  // sequence is STILL consumed above: invoice numbers must never be reused, so
+  // burning one keeps the counter and the table from drifting apart.
+  const usingOrderNumber = settings.invoiceNumberFromOrder === true;
+  const template = usingOrderNumber
+    ? 'INVOICE-{ORDER_NUMBER}'
+    : (settings.invoiceNumberTemplate ?? DEFAULT_INVOICE_NUMBER_TEMPLATE);
+
+  // Refuse rather than issue 'INVOICE-': a template that asks for the order
+  // number but was handed none would print a document whose number names nothing.
+  if (template.includes('{ORDER_NUMBER}') && orderNumber.trim() === '') {
+    throw new Error(`Invoice number template needs an order number but none was supplied (tenant ${tenantId})`);
+  }
+
   return renderInvoiceNumber(
-    settings.invoiceNumberTemplate ?? DEFAULT_INVOICE_NUMBER_TEMPLATE,
+    template,
     settings.invoiceNumberPrefix ?? DEFAULT_INVOICE_NUMBER_PREFIX,
     seq?.lastSeq ?? 1,
     now,
+    orderNumber,
   );
 }
 
@@ -184,10 +245,10 @@ export async function voidOrderInvoice(
   // Resolve and validate everything the reissue needs BEFORE mutating anything:
   // `computeInvoiceAmount` can refuse (mixed-currency lines) and that must not
   // leave a voided invoice with nothing to replace it.
-  let reissueContext: { tenantId: string; dueDate: string; amount: string } | null = null;
+  let reissueContext: { tenantId: string; dueDate: string; amount: string; orderNumber: string; revisionSuffix: string } | null = null;
   if (options.reissue !== false) {
     const [order] = await db
-      .select({ tenantId: orders.tenantId })
+      .select({ tenantId: orders.tenantId, orderNumber: orders.orderNumber })
       .from(orders)
       .where(eq(orders.id, orderId))
       .limit(1);
@@ -216,10 +277,24 @@ export async function voidOrderInvoice(
       }
     }
 
+    // When the number derives from the ORDER, a replacement re-derives to the
+    // SAME string as the document it voids — indistinguishable to the customer
+    // and a straight collision on the unique index. The revision number is the
+    // only thing that separates them, so it is appended. Left empty for a
+    // sequence-based tenant, whose replacement already gets a fresh number.
+    // Counts every invoice this order has ever had, voided included, so a second
+    // replacement does not reuse -R1.
+    const [priorCount] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(invoices)
+      .where(eq(invoices.orderId, orderId));
+    const revisionNumber = priorCount?.n ?? 1;
     reissueContext = {
       tenantId: order.tenantId,
       dueDate: options.dueDate ?? current.dueDate,
       amount,
+      orderNumber: order.orderNumber ?? '',
+      revisionSuffix: (await isOrderNumberedScheme(order.tenantId)) ? `-R${revisionNumber}` : '',
     };
   }
 
@@ -249,6 +324,8 @@ export async function voidOrderInvoice(
       executor: tx,
       orderId,
       tenantId: context.tenantId,
+      orderNumber: context.orderNumber,
+      ...(context.revisionSuffix ? { revisionSuffix: context.revisionSuffix } : {}),
       dueDate: context.dueDate,
       amount: context.amount,
       // Carry the tranche identity through the correction, or the replacement
@@ -439,6 +516,14 @@ async function insertInvoiceWithRetry(params: {
   tenantId: string;
   dueDate: string;
   amount: string;
+  /**
+   * The order's number, needed when the tenant derives the invoice number from
+   * it. Read by the caller (which already has the order) rather than re-fetched
+   * here, so the number cannot come from a different row than the one billed.
+   */
+  orderNumber?: string;
+  /** Set on a replacement so it is distinguishable from the document it voids. */
+  revisionSuffix?: string;
   tranche?: {
     /** Null when the tranche's schedule row was cleared after issuance. */
     scheduleId: string | null;
@@ -455,7 +540,11 @@ async function insertInvoiceWithRetry(params: {
       .insert(invoices)
       .values({
         orderId: params.orderId,
-        invoiceNumber: await allocateInvoiceNumber(params.tenantId),
+        // Allocated ONCE. A revision suffix is appended to the rendered number,
+        // not to a second allocation: invoice numbers are never reused, so
+        // burning two would leave the counter and the table further apart than
+        // the gap the design already accepts.
+        invoiceNumber: `${await allocateInvoiceNumber(params.tenantId, new Date(), params.orderNumber ?? '')}${params.revisionSuffix ?? ''}`,
         status: 'SENT',
         dueDate: params.dueDate,
         amount: params.amount,
@@ -638,6 +727,7 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
     .select({
       id: orders.id,
       tenantId: orders.tenantId,
+      orderNumber: orders.orderNumber,
       orderKind: orders.orderKind,
       customerPaymentTermType: orders.customerPaymentTermType,
       customerCreditDays: orders.customerCreditDays,
@@ -677,6 +767,7 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
           executor: tx,
           orderId,
           tenantId: order.tenantId,
+          orderNumber: order.orderNumber ?? '',
           dueDate: tranche.dueDate ?? computeInvoiceDueDate(
             order.deliveredAt ?? order.eta,
             order.customerPaymentTermType,
@@ -723,7 +814,7 @@ export async function ensureOrderInvoice(orderId: string): Promise<typeof invoic
     throw new UnpricedOrderError(orderId);
   }
 
-  const created = await insertInvoiceWithRetry({ orderId, tenantId: order.tenantId, dueDate, amount });
+  const created = await insertInvoiceWithRetry({ orderId, tenantId: order.tenantId, dueDate, amount, orderNumber: order.orderNumber ?? '' });
   if (created) {
     // Claim payments recorded before this invoice existed (a trader can take
     // payment on delivery before issuing the PDF). Without this they stay

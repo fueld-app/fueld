@@ -276,6 +276,32 @@ export interface TenantSettings {
    */
   supplierInvoiceTermsDays?: number;
   invoiceNumberPrefix?: string;   // default 'INV-'
+  /**
+   * Derive the invoice number from the ORDER number instead of the tenant's
+   * sequence — 'INVOICE-20260916-000130' rather than 'INV-2026-0005'.
+   *
+   * Opt-in per tenant. The advantage is one reference for the whole job: the
+   * order, the emails and the invoice all quote the same string, which is the
+   * reference the customer's remittance advice already carries. The costs are
+   * real and deliberate: the number gets longer, the global sequence (which also
+   * told you how many invoices existed) is gone, and a reissue can no longer mint
+   * a fresh number because it re-derives from the same order — so a replacement
+   * is disambiguated with a revision suffix instead. Never enabled over an
+   * existing series without the tenant accepting those trade-offs.
+   */
+  invoiceNumberFromOrder?: boolean;
+  /**
+   * Show Reports → Invoices: every issued invoice, paid and unpaid, with its
+   * order reference, amounts and status.
+   *
+   * Opt-in per tenant. The Invoice Aging report deliberately shows only invoices
+   * still owed (an invoice with nothing outstanding is not collectible and does
+   * not belong in an ageing view), and Trading → Invoiced Orders lists ORDERS,
+   * not invoices — so without this there is nowhere to look up an invoice that
+   * has been paid, which is exactly the question "have we sent that bill, and
+   * what is it called?".
+   */
+  invoiceRegister?: boolean;
   // Vessel-company roles (configurable from admin)
   vesselCompanyRoles?: { key: string; label: string; group: string; description?: string; seasearcherCode?: string }[];
   // Configurable product and unit options for order line items

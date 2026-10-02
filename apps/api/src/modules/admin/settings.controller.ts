@@ -50,6 +50,8 @@ import {
   updateAtradiusSettings,
   getPhotoGallerySettings,
   getThroughputReportSettings,
+  getInvoiceSettings,
+  updateInvoiceSettings,
   getVesselTypeSettings,
   updateVesselTypeSettings,
   getVesselPersonTitleSettings,
@@ -713,6 +715,38 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       groupByCategory: t.Boolean(),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update throughput report settings (admin only)' },
+  })
+
+  .get('/my-invoice-settings', async ({ auth }) => {
+    try {
+      const data = await getInvoiceSettings(auth.tenantId);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get invoice settings for current tenant' },
+  })
+
+  .put('/invoice-settings', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateInvoiceSettings(auth.tenantId, {
+        numberFromOrder: body.numberFromOrder,
+        register: body.register,
+      });
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      numberFromOrder: t.Boolean(),
+      register: t.Boolean(),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update invoice settings (admin only)' },
   })
 
   .get('/my-custom-columns', async ({ auth }) => {

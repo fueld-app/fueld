@@ -18,6 +18,7 @@ import {
   priceReferences,
 } from '../../db/schema';
 import type { OwnCompanyDto, TeamDto, CompanyGroupDto, BankAccountDto } from '@fueld/types';
+import type { TenantSettings } from '../../db/schema';
 
 export const DEFAULT_FINANCING_RATE_ANNUAL = 0.08;
 export const DEFAULT_FINANCING_DAY_COUNT = 365;
@@ -1464,6 +1465,52 @@ export async function getThroughputReportSettings(): Promise<{
     defaultUnit: tr?.defaultUnit ?? 'Gallons',
     groupByCategory: tr?.groupByCategory ?? false,
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  INVOICE SETTINGS (number source + register)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface InvoiceSettings {
+  /** Derive the invoice number from the order number ('INVOICE-20260916-000130'). */
+  numberFromOrder: boolean;
+  /** Show Reports → Invoices — every issued invoice, paid and unpaid. */
+  register: boolean;
+}
+
+/**
+ * Both flags are opt-in and off by default. Read per tenant, not from the first
+ * tenant on the instance — this decides the SHAPE OF AN INVOICE NUMBER, and a
+ * shared default would silently change one tenant's numbering when another's
+ * was configured.
+ */
+export async function getInvoiceSettings(tenantId: string): Promise<InvoiceSettings> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  return {
+    numberFromOrder: settings.invoiceNumberFromOrder ?? false,
+    register: settings.invoiceRegister ?? false,
+  };
+}
+
+export async function updateInvoiceSettings(tenantId: string, data: InvoiceSettings): Promise<InvoiceSettings> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!tenant) throw new Error('No tenant found');
+  const settings = {
+    ...(tenant.settings as Record<string, unknown> ?? {}),
+    invoiceNumberFromOrder: data.numberFromOrder,
+    invoiceRegister: data.register,
+  };
+  await db.update(tenants).set({ settings, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
+  return data;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
