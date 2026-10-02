@@ -144,6 +144,15 @@ export const routes: Routes = [
         title: 'Supplier Commission Report',
       },
       {
+        path: 'reports/invoices',
+        canActivate: [lightGuard],
+        loadComponent: () =>
+          import('./features/reports/pages/invoices-register/invoices-register-page.component').then(
+            (m) => m.InvoicesRegisterPageComponent,
+          ),
+        title: 'Invoices',
+      },
+      {
         path: 'reports/supplier-invoices',
         canActivate: [lightGuard],
         loadComponent: () =>

@@ -84,6 +84,8 @@ const reportExceptionTypesSchema = t.Optional(t.Array(t.Union([
   t.Literal('LOW_MARGIN_CUSTOMER'),
 ])));
 
+import { handleGetInvoiceRegister, handleExportInvoiceRegister, type InvoiceRegisterQuery } from './invoice-register.controller';
+
 export const reportsController = new Elysia({ prefix: '/reports' })
   .use(authGuard)
   .get(
@@ -244,6 +246,43 @@ export const reportsController = new Elysia({ prefix: '/reports' })
       },
     },
   )
+  // ── Invoice register (opt-in per tenant) ────────────────────────────
+  .get('/invoices', async ({ auth, query, set }) => {
+    const result = await handleGetInvoiceRegister(auth.tenantId, query as InvoiceRegisterQuery);
+    if (!result.ok) {
+      set.status = 403;
+      return { success: false, data: null, message: result.message };
+    }
+    return { success: true, data: result.data } satisfies ApiResponse<unknown>;
+  }, {
+    query: t.Object({
+      from: t.Optional(t.String()),
+      to: t.Optional(t.String()),
+      status: t.Optional(t.String()),
+      clientId: t.Optional(t.String()),
+      q: t.Optional(t.String()),
+    }),
+    detail: { tags: ['Reports'], summary: 'List every issued invoice (paid and unpaid)', security: [{ bearerAuth: [] }] },
+  })
+  .get('/invoices/export.xlsx', async ({ auth, query, set }) => {
+    const result = await handleExportInvoiceRegister(auth.tenantId, query as InvoiceRegisterQuery);
+    if (!result.ok) {
+      set.status = 403;
+      return { success: false, data: null, message: result.message };
+    }
+    set.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    set.headers['Content-Disposition'] = `attachment; filename="${result.fileName}"`;
+    return result.content;
+  }, {
+    query: t.Object({
+      from: t.Optional(t.String()),
+      to: t.Optional(t.String()),
+      status: t.Optional(t.String()),
+      clientId: t.Optional(t.String()),
+      q: t.Optional(t.String()),
+    }),
+    detail: { tags: ['Reports'], summary: 'Export the invoice register XLSX', security: [{ bearerAuth: [] }] },
+  })
   .get('/trader-performance/export', async ({ auth, query, set }) => {
     const { csv, fileName } = await exportTraderPerformanceCsv(auth.tenantId, auth.userId, query as any);
     set.headers['Content-Type'] = 'text/csv; charset=utf-8';

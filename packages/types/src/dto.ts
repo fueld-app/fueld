@@ -2088,6 +2088,55 @@ export interface InvoiceAgingBucketDto {
 }
 
 /** Invoice aging report payload. */
+/**
+ * One row of the invoice register — every issued invoice, paid and unpaid.
+ *
+ * Distinct from `InvoiceAgingReportRowDto`, which is the OPEN set only: an
+ * invoice that has been settled has no ageing bucket to sit in, but it still has
+ * to be findable by the number it was issued under.
+ */
+export interface InvoiceRegisterRowDto {
+  invoiceId: string;
+  invoiceNumber: string;
+  orderId: string;
+  orderNumber: string | null;
+  clientId: string;
+  clientName: string;
+  vesselName: string;
+  traderName: string | null;
+  /** When the invoice was issued (ISO). */
+  issuedAt: string;
+  dueDate: string;
+  amount: string;
+  amountPaid: string;
+  outstandingAmount: string;
+  /**
+   * The DISPLAY status (`deriveInvoiceDisplayStatus`), not the stored enum: a
+   * settled invoice reads PAID because its amounts say so, not because a flag was
+   * flipped, and VOID wins over everything.
+   */
+  status: 'DRAFT' | 'SENT' | 'OVERDUE' | 'PARTIALLY_PAID' | 'PAID' | 'VOID';
+  daysOverdue: number;
+  agingBucket: string;
+  /** Split payment terms only: which tranche this invoice bills. */
+  trancheLabel: string | null;
+}
+
+export interface InvoiceRegisterTotalsDto {
+  /** Row count AFTER filtering, so it matches what is on screen. */
+  invoices: number;
+  /** Sum of live (non-void) invoices — what the register exists to show. */
+  totalIssued: string;
+  totalOutstanding: string;
+  totalPaid: string;
+  voided: number;
+}
+
+export interface InvoiceRegisterDto {
+  rows: InvoiceRegisterRowDto[];
+  totals: InvoiceRegisterTotalsDto;
+}
+
 export interface InvoiceAgingReportDto {
   rows: InvoiceAgingReportRowDto[];
   buckets: InvoiceAgingBucketDto[];

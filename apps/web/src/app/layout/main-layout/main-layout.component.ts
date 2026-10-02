@@ -37,6 +37,7 @@ import { DensityService } from '../../core/ui/density.service';
 import { PwaInstallService } from '../../core/ui/pwa-install.service';
 import { ThemeService } from '../../core/theme.service';
 import { ThroughputReportService } from '../../core/services/throughput-report.service';
+import { InvoiceSettingsService } from '../../core/services/invoice-settings.service';
 
 import { API } from '@app/core/config/api';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
@@ -192,7 +193,7 @@ interface NavItem {
   label: string;
   icon: string;
   route?: string;
-  children?: { label: string; route: string; allowedRoles?: string[]; hiddenForRoles?: string[]; requiresBrokerDeals?: boolean; requiresThroughputReport?: boolean; requiresDealEconomics?: boolean }[];
+  children?: { label: string; route: string; allowedRoles?: string[]; hiddenForRoles?: string[]; requiresBrokerDeals?: boolean; requiresThroughputReport?: boolean; requiresDealEconomics?: boolean; requiresInvoiceRegister?: boolean }[];
   adminOnly?: boolean;
   /** When set, item is visible to these roles (and always to ADMIN). */
   allowedRoles?: string[];
@@ -216,6 +217,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Broker Commission', route: '/reports/broker-commission', requiresBrokerDeals: true },
       { label: 'Supplier Commission', route: '/reports/supplier-commission', requiresBrokerDeals: true },
       { label: 'Supplier Invoices', route: '/reports/supplier-invoices', requiresBrokerDeals: true },
+      { label: 'Invoices', route: '/reports/invoices', requiresInvoiceRegister: true },
     ],
   },
   {
@@ -851,6 +853,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly brokerDealSvc = inject(BrokerDealService);
   private readonly views = inject(ViewsService);
   private readonly throughputReportSvc = inject(ThroughputReportService);
+  private readonly invoiceSettingsSvc = inject(InvoiceSettingsService);
   protected readonly palette = inject(CommandPaletteService);
   protected readonly density = inject(DensityService);
   protected readonly pwa = inject(PwaInstallService);
@@ -916,6 +919,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     void this.brokerDealSvc.load();
     void this.views.load();
     void this.throughputReportSvc.load();
+    void this.invoiceSettingsSvc.load();
 
     // Tick every 30s so the relative "X min ago" label refreshes
     this.pricesTickTimer = setInterval(() => this.pricesTick.update((n) => n + 1), 30_000);
@@ -1121,6 +1125,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     const role = this.auth.user()?.role;
     const brokerDealsEnabled = this.brokerDealSvc.enabled();
     const throughputEnabled = this.throughputReportSvc.enabled();
+    const invoiceRegisterEnabled = this.invoiceSettingsSvc.register();
     return NAVIGATION.filter((item) => {
       if (item.adminOnly) return this.auth.isAdmin();
       if (item.hiddenForRoles && role && item.hiddenForRoles.includes(role)) return false;
@@ -1133,6 +1138,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
           if (c.requiresBrokerDeals && !brokerDealsEnabled) return false;
           if (c.requiresDealEconomics && !this.views.has('deal-economics')) return false;
           if (c.requiresThroughputReport && !throughputEnabled) return false;
+          if (c.requiresInvoiceRegister && !invoiceRegisterEnabled) return false;
           return true;
         });
         return { ...item, children: filtered };
