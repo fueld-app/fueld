@@ -98,7 +98,8 @@ export async function getInvoiceRegister(
     // A VOID invoice keeps its display status: the money is no longer owed, and
     // labelling it by its due date would put a cancelled document in an ageing
     // bucket that collections might act on.
-    const status = row.invoiceStatus === 'VOID'
+    const isVoid = row.invoiceStatus === 'VOID';
+    const status = isVoid
       ? 'VOID'
       : deriveInvoiceDisplayStatus(
           { status: row.invoiceStatus, amount: row.amount, amountPaid: row.amountPaid },
@@ -118,7 +119,10 @@ export async function getInvoiceRegister(
       dueDate: row.dueDate,
       amount: money(amount),
       amountPaid: money(amountPaid),
-      outstandingAmount: money(outstanding),
+      // A VOID invoice owes nothing. Reporting its frozen amount as outstanding
+      // is how a cancelled document gets chased — the exact confusion this
+      // register exists to remove.
+      outstandingAmount: money(isVoid ? 0 : outstanding),
       status,
       daysOverdue: bucket.daysOverdue,
       agingBucket: bucket.label,
